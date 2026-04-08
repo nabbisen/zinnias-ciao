@@ -4,13 +4,16 @@ use leptos_router::{
     path, MatchNestedRoutes,
 };
 
-use super::pages::{event::Event, home_page::HomePage, list::List, settings::Settings};
+use super::pages::{
+    calendar::Calendar, event::Event, home_page::HomePage, list::List, settings::Settings,
+};
 
 #[component(transparent)]
 pub fn MemberRoutes() -> impl MatchNestedRoutes + Clone {
     view! {
         <ParentRoute path=path!("") view=|| view! { <Outlet /> }>
             <Route path=path!("") view=HomePage/>
+            <Route path=path!("calendar") view=Calendar/>
             <Route path=path!("list") view=List/>
             <Route path=path!("update") view=Event/>
             <Route path=path!("settings") view=Settings/>
