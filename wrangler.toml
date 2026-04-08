@@ -1,0 +1,15 @@
+name = "zinnias-ciao"
+main = "build/index.js"
+compatibility_date = "2026-04-05"
+
+[[routes]]
+pattern = "ciao.zinnias.org"
+custom_domain = true
+
+[build]
+command = "cargo leptos build --release && cargo install -q \"worker-build@^0.7\" && LEPTOS_OUTPUT_NAME=zinnias-ciao worker-build --release --features ssr"
+[env.dev.build]
+command = "cargo leptos build && LEPTOS_OUTPUT_NAME=zinnias-ciao worker-build --features ssr"
+
+[assets]
+directory = "./target/site"
