@@ -11,8 +11,8 @@ type HmacSha256 = Hmac<Sha256>;
 
 /// Compute HMAC-SHA256(key=pepper, msg=value) and return lowercase hex.
 pub fn hmac_hex(pepper: &str, value: &str) -> String {
-    let mut mac = HmacSha256::new_from_slice(pepper.as_bytes())
-        .expect("HMAC accepts any key length");
+    let mut mac =
+        HmacSha256::new_from_slice(pepper.as_bytes()).expect("HMAC accepts any key length");
     mac.update(value.as_bytes());
     hex::encode(mac.finalize().into_bytes())
 }

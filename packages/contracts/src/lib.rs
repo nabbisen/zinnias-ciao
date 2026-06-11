@@ -3,7 +3,8 @@
 
 pub mod auth;
 pub mod error;
+pub mod i18n;
 pub mod views;
 
-pub use auth::{SESSION_TTL_SECONDS, FORM_TOKEN_TTL_SECONDS, SESSION_COOKIE_NAME};
+pub use auth::{FORM_TOKEN_TTL_SECONDS, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS};
 pub use error::{AppError, ErrorCode};

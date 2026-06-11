@@ -16,15 +16,15 @@ pub const SESSION_COOKIE_NAME: &str = "ciao_sid";
 
 /// Purpose strings for form tokens (AD-4 / RFC-002).
 pub mod token_purpose {
-    pub const SET_STATUS: &str    = "set_status";
-    pub const SAVE_NOTE: &str     = "save_note";
-    pub const DELETE_NOTE: &str   = "delete_note";
-    pub const CREATE_EVENT: &str  = "create_event";
-    pub const EDIT_EVENT: &str    = "edit_event";
-    pub const CANCEL_EVENT: &str  = "cancel_event";
+    pub const SET_STATUS: &str = "set_status";
+    pub const SAVE_NOTE: &str = "save_note";
+    pub const DELETE_NOTE: &str = "delete_note";
+    pub const CREATE_EVENT: &str = "create_event";
+    pub const EDIT_EVENT: &str = "edit_event";
+    pub const CANCEL_EVENT: &str = "cancel_event";
     pub const REDEEM_INVITE: &str = "redeem_invite";
-    pub const JOIN_PROFILE: &str  = "join_profile";
-    pub const LOGOUT: &str        = "logout";
+    pub const JOIN_PROFILE: &str = "join_profile";
+    pub const LOGOUT: &str = "logout";
 }
 
 #[cfg(test)]
@@ -36,8 +36,14 @@ mod tests {
     /// updated to verify the decoupling explicitly (RFC-003 §8).
     #[test]
     fn session_ttl_is_positive_and_reasonable() {
-        assert!(SESSION_TTL_SECONDS >= 3_600, "SESSION_TTL_SECONDS too short");
-        assert!(SESSION_TTL_SECONDS <= 7 * 86_400, "SESSION_TTL_SECONDS too long for MVP");
+        assert!(
+            SESSION_TTL_SECONDS >= 3_600,
+            "SESSION_TTL_SECONDS too short"
+        );
+        assert!(
+            SESSION_TTL_SECONDS <= 7 * 86_400,
+            "SESSION_TTL_SECONDS too long for MVP"
+        );
     }
 
     #[test]

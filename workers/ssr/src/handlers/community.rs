@@ -1,5 +1,5 @@
-use worker::{Env, Request, Response, Result};
 use crate::render;
+use worker::{Env, Request, Response, Result};
 
 pub async fn dispatch_get(
     _req: Request,

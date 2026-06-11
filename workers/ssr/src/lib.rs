@@ -1,8 +1,15 @@
 use worker::*;
 
+mod audit;
+mod authz;
 mod crypto;
-mod handlers;
+mod db;
+mod errors;
+mod form_token;
 mod render;
+mod session;
+
+mod handlers;
 
 /// Cloudflare Worker entrypoint — routes all requests.
 #[event(fetch)]
@@ -14,22 +21,33 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     let method = req.method();
 
     let result: Result<Response> = match (method, path) {
-        (Method::Get,  "/healthz")      => handlers::health::get_health(&env).await,
-        (Method::Get,  "/version")      => handlers::health::get_version(&env).await,
-        (Method::Get,  "/join")         => handlers::join::get_join(req, &env, &request_id).await,
-        (Method::Post, "/join")         => handlers::join::post_join(req, &env, &request_id).await,
-        (Method::Get,  "/join/profile") => handlers::join::get_profile(req, &env, &request_id).await,
-        (Method::Post, "/join/profile") => handlers::join::post_profile(req, &env, &request_id).await,
-        (Method::Get,  "/") | (Method::Get, "/c") => {
+        // ── infrastructure ─────────────────────────────────────────────
+        (Method::Get, "/healthz") => handlers::health::get_health(&env).await,
+        (Method::Get, "/version") => handlers::health::get_version(&env).await,
+
+        // ── join / onboarding ──────────────────────────────────────────
+        (Method::Get, "/join") => handlers::join::get_join(req, &env, &request_id).await,
+        (Method::Post, "/join") => handlers::join::post_join(req, &env, &request_id).await,
+        (Method::Get, "/join/profile") => handlers::join::get_profile(req, &env, &request_id).await,
+        (Method::Post, "/join/profile") => {
+            handlers::join::post_profile(req, &env, &request_id).await
+        }
+
+        // ── member area ────────────────────────────────────────────────
+        (Method::Get, "/") | (Method::Get, "/c") => {
             handlers::home::redirect_to_home(req, &env, &request_id).await
         }
-        (Method::Get,  p) if p.starts_with("/c/") => {
+        (Method::Get, p) if p.starts_with("/c/") => {
             handlers::community::dispatch_get(req, &env, &request_id, p).await
         }
         (Method::Post, p) if p.starts_with("/c/") => {
             handlers::community::dispatch_post(req, &env, &request_id, p).await
         }
+
+        // ── logout ─────────────────────────────────────────────────────
         (Method::Post, "/logout") => handlers::auth::post_logout(req, &env, &request_id).await,
+
+        // ── 404 ────────────────────────────────────────────────────────
         _ => render::not_found(),
     };
 

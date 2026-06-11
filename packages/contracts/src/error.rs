@@ -13,7 +13,7 @@ pub enum ErrorCode {
     TokenExpired,
     TokenConsumed,
     // Authorization
-    NotFound,       // also used to avoid leaking resource existence (RFC-004)
+    NotFound, // also used to avoid leaking resource existence (RFC-004)
     Forbidden,
     // Invite codes
     InviteInvalidOrExpired,
@@ -110,7 +110,10 @@ mod tests {
     #[test]
     fn forbidden_and_not_found_same_message() {
         // Must not leak resource existence (RFC-004 / RFC-012)
-        assert_eq!(AppError::forbidden().user_message, AppError::not_found().user_message);
+        assert_eq!(
+            AppError::forbidden().user_message,
+            AppError::not_found().user_message
+        );
     }
 
     #[test]

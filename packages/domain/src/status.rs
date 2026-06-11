@@ -113,28 +113,52 @@ mod tests {
 
     #[test]
     fn member_going_upcoming() {
-        ok(Role::Member, DayTimeState::Upcoming, Some(AttendanceStatus::Going));
+        ok(
+            Role::Member,
+            DayTimeState::Upcoming,
+            Some(AttendanceStatus::Going),
+        );
     }
 
     #[test]
     fn member_not_going_upcoming() {
-        ok(Role::Member, DayTimeState::Upcoming, Some(AttendanceStatus::NotGoing));
+        ok(
+            Role::Member,
+            DayTimeState::Upcoming,
+            Some(AttendanceStatus::NotGoing),
+        );
     }
 
     #[test]
     fn member_going_started() {
-        ok(Role::Member, DayTimeState::Started, Some(AttendanceStatus::Going));
+        ok(
+            Role::Member,
+            DayTimeState::Started,
+            Some(AttendanceStatus::Going),
+        );
     }
 
     #[test]
     fn member_going_ended_is_err() {
-        err(Role::Member, DayTimeState::Ended, Some(AttendanceStatus::Going));
+        err(
+            Role::Member,
+            DayTimeState::Ended,
+            Some(AttendanceStatus::Going),
+        );
     }
 
     #[test]
     fn member_attended_before_end_is_err() {
-        err(Role::Member, DayTimeState::Upcoming, Some(AttendanceStatus::Attended));
-        err(Role::Member, DayTimeState::Started, Some(AttendanceStatus::Attended));
+        err(
+            Role::Member,
+            DayTimeState::Upcoming,
+            Some(AttendanceStatus::Attended),
+        );
+        err(
+            Role::Member,
+            DayTimeState::Started,
+            Some(AttendanceStatus::Attended),
+        );
     }
 
     #[test]
@@ -151,7 +175,11 @@ mod tests {
 
     #[test]
     fn admin_attended_after_end_ok() {
-        ok(Role::Admin, DayTimeState::Ended, Some(AttendanceStatus::Attended));
+        ok(
+            Role::Admin,
+            DayTimeState::Ended,
+            Some(AttendanceStatus::Attended),
+        );
     }
 
     #[test]

@@ -1,5 +1,5 @@
-use zinnias_ciao_domain::status::AttendanceStatus;
 use serde::{Deserialize, Serialize};
+use zinnias_ciao_domain::status::AttendanceStatus;
 
 // ── Capabilities ──────────────────────────────────────────────────────────
 
