@@ -1,0 +1,29 @@
+[package]
+name    = "zinnias-ciao-ssr"
+version = "0.1.0"
+edition.workspace    = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+
+# Workers target is wasm32-unknown-unknown; wrangler/worker-build drives this.
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+zinnias-ciao-domain     = { path = "../../packages/domain" }
+zinnias-ciao-contracts  = { path = "../../packages/contracts" }
+
+worker     = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+time       = { workspace = true }
+hmac       = { workspace = true }
+sha2       = { workspace = true }
+hex        = { workspace = true }
+getrandom  = { workspace = true }
+
+[dev-dependencies]
+# SSR worker tests run via `cargo test` in native mode for handler logic;
+# wasm integration tests are handled by wrangler/vitest.

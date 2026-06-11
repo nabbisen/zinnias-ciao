@@ -1,0 +1,18 @@
+{
+  "name": "zinnias-ciao",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "setup": "bun install && bunx wrangler d1 migrations apply zinnias-ciao-dev --local --env dev",
+    "dev": "bunx wrangler dev --env dev --local",
+    "build": "worker-build --release",
+    "migrate:dev": "bunx wrangler d1 migrations apply zinnias-ciao-dev --local --env dev",
+    "migrate:prod": "bunx wrangler d1 migrations apply zinnias-ciao --env production",
+    "test": "cargo test -p domain -p contracts",
+    "lint": "cargo clippy -p domain -p contracts -- -D warnings",
+    "fmt": "cargo fmt --all -- --check"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

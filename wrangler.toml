@@ -1,15 +1,48 @@
 name = "zinnias-ciao"
-main = "build/index.js"
-compatibility_date = "2026-04-05"
+main = "workers/ssr/src/lib.rs"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
 
-[[routes]]
-pattern = "ciao.zinnias.org"
-custom_domain = true
-
+# Build via worker-build (Rust -> wasm32-unknown-unknown)
 [build]
-command = "cargo leptos build --release && cargo install -q \"worker-build@^0.7\" && LEPTOS_OUTPUT_NAME=zinnias-ciao worker-build --release --features ssr"
-[env.dev.build]
-command = "cargo leptos build && LEPTOS_OUTPUT_NAME=zinnias-ciao worker-build --features ssr"
+command = "worker-build --release"
 
-[assets]
-directory = "./target/site"
+# D1 database binding
+[[d1_databases]]
+binding       = "DB"
+database_name = "zinnias-ciao"
+database_id   = "local"          # replaced by real ID on deploy
+
+# KV namespace for rate-limiting (RFC-012)
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id      = "local"
+
+# Secret bindings — set via `wrangler secret put` in each environment.
+# Never hard-coded here.
+#   HMAC_PEPPER     — server pepper for invite-code and session HMAC (AD-3)
+#   SESSION_COOKIE_DOMAIN
+
+[vars]
+BUILD_VERSION = "dev"
+LOG_LEVEL     = "info"
+
+[env.dev]
+name = "zinnias-ciao-ssr-dev"
+[env.dev.vars]
+BUILD_VERSION = "dev"
+LOG_LEVEL     = "debug"
+
+[[env.dev.d1_databases]]
+binding       = "DB"
+database_name = "zinnias-ciao-dev"
+database_id   = "local"
+
+[[env.dev.kv_namespaces]]
+binding = "RATE_LIMIT"
+id      = "local"
+
+[env.production]
+name = "zinnias-ciao-ssr-prd"
+[env.production.vars]
+LOG_LEVEL = "warn"

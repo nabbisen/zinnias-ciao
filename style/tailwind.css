@@ -1,8 +1,0 @@
-@import "tailwindcss";
-
-@plugin "./daisyui.js" {
-    themes: light --default, dark, cupcake;
-}
-
-/* Leptos のソースファイルをスキャン対象に指定 */
-@source "../src/**/*.rs";

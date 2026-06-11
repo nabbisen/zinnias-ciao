@@ -1,0 +1,17 @@
+[package]
+name    = "zinnias-ciao-contracts"
+version = "0.1.0"
+edition.workspace    = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+
+[dependencies]
+zinnias-ciao-domain  = { path = "../domain" }
+
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+
+[dev-dependencies]
+# nothing extra

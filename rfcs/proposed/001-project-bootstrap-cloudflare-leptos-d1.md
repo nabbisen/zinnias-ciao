@@ -1,0 +1,88 @@
+# RFC 001 — Project Bootstrap: Cloudflare Workers, Leptos SSR, D1
+
+**Status.** Proposed
+**Phase:** M0 / Project Foundation
+**Project:** ciao.zinnias
+**Date:** 2026-06-11
+**Reconciled:** aligned to ADR (AD-1 SSR, AD-3 CPU budget). Supersedes the WASM-frontend assumption of the original RFC-001.
+
+---
+
+## 1. Summary
+
+Defines the initial skeleton: a Rust/Leptos **server-side-rendered** frontend on Cloudflare Workers with D1 persistence. Per AD-1 the app ships no browser WASM and does not hydrate; per AD-3 it is designed to the 10 ms Free-tier CPU budget. The goal is a deployable, minimal foundation before features.
+
+## 2. Goals
+
+- Deployable SSR web service with a health route and a placeholder shell.
+- Local development flow (`wrangler dev`, multi-config where multiple Workers exist).
+- D1 migration runner wired for dev.
+- Cargo **workspace** layout that matches build boundaries, not a single crate.
+- Minimal, purposeful dependencies.
+
+## 3. Non-Goals
+
+- No WASM/hydrate frontend, no client reactive runtime (AD-1).
+- No production invite/session logic yet (RFC-003).
+- No feature UI, analytics, chat, media, or recurring events.
+
+## 4. External Behavior
+
+A placeholder SSR page and a health endpoint:
+
+```text
+ciao.zinnias
+Private community schedule sharing.
+This environment is not ready for members yet.
+```
+
+`GET /healthz` -> `{"ok":true,"service":"ciao.zinnias"}`. `GET /version` -> build hash, no secrets.
+
+## 5. Internal Design
+
+**Workspace, not single crate.** Separate runtime boundaries (Workers) from shared logic so the trust boundary is testable as plain crates, decoupled from the Worker runtime:
+
+```text
+Cargo.toml                # [workspace]
+packages/
+  domain/                 # entities, status/transition logic; pure, unit-testable
+  contracts/              # DTOs / shared types at the SSR + small-JSON boundary
+workers/
+  ssr/                    # Leptos SSR app: routes, handlers, form-token + render
+  ...                     # additional workers only when a boundary justifies one
+migrations/
+  0001_initial.sql
+```
+
+Conventions: Rust 2024 edition; 2018+ module style (a `foo.rs` may coexist with a `foo/` directory; no `mod.rs`). Keep render handlers thin; push rules into `packages/domain` so they run as native unit tests, not only inside the isolate.
+
+Per-environment config: D1 binding, cookie name, `SESSION_TTL_SECONDS`, HMAC pepper (secret binding), allowed origins, rate-limit namespace, build version.
+
+CPU budget (AD-3): SSR render of a notice-board page must stay well under 10 ms; no slow KDF anywhere in the request path; large lists paginate.
+
+## 6. Data and API Design
+
+Initial endpoints: `GET /healthz`, `GET /version`, `GET /` (SSR shell), plus static assets (served outside the Worker CPU budget). Migration tooling creates a migration-tracking table if the platform does not.
+
+## 7. Security, Privacy, and Safety
+
+No sample secrets, invite codes, or hard-coded admins. Production-like security headers and a strict CSP (easy here because there is little/no inline JS, AD-1) are introduced early. The placeholder must not imply member data is safe before RFC-003/004 land.
+
+## 8. Acceptance Criteria
+
+- `wrangler dev` (multi-config if applicable) starts; health/version respond.
+- Placeholder SSR page renders on a 360 px viewport with JavaScript disabled.
+- D1 migration applies locally.
+- Workspace builds; `packages/domain` tests run as native (non-WASM) tests.
+- CI runs format, clippy, build, and the migration dry-run.
+
+## 9. Test Plan
+
+- Unit test for health/version handlers.
+- Render smoke test (HTML contains the placeholder, no script required).
+- Migration dry-run in CI.
+- Manual: deploy to dev, open on a phone viewport with JS off.
+
+## 10. Open Questions / Decisions
+
+Stack (Workers + Leptos SSR + D1) is the baseline; moving off it needs a new architecture RFC. The number of Workers is deliberately minimal at bootstrap; additional Workers are added only when a real boundary (e.g. a separate auth or notification surface) justifies the split, with `request_id` propagated across Service Bindings from the start (RFC-014).
