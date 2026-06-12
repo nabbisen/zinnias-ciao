@@ -37,7 +37,7 @@ fn redirect(url: &str) -> Result<Response> {
 pub async fn get_event_detail(
     req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
     event_id: &str,
     flash: Option<&str>,
@@ -193,8 +193,8 @@ pub async fn get_event_detail(
     } else { String::new() };
 
     let community = community_row;
-    let community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or_default();
-    let community_tz   = community.as_ref().map(|c| c.timezone.as_str()).unwrap_or("UTC");
+    let _community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or_default();
+    let _community_tz  = community.as_ref().map(|c| c.timezone.as_str()).unwrap_or("UTC");
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav  = render::bottom_nav(community_id, "home");
@@ -331,7 +331,7 @@ pub async fn post_my_status(
 pub async fn post_my_note(
     mut req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
@@ -372,7 +372,7 @@ pub async fn post_my_note(
 pub async fn delete_my_note(
     mut req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {

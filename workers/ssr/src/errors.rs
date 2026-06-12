@@ -1,4 +1,5 @@
 //! Error conversion helpers for the SSR worker.
+#![allow(dead_code)]
 
 use zinnias_ciao_contracts::AppError;
 

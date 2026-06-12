@@ -8,7 +8,7 @@ use crate::db::{self, event as event_db, attendance as attendance_db, membership
 use crate::render;
 use crate::session::require_auth;
 
-pub async fn redirect_to_home(req: Request, env: &Env, rid: &str) -> Result<Response> {
+pub async fn redirect_to_home(req: Request, env: &Env, _rid: &str) -> Result<Response> {
     let auth = match require_auth(&req, &env).await {
         Ok(a) => a,
         Err(_) => return crate::render::session_expired(),
@@ -25,7 +25,7 @@ pub async fn redirect_to_home(req: Request, env: &Env, rid: &str) -> Result<Resp
     Ok(resp.with_status(303))
 }
 
-pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) -> Result<Response> {
+pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -> Result<Response> {
     let auth = match require_auth(&req, &env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
@@ -39,13 +39,13 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
     let rows = event_db::home_upcoming(&db, community_id, &from_utc, &to_utc).await?;
 
     // Active member count for no_answer calculation
-    let all_members = membership_db::list_active_for_user(&db, &auth.user_id).await?;
+    let _all_members = membership_db::list_active_for_user(&db, &auth.user_id).await?;
     // Use a rough count; accurate count is per community — we fetch it here
     let member_count = membership_db::count_active(&db, community_id).await?;
 
     // Fetch community (name + timezone) before the event loop (needed for time display).
     let community = db::community::find_active(&db, community_id).await?;
-    let community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or_default();
+    let _community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or_default();
     let community_tz   = community.as_ref().map(|c| c.timezone.as_str()).unwrap_or("UTC");
 
     // Collect my attendances for the listed days in one query

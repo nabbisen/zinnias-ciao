@@ -3,7 +3,6 @@
 use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 
-use crate::crypto::hmac_hex;
 use crate::db::session as session_db;
 use crate::form_token;
 use crate::session::{clear_session_cookie, require_auth};

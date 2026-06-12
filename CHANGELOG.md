@@ -2,6 +2,33 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.11.0] — 2026-06-12
+
+### Fixed
+
+- **SSR worker: zero warnings.** Resolved all 53 `cargo check` warnings that would
+  become build failures under `worker-build --deny warnings`:
+  - `calendar.rs`: removed dead local ICS builder functions (`build_ics`, `ics_text`,
+    `fold_ics_line`, `utc_to_ics_dt`, `sanitize_filename`) and their tests that were
+    left behind by the cleanup script (the marker used Unicode em-dashes which the
+    script compared against plain hyphens). Also removed stale `token_hmac` variable
+    and unused `req`/`_pp` parameters in `get_ics_feed`.
+  - `me.rs`, `communities.rs`: unused `i18n` imports from failed Python wiring patches;
+    re-wired the hardcoded strings correctly using named `format!()` arguments.
+  - `db/event.rs`, `rate_limit.rs`, `handlers/auth.rs`, `handlers/join.rs`: removed
+    stale unused imports.
+  - All handler files: prefixed unused `rid` parameters with `_` across `admin.rs`,
+    `event.rs`, `home.rs`, `join.rs`, `calendar.rs`.
+  - All handler files: prefixed unused local variables (`_membership`, `_community_name`,
+    `_community_tz`, `_all_members`, `_current_name`) with `_`.
+  - `render.rs`, `errors.rs`, `form_token.rs`: added `#[allow(dead_code)]` to
+    forward-declared design vocabulary items (constants, helper functions) that are
+    part of the intended API but not yet fully wired to call sites.
+
+- **CI** (`check-wasm` merged into `test` job): the `cargo check --target wasm32` step
+  now runs in the same job as `cargo test`, sharing the build cache. A green test run
+  is no longer possible without also passing the wasm type-check.
+
 ## [0.10.0] — 2026-06-12
 
 ### Added

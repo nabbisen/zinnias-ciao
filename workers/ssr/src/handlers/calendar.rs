@@ -164,7 +164,7 @@ pub async fn get_me_calendar(
 pub async fn post_regenerate_calendar(
     mut req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = match require_auth(&req, &env).await {
@@ -233,14 +233,14 @@ pub async fn post_revoke_calendar(
 // Unauthenticated bearer URL. Returns ICS content.
 
 pub async fn get_ics_feed(
-    req: Request,
+    _req: Request,
     env: &Env,
     _rid: &str,
     community_id: &str,
     bearer_token: &str,
 ) -> Result<Response> {
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let _pp = pepper(env);  // pepper unused — bearer token IS the stored HMAC
 
     // The bearer token IS the stored HMAC — look it up directly.
     let claims = cal_db::find_by_hmac(&db, bearer_token).await?;

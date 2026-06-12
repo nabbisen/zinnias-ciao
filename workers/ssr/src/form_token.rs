@@ -123,6 +123,7 @@ pub async fn consume(
 }
 
 /// Store the result ref on a consumed token (for idempotency replay).
+#[allow(dead_code)]
 pub async fn set_result(
     db: &D1Database,
     pepper: &str,

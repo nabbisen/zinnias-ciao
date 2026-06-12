@@ -28,7 +28,7 @@ pub async fn get_communities(
         .map(|m| (m.community_id.as_str(), m.role.as_str()))
         .collect();
 
-    let current_name = summaries.iter()
+    let _current_name = summaries.iter()
         .find(|s| s.community_id == community_id)
         .map(|s| s.community_name.as_str())
         .unwrap_or("");

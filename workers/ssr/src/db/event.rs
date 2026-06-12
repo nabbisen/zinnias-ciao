@@ -2,7 +2,6 @@
 //! Event and EventDay table access (RFC-002 / RFC-005).
 
 use worker::{D1Database, Result};
-use crate::db::now_utc;
 
 pub struct EventRow {
     pub id: String,

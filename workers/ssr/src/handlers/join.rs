@@ -17,7 +17,6 @@ use crate::audit;
 use crate::crypto::{hmac_hex, normalize_invite_code, random_token};
 use crate::rate_limit;
 use crate::db::{invite as invite_db, membership as membership_db, session as session_db};
-use crate::errors::IntoWorkerResult;
 use crate::form_token;
 use crate::render::{self, escape_html};
 use crate::session::build_session_cookie;
@@ -43,7 +42,7 @@ pub async fn get_join(req: Request, env: &Env, _rid: &str) -> Result<Response> {
 
 // ── POST /join ───────────────────────────────────────────────────────────
 
-pub async fn post_join(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
+pub async fn post_join(mut req: Request, env: &Env, _rid: &str) -> Result<Response> {
     let body = req.form_data().await?;
 
     let raw_code = body.get_field("code").unwrap_or_default();
@@ -131,7 +130,7 @@ pub async fn post_join(mut req: Request, env: &Env, rid: &str) -> Result<Respons
 
 // ── GET /join/profile ────────────────────────────────────────────────────
 
-pub async fn get_profile(req: Request, env: &Env, _rid: &str) -> Result<Response> {
+pub async fn get_profile(req: Request, _env: &Env, _rid: &str) -> Result<Response> {
     let profile_token = extract_cookie(&req, "__join_ptoken").unwrap_or_default();
     let community_name = ""; // M1: community name looked up in POST; omit for GET
     render_profile_form(community_name, &profile_token, None)

@@ -1,4 +1,8 @@
 //! HTML render helpers — shared shell, escape, and UI components.
+//
+// Design-vocabulary items (constants, helper fns) are declared here for future
+// use and kept for reference; suppress dead_code warnings at module level.
+#![allow(dead_code)]
 
 use worker::{Response, Result};
 use zinnias_ciao_contracts::i18n;

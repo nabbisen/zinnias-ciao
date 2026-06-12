@@ -3,7 +3,7 @@
 //! Tracks failed redemption attempts per IP using KV with a short TTL.
 //! Generic errors are returned — never revealing whether a code was valid.
 
-use worker::{Env, Result};
+use worker::Env;
 
 const MAX_FAILURES: u32 = 10;
 const WINDOW_SECONDS: u64 = 300; // 5-minute window

@@ -32,21 +32,21 @@ fn redirect(url: &str) -> Result<Response> {
 pub async fn get_create_event(
     req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = match require_auth(&req, &env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let pp = pepper(env);
     let token = form_token::issue(&db, &pp, &auth.user_id,
         token_purpose::CREATE_EVENT, None).await.unwrap_or_default();
 
     let community = db::community::find_active(&db, community_id).await?;
-    let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _community_name = community.map(|c| c.name).unwrap_or_default();
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav = render::bottom_nav(community_id, "home");
@@ -145,7 +145,7 @@ pub async fn post_create_event(
 pub async fn get_cancel_event(
     req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
@@ -153,7 +153,7 @@ pub async fn get_cancel_event(
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let pp = pepper(env);
     let token = form_token::issue(&db, &pp, &auth.user_id,
@@ -164,7 +164,7 @@ pub async fn get_cancel_event(
         None    => return render::not_found(),
     };
     let community = db::community::find_active(&db, community_id).await?;
-    let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _community_name = community.map(|c| c.name).unwrap_or_default();
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav = render::bottom_nav(community_id, "home");
@@ -235,14 +235,14 @@ pub async fn post_cancel_event(
 pub async fn get_invites(
     req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = match require_auth(&req, &env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let pp = pepper(env);
     let gen_token = form_token::issue(&db, &pp, &auth.user_id,
@@ -413,7 +413,7 @@ pub async fn post_revoke_invite(
 pub async fn get_members(
     req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = match require_auth(&req, &env).await {
@@ -423,7 +423,7 @@ pub async fn get_members(
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let community = db::community::find_active(&db, community_id).await?;
-    let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _community_name = community.map(|c| c.name).unwrap_or_default();
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
 
@@ -476,7 +476,7 @@ pub async fn get_members(
 pub async fn get_remove_member(
     req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
@@ -504,7 +504,7 @@ pub async fn get_remove_member(
         .unwrap_or("this member");
 
     let community = db::community::find_active(&db, community_id).await?;
-    let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _community_name = community.map(|c| c.name).unwrap_or_default();
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav = render::bottom_nav(community_id, "home");
@@ -592,7 +592,7 @@ pub async fn post_remove_member(
 pub async fn get_edit_event(
     req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
@@ -600,7 +600,7 @@ pub async fn get_edit_event(
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -751,7 +751,7 @@ pub async fn post_edit_event(
 pub async fn get_attendance(
     req: Request,
     env: &Env,
-    rid: &str,
+    _rid: &str,
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
@@ -759,7 +759,7 @@ pub async fn get_attendance(
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
