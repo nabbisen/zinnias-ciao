@@ -2,6 +2,19 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.20.0] — 2026-06-12
+
+### Added
+
+- **`README.md`**: complete rewrite from placeholder title. Follows the
+  project-mandated structure: hero section (CI badge, license badge, Rust badge,
+  catchphrase), Overview, Why/When, Quick Start, Design Notes, More Detail table.
+  Covers pure-SSR design, invite-only auth, offline behaviour, recurring events,
+  templates, and community export. Links to all docs pages, ROADMAP, CHANGELOG,
+  and RFC index.
+
+- **`NOTICE`**: Apache-2.0 required notice file (was missing).
+
 ## [0.19.0] — 2026-06-12
 
 ### Documentation and project hygiene
