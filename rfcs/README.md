@@ -25,6 +25,7 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 017 | [PWA Installability and Service Worker](./done/017-pwa-installability-and-service-worker.md) | v0.4.0 |
 | 018 | [Time-Zone and Event Cutoff Policy](./done/018-timezone-and-event-cutoff-policy.md) | v0.7.0 |
 | 019 | [Retention, Soft Delete, and Data Lifecycle](./done/019-retention-soft-delete-and-data-lifecycle.md) | v0.4.0 |
+| 022 | [Recurring Events and Event Series](./done/022-recurring-events-and-event-series.md) | v0.17.0 |
 | 023 | [Optional Calendar Export and ICS Interop](./done/023-optional-calendar-export-and-ics-interop.md) | v0.10.0 |
 | 027 | [Import, Export, Human-Readable Backup, and Data Portability](./done/027-import-export-human-readable-backup-and-data-portability.md) | v0.15.0 |
 | 028 | [Backup, Restore, and Disaster Recovery Operations](./done/028-backup-restore-and-disaster-recovery-operations.md) | v0.14.0 |
@@ -53,7 +54,6 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | ID | Title | File |
 |----|-------|------|
 | 021 | Post-MVP Notification Strategy and Reminder Digests | [./proposed/021-post-mvp-notification-strategy-and-reminder-digests.md](./proposed/021-post-mvp-notification-strategy-and-reminder-digests.md) |
-| 022 | Recurring Events and Event Series | [./proposed/022-recurring-events-and-event-series.md](./proposed/022-recurring-events-and-event-series.md) |
 | 024 | Display Name Recovery and Admin-Mediated Account Relinking | [./proposed/024-display-name-recovery-and-admin-mediated-account-relinking.md](./proposed/024-display-name-recovery-and-admin-mediated-account-relinking.md) |
 | 031 | Consentful Contact Channels and Privacy-Safe Messaging | [./proposed/031-consentful-contact-channels-and-privacy-safe-messaging.md](./proposed/031-consentful-contact-channels-and-privacy-safe-messaging.md) |
 | 033 | Subgroups, Event Visibility, and Boundary Safety | [./proposed/033-subgroups-event-visibility-and-boundary-safety.md](./proposed/033-subgroups-event-visibility-and-boundary-safety.md) |

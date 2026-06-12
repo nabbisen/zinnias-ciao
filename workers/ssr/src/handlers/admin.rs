@@ -11,7 +11,7 @@ use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
 use crate::handlers::event::classify_day;
-use zinnias_ciao_domain::{validate_event, DayInput, EventInput};
+use zinnias_ciao_domain::{validate_event, DayInput, EventInput, RecurrenceFreq, expand_recurrence};
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::status::DayTimeState;
 
@@ -131,7 +131,25 @@ pub async fn post_create_event(
         }],
     };
 
+    // RFC-022: recurrence
+    let freq_str  = body.get_field("repeat_rule").unwrap_or_default();
+    let freq      = RecurrenceFreq::from_str(&freq_str);
+    let rep_count = body.get_field("repeat_count")
+        .and_then(|s| s.trim().parse::<u32>().ok())
+        .unwrap_or(1)
+        .max(1);
+
     let validated = match validate_event(input) {
+        Ok(v)  => v,
+        Err(e) => {
+            let msg = render::escape_html(&e.to_string());
+            return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
+        }
+    };
+
+    // Expand recurrence from the single validated base day.
+    let base_day = validated.days[0].clone();
+    let expanded = match expand_recurrence(&base_day, freq, rep_count) {
         Ok(v)  => v,
         Err(e) => {
             let msg = render::escape_html(&e.to_string());
@@ -141,18 +159,21 @@ pub async fn post_create_event(
 
     // Convert local "HH:MM" on day_date to a UTC-like ISO string.
     // In MVP we store times as entered (community TZ handling is RFC-018).
-    let days_utc: Vec<(String, String, String)> = validated.days.iter().map(|d| {
+    let days_utc: Vec<(String, String, String)> = expanded.iter().map(|d| {
         let starts = format!("{}T{}:00.000Z", d.day_date, d.starts_at);
         let ends   = format!("{}T{}:00.000Z", d.day_date, d.ends_at);
         (d.day_date.clone(), starts, ends)
     }).collect();
 
+    let repeat_count_stored = if freq.is_recurring() { Some(expanded.len() as u32) } else { None };
     let event_id = event_write::create_event(
         &db, community_id, &membership.membership_id,
         &validated.title,
         validated.location.as_deref(),
         validated.description.as_deref(),
         &days_utc,
+        freq.as_str(),
+        repeat_count_stored,
     ).await?;
 
     let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
@@ -1029,6 +1050,27 @@ fn event_form_fields(
         )
     };
 
+    // RFC-022: repeat fields
+    let repeat_html = r#"<div style="margin-bottom:1rem">
+        <label style="font-size:.875rem;display:block;margin-bottom:.375rem">Repeat</label>
+        <div style="display:flex;gap:.75rem;align-items:center">
+          <select name="repeat_rule" style="padding:.625rem;border:1px solid #e5e5ea;
+            border-radius:12px;font-size:1rem;flex:1">
+            <option value="none">Do not repeat</option>
+            <option value="weekly">Every week</option>
+            <option value="biweekly">Every 2 weeks</option>
+            <option value="monthly">Every month</option>
+          </select>
+          <input type="number" name="repeat_count" value="8" min="1" max="52"
+            style="width:5rem;padding:.625rem;border:1px solid #e5e5ea;
+            border-radius:12px;font-size:1rem">
+          <span style="font-size:.875rem;color:#6e6e73">times</span>
+        </div>
+        <p style="font-size:.75rem;color:#6e6e73;margin:.25rem 0 0">
+          Number of times ignored when "Do not repeat" is selected.
+        </p>
+      </div>"#;
+
     format!(
         "{err}\
          {title}\
@@ -1036,13 +1078,15 @@ fn event_form_fields(
          {start}\
          {end}\
          {loc}\
+         {repeat}\
          {desc}",
-        err   = err_html,
-        title = field("Title", "title", "text", title.unwrap_or(""), true),
-        date  = field("Date", "day_date", "date", "", true),
-        start = field("Start time", "starts_at", "time", "", true),
-        end   = field("End time", "ends_at", "time", "", true),
-        loc   = field("Location (optional)", "location", "text",
+        err    = err_html,
+        title  = field("Title", "title", "text", title.unwrap_or(""), true),
+        date   = field("Date", "day_date", "date", "", true),
+        start  = field("Start time", "starts_at", "time", "", true),
+        end    = field("End time", "ends_at", "time", "", true),
+        repeat = repeat_html,
+        loc    = field("Location (optional)", "location", "text",
                       location.unwrap_or(""), false),
         desc  = {
             let dval = render::escape_html(description.unwrap_or(""));

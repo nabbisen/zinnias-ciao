@@ -13,7 +13,10 @@ pub mod status;
 pub use community::Community;
 pub use display_name::{validate_display_name, DisplayNameError, DISPLAY_NAME_MAX};
 pub use event::{Event, EventDay};
-pub use event_admin::{validate_event, DayInput, EventInput, EventValidationError};
+pub use event_admin::{
+    validate_event, DayInput, EventInput, EventValidationError,
+    RecurrenceFreq, expand_recurrence, RECURRENCE_MAX_COUNT,
+};
 pub use invite::{validate_invite_input, InviteValidationError, INVITE_CODE_LEN};
 pub use membership::{Membership, Role};
 pub use note::{validate_note, NoteError, NOTE_MAX_CHARS};

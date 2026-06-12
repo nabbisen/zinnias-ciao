@@ -2,6 +2,51 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.17.0] — 2026-06-12
+
+### Added
+
+- **RFC-022 — Recurring events (bounded materialization).**
+
+  Admins can now create repeating events directly from the Create Event form.
+  The implementation uses **bounded materialization at creation time**: the
+  handler generates all concrete `event_days` rows upfront rather than
+  introducing a background scheduler or a separate series abstraction.
+  Members always see concrete event instances with real dates.
+
+  - **`packages/domain/src/event_admin.rs`:**
+    - `RecurrenceFreq` enum: `None`, `Weekly`, `Biweekly`, `Monthly`.
+      `from_str()`/`as_str()` for form round-trip. `is_recurring()` predicate.
+    - `RECURRENCE_MAX_COUNT = 52`: hard cap on occurrences per creation.
+    - `expand_recurrence(base, freq, count)`: pure function, returns a
+      `Vec<DayInput>` of concrete dates. Weekly uses `time::Duration::weeks`.
+      Biweekly uses 2× that. Monthly uses 0-indexed month arithmetic to avoid
+      off-by-one at December→January boundaries; clamps day to end-of-month
+      (e.g. Jan 31 + 1 month → Feb 28). Capped at `RECURRENCE_MAX_COUNT`.
+    - 9 new unit tests covering all four frequencies, year-boundary crossing,
+      end-of-February clamping, count capping, and time preservation.
+
+  - **`migrations/0006_event_recurrence.sql`:** adds `repeat_rule` and
+    `repeat_count` informational columns to `events`. The actual days are
+    already in `event_days`; these columns let the export and future UI show
+    what pattern was used.
+
+  - **`db/event_write.rs`:** `create_event` gains `repeat_rule` and
+    `repeat_count` parameters; stores them alongside the event row.
+    Uses `worker::wasm_bindgen::JsValue::NULL` for optional `repeat_count`.
+
+  - **`handlers/admin.rs`:**
+    - `post_create_event` reads `repeat_rule` and `repeat_count` form fields,
+      calls `expand_recurrence`, and passes all expanded day rows to
+      `create_event`. Non-recurring events behave identically to before.
+    - `event_form_fields` now includes a Repeat `<select>` (None / Weekly /
+      Every 2 weeks / Monthly) and an occurrence count `<input type=number>`
+      defaulting to 8, with a helper note that count is ignored for
+      non-recurring events.
+
+  - RFC-022 moved to `rfcs/done/` (v0.17.0). Total: 32 of 36 RFCs done.
+  - Tests: 152 → 160 (+9 recurrence, -1 prior count correction).
+
 ## [0.16.0] — 2026-06-12
 
 ### Added

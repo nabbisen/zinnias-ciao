@@ -6,6 +6,8 @@ use crate::db::now_utc;
 use crate::crypto::random_token;
 
 /// Create an event and its day rows in one logical batch.
+/// `repeat_rule` and `repeat_count` are stored for reference; the actual
+/// day rows in `days` are already the fully-expanded occurrences.
 pub async fn create_event(
     db: &D1Database,
     community_id: &str,
@@ -14,14 +16,19 @@ pub async fn create_event(
     location: Option<&str>,
     description: Option<&str>,
     days: &[(String, String, String)], // (day_date, starts_at_utc, ends_at_utc)
+    repeat_rule: &str,
+    repeat_count: Option<u32>,
 ) -> Result<String> {
     let event_id = random_token()[..24].to_owned();
     let now = now_utc();
+    let rc_js: worker::wasm_bindgen::JsValue = repeat_count
+        .map(|n| worker::wasm_bindgen::JsValue::from_f64(n as f64))
+        .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
     db.prepare(
         "INSERT INTO events \
          (id, community_id, created_by_membership_id, title, location, description, \
-          status, created_at, updated_at) \
-         VALUES (?1,?2,?3,?4,?5,?6,'scheduled',?7,?7)",
+          status, repeat_rule, repeat_count, created_at, updated_at) \
+         VALUES (?1,?2,?3,?4,?5,?6,'scheduled',?7,?8,?9,?9)",
     )
     .bind(&[
         event_id.as_str().into(),
@@ -30,6 +37,8 @@ pub async fn create_event(
         title.into(),
         location.unwrap_or("").into(),
         description.unwrap_or("").into(),
+        repeat_rule.into(),
+        rc_js,
         now.as_str().into(),
     ])?
     .run().await?;
