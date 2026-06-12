@@ -1,58 +1,76 @@
-/* ciao.zinnias — base styles (design tokens from RFC-011) */
+/* ciao.zinnias — base styles
+ * Design tokens use the --cz- prefix (RFC-011 §5).
+ * Token names map 1-to-1 with the JSON token file (RFC-020 future).
+ */
 *, *::before, *::after { box-sizing: border-box; }
 
 :root {
-  --color-bg:            #FFFFFF;
-  --color-surface:       #F5F5F7;
-  --color-surface-strong:#E5E5EA;
-  --color-text-primary:  #1D1D1F;
-  --color-text-secondary:#6E6E73;
-  --color-text-muted:    #86868B;
-  --color-going:         #007AFF;
-  --color-not-going:     #FF3B30;
-  --color-attended:      #34C759;
-  --color-no-answer:     #8E8E93;
-  --color-warning:       #FF9500;
-  --color-danger:        #FF3B30;
-  --color-focus:         #007AFF;
-  --space-1: 4px;  --space-2: 8px;   --space-3: 12px;
-  --space-4: 16px; --space-5: 24px;  --space-6: 32px;
-  --radius-card:   16px;
-  --radius-button: 14px;
-  --radius-input:  12px;
-  --touch-min:     44px;
+  /* Colour tokens */
+  --cz-color-bg:             #FFFFFF;
+  --cz-color-surface:        #F5F5F7;
+  --cz-color-surface-strong: #E5E5EA;
+  --cz-color-text-primary:   #1D1D1F;
+  --cz-color-text-secondary: #6E6E73;
+  --cz-color-text-muted:     #86868B;
+  --cz-color-going:          #007AFF;
+  --cz-color-not-going:      #FF3B30;
+  --cz-color-attended:       #34C759;
+  --cz-color-no-answer:      #8E8E93;
+  --cz-color-warning:        #FF9500;
+  --cz-color-danger:         #FF3B30;
+  --cz-color-focus:          #007AFF;
+
+  /* Spacing tokens */
+  --cz-space-1: 4px;
+  --cz-space-2: 8px;
+  --cz-space-3: 12px;
+  --cz-space-4: 16px;
+  --cz-space-5: 24px;
+  --cz-space-6: 32px;
+
+  /* Radius tokens */
+  --cz-radius-card:   16px;
+  --cz-radius-button: 14px;
+  --cz-radius-input:  12px;
+
+  /* Touch target minimum (RFC-011 §5) */
+  --cz-touch-min: 44px;
+
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 16px;
-  color: var(--color-text-primary);
-  background: var(--color-bg);
+  color: var(--cz-color-text-primary);
+  background: var(--cz-color-bg);
   -webkit-text-size-adjust: 100%;
 }
 
 body { margin: 0; padding: 0; }
-a { color: var(--color-going); }
+a { color: var(--cz-color-going); }
 
-/* Offline banner — hidden by default; shown by SW offline fallback + app.js */
+/* Offline banner */
 #offline-banner {
-  background: var(--color-surface-strong);
-  color: var(--color-text-secondary);
+  background: var(--cz-color-surface-strong);
+  color: var(--cz-color-text-secondary);
   text-align: center;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--cz-space-2) var(--cz-space-4);
   font-size: .875rem;
   position: sticky;
   top: 0;
   z-index: 20;
 }
 
-/* Focus ring — visible for keyboard users */
+/* Keyboard focus ring — visible, colour-independent */
 :focus-visible {
-  outline: 2px solid var(--color-focus);
+  outline: 2px solid var(--cz-color-focus);
   outline-offset: 2px;
 }
 
-/* Touch targets */
-button, a, [role="button"] { min-height: var(--touch-min); }
+/* Touch targets — all interactive elements meet the 44 px minimum */
+button, a, [role="button"] { min-height: var(--cz-touch-min); }
 
-/* Accessible reduced motion */
+/* Reduced motion — disable all non-essential animation (RFC-011 §5) */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { transition: none !important; animation: none !important; }
+  *, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }

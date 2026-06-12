@@ -39,11 +39,13 @@ pub async fn get_create_event(
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let pp = pepper(env);
-    let token = form_token::issue(&db, &pp, &membership.membership_id,
+    let token = form_token::issue(&db, &pp, &auth.user_id,
         token_purpose::CREATE_EVENT, None).await.unwrap_or_default();
 
     let community = db::community::find_active(&db, community_id).await?;
     let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav = render::bottom_nav(community_id, "home");
 
     let body = format!(
@@ -57,7 +59,7 @@ pub async fn get_create_event(
            color:#fff;border:none;border-radius:14px;font-size:1rem;font-weight:600;\
            min-height:44px;cursor:pointer;margin-top:1rem\">Create Event</button>\
          </form></main>{nav}",
-        header = render::header("Create Event", &community_name),
+        header = render::header_with_switcher("Create Event", community_id, &_community_pairs),
         cid    = render::escape_html(community_id),
         tok    = render::escape_html(&token),
         fields = event_form_fields(None, None, None, None),
@@ -85,7 +87,7 @@ pub async fn post_create_event(
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
 
-    let replay = form_token::consume(&db, &pp, &membership.membership_id,
+    let replay = form_token::consume(&db, &pp, &auth.user_id,
         token_purpose::CREATE_EVENT, &raw_token, None).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/home"));
@@ -150,7 +152,7 @@ pub async fn get_cancel_event(
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let pp = pepper(env);
-    let token = form_token::issue(&db, &pp, &membership.membership_id,
+    let token = form_token::issue(&db, &pp, &auth.user_id,
         token_purpose::CANCEL_EVENT, Some(event_id)).await.unwrap_or_default();
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -159,6 +161,8 @@ pub async fn get_cancel_event(
     };
     let community = db::community::find_active(&db, community_id).await?;
     let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav = render::bottom_nav(community_id, "home");
 
     let body = format!(
@@ -180,7 +184,7 @@ pub async fn get_cancel_event(
                Cancel Event</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header("Cancel Event", &community_name),
+        header = render::header_with_switcher("Cancel Event", community_id, &_community_pairs),
         title  = render::escape_html(&event.title),
         cid    = render::escape_html(community_id),
         eid    = render::escape_html(event_id),
@@ -209,7 +213,7 @@ pub async fn post_cancel_event(
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(&db, &pp, &membership.membership_id,
+    let replay = form_token::consume(&db, &pp, &auth.user_id,
         token_purpose::CANCEL_EVENT, &raw_token, Some(event_id)).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
@@ -237,11 +241,13 @@ pub async fn get_invites(
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let pp = pepper(env);
-    let token = form_token::issue(&db, &pp, &membership.membership_id,
+    let token = form_token::issue(&db, &pp, &auth.user_id,
         "generate_invite", None).await.unwrap_or_default();
 
     let community = db::community::find_active(&db, community_id).await?;
     let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
 
     // Check for a just-generated code in query param
     let url = req.url()?;
@@ -272,7 +278,7 @@ pub async fn get_invites(
              border:none;border-radius:14px;font-size:1rem;font-weight:600;\
              min-height:44px;cursor:pointer;margin-top:1rem\">Generate Code</button>\
          </form></main>{nav}",
-        header    = render::header("Invite Members", &community_name),
+        header    = render::header_with_switcher("Invite Members", community_id, &_community_pairs),
         cid       = render::escape_html(community_id),
         tok       = render::escape_html(&token),
         code_html = code_html,
@@ -299,7 +305,7 @@ pub async fn post_generate_invite(
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(&db, &pp, &membership.membership_id,
+    let replay = form_token::consume(&db, &pp, &auth.user_id,
         "generate_invite", &raw_token, None).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/admin/invites"));
@@ -339,6 +345,8 @@ pub async fn get_members(
     let db = env.d1("DB")?;
     let community = db::community::find_active(&db, community_id).await?;
     let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
 
     let members = membership_db::list_all_active(&db, community_id).await?;
     let member_rows: String = members.iter().map(|m| {
@@ -376,7 +384,7 @@ pub async fn get_members(
             color:#007AFF;text-decoration:none;font-weight:600\">\
             Generate invite code</a>\
          </main>{nav}",
-        header = render::header("Members", &community_name),
+        header = render::header_with_switcher("Members", community_id, &_community_pairs),
         rows   = member_rows,
         cid    = render::escape_html(community_id),
         nav    = nav,
@@ -406,7 +414,7 @@ pub async fn get_remove_member(
 
     let db = env.d1("DB")?;
     let pp = pepper(env);
-    let token = form_token::issue(&db, &pp, &membership.membership_id,
+    let token = form_token::issue(&db, &pp, &auth.user_id,
         "remove_member", Some(target_membership_id)).await.unwrap_or_default();
 
     // Find the target member name
@@ -418,6 +426,8 @@ pub async fn get_remove_member(
 
     let community = db::community::find_active(&db, community_id).await?;
     let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav = render::bottom_nav(community_id, "home");
 
     let body = format!(
@@ -442,7 +452,7 @@ pub async fn get_remove_member(
                Remove</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header("Remove Member", &community_name),
+        header = render::header_with_switcher("Remove Member", community_id, &_community_pairs),
         name   = render::escape_html(target_name),
         cid    = render::escape_html(community_id),
         mid    = render::escape_html(target_membership_id),
@@ -476,7 +486,7 @@ pub async fn post_remove_member(
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(&db, &pp, &membership.membership_id,
+    let replay = form_token::consume(&db, &pp, &auth.user_id,
         "remove_member", &raw_token, Some(target_membership_id)).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/admin/members"));

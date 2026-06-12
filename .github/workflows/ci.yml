@@ -1,0 +1,48 @@
+# ciao.zinnias CI — RFC-015 / RFC-016
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test (native)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: Clippy (domain + contracts)
+        run: cargo clippy -p zinnias-ciao-domain -p zinnias-ciao-contracts -- -D warnings
+      - name: Tests (domain + contracts)
+        run: cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts
+
+  check-wasm:
+    name: Type-check (wasm32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Check SSR worker
+        run: cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown
+
+  migration-check:
+    name: Migration syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate SQL syntax
+        run: |
+          # Basic well-formedness: file exists and is non-empty
+          test -s migrations/0001_initial.sql
+          echo "Migration file OK"

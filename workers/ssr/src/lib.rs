@@ -6,6 +6,7 @@ mod crypto;
 mod db;
 mod errors;
 mod form_token;
+mod rate_limit;
 mod render;
 mod session;
 

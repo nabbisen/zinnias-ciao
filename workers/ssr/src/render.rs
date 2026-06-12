@@ -2,6 +2,33 @@
 
 use worker::{Response, Result};
 
+// ── CSS design tokens (RFC-011 §5) ───────────────────────────────────────
+// Must stay in sync with workers/ssr/static/app.css --cz-* custom properties.
+const CZ_COLOR_BG:             &str = "#FFFFFF";
+const CZ_COLOR_SURFACE:        &str = "#F5F5F7";
+const CZ_COLOR_SURFACE_STRONG: &str = "#E5E5EA";
+const CZ_COLOR_TEXT_PRIMARY:   &str = "#1D1D1F";
+const CZ_COLOR_TEXT_SECONDARY: &str = "#6E6E73";
+const CZ_COLOR_GOING:          &str = "#007AFF";
+const CZ_COLOR_NOT_GOING:      &str = "#FF3B30";
+const CZ_COLOR_ATTENDED:       &str = "#34C759";
+const CZ_COLOR_NO_ANSWER:      &str = "#8E8E93";
+const CZ_COLOR_DANGER:         &str = "#FF3B30";
+const CZ_BORDER:               &str = "#E5E5EA"; // --cz-color-surface-strong
+const CZ_BORDER_LIGHT:         &str = "#F5F5F7"; // --cz-color-surface
+
+// ── Status icons (RFC-011 §4) ─────────────────────────────────────────────
+// Inline SVG — each icon is 1em × 1em, aria-hidden (label carries meaning).
+const ICON_GOING: &str =
+    "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28              a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z'/></svg>";
+const ICON_NOT_GOING: &str =
+    "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06              L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1              -1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z'/></svg>";
+const ICON_ATTENDED: &str =
+    "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm3.78 5.22a.75.75 0 0 0-1.06 0L7 8.94              5.28 7.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.06 0l4.25-4.25              a.75.75 0 0 0 0-1.06z'/></svg>";
+const ICON_NO_ANSWER: &str =
+    "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0              0-13zM7.25 10.5h1.5v1.5h-1.5zm0-7h1.5v5.5h-1.5z'/></svg>";
+
+
 // ── Static asset paths ────────────────────────────────────────────────────
 const MANIFEST: &str = "/manifest.webmanifest";
 const CSS: &str      = "/static/app.css";
@@ -64,7 +91,7 @@ pub fn bottom_nav(community_id: &str, active: &str) -> String {
         let style = if id == active {
             "color:#007AFF;font-weight:600"
         } else {
-            "color:#6e6e73"
+            "color:#6E6E73"
         };
         format!(
             "<a href=\"{href}\" style=\"flex:1;text-align:center;padding:.75rem 0;\
@@ -75,7 +102,7 @@ pub fn bottom_nav(community_id: &str, active: &str) -> String {
     format!(
         "<nav role=\"navigation\" aria-label=\"Main\" \
          style=\"position:fixed;bottom:0;left:0;right:0;display:flex;\
-         background:#fff;border-top:1px solid #e5e5ea;\
+         background:#FFFFFF;border-top:1px solid #E5E5EA;\
          padding-bottom:env(safe-area-inset-bottom)\">\
          {home}{communities}{me}\
          </nav>",
@@ -86,28 +113,70 @@ pub fn bottom_nav(community_id: &str, active: &str) -> String {
 }
 
 /// App header bar.
+/// Simple header — for pages that don't need a community switcher (join, errors).
 pub fn header(title: &str, community_name: &str) -> String {
     format!(
-        "<header style=\"position:sticky;top:0;background:#fff;border-bottom:1px solid #e5e5ea;\
+        "<header style=\"position:sticky;top:0;background:#FFFFFF;border-bottom:1px solid #E5E5EA;\
          padding:.875rem 1rem;display:flex;justify-content:space-between;align-items:center;z-index:10\">\
          <span style=\"font-size:1.25rem;font-weight:600\">{title}</span>\
-         <span style=\"font-size:.8125rem;color:#6e6e73\">{community}</span>\
+         <span style=\"font-size:.8125rem;color:#6E6E73\">{community}</span>\
          </header>",
         title     = escape_html(title),
         community = escape_html(community_name),
     )
 }
 
-// ── Status chip / buttons ─────────────────────────────────────────────────
+/// Header with a community switcher `<select>` in place of the static name.
+///
+/// `communities` is a slice of `(community_id, community_name)` pairs for the
+/// current user. When the user has only one community the select is still shown
+/// (consistent UI) but there is nothing else to switch to.
+/// Submits via a tiny inline form (no JS needed; works with JS off via POST,
+/// enhanced by an onchange JS redirect when JS is available).
+pub fn header_with_switcher(
+    title: &str,
+    current_community_id: &str,
+    communities: &[(impl AsRef<str>, impl AsRef<str>)],
+) -> String {
+    let title_s = escape_html(title);
+
+    // <option> elements — use single-quoted HTML attributes to avoid \" in Rust strings.
+    let options: String = communities.iter().map(|(id, name)| {
+        let id_s   = escape_html(id.as_ref());
+        let name_s = escape_html(name.as_ref());
+        let sel    = if id.as_ref() == current_community_id { " selected" } else { "" };
+        format!("<option value='{id_s}'{sel}>{name_s}</option>")
+    }).collect();
+
+    // onchange navigates immediately with JS.
+    // Without JS the select still shows the current community visually.
+    let mut h = String::new();
+    h.push_str("<header style='position:sticky;top:0;background:#FFFFFF;");
+    h.push_str("border-bottom:1px solid #E5E5EA;");
+    h.push_str("padding:.875rem 1rem;display:flex;justify-content:space-between;");
+    h.push_str("align-items:center;gap:.5rem;z-index:10'>");
+    h.push_str("<span style='font-size:1.25rem;font-weight:600;white-space:nowrap'>");
+    h.push_str(&title_s);
+    h.push_str("</span>");
+    h.push_str("<select aria-label='Switch community' ");
+    h.push_str("onchange=\"location.href='/c/'+this.value+'/home';\" ");
+    h.push_str("style='font-size:.8125rem;color:#6E6E73;background:none;border:none;");
+    h.push_str("border-bottom:1px solid #E5E5EA;padding:.125rem .25rem;");
+    h.push_str("max-width:160px;cursor:pointer'>");
+    h.push_str(&options);
+    h.push_str("</select>");
+    h.push_str("</header>");
+    h
+}// ── Status chip / buttons ─────────────────────────────────────────────────
 
 /// Colour and label for a status value.
 pub fn status_display(status: Option<&str>) -> (&'static str, &'static str, &'static str) {
     // returns (colour, icon, label)
     match status {
-        Some("going")     => ("#007AFF", "✓", "Going"),
-        Some("not_going") => ("#FF3B30", "✕", "No Go"),
-        Some("attended")  => ("#34C759", "✓", "Attended"),
-        _                 => ("#8E8E93", "○", "No answer"),
+        Some("going")     => (CZ_COLOR_GOING,    ICON_GOING,     "Going"),
+        Some("not_going") => (CZ_COLOR_NOT_GOING, ICON_NOT_GOING, "No Go"),
+        Some("attended")  => (CZ_COLOR_ATTENDED,  ICON_ATTENDED,  "Attended"),
+        _                 => (CZ_COLOR_NO_ANSWER, ICON_NO_ANSWER, "No answer"),
     }
 }
 
@@ -137,8 +206,8 @@ pub fn status_form(
 ) -> String {
     let btn = |value: Option<&str>, label: &str, icon: &str, color: &str, disabled: bool, reason: &str| {
         let is_current = current == value;
-        let bg = if is_current { color } else { "#f5f5f7" };
-        let fg = if is_current { "#fff" } else { color };
+        let bg = if is_current { color } else { "#F5F5F7" };
+        let fg = if is_current { "#FFFFFF" } else { color };
         let val_str = value.unwrap_or("clear");
         let disabled_attr = if disabled { " disabled" } else { "" };
         let title_attr = if disabled && !reason.is_empty() {
@@ -156,10 +225,10 @@ pub fn status_form(
         )
     };
 
-    let going_btn = btn(Some("going"), "Going", "✓", "#007AFF", false, "");
-    let notgoing_btn = btn(Some("not_going"), "No Go", "✕", "#FF3B30", false, "");
+    let going_btn = btn(Some("going"), "Going", ICON_GOING, CZ_COLOR_GOING, false, "");
+    let notgoing_btn = btn(Some("not_going"), "No Go", ICON_NOT_GOING, CZ_COLOR_NOT_GOING, false, "");
     let attended_btn = btn(
-        Some("attended"), "Attended", "✓", "#34C759",
+        Some("attended"), "Attended", ICON_ATTENDED, CZ_COLOR_ATTENDED,
         !can_set_attended, attended_disabled_reason,
     );
 
@@ -167,7 +236,7 @@ pub fn status_form(
     let clear_btn = if current.is_some() {
         format!(
             "<button type=\"submit\" name=\"status\" value=\"clear\" \
-             style=\"font-size:.75rem;color:#6e6e73;background:none;border:none;\
+             style=\"font-size:.75rem;color:#6E6E73;background:none;border:none;\
              padding:.25rem;cursor:pointer\" aria-label=\"Clear answer\">Clear</button>"
         )
     } else {
@@ -237,13 +306,13 @@ pub fn note_form(
          <form method=\"post\" action=\"/c/{cid}/events/{eid}/my-note\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            <textarea name=\"note\" rows=\"3\" maxlength=\"200\" \
-             style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
+             style=\"width:100%;padding:.75rem;border:1px solid #E5E5EA;\
              border-radius:12px;font-size:1rem;resize:vertical;box-sizing:border-box\" \
              aria-label=\"Note (up to 200 characters)\">{existing}</textarea>\
            <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:.5rem\">\
-             <span style=\"font-size:.75rem;color:#6e6e73\">Up to 200 characters</span>\
+             <span style=\"font-size:.75rem;color:#6E6E73\">Up to 200 characters</span>\
              <button type=\"submit\" \
-               style=\"padding:.625rem 1.25rem;background:#007AFF;color:#fff;\
+               style=\"padding:.625rem 1.25rem;background:#007AFF;color:#FFFFFF;\
                border:none;border-radius:14px;font-size:.9375rem;font-weight:600;\
                min-height:44px;cursor:pointer\">Save Note</button>\
            </div>\
@@ -282,21 +351,21 @@ pub fn event_card(
     let (_, icon, label) = status_display(my_status);
     let (sc, _, _) = status_display(my_status);
     let cancelled_badge = if is_cancelled {
-        "<span style=\"font-size:.75rem;background:#FF3B30;color:#fff;\
+        "<span style=\"font-size:.75rem;background:#FF3B30;color:#FFFFFF;\
          border-radius:99px;padding:.125rem .5rem;margin-left:.5rem\">Cancelled</span>"
     } else { "" };
     let multi_badge = if total_days > 1 {
-        format!("<span style=\"font-size:.75rem;color:#6e6e73\"> · {total_days} days</span>")
+        format!("<span style=\"font-size:.75rem;color:#6E6E73\"> · {total_days} days</span>")
     } else { String::new() };
     let loc_html = location.map(|l| format!(
-        "<span style=\"color:#6e6e73;font-size:.875rem\"> · {}</span>",
+        "<span style=\"color:#6E6E73;font-size:.875rem\"> · {}</span>",
         escape_html(l)
     )).unwrap_or_default();
     let muted = if is_cancelled { "opacity:.5;" } else { "" };
 
     format!(
         "<a href=\"/c/{cid}/events/{eid}\" style=\"display:block;text-decoration:none;color:inherit\">\
-         <article style=\"background:#fff;border-radius:16px;padding:1rem;\
+         <article style=\"background:#FFFFFF;border-radius:16px;padding:1rem;\
          box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:.75rem;{muted}\">\
            <div style=\"display:flex;align-items:center;gap:.5rem;margin-bottom:.375rem\">\
              <span style=\"color:{sc};font-weight:600;font-size:.875rem\">{icon} {label}</span>\
@@ -306,7 +375,7 @@ pub fn event_card(
            <div style=\"font-size:.875rem;color:#3c3c3e;margin-top:.25rem\">\
              {time}{loc}\
            </div>\
-           <div style=\"font-size:.8125rem;color:#6e6e73;margin-top:.375rem\">\
+           <div style=\"font-size:.8125rem;color:#6E6E73;margin-top:.375rem\">\
              Going {going} · No Go {ng} · No answer {na}\
            </div>\
          </article></a>",
@@ -366,14 +435,14 @@ pub struct ParticipantEntry<'a> {
 
 pub fn participant_list(participants: &[ParticipantEntry<'_>]) -> String {
     if participants.is_empty() {
-        return "<p style=\"color:#6e6e73;font-size:.875rem\">No participants yet.</p>".to_owned();
+        return "<p style=\"color:#6E6E73;font-size:.875rem\">No participants yet.</p>".to_owned();
     }
     let rows: String = participants.iter().map(|p| {
         let initials = initials(p.display_name);
         let (color, icon, label) = status_display(p.status);
         format!(
             "<li style=\"display:flex;align-items:center;gap:.75rem;padding:.5rem 0;\
-             border-bottom:1px solid #f5f5f7\">\
+             border-bottom:1px solid #F5F5F7\">\
              <span style=\"width:2rem;height:2rem;border-radius:50%;background:{color}22;\
              color:{color};display:flex;align-items:center;justify-content:center;\
              font-size:.75rem;font-weight:700;flex-shrink:0\">{initials}</span>\
@@ -402,7 +471,7 @@ pub fn placeholder() -> Result<Response> {
     let body = "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
   <h1 style=\"font-size:1.25rem;font-weight:600\">ciao.zinnias</h1>\
   <p>Private community schedule sharing.</p>\
-  <p style=\"color:#6e6e73;font-size:.875rem\">This environment is not ready for members yet.</p>\
+  <p style=\"color:#6E6E73;font-size:.875rem\">This environment is not ready for members yet.</p>\
 </main>";
     Response::from_html(shell("ciao.zinnias", body))
 }

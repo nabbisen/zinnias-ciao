@@ -113,6 +113,8 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
     // Fetch community name for the header
     let community = db::community::find_active(&db, community_id).await?;
     let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
 
     let nav = render::bottom_nav(community_id, "home");
     let body = format!(
@@ -121,7 +123,7 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
            {today}{thisweek}{later}{empty}\
          </main>\
          {nav}",
-        header   = render::header("Home", &community_name),
+        header   = render::header_with_switcher("Home", community_id, &_community_pairs),
         today    = section("Today", &today_cards),
         thisweek = section("This Week", &thisweek_cards),
         later    = section("Later", &later_cards),

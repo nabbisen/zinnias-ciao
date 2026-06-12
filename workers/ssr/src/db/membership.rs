@@ -184,3 +184,36 @@ pub async fn soft_remove(db: &D1Database, membership_id: &str) -> Result<()> {
         .await?;
     Ok(())
 }
+
+/// One community entry for the header switcher: id + display name.
+pub struct CommunitySummary {
+    pub community_id: String,
+    pub community_name: String,
+}
+
+/// All communities a user is an active member of, with community names,
+/// ordered by joined_at. Used for the header community switcher.
+pub async fn list_communities_for_user(
+    db: &D1Database,
+    user_id: &str,
+) -> Result<Vec<CommunitySummary>> {
+    let rows = db
+        .prepare(
+            "SELECT m.community_id, c.name AS community_name \
+             FROM community_memberships m \
+             JOIN communities c ON c.id = m.community_id \
+             WHERE m.user_id = ?1 AND m.removed_at IS NULL \
+             ORDER BY m.joined_at ASC",
+        )
+        .bind(&[user_id.into()])?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?;
+
+    Ok(rows.into_iter().filter_map(|v| {
+        Some(CommunitySummary {
+            community_id:   v.get("community_id")?.as_str()?.to_owned(),
+            community_name: v.get("community_name")?.as_str()?.to_owned(),
+        })
+    }).collect())
+}

@@ -15,6 +15,7 @@ use zinnias_ciao_domain::{validate_display_name, validate_invite_input};
 
 use crate::audit;
 use crate::crypto::{hmac_hex, normalize_invite_code, random_token};
+use crate::rate_limit;
 use crate::db::{invite as invite_db, membership as membership_db, session as session_db};
 use crate::errors::IntoWorkerResult;
 use crate::form_token;
@@ -35,7 +36,7 @@ pub async fn get_join(req: Request, env: &Env, _rid: &str) -> Result<Response> {
     let pepper = get_pepper(&env);
     let db = env.d1("DB")?;
     let anon_token =
-        form_token::issue(&db, &pepper, "anon", token_purpose::REDEEM_INVITE, None).await?;
+        form_token::issue(&db, &pepper, "", token_purpose::REDEEM_INVITE, None).await?;
 
     render_join_form(&anon_token, None)
 }
@@ -48,6 +49,15 @@ pub async fn post_join(mut req: Request, env: &Env, rid: &str) -> Result<Respons
     let raw_code = body.get_field("code").unwrap_or_default();
     let raw_token = body.get_field("_token").unwrap_or_default();
 
+    // Rate-limit check (RFC-012) — before any DB work.
+    let client_ip = rate_limit::client_ip(&req);
+    if rate_limit::is_rate_limited(&env, &client_ip).await {
+        return render_join_form(
+            &refresh_anon_token(&env).await?,
+            Some(zinnias_ciao_contracts::i18n::EN_JOIN_CODE_HINT),
+        );
+    }
+
     // Validate the invite code format (domain rule — before DB lookup).
     if let Err(_) = validate_invite_input(&raw_code) {
         return render_join_form(
@@ -59,11 +69,11 @@ pub async fn post_join(mut req: Request, env: &Env, rid: &str) -> Result<Respons
     // Validate the form token (CSRF).
     let pepper = get_pepper(&env);
     let db = env.d1("DB")?;
-    // For anon tokens we used user_id = "anon"
+    // For anon tokens we used user_id = ""
     let _ = form_token::consume(
         &db,
         &pepper,
-        "anon",
+        "",
         token_purpose::REDEEM_INVITE,
         &raw_token,
         None,
@@ -78,12 +88,16 @@ pub async fn post_join(mut req: Request, env: &Env, rid: &str) -> Result<Respons
 
     if invite.is_none() {
         // Generic error: do not reveal whether the code existed (RFC-003 §7).
+        rate_limit::record_failure(&env, &client_ip).await;
         return render_join_form(
             &refresh_anon_token(&env).await?,
             Some(i18n::EN_JOIN_CODE_HINT),
         );
     }
     let invite = invite.unwrap();
+    // Valid code — clear the failure counter so a legitimate user isn't
+    // locked out by their own earlier mistakes.
+    rate_limit::clear_failures(&env, &client_ip).await;
 
     // Stash invite_id + community_id in a short-lived join-ticket cookie
     // so the profile step can complete the redemption atomically.
@@ -256,7 +270,7 @@ fn extract_cookie(req: &Request, name: &str) -> Option<String> {
 async fn refresh_anon_token(env: &Env) -> Result<String> {
     let pepper = get_pepper(env);
     let db = env.d1("DB")?;
-    form_token::issue(&db, &pepper, "anon", token_purpose::REDEEM_INVITE, None).await
+    form_token::issue(&db, &pepper, "", token_purpose::REDEEM_INVITE, None).await
 }
 
 fn redirect(url: &str) -> Result<Response> {

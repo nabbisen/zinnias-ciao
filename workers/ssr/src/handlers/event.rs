@@ -147,7 +147,7 @@ pub async fn get_event_detail(
 
     // ── Note section ─────────────────────────────────────────────────────
     let save_token = form_token::issue(
-        &db, &pp, &membership.membership_id,
+        &db, &pp, &auth.user_id,
         token_purpose::SAVE_NOTE, Some(event_id),
     ).await.unwrap_or_default();
     let delete_token = if my_note.is_some() {
@@ -190,6 +190,8 @@ pub async fn get_event_detail(
 
     let community = db::community::find_active(&db, community_id).await?;
     let community_name = community.map(|c| c.name).unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav  = render::bottom_nav(community_id, "home");
     let back = format!(
         "<a href=\"/c/{}/home\" style=\"color:#007AFF;font-size:.9375rem\">\u{2190} Home</a>",
@@ -210,7 +212,7 @@ pub async fn get_event_detail(
            {note}\
            {notes_section}\
          </main>{nav}",
-        header         = render::header("Event", &community_name),
+        header         = render::header_with_switcher("Event", community_id, &_community_pairs),
         title          = render::escape_html(&event.title),
         loc            = event.location.as_deref().map(|l| format!(
             "<p style=\"color:#6e6e73;font-size:.875rem\">\u{1F4CD} {}</p>",
@@ -253,7 +255,7 @@ pub async fn post_my_status(
 
     // Validate and consume form token (CSRF + idempotency, AD-4)
     let replay = form_token::consume(
-        &db, &pp, &membership.membership_id,
+        &db, &pp, &auth.user_id,
         token_purpose::SET_STATUS, &raw_token, Some(day_id),
     ).await?;
 
@@ -341,7 +343,7 @@ pub async fn post_my_note(
     let raw_note  = body.get_field("note").unwrap_or_default();
 
     let replay = form_token::consume(
-        &db, &pp, &membership.membership_id,
+        &db, &pp, &auth.user_id,
         token_purpose::SAVE_NOTE, &raw_token, Some(event_id),
     ).await?;
     if replay.is_some() {
@@ -381,7 +383,7 @@ pub async fn delete_my_note(
     let raw_token = body.get_field("_token").unwrap_or_default();
 
     let replay = form_token::consume(
-        &db, &pp, &membership.membership_id,
+        &db, &pp, &auth.user_id,
         token_purpose::DELETE_NOTE, &raw_token, Some(event_id),
     ).await?;
     if replay.is_some() {

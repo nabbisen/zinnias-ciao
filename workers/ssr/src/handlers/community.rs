@@ -22,8 +22,8 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
             } else { render::not_found() }
         }
 
-        "communities" => render::placeholder(),
-        "me"          => render::placeholder(),
+        "communities" => super::communities::get_communities(req, env, rid, cid).await,
+        "me"          => super::me::get_me(req, env, rid, cid).await,
 
         // ── Admin GET routes ─────────────────────────────────────────────
         "admin" | "admin/" => render::not_found(),

@@ -55,17 +55,13 @@ pub fn validate_event(raw: EventInput) -> Result<EventInput, EventValidationErro
     }
 
     let location = raw.location.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(String::from);
-    if let Some(ref l) = location {
-        if l.chars().count() > EVENT_LOCATION_MAX {
-            return Err(EventValidationError::LocationTooLong);
-        }
+    if location.as_deref().map(|l| l.chars().count() > EVENT_LOCATION_MAX).unwrap_or(false) {
+        return Err(EventValidationError::LocationTooLong);
     }
 
     let description = raw.description.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(String::from);
-    if let Some(ref d) = description {
-        if d.chars().count() > EVENT_DESC_MAX {
-            return Err(EventValidationError::DescriptionTooLong);
-        }
+    if description.as_deref().map(|d| d.chars().count() > EVENT_DESC_MAX).unwrap_or(false) {
+        return Err(EventValidationError::DescriptionTooLong);
     }
 
     if raw.days.is_empty() {

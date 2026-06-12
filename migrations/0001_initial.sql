@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS event_notes (
 -- Replaces any client-generated mutation_id. No client_mutations table.
 CREATE TABLE IF NOT EXISTS form_tokens (
     token_hmac     TEXT PRIMARY KEY,
-    user_id        TEXT NOT NULL REFERENCES users(id),
+    user_id        TEXT,  -- NULL or sentinel for pre-auth tokens (no FK: short-lived operational table)
     -- Purpose values are defined in contracts::auth::token_purpose.
     purpose        TEXT NOT NULL,
     -- Optional: event_day_id / event_id / membership_id the token is scoped to.

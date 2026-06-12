@@ -2,6 +2,77 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.5.0] — 2026-06-12
+
+### Added
+
+- **M5 — Security hardening and release gates.**
+  - `rate_limit.rs`: KV-backed invite-redemption failure counter (10 failures per
+    5-minute window per IP, cleared on success). Wired into `post_join`: check
+    before any DB work, record on bad code, clear on successful redemption.
+  - `handlers/me.rs`: Me page — display name, community + role, help text,
+    logout form with form-token guard.
+  - `handlers/communities.rs`: Communities list — all user communities with
+    current badge, "Join another community" link.
+  - Community dispatcher updated: `/me` and `/communities` routed.
+  - `domain/tests/security_tests.rs`: XSS pass-through contract, control-char
+    rejection, error-message internal-term guards, audit key documentation.
+  - `domain/tests/event_admin_tests.rs`: 13 release-gate cases for event
+    validation including multi-day, field lengths, plain-language error check.
+  - `contracts/tests/release_gates.rs`: session TTL bounds, leeway-edge
+    regression, error model, token purpose completeness, EN/JA i18n spot-check.
+
+- **RFC-011 — Accessibility and design system.**
+  - `static/app.css`: all CSS custom property tokens renamed to `--cz-*` prefix
+    (`--cz-color-*`, `--cz-space-*`, `--cz-radius-*`, `--cz-touch-min`). Names
+    map 1-to-1 with the future RFC-020 token JSON deliverable.
+  - `render.rs`: named Rust `const` values (`CZ_COLOR_*`, `CZ_BORDER*`) mirror
+    the CSS tokens, keeping inline styles in sync.
+  - `render.rs`: four inline SVG icon constants (`ICON_GOING`, `ICON_NOT_GOING`,
+    `ICON_ATTENDED`, `ICON_NO_ANSWER`) replace Unicode characters (✓ ✕ ○).
+    Each is a 1em × 1em `aria-hidden` SVG with `fill='currentColor'`. Status is
+    never conveyed by colour alone (RFC-011 §8).
+
+- **M6 — Deployment and operations.**
+  - `.github/workflows/ci.yml`: format, clippy (`-D warnings`), native tests,
+    wasm32 type-check, migration existence check.
+  - `docs/src/`: overview, quick-start, deployment, operations, architecture,
+    release checklist covering all RFC-015 gates.
+
+- **Community switcher in header.**
+  - The community name label in every community-scoped page header is now a
+    `<select>` that navigates to `/c/:cid/home` on change (`onchange` JS;
+    falls back gracefully without JS). Populated via a single
+    `JOIN community_memberships → communities` query per render.
+  - `db/membership.rs`: `list_communities_for_user` helper added.
+
+- **Dev setup script (`scripts/setup.mjs`).**
+  - Generates the initial invite code automatically (same alphabet as Rust
+    `INVITE_CODE_ALPHABET`, no ambiguous chars). No `--code` option.
+  - `-y` / `--yes` skips all confirmation prompts including wrangler's own
+    migration prompt (detaches stdin so wrangler sees non-TTY).
+  - `--reset` wipes `.wrangler/state/v3/d1/` before running.
+  - `--community` / `--admin` for custom seed names.
+  - Prints the generated invite code in a summary box at the end.
+
+- **`migrations/0002_form_tokens_nullable_user.sql`**: recreates `form_tokens`
+  without the `REFERENCES users(id)` FK that caused a 500 on `GET /join`
+  (pre-auth tokens have no user row yet).
+
+### Fixed
+
+- `form_tokens.user_id`: removed FK constraint that caused
+  `FOREIGN KEY constraint failed` on `GET /join` (pre-auth tokens). Sentinel
+  changed from `"anon"` to `""` throughout `join.rs`.
+- `form_token::issue` / `consume`: standardised all call sites to `auth.user_id`
+  (was inconsistently mixing `membership.membership_id`). Fixed logout 500 where
+  issue used `membership_id` but consume used `user_id`.
+- `scripts/setup.mjs`: `bun run setup -- -y` hung at wrangler's migration
+  confirmation prompt. Fixed by passing `stdio: ['ignore', 'inherit', 'inherit']`
+  when `-y` is active, making stdin non-TTY so wrangler skips its prompt.
+- `package.json`: `test` and `lint` scripts corrected to use
+  `zinnias-ciao-domain` / `zinnias-ciao-contracts` crate names.
+
 ## [0.4.0] — 2026-06-12
 
 ### Added
