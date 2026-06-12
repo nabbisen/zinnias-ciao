@@ -26,8 +26,10 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 018 | [Time-Zone and Event Cutoff Policy](./done/018-timezone-and-event-cutoff-policy.md) | v0.7.0 |
 | 019 | [Retention, Soft Delete, and Data Lifecycle](./done/019-retention-soft-delete-and-data-lifecycle.md) | v0.4.0 |
 | 023 | [Optional Calendar Export and ICS Interop](./done/023-optional-calendar-export-and-ics-interop.md) | v0.10.0 |
+| 028 | [Backup, Restore, and Disaster Recovery Operations](./done/028-backup-restore-and-disaster-recovery-operations.md) | v0.14.0 |
 | 029 | [Scalability and Query Performance Discipline](./done/029-scalability-and-query-performance-discipline.md) | v0.12.0 |
 | 025 | [Community Moderation, Abuse Response, and Member Safety](./done/025-community-moderation-abuse-response-and-member-safety.md) | v0.13.0 |
+| 030 | [Admin Onboarding, First Community Setup, and Empty States](./done/030-admin-onboarding-first-community-setup-and-empty-states.md) | v0.14.0 |
 | 026 | [Multi-Language and Plain-Language Localization](./done/026-multi-language-and-plain-language-localization.md) | v0.10.0 — EN/JA table complete; per-community lang selection deferred |
 
 ## Also Done
@@ -50,8 +52,6 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 022 | Recurring Events and Event Series | [./proposed/022-recurring-events-and-event-series.md](./proposed/022-recurring-events-and-event-series.md) |
 | 024 | Display Name Recovery and Admin-Mediated Account Relinking | [./proposed/024-display-name-recovery-and-admin-mediated-account-relinking.md](./proposed/024-display-name-recovery-and-admin-mediated-account-relinking.md) |
 | 027 | Import, Export, Human-Readable Backup, and Data Portability | [./proposed/027-import-export-human-readable-backup-and-data-portability.md](./proposed/027-import-export-human-readable-backup-and-data-portability.md) |
-| 028 | Backup, Restore, and Disaster Recovery Operations | [./proposed/028-backup-restore-and-disaster-recovery-operations.md](./proposed/028-backup-restore-and-disaster-recovery-operations.md) |
-| 030 | Admin Onboarding, First Community Setup, and Empty States | [./proposed/030-admin-onboarding-first-community-setup-and-empty-states.md](./proposed/030-admin-onboarding-first-community-setup-and-empty-states.md) |
 | 031 | Consentful Contact Channels and Privacy-Safe Messaging | [./proposed/031-consentful-contact-channels-and-privacy-safe-messaging.md](./proposed/031-consentful-contact-channels-and-privacy-safe-messaging.md) |
 | 032 | Event Templates and Quick Create for Non-Technical Admins | [./proposed/032-event-templates-and-quick-create-for-non-technical-admins.md](./proposed/032-event-templates-and-quick-create-for-non-technical-admins.md) |
 | 033 | Subgroups, Event Visibility, and Boundary Safety | [./proposed/033-subgroups-event-visibility-and-boundary-safety.md](./proposed/033-subgroups-event-visibility-and-boundary-safety.md) |

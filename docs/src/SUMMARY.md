@@ -5,5 +5,6 @@
 - [Deployment](./deployment.md)
 - [Launch Runbook](./launch-runbook.md)
 - [Operations](./operations.md)
+- [Backup and Recovery](./backup-recovery.md)
 - [Architecture](./architecture.md)
 - [Release Checklist](./release-checklist.md)

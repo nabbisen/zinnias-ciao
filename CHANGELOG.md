@@ -2,6 +2,33 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.14.0] — 2026-06-12
+
+### Added
+
+- **RFC-028 — Backup and recovery documentation.**
+  New `docs/src/backup-recovery.md` covering:
+  - D1 built-in 30-day point-in-time snapshots (dashboard restore procedure).
+  - Manual export with `wrangler d1 export` before every migration.
+  - Restore procedure using a new D1 database from a SQL dump.
+  - Recommended backup schedule (before migrations, weekly for active communities).
+  - What is and is not in a backup (names/events/notes are; HMAC secrets are not).
+  - Migration forward-only policy and the prohibition on deleting from `d1_migrations`.
+  - Incident response checklist.
+  Added to `docs/src/SUMMARY.md`. RFC-028 moved to `rfcs/done/` (v0.14.0).
+
+- **RFC-030 — Admin first-run experience (empty states, onboarding).**
+  `handlers/home.rs`: the admin empty-state is now a **first-run card** rather
+  than a plain text paragraph:
+  - When an admin is the only member (member_count ≤ 1) and no events exist,
+    shows "Welcome. Your community is set up." with a secondary hint to invite
+    members first.
+  - When no events exist but members are present, shows a simpler "No events yet"
+    card with the two action buttons embedded.
+  - When events exist, shows the persistent admin shortcuts bar as before.
+  - Non-admins continue to see the plain "Ask your community admin" message.
+  RFC-030 moved to `rfcs/done/` (v0.14.0).
+
 ## [0.13.0] — 2026-06-12
 
 ### Added
