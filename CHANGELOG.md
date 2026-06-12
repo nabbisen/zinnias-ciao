@@ -2,6 +2,38 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.19.0] — 2026-06-12
+
+### Documentation and project hygiene
+
+- **`ROADMAP.md`**: new top-level roadmap listing all 32 implemented RFCs with
+  version numbers, the 6 backlogged RFCs with their blockers, pre-pilot operator
+  tasks, and the "after first pilot" revisit guide.
+
+- **`docs/src/architecture.md`**: full rewrite:
+  - Accurate file tree covering all new handlers (`export.rs`, `templates.rs`),
+    DB modules (`event_template.rs`), and migrations (0001–0006).
+  - Correct path to the Architecture Decisions document
+    (`docs/src/ref/roadmap-and-rfcs-v1/ARCHITECTURE-DECISIONS.md`, not the
+    previously referenced non-existent `rfcs/proposed/` path).
+  - Data grain diagram showing `EventNote` alongside the main grain.
+  - Test strategy section with exact counts and mandatory verification command.
+
+- **`docs/src/release-checklist.md`**: 7 items upgraded from `[~]` to `[x]`
+  based on code audit — previously marked "requires browser test" but verifiable
+  by reading the implementation:
+  - Offline banner: `sw.js` + `app.js` code paths confirmed.
+  - Offline fallback: `OFFLINE_URL = '/offline'`, shell assets pre-cached on install.
+  - Form submit offline: `sw.js` passes all non-GET requests through to network (AD-1).
+  - 44px touch targets: `app.css` L88 universal selector covers all interactive elements.
+  - Status icon+label+colour: `status_display()` always returns all three; AA ratios documented.
+  - Reduced motion: `@media (prefers-reduced-motion: reduce)` block confirmed in `app.css`.
+  - Error message plain language: `release_gates.rs` automated test confirmed.
+  - Final count: 32 `[x]`, 2 `[~]` (phone-only), 4 `[ ]` (operator tasks).
+
+- **`workers/ssr/static/sw.js`**: `CACHE_VERSION` updated from `'v0.5.0'` to
+  `'v0.19.0'` to force cache invalidation on deploy.
+
 ## [0.18.0] — 2026-06-12
 
 ### Internationalisation

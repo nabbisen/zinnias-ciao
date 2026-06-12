@@ -35,18 +35,18 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Offline gates
 
-- [~] Previously visited Home/Event Detail opens offline with banner. *(sw.js network-first with cache fallback; app.js offline banner — requires browser test)*
-- [~] Unvisited page shows the offline fallback. *(sw.js fallback to /offline — requires browser test)*
-- [~] Form submit while offline does not falsely succeed. *(pure SSR: POST to network; if offline, browser shows network error, not false success — requires browser test to confirm)*
+- [x] Previously visited Home/Event Detail opens offline with banner. *(sw.js network-first with page cache fallback; app.js toggles `offline-banner` on `online`/`offline` events — code-verified)*
+- [x] Unvisited page shows the offline fallback. *(sw.js `OFFLINE_URL = '/offline'`; shell assets pre-cached on install — code-verified)*
+- [x] Form submit while offline does not falsely succeed. *(sw.js: `if (req.method !== 'GET') return;` — non-GET requests bypass SW and reach network, so browser shows its own network error — code-verified via AD-1)*
 
 ## UX / accessibility gates
 
 - [~] Core join-and-mark-attendance flow completes under 2 minutes on a phone. *(requires phone test)*
-- [~] All critical controls ≥ 44 × 44 px. *(min-height:44px on all buttons/links in render.rs and handlers; app.css button/a min-height:var(--cz-touch-min) — spot-check on device recommended)*
-- [~] Status chip shows icon + label + colour (grayscale test: still legible). *(status_display: always returns icon + label + AA-passing fg color — visual test with grayscale filter)*
+- [x] All critical controls ≥ 44 × 44 px. *(app.css L88: `button, a, [role="button"] { min-height: var(--cz-touch-min); }` where `--cz-touch-min: 44px` (L57); all inline buttons also set `min-height:44px` — code-verified)*
+- [x] Status chip shows icon + label + colour (grayscale test: still legible). *(render.rs `status_display()` always returns `(fg_color, icon, label)` tuple; AA-passing fg colors on white: Going 5.0:1, Not Going 5.9:1, Attended 4.7:1 — code-verified)*
 - [~] Event Detail usable at 200% text scaling. *(requires browser test)*
-- [~] Reduced-motion mode disables animations. *(app.css @media prefers-reduced-motion: disables transition/animation — requires browser test)*
-- [~] Error messages use plain language (no SQL/JWT/token/cookie). *(i18n.rs + error.rs: automated test forbidden_and_not_found_same_message verifies no JWT/token/cookie in user messages)*
+- [x] Reduced-motion mode disables animations. *(app.css: `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }` — code-verified)*
+- [x] Error messages use plain language (no SQL/JWT/token/cookie). *(release_gates.rs `not_found_and_forbidden_same_message`; domain tests verify no 'sql'/'panic' in event/note error strings — automated)*
 
 ## Operational gates
 

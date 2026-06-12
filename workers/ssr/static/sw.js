@@ -2,7 +2,7 @@
 // Read-only caching only. No mutation queue. No IndexedDB private store.
 'use strict';
 
-const CACHE_VERSION   = 'v0.5.0';
+const CACHE_VERSION   = 'v0.19.0';
 const SHELL_CACHE     = 'shell-' + CACHE_VERSION;
 const PAGE_CACHE      = 'pages-' + CACHE_VERSION;
 const OFFLINE_URL     = '/offline';
