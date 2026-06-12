@@ -2,6 +2,28 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.26.0] — 2026-06-12
+
+RFC-044 partial: SW version gate and coverage completion.
+
+### Testing / release gates
+
+- **SW `CACHE_VERSION` gate** (RFC-044 §11 step 1). `release_gates.rs` now
+  uses `include_str!` to read `sw.js` and the workspace `Cargo.toml` at test
+  time and asserts `CACHE_VERSION` matches the package version. A mismatch
+  fails `cargo test` immediately, catching forgotten SW version bumps before
+  they ship. The gate was verified to catch real mismatches (tested by
+  temporarily setting `v0.24.0` while on `v0.25.0`).
+- **`Role::is_admin()` contract tests** in `membership.rs`: admin returns
+  true, member returns false, active/removed membership states documented as
+  tests.
+- 179 passing (was 174). Zero warnings.
+
+### Changed
+
+- SW `CACHE_VERSION` updated to `v0.26.0`.
+- RFC-044 status note updated to reflect partial completion.
+
 ## [0.25.0] — 2026-06-12
 
 Query performance pass (RFC-029 / RFC-044 partial) and RFC-043 completion.

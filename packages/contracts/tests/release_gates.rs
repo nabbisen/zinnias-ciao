@@ -166,3 +166,63 @@ fn query_budgets_are_positive_and_ordered() {
     assert!(QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY < 20,
         "Event detail budget {QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY} suggests an N+1 regression");
 }
+
+// ── Service worker version gate (RFC-044 §11 step 1) ─────────────────────
+//
+// sw.js CACHE_VERSION must equal the package version at every release.
+// A mismatch means the service worker will not invalidate old caches on deploy.
+//
+// This test reads both files at test time using include_str! so it fires on
+// every `cargo test` run without any external tooling.
+
+const SW_JS_SOURCE: &str = include_str!("../../../workers/ssr/static/sw.js");
+const WORKSPACE_CARGO_TOML: &str = include_str!("../../../Cargo.toml");
+
+#[test]
+fn sw_cache_version_matches_workspace_version() {
+    // Extract CACHE_VERSION from sw.js:  const CACHE_VERSION = 'vX.Y.Z';
+    let cache_ver = SW_JS_SOURCE
+        .lines()
+        .find(|l| l.trim_start().starts_with("const CACHE_VERSION"))
+        .and_then(|l| {
+            // e.g.  const CACHE_VERSION = 'v0.25.0';
+            let after_eq = l.splitn(2, '=').nth(1)?;
+            let inner = after_eq.trim().trim_start_matches('\'').trim_end_matches(';')
+                .trim_end_matches('\'');
+            // Strip the leading 'v'
+            inner.strip_prefix('v')
+        })
+        .expect("CACHE_VERSION not found in sw.js");
+
+    // Extract version from [workspace.package] block in Cargo.toml.
+    // Find the version line that follows the [workspace.package] header.
+    let workspace_ver = {
+        let mut in_workspace_pkg = false;
+        let mut found = None;
+        for line in WORKSPACE_CARGO_TOML.lines() {
+            let trimmed = line.trim();
+            if trimmed == "[workspace.package]" {
+                in_workspace_pkg = true;
+                continue;
+            }
+            if in_workspace_pkg {
+                if trimmed.starts_with('[') {
+                    break; // left the [workspace.package] section
+                }
+                if trimmed.starts_with("version") {
+                    // version     = "0.25.0"
+                    found = trimmed.splitn(2, '=').nth(1)
+                        .map(|v| v.trim().trim_matches('"').to_owned());
+                    break;
+                }
+            }
+        }
+        found.expect("workspace version not found in Cargo.toml")
+    };
+
+    assert_eq!(
+        cache_ver, workspace_ver,
+        "sw.js CACHE_VERSION 'v{cache_ver}' does not match workspace version '{workspace_ver}'. \
+         Update sw.js CACHE_VERSION when bumping the version."
+    );
+}

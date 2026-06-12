@@ -6,10 +6,10 @@
 **Date:** June 12, 2026
 **Relationship:** Stabilization RFC. Closes deep-review finding P1-4 (D1/subrequest pressure) and provides the live-D1 integration harness that RFC-037, RFC-040, and RFC-041 defer their end-to-end tests to. Refines RFC-029 (query performance discipline) and RFC-015 (testing and release gates).
 
-> **Proposed.** This is tooling/CI work, not a feature fix. None of it ships in
-> v0.23.0. It is the highest-value next step after the P0/P1 correctness fixes
-> because it converts several "verified by reasoning" claims into "verified by
-> a running test."
+> **Proposed (partial).** The compile-level query-budget constants shipped in
+> v0.25.0 (§6.1 option a) and the SW version gate shipped in v0.26.0 (§11 step 1).
+> The integration harness (§6.2) and the race-regression tests (§11 steps 3–5)
+> remain unimplemented. They gate beta, not the first pilot.
 
 ---
 
