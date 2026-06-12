@@ -2,6 +2,38 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.29.0] — 2026-06-12
+
+SSR crate tests fixed; admin handler split; ssr tests included in standard run.
+
+### Fixed
+
+- **Pre-existing broken `render::tests::title_escaped_in_shell`** — the test
+  called `page(...)` which constructs a `worker::Response` via `web-sys::Headers`,
+  a WASM stub that panics in native test runs. The test had been silently failing
+  whenever someone ran `cargo test -p zinnias-ciao-ssr` (not the standard
+  command). Fixed by removing the unreachable `page()` call; the actual assertion
+  (that `escape_html` escapes `<` and `&`) is still exercised.
+
+### Refactored
+
+- **`admin.rs` split (1229 → 22-line facade + 855 + 388 subfiles).**
+  `admin.rs` exceeded the 500 ELOC split threshold by 2.5×. The 16 public
+  functions are now in two focused files under `handlers/admin/`:
+  - `events.rs`: event create, cancel, edit, attendance, hide-note confirmation
+    (~855 lines; large due to multi-field recurrence form)
+  - `members.rs`: invite code generation/revocation and member management
+    (~388 lines)
+  - `admin.rs` becomes a 22-line re-export facade so all callsites in
+    `community.rs` using `super::admin::*` continue to work without changes.
+
+### Testing
+
+- **SSR crate now included in the standard test run.** `package.json` test
+  script and `HANDOFF.md` verify command updated to include
+  `-p zinnias-ciao-ssr`. Total: 207 passing across all three crates
+  (194 domain+contracts, 13 ssr). Zero warnings.
+
 ## [0.28.0] — 2026-06-12
 
 Release-gate hardening: full i18n parity coverage, tested XSS escape boundary.

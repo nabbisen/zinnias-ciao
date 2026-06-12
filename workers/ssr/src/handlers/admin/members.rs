@@ -1,0 +1,388 @@
+//! Admin member handlers — invite codes and member management (RFC-010).
+
+use zinnias_ciao_contracts::auth::token_purpose;
+use worker::{Env, Request, Response, Result};
+
+use crate::audit;
+use crate::authz::require_admin;
+use crate::crypto::{hmac_hex, normalize_invite_code, random_token};
+use crate::db::{self, invite as invite_db, membership as membership_db};
+use crate::form_token;
+use crate::render;
+use crate::session::require_auth;
+use zinnias_ciao_contracts::i18n;
+
+fn redirect(url: &str) -> Result<Response> {
+    let mut r = Response::empty()?;
+    r.headers_mut().set("Location", url)?;
+    Ok(r.with_status(303))
+}
+
+// ── GET /c/:cid/admin/invites ────────────────────────────────────────────
+
+pub async fn get_invites(
+    req: Request,
+    env: &Env,
+    _rid: &str,
+    community_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let _membership = require_admin(&env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let pp = crate::crypto::pepper(env);
+    let gen_token = form_token::issue(&db, &pp, &auth.user_id,
+        token_purpose::GENERATE_INVITE, None).await.unwrap_or_default();
+
+    let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let community_pairs: Vec<(String,String)> = communities_for_switcher.iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+
+    let url = req.url()?;
+    let new_code: Option<String> = url.query_pairs()
+        .find(|(k, _)| k == "code").map(|(_, v)| v.to_string());
+    let flash: Option<String> = url.query_pairs()
+        .find(|(k, _)| k == "flash").map(|(_, v)| v.to_string());
+
+    let new_code_html = new_code.as_deref().map(|c| format!(
+        "<div style=\"background:#edfaf0;border-radius:12px;padding:1rem;margin:1rem 0;border:1px solid #34C759\">\
+         <p style=\"font-size:.8125rem;color:#167A34;margin:0 0 .5rem\">Share with one person only — expires in 24 hours.</p>\
+         <div style=\"font-size:1.5rem;font-weight:700;letter-spacing:.2em;color:#1D1D1F\" aria-label=\"Invite code\">{code}</div>\
+         </div>",
+        code = render::escape_html(c)
+    )).unwrap_or_default();
+
+    let flash_html = flash.map(|f| format!(
+        "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0\">{}</p>",
+        render::escape_html(&f)
+    )).unwrap_or_default();
+
+    // List active codes with per-row revoke tokens.
+    let active_codes = invite_db::list_active_for_community(&db, community_id).await
+        .unwrap_or_default();
+
+    let mut code_rows = String::new();
+    for inv in &active_codes {
+        let revoke_tok = form_token::issue(&db, &pp, &auth.user_id,
+            token_purpose::REVOKE_INVITE, Some(&inv.id)).await.unwrap_or_default();
+        let role_label = if inv.grants_role == "admin" { " · admin invite" } else { "" };
+        let exp_display = inv.expires_at.get(..16).unwrap_or(&inv.expires_at);
+        code_rows.push_str(&format!(
+            "<li style=\"display:flex;align-items:center;justify-content:space-between;\
+             padding:.625rem 0;border-bottom:1px solid #f5f5f7;gap:.5rem\">\
+             <span style=\"font-size:.875rem;color:#1D1D1F\">Expires {exp}{role}</span>\
+             <form method=\"post\" action=\"/c/{cid}/admin/invites/{iid}/revoke\" style=\"margin:0\">\
+               <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
+               <button type=\"submit\" \
+                 style=\"font-size:.8125rem;color:#FF3B30;background:none;border:none;\
+                 padding:.375rem .5rem;cursor:pointer;min-height:44px\" \
+                 aria-label=\"Revoke this invite code\">Revoke</button>\
+             </form></li>",
+            exp  = render::escape_html(exp_display),
+            role = role_label,
+            cid  = render::escape_html(community_id),
+            iid  = render::escape_html(&inv.id),
+            tok  = render::escape_html(&revoke_tok),
+        ));
+    }
+    let codes_html = if active_codes.is_empty() {
+        format!("<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>", i18n::EN_ADMIN_INVITES_NONE)
+    } else {
+        format!("<ul style=\"list-style:none;padding:0;margin:.75rem 0\">{code_rows}</ul>")
+    };
+
+    let nav = render::bottom_nav(community_id, "home");
+    let body = format!(
+        "{header}\
+         <main style=\"padding:1rem 1rem 5rem\">\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">Invite Members</h1>\
+         <p style=\"font-size:.875rem;color:#6e6e73\">Generate a one-time code for one person.</p>\
+         {flash}{new_code}\
+         <form method=\"post\" action=\"/c/{cid}/admin/invites\">\
+           <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
+           <button type=\"submit\" \
+             style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
+             border:none;border-radius:14px;font-size:1rem;font-weight:600;\
+             min-height:44px;cursor:pointer;margin-top:.5rem\">Generate Code</button>\
+         </form>\
+         <section style=\"margin-top:1.5rem\">\
+           <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
+             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">Active codes</h2>\
+           {codes}\
+         </section>\
+         </main>{nav}",
+        header   = render::header_with_switcher(i18n::EN_ADMIN_INVITES_TITLE, community_id, &community_pairs),
+        cid      = render::escape_html(community_id),
+        tok      = render::escape_html(&gen_token),
+        new_code = new_code_html,
+        flash    = flash_html,
+        codes    = codes_html,
+        nav      = nav,
+    );
+    render::page("Invite Members", &body)
+}
+
+// ── POST /c/:cid/admin/invites ───────────────────────────────────────────
+
+pub async fn post_generate_invite(
+    mut req: Request,
+    env: &Env,
+    rid: &str,
+    community_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_admin(&env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let pp = crate::crypto::pepper(env);
+
+    let body = req.form_data().await?;
+    let raw_token = body.get_field("_token").unwrap_or_default();
+    let replay = form_token::consume(&db, &pp, &auth.user_id,
+        token_purpose::GENERATE_INVITE, &raw_token, None).await?;
+    if replay.is_some() {
+        return redirect(&format!("/c/{community_id}/admin/invites"));
+    }
+
+    let code = generate_invite_code();
+    let normalized = normalize_invite_code(&code);
+    let code_hmac = hmac_hex(&pp, &normalized);
+    let invite_id = random_token()[..24].to_owned();
+    let expires_at = db::add_seconds_to_now(86_400);
+
+    invite_db::insert(&db, &invite_id, community_id, &code_hmac,
+        &membership.membership_id, &expires_at, "member").await?;
+
+    let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
+        "invite_code", Some(&invite_id), "generated", None).await;
+
+    redirect(&format!("/c/{community_id}/admin/invites?code={code}"))
+}
+
+// ── POST /c/:cid/admin/invites/:iid/revoke ───────────────────────────────
+
+pub async fn post_revoke_invite(
+    mut req: Request,
+    env: &Env,
+    rid: &str,
+    community_id: &str,
+    invite_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_admin(&env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let pp = crate::crypto::pepper(env);
+
+    let body = req.form_data().await?;
+    let raw_token = body.get_field("_token").unwrap_or_default();
+    let replay = form_token::consume(&db, &pp, &auth.user_id,
+        token_purpose::REVOKE_INVITE, &raw_token, Some(invite_id)).await?;
+    if replay.is_some() {
+        return redirect(&format!("/c/{community_id}/admin/invites"));
+    }
+
+    invite_db::revoke(&db, invite_id, community_id).await?;
+
+    let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
+        "invite_code", Some(invite_id), "revoked", None).await;
+
+    redirect(&format!("/c/{community_id}/admin/invites?flash=Code+revoked"))
+}
+
+// ── GET /c/:cid/admin/members ────────────────────────────────────────────
+
+pub async fn get_members(
+    req: Request,
+    env: &Env,
+    _rid: &str,
+    community_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_admin(&env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let community = db::community::find_active(&db, community_id).await?;
+    let _community_name = community.map(|c| c.name).unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+
+    let members = membership_db::list_all_active(&db, community_id).await?;
+    let member_rows: String = members.iter().map(|m| {
+        let is_self = m.id == membership.membership_id;
+        let remove_btn = if is_self {
+            String::new() // cannot remove yourself
+        } else {
+            format!(
+                "<a href=\"/c/{cid}/admin/members/{mid}/remove\" \
+                 style=\"color:#FF3B30;font-size:.875rem\">Remove</a>",
+                cid = render::escape_html(community_id),
+                mid = render::escape_html(&m.id),
+            )
+        };
+        format!(
+            "<li style=\"display:flex;align-items:center;justify-content:space-between;\
+             padding:.75rem 0;border-bottom:1px solid #f5f5f7\">\
+             <span style=\"font-size:.9375rem\">{name}</span>\
+             {remove}\
+             </li>",
+            name   = render::escape_html(&m.display_name),
+            remove = remove_btn,
+        )
+    }).collect();
+
+    let nav  = render::bottom_nav(community_id, "home");
+    let body = format!(
+        "{header}\
+         <main style=\"padding:1rem 1rem 5rem\">\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">Members</h1>\
+         <ul style=\"list-style:none;padding:0;margin:0\">{rows}</ul>\
+         <a href=\"/c/{cid}/admin/invites\" \
+            style=\"display:block;margin-top:1.5rem;text-align:center;\
+            padding:.875rem;border:2px solid #007AFF;border-radius:14px;\
+            color:#007AFF;text-decoration:none;font-weight:600\">\
+            Generate invite code</a>\
+         </main>{nav}",
+        header = render::header_with_switcher(i18n::EN_ADMIN_MEMBERS_TITLE, community_id, &_community_pairs),
+        rows   = member_rows,
+        cid    = render::escape_html(community_id),
+        nav    = nav,
+    );
+    render::page("Members", &body)
+}
+
+// ── GET /c/:cid/admin/members/:mid/remove ────────────────────────────────
+
+pub async fn get_remove_member(
+    req: Request,
+    env: &Env,
+    _rid: &str,
+    community_id: &str,
+    target_membership_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_admin(&env, &auth, community_id).await?;
+
+    // Cannot remove yourself
+    if target_membership_id == membership.membership_id {
+        return render::not_found();
+    }
+
+    let db = env.d1("DB")?;
+    let pp = crate::crypto::pepper(env);
+    let token = form_token::issue(&db, &pp, &auth.user_id,
+        token_purpose::REMOVE_MEMBER, Some(target_membership_id)).await.unwrap_or_default();
+
+    // Find the target member name
+    let all = membership_db::list_all_active(&db, community_id).await?;
+    let target_name = all.iter()
+        .find(|m| m.id == target_membership_id)
+        .map(|m| m.display_name.as_str())
+        .unwrap_or("this member");
+
+    let community = db::community::find_active(&db, community_id).await?;
+    let _community_name = community.map(|c| c.name).unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    let nav = render::bottom_nav(community_id, "home");
+
+    let body = format!(
+        "{header}\
+         <main style=\"padding:1rem 1rem 5rem\">\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">Remove member?</h1>\
+         <p style=\"font-size:.9375rem;color:#6e6e73\">\
+           Remove <strong>{name}</strong> from this community?<br>\
+           They will no longer be able to see events or notes.\
+         </p>\
+         <div style=\"display:flex;gap:.75rem;margin-top:1.5rem\">\
+           <a href=\"/c/{cid}/admin/members\" \
+              style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
+              text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600\">\
+              Keep Member</a>\
+           <form method=\"post\" \
+             action=\"/c/{cid}/admin/members/{mid}/remove\" style=\"flex:1\">\
+             <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
+             <button type=\"submit\" \
+               style=\"width:100%;padding:.875rem;background:#FF3B30;color:#fff;\
+               border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
+               Remove</button>\
+           </form>\
+         </div></main>{nav}",
+        header = render::header_with_switcher("Remove Member", community_id, &_community_pairs),
+        name   = render::escape_html(target_name),
+        cid    = render::escape_html(community_id),
+        mid    = render::escape_html(target_membership_id),
+        tok    = render::escape_html(&token),
+        nav    = nav,
+    );
+    render::page("Remove Member", &body)
+}
+
+// ── POST /c/:cid/admin/members/:mid/remove ───────────────────────────────
+
+pub async fn post_remove_member(
+    mut req: Request,
+    env: &Env,
+    rid: &str,
+    community_id: &str,
+    target_membership_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_admin(&env, &auth, community_id).await?;
+
+    if target_membership_id == membership.membership_id {
+        return render::not_found();
+    }
+
+    let db = env.d1("DB")?;
+    let pp = crate::crypto::pepper(env);
+
+    let body = req.form_data().await?;
+    let raw_token = body.get_field("_token").unwrap_or_default();
+    let replay = form_token::consume(&db, &pp, &auth.user_id,
+        token_purpose::REMOVE_MEMBER, &raw_token, Some(target_membership_id)).await?;
+    if replay.is_some() {
+        return redirect(&format!("/c/{community_id}/admin/members"));
+    }
+
+    // Last-admin guard (RFC-010 §5)
+    let admin_count = membership_db::count_admins(&db, community_id).await?;
+    let target_role = membership_db::get_role(&db, target_membership_id, community_id).await?;
+    if admin_count <= 1 && target_role.as_deref() == Some("admin") {
+        return render::page("Cannot remove",
+            "<main style=\"padding:2rem\"><p>Cannot remove the last admin. \
+             Transfer the admin role first.</p></main>");
+    }
+
+    membership_db::soft_remove(&db, target_membership_id, community_id).await?;
+    let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
+        "membership", Some(target_membership_id), "removed", None).await;
+
+    redirect(&format!("/c/{community_id}/admin/members"))
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+/// Generate a 6-char invite code from the safe alphabet (no ambiguous chars).
+fn generate_invite_code() -> String {
+    use zinnias_ciao_domain::invite::INVITE_CODE_ALPHABET;
+    let mut bytes = [0u8; 6];
+    getrandom::getrandom(&mut bytes).unwrap_or_default();
+    bytes.iter()
+        .map(|&b| INVITE_CODE_ALPHABET[b as usize % INVITE_CODE_ALPHABET.len()] as char)
+        .collect()
+}

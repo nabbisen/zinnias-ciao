@@ -624,10 +624,14 @@ mod tests {
 
     #[test]
     fn title_escaped_in_shell() {
-        let html = page("<bad>", "").unwrap();
-        // Can't call .text() in non-wasm; just verify escape_html works
-        let escaped = escape_html("<bad>");
+        // Verify the title is properly escaped when inserted into the page shell.
+        // We test escape_html directly here because page() wraps a worker::Response
+        // and cannot be constructed in a native test environment.
+        let escaped = escape_html("<bad>&title");
         assert!(escaped.contains("&lt;bad&gt;"));
+        assert!(escaped.contains("&amp;"));
+        assert!(!escaped.contains('<'));
+        assert!(!escaped.contains('>'));
     }
 
     #[test]
