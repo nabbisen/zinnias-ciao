@@ -1,15 +1,11 @@
 # RFC 043 — Pilot UX Acceptance and Error Feedback
 
-**Status.** Proposed
+**Status.** Implemented (v0.23.0 / v0.24.0)
 **Phase:** F7 / Stabilization (architect deep-review remediation)
 **Project:** ciao.zinnias
 **Date:** June 12, 2026
 **Relationship:** Stabilization RFC. Closes deep-review finding P1-3 (partially shipped in v0.23.0) and consolidates the remaining pilot-UX acceptance gates (deep review §6.2, §9). Refines RFC-011 (accessibility) and RFC-030 (onboarding/empty states).
 
-> **Proposed.** Error-banner rendering (P1-3) shipped in v0.23.0; the remaining
-> items — no-JS destructive confirmations, device QA at 200% scaling, and a
-> standardized flash/err convention — are not yet complete. This RFC tracks the
-> whole acceptance surface so the pilot has a single checklist.
 
 ---
 

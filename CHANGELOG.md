@@ -2,6 +2,44 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.25.0] — 2026-06-12
+
+Query performance pass (RFC-029 / RFC-044 partial) and RFC-043 completion.
+
+### Performance
+
+- **Event Detail N+1s eliminated (RFC-029/RFC-044).** Two per-request N+1
+  patterns are gone:
+  - `attendance_db::list_for_day` was called once per event day inside the
+    render loop. Replaced with a new `list_for_event_days` batch function that
+    fetches all attendance rows for all days of an event in a single `IN`
+    query. For a 7-day recurring event this reduces 7 attendance queries to 1.
+  - `form_token::issue` for `ADMIN_HIDE_NOTE` was called once per other
+    member's note during Event Detail render (effectively N writes to D1 where
+    N = number of notes). Since v0.24.0's RFC-043 work changed admin note
+    removal to a confirmation-page link, the token is no longer needed at
+    render time. The dead token-issue loop was removed from `event.rs`.
+- **Export N+1 eliminated (RFC-029/RFC-044).** `build_export` previously ran
+  O(events × days) D1 queries (per-event days query, per-day attendance query,
+  per-event notes query). Replaced with three batched `IN` queries — all days,
+  all attendance, all notes — making export a flat 8 queries regardless of
+  community size.
+
+### Changed
+
+- `render::note_form` — removed `delete_token` parameter (no longer needed;
+  delete is now a link to the confirmation page, not an embedded form+token).
+- `attendance_db::list_for_event_days` added (batch `IN` variant of
+  `list_for_day`).
+
+### Testing
+
+- **D1 query-budget constants** added to `release_gates.rs` (RFC-044 §6.1
+  compile-level gate): Home ≤ 8, Event Detail single-day ≤ 13, max-recurring
+  ≤ 65, Export ≤ 8. A regression guard asserts these are positive, ordered,
+  and within expected bounds.
+- 174 passing (was 173). Zero warnings.
+
 ## [0.24.0] — 2026-06-12
 
 Completes RFC-043 (pilot UX acceptance): all destructive actions now have

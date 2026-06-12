@@ -76,6 +76,8 @@ pub async fn get_event_detail(
         &db, &membership.membership_id, &day_id_strs,
     ).await?;
     let day_counts = attendance_db::counts_for_days(&db, &day_id_strs, member_count).await?;
+    // Batch-fetch all per-day attendances in one IN query (RFC-029/RFC-044).
+    let all_day_attendances = attendance_db::list_for_event_days(&db, &day_id_strs).await?;
 
     // ── Days section ─────────────────────────────────────────────────────
     let mut days_html = String::new();
@@ -114,9 +116,10 @@ pub async fn get_event_detail(
             "<p style=\"font-size:.875rem;color:#6e6e73\">Going {cg} · No Go {cng} · No answer {cna}</p>",
         );
 
-        // Participant rows for this day
+        // Participant rows for this day — from the pre-fetched batch, no N+1.
         let mut participants: Vec<ParticipantEntry> = Vec::new();
-        let day_attendances = attendance_db::list_for_day(&db, &day.id).await?;
+        let empty_day_att = Vec::new();
+        let day_attendances = all_day_attendances.get(&day.id).unwrap_or(&empty_day_att);
         let att_map: std::collections::HashMap<&str, Option<&str>> = day_attendances
             .iter()
             .map(|a| (a.membership_id.as_str(), a.status.as_deref()))
@@ -168,33 +171,15 @@ pub async fn get_event_detail(
         flash,
     );
 
-    // ── Other members' notes (admin gets a hide button per note) ────
+    // ── Other members' notes (admin gets a link to the confirmation page) ────
     let mut others_html = String::new();
     for n in all_notes.iter().filter(|n| n.membership_id != membership.membership_id) {
         let name = name_map.get(&n.membership_id)
             .map(|s| s.as_str()).unwrap_or(i18n::EN_EVENT_MEMBER_FALLBACK);
+        // The hide button is now a link to GET …/notes/:mid/hide (RFC-043).
+        // Token is issued on that confirmation page — no per-note DB write here.
         let hide_btn = if membership.is_admin() {
-            let hide_tok = form_token::issue(
-                &db, &pp, &auth.user_id,
-                token_purpose::ADMIN_HIDE_NOTE, Some(event_id),
-            ).await.unwrap_or_default();
-            format!(
-                "<form method=\"post\" \
-                  action=\"/c/{cid}/admin/events/{eid}/notes/{mid}/hide\" \
-                  style=\"display:inline;margin-left:.5rem\">\
-                  <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
-                  <button type=\"submit\" \
-                    style=\"font-size:.75rem;color:#FF3B30;background:none;border:none;\
-                    cursor:pointer;padding:.125rem .25rem;min-height:44px\" \
-                    aria-label=\"Hide this note\">\
-                    Hide\
-                  </button>\
-                </form>",
-                cid = render::escape_html(community_id),
-                eid = render::escape_html(event_id),
-                mid = render::escape_html(&n.membership_id),
-                tok = render::escape_html(&hide_tok),
-            )
+            render::admin_note_hide_form(community_id, event_id, &n.membership_id, "")
         } else { String::new() };
         others_html.push_str(&format!(
             "<div style=\"padding:.75rem 0;border-bottom:1px solid #f5f5f7\">\

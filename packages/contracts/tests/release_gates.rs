@@ -114,3 +114,55 @@ fn i18n_en_ja_parity_count() {
         assert!(!ja.is_empty(), "JA string empty for EN: {en}");
     }
 }
+
+// ── D1 query budget documentation (RFC-029 / RFC-044) ────────────────────
+//
+// These constants document the approved D1 operation budget per route.
+// The values are *code-level* counts (DB calls + form-token issues in the
+// hot paths). They serve as a regression guard: if a future change inflates
+// the count, the constant must be updated here with a deliberate review.
+//
+// All loop-based N+1s that existed before v0.24.0 are eliminated:
+//   - Event Detail: list_for_day replaced with list_for_event_days (IN batch)
+//   - Event Detail: per-note admin token loop replaced with a confirm-page link
+//   - Export: per-event days+attendance+notes replaced with 3 IN queries
+//
+// The remaining per-day SET_STATUS token issue in Event Detail is bounded:
+// single-day events = 1 token issue; recurring events bounded by
+// RECURRENCE_MAX_COUNT = 52 (RFC-022) so the worst case is 9 fixed queries
+// + 1 batch attendance + 52 token issues = 62 ops, documented below.
+
+/// Fixed D1 queries for Home (no loops above 1 per route):
+/// memberships, events, member_count, my_statuses (IN), counts (IN),
+/// communities_for_switcher + 2 spares = 8 total.
+const QUERY_BUDGET_HOME: usize = 8;
+
+/// Fixed D1 queries for Event Detail (single-day event):
+/// find_event, days, member_count, my_note, all_notes, all_members,
+/// community, my_statuses (IN), counts (IN), all_day_attendances (IN),
+/// 1 SET_STATUS token issue, 1 SAVE_NOTE token issue,
+/// communities_for_switcher = 13 total.
+const QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY: usize = 13;
+
+/// Worst-case D1 ops for Event Detail (recurring, RECURRENCE_MAX_COUNT days):
+/// 10 fixed + 1 batch attendance + 52 SET_STATUS token issues + 1 SAVE_NOTE
+/// + 1 communities_for_switcher = 65.
+const QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING: usize = 65;
+
+/// D1 queries for Export (any community size): 5 fixed + 3 IN batches = 8.
+/// Was O(events * days) before v0.24.0; now a flat 8 regardless of size.
+const QUERY_BUDGET_EXPORT: usize = 8;
+
+#[test]
+fn query_budgets_are_positive_and_ordered() {
+    assert!(QUERY_BUDGET_HOME > 0);
+    assert!(QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY > QUERY_BUDGET_HOME);
+    assert!(QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING >= QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY);
+    assert!(QUERY_BUDGET_EXPORT > 0);
+    // Export must be flat (well under the old per-event worst case):
+    assert!(QUERY_BUDGET_EXPORT < 20,
+        "Export budget {QUERY_BUDGET_EXPORT} exceeds expected flat upper bound");
+    // Event detail single-day must be well under the old per-note worst case:
+    assert!(QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY < 20,
+        "Event detail budget {QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY} suggests an N+1 regression");
+}

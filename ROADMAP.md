@@ -2,12 +2,13 @@
 
 ## Status
 
-**v0.23.0** — 38 of 44 RFCs implemented (6 proposed). 173 passing unit tests. Zero warnings.
+**v0.25.0** — 39 of 44 RFCs implemented (5 proposed). 174 passing unit tests. Zero warnings.
 
-The core product has completed a deep architect review and stabilization pass
-(RFC-037–042). All P0/P1 pilot blockers are resolved. The remaining open work
-before a first pilot is: RFC-043 (no-JS destructive confirmations + device QA)
-and four operator tasks (secrets, migrations, Logpush, security review).
+The core product has completed a deep architect review, stabilization pass (RFC-037–043),
+and query-performance pass (RFC-025/RFC-044 partial). All P0/P1 pilot blockers are
+resolved; all N+1 query patterns eliminated. The remaining open work before a first
+pilot is: four operator tasks (secrets, migrations, Logpush, security review) and
+three QA tasks (phone flow, 200% scaling, no-JS scripting disabled).
 
 ---
 

@@ -198,6 +198,90 @@ async fn build_export(
         .bind(&[community_id.into()])?
         .all().await?.results::<serde_json::Value>()?;
 
+    // Collect all event IDs for the batched sub-queries below.
+    let event_ids: Vec<&str> = events_raw.iter()
+        .filter_map(|ev| ev.get("id").and_then(|x| x.as_str()))
+        .collect();
+
+    if event_ids.is_empty() {
+        let community = community_db::find_active(db, community_id).await?;
+        return Ok(serde_json::json!({
+            "export_version": 1,
+            "exported_at":    db::now_utc(),
+            "community": {
+                "id":   community_id,
+                "name": community.map(|c| c.name).unwrap_or_default(),
+            },
+            "members": members,
+            "events":  [],
+        }));
+    }
+
+    // Batch 1: all days for all events in one IN query.
+    let ev_placeholders = zinnias_ciao_contracts::build_in_placeholders(event_ids.len(), 0);
+    let ev_binds: Vec<worker::wasm_bindgen::JsValue> = event_ids.iter().map(|id| (*id).into()).collect();
+    let all_days_raw = db
+        .prepare(&format!(
+            "SELECT id, event_id, seq, day_date, starts_at_utc, ends_at_utc \
+             FROM event_days WHERE event_id IN ({ev_placeholders}) ORDER BY event_id, seq ASC"
+        ))
+        .bind(&ev_binds)?
+        .all().await?.results::<serde_json::Value>()?;
+
+    // Collect all day IDs for the attendance batch.
+    let all_day_ids: Vec<String> = all_days_raw.iter()
+        .filter_map(|d| d.get("id").and_then(|x| x.as_str()).map(|s| s.to_owned()))
+        .collect();
+    let day_id_refs: Vec<&str> = all_day_ids.iter().map(|s| s.as_str()).collect();
+
+    // Batch 2: all attendance rows for all days in one IN query.
+    let mut att_by_day: std::collections::HashMap<String, Vec<serde_json::Value>> =
+        std::collections::HashMap::new();
+    if !all_day_ids.is_empty() {
+        let day_placeholders = zinnias_ciao_contracts::build_in_placeholders(all_day_ids.len(), 0);
+        let day_binds: Vec<worker::wasm_bindgen::JsValue> = day_id_refs.iter().map(|id| (*id).into()).collect();
+        let att_raw = db
+            .prepare(&format!(
+                "SELECT event_day_id, membership_id, status, status_updated_at \
+                 FROM attendances WHERE event_day_id IN ({day_placeholders})"
+            ))
+            .bind(&day_binds)?
+            .all().await?.results::<serde_json::Value>()?;
+        for a in att_raw {
+            let did = a.get("event_day_id").and_then(|x| x.as_str()).unwrap_or("").to_owned();
+            att_by_day.entry(did).or_default().push(a);
+        }
+    }
+
+    // Batch 3: all visible notes for all events in one IN query.
+    let notes_sql = format!(
+        "SELECT event_id, membership_id, note, note_updated_at \
+         FROM event_notes \
+         WHERE event_id IN ({ev_placeholders}) \
+           AND note_deleted_at IS NULL \
+           AND hidden_by_admin_at IS NULL \
+         ORDER BY event_id, note_updated_at ASC"
+    );
+    let notes_all_raw = db
+        .prepare(&notes_sql)
+        .bind(&ev_binds)?
+        .all().await?.results::<serde_json::Value>()?;
+    let mut notes_by_event: std::collections::HashMap<String, Vec<serde_json::Value>> =
+        std::collections::HashMap::new();
+    for n in notes_all_raw {
+        let eid = n.get("event_id").and_then(|x| x.as_str()).unwrap_or("").to_owned();
+        notes_by_event.entry(eid).or_default().push(n);
+    }
+
+    // Group days by event_id.
+    let mut days_by_event: std::collections::HashMap<&str, Vec<&serde_json::Value>> =
+        std::collections::HashMap::new();
+    for day in &all_days_raw {
+        let eid = day.get("event_id").and_then(|x| x.as_str()).unwrap_or("");
+        days_by_event.entry(eid).or_default().push(day);
+    }
+
+    // Assemble events without any additional DB queries.
     let mut events_out = Vec::new();
     for ev in &events_raw {
         let event_id = match ev.get("id").and_then(|x| x.as_str()) {
@@ -205,69 +289,41 @@ async fn build_export(
             None => continue,
         };
 
-        // Days
-        let days_raw = db
-            .prepare(
-                "SELECT id, seq, day_date, starts_at_utc, ends_at_utc \
-                 FROM event_days WHERE event_id = ?1 ORDER BY seq ASC",
-            )
-            .bind(&[event_id.into()])?
-            .all().await?.results::<serde_json::Value>()?;
+        let days_out: Vec<serde_json::Value> = days_by_event.get(event_id)
+            .map(|days| days.iter().map(|day| {
+                let day_id = day.get("id").and_then(|x| x.as_str()).unwrap_or("");
+                let attendance: Vec<serde_json::Value> = att_by_day.get(day_id)
+                    .map(|rows| rows.iter().map(|a| {
+                        let mid  = a.get("membership_id").and_then(|x| x.as_str()).unwrap_or("");
+                        let name = name_map.get(mid).map(|s| s.as_str()).unwrap_or("[removed member]");
+                        serde_json::json!({
+                            "member":     name,
+                            "status":     a.get("status").and_then(|x| x.as_str()).unwrap_or("no_answer"),
+                            "updated_at": a.get("status_updated_at").and_then(|x| x.as_str()),
+                        })
+                    }).collect())
+                    .unwrap_or_default();
+                serde_json::json!({
+                    "seq":        day.get("seq").and_then(|x| x.as_u64()),
+                    "date":       day.get("day_date").and_then(|x| x.as_str()),
+                    "starts_at":  day.get("starts_at_utc").and_then(|x| x.as_str()),
+                    "ends_at":    day.get("ends_at_utc").and_then(|x| x.as_str()),
+                    "attendance": attendance,
+                })
+            }).collect())
+            .unwrap_or_default();
 
-        let mut days_out = Vec::new();
-        for day in &days_raw {
-            let day_id = day.get("id").and_then(|x| x.as_str()).unwrap_or("");
-
-            // Attendance for this day
-            let att_raw = db
-                .prepare(
-                    "SELECT membership_id, status, status_updated_at \
-                     FROM attendances WHERE event_day_id = ?1",
-                )
-                .bind(&[day_id.into()])?
-                .all().await?.results::<serde_json::Value>()?;
-
-            let attendance: Vec<serde_json::Value> = att_raw.iter().map(|a| {
-                let mid  = a.get("membership_id").and_then(|x| x.as_str()).unwrap_or("");
+        let notes: Vec<serde_json::Value> = notes_by_event.get(event_id)
+            .map(|ns| ns.iter().map(|n| {
+                let mid  = n.get("membership_id").and_then(|x| x.as_str()).unwrap_or("");
                 let name = name_map.get(mid).map(|s| s.as_str()).unwrap_or("[removed member]");
                 serde_json::json!({
                     "member":     name,
-                    "status":     a.get("status").and_then(|x| x.as_str()).unwrap_or("no_answer"),
-                    "updated_at": a.get("status_updated_at").and_then(|x| x.as_str()),
+                    "note":       n.get("note").and_then(|x| x.as_str()).unwrap_or(""),
+                    "updated_at": n.get("note_updated_at").and_then(|x| x.as_str()),
                 })
-            }).collect();
-
-            days_out.push(serde_json::json!({
-                "seq":          day.get("seq").and_then(|x| x.as_u64()),
-                "date":         day.get("day_date").and_then(|x| x.as_str()),
-                "starts_at":    day.get("starts_at_utc").and_then(|x| x.as_str()),
-                "ends_at":      day.get("ends_at_utc").and_then(|x| x.as_str()),
-                "attendance":   attendance,
-            }));
-        }
-
-        // Notes (visible only — not deleted or admin-hidden)
-        let notes_raw = db
-            .prepare(
-                "SELECT membership_id, note, note_updated_at \
-                 FROM event_notes \
-                 WHERE event_id = ?1 \
-                   AND note_deleted_at IS NULL \
-                   AND hidden_by_admin_at IS NULL \
-                 ORDER BY note_updated_at ASC",
-            )
-            .bind(&[event_id.into()])?
-            .all().await?.results::<serde_json::Value>()?;
-
-        let notes: Vec<serde_json::Value> = notes_raw.iter().map(|n| {
-            let mid  = n.get("membership_id").and_then(|x| x.as_str()).unwrap_or("");
-            let name = name_map.get(mid).map(|s| s.as_str()).unwrap_or("[removed member]");
-            serde_json::json!({
-                "member":     name,
-                "note":       n.get("note").and_then(|x| x.as_str()).unwrap_or(""),
-                "updated_at": n.get("note_updated_at").and_then(|x| x.as_str()),
-            })
-        }).collect();
+            }).collect())
+            .unwrap_or_default();
 
         events_out.push(serde_json::json!({
             "id":          event_id,

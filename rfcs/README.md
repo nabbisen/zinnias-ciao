@@ -47,6 +47,7 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 040 | [Event Edit Contract](./done/040-event-edit-contract.md) | v0.23.0 |
 | 041 | [Atomic Invite Redemption](./done/041-atomic-invite-redemption.md) | v0.23.0 |
 | 042 | [Pilot Offline and Private Cache Contract](./done/042-pilot-offline-and-private-cache-contract.md) | v0.23.0 |
+| 043 | [Pilot UX Acceptance and Error Feedback](./done/043-pilot-ux-acceptance-and-error-feedback.md) | v0.23.0 / v0.24.0 |
 
 ## Also Done
 
@@ -74,7 +75,6 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 
 | ID | Title | File | Note |
 |----|-------|------|------|
-| 043 | Pilot UX Acceptance and Error Feedback | [./proposed/043-pilot-ux-acceptance-and-error-feedback.md](./proposed/043-pilot-ux-acceptance-and-error-feedback.md) | Error banners shipped v0.23.0; no-JS confirmations + device QA open |
 | 044 | D1 Query-Budget Gate and Integration Test Harness | [./proposed/044-d1-query-budget-gate-and-integration-test-harness.md](./proposed/044-d1-query-budget-gate-and-integration-test-harness.md) | Provides the live-D1 harness for RFC-037/040/041 deferred tests |
 
 ## Archive

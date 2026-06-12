@@ -75,6 +75,46 @@ pub async fn list_for_day(
     }).collect())
 }
 
+/// Fetch all attendance rows for multiple event days in a single `IN` query
+/// (RFC-029 / RFC-044: no per-day N+1). Returns a map from `event_day_id` to
+/// the list of attendance rows for that day.
+pub async fn list_for_event_days(
+    db: &D1Database,
+    day_ids: &[&str],
+) -> Result<std::collections::HashMap<String, Vec<AttendanceRow>>> {
+    if day_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let placeholders = zinnias_ciao_contracts::build_in_placeholders(day_ids.len(), 0);
+    let sql = format!(
+        "SELECT event_day_id, membership_id, status, status_updated_at \
+         FROM attendances WHERE event_day_id IN ({placeholders})"
+    );
+    let binds: Vec<worker::wasm_bindgen::JsValue> =
+        day_ids.iter().map(|id| (*id).into()).collect();
+    let rows = db.prepare(&sql)
+        .bind(&binds)?
+        .all().await?
+        .results::<serde_json::Value>()?;
+
+    let mut out: std::collections::HashMap<String, Vec<AttendanceRow>> =
+        std::collections::HashMap::new();
+    for v in rows {
+        if let Some(row) = (|| -> Option<AttendanceRow> {
+            Some(AttendanceRow {
+                event_day_id:      v.get("event_day_id")?.as_str()?.to_owned(),
+                membership_id:     v.get("membership_id")?.as_str()?.to_owned(),
+                status:            v.get("status").and_then(|x| x.as_str()).map(|s| s.to_owned()),
+                status_updated_at: v.get("status_updated_at").and_then(|x| x.as_str()).map(|s| s.to_owned()),
+            })
+        })() {
+            out.entry(row.event_day_id.clone()).or_default().push(row);
+        }
+    }
+    Ok(out)
+}
+
+
 /// Status counts for one day. `active_member_count` is used to derive `no_answer`.
 pub async fn counts_for_day(
     db: &D1Database,
