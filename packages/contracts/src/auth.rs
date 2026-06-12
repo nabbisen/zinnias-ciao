@@ -27,6 +27,8 @@ pub mod token_purpose {
     pub const REVOKE_INVITE: &str = "revoke_invite";
     pub const CALENDAR_REGENERATE: &str = "calendar_regenerate";
     pub const COMMUNITY_EXPORT: &str = "community_export";
+    pub const CREATE_TEMPLATE: &str = "create_template";
+    pub const DELETE_TEMPLATE: &str = "delete_template";
     pub const CALENDAR_REVOKE: &str = "calendar_revoke";
     pub const REDEEM_INVITE: &str = "redeem_invite";
     pub const JOIN_PROFILE: &str = "join_profile";

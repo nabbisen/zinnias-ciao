@@ -142,6 +142,8 @@ fn all_token_purposes_are_unique() {
         token_purpose::CALENDAR_REGENERATE,
         token_purpose::CALENDAR_REVOKE,
         token_purpose::COMMUNITY_EXPORT,
+        token_purpose::CREATE_TEMPLATE,
+        token_purpose::DELETE_TEMPLATE,
         token_purpose::REDEEM_INVITE,
         token_purpose::JOIN_PROFILE,
         token_purpose::LOGOUT,

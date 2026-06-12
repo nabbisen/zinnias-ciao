@@ -45,11 +45,31 @@ pub async fn get_create_event(
     let token = form_token::issue(&db, &pp, &auth.user_id,
         token_purpose::CREATE_EVENT, None).await.unwrap_or_default();
 
-    let community = db::community::find_active(&db, community_id).await?;
-    let _community_name = community.map(|c| c.name).unwrap_or_default();
+    let _community = db::community::find_active(&db, community_id).await?;
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav = render::bottom_nav(community_id, "home");
+
+    // RFC-032: pre-fill from template if ?template=TID is present.
+    let url = req.url()?;
+    let template_id = url.query_pairs().find(|(k,_)| k == "template").map(|(_,v)| v.to_string());
+    let (prefill_title, prefill_location) = if let Some(ref tid) = template_id {
+        let tmpl = db::event_template::find_active(&db, tid, community_id).await.ok().flatten();
+        (
+            tmpl.as_ref().map(|t| t.title.clone()),
+            tmpl.as_ref().and_then(|t| t.location.clone()),
+        )
+    } else {
+        (None, None)
+    };
+
+    let templates_link = format!(
+        "<a href=\"/c/{cid}/admin/templates\" \
+           style=\"display:block;text-align:center;color:#007AFF;\
+           font-size:.875rem;margin-top:1rem;min-height:44px;line-height:44px\">\
+           Use a template</a>",
+        cid = render::escape_html(community_id),
+    );
 
     let body = format!(
         "{header}\
@@ -61,13 +81,16 @@ pub async fn get_create_event(
            <button type=\"submit\" style=\"width:100%;padding:.875rem;background:#007AFF;\
            color:#fff;border:none;border-radius:14px;font-size:1rem;font-weight:600;\
            min-height:44px;cursor:pointer;margin-top:1rem\">{submit}</button>\
-         </form></main>{nav}",
-        header  = render::header_with_switcher(i18n::EN_ADMIN_CREATE_EVENT_TITLE, community_id, &_community_pairs),
-        cid     = render::escape_html(community_id),
-        tok     = render::escape_html(&token),
-        fields  = event_form_fields(None, None, None, None),
-        submit  = i18n::EN_ADMIN_CREATE_EVENT_SUBMIT,
-        nav     = nav,
+         </form>\
+         {tmpl_link}\
+         </main>{nav}",
+        header    = render::header_with_switcher(i18n::EN_ADMIN_CREATE_EVENT_TITLE, community_id, &_community_pairs),
+        cid       = render::escape_html(community_id),
+        tok       = render::escape_html(&token),
+        fields    = event_form_fields(prefill_title.as_deref(), prefill_location.as_deref(), None, None),
+        submit    = i18n::EN_ADMIN_CREATE_EVENT_SUBMIT,
+        tmpl_link = templates_link,
+        nav       = nav,
     );
     render::page(i18n::EN_ADMIN_CREATE_EVENT_TITLE, &body)
 }

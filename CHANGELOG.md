@@ -2,6 +2,33 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.16.0] — 2026-06-12
+
+### Added
+
+- **RFC-032 — Event templates and quick create.**
+  - New migration: `migrations/0005_event_templates.sql` — `event_templates` table
+    scoped to community; stores title (1–80 chars), optional location (≤120),
+    optional description (≤500), optional default duration in minutes, active flag.
+    Partial index on `(community_id) WHERE is_active = 1`.
+  - New `db/event_template.rs`: `list_active`, `find_active`, `insert` (nullable
+    fields bound via `worker::wasm_bindgen::JsValue::NULL`), `soft_delete`.
+  - New `handlers/templates.rs`:
+    - `GET /c/:cid/admin/templates` — lists active templates (each with a "Use"
+      link and a CSRF-guarded delete button) plus a create form with title,
+      location, and optional duration fields.
+    - `POST /c/:cid/admin/templates` — validates `CREATE_TEMPLATE` form token,
+      inserts template, audits, redirects with flash.
+    - `POST /c/:cid/admin/templates/:tid/delete` — validates `DELETE_TEMPLATE`
+      form token, soft-deletes, audits, redirects with flash.
+  - `handlers/admin.rs` `get_create_event`: accepts `?template=:tid` query
+    parameter; fetches the template and pre-fills title and location into the
+    event form. Shows "Use a template" link below the submit button.
+  - `contracts/src/auth.rs`: `CREATE_TEMPLATE` and `DELETE_TEMPLATE` token
+    purposes (17 total).
+  - Token uniqueness and regression tests updated.
+  - RFC-032 moved to `rfcs/done/` (v0.16.0).
+
 ## [0.15.0] — 2026-06-12
 
 ### Added

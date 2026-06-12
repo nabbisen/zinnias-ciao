@@ -10,3 +10,4 @@ pub mod home;
 pub mod join;
 pub mod me;
 pub mod static_files;
+pub mod templates;

@@ -53,6 +53,7 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
                 "members" => super::admin::get_members(req, env, rid, cid).await,
                 "export" => super::export::get_export_page(req, env, rid, cid).await,
                 "export/json" => super::export::get_export_json(req, env, rid, cid).await,
+                "templates" => super::templates::get_templates(req, env, rid, cid).await,
                 t if t.starts_with("members/") => {
                     let (mid, sub) = split_once(&t[8..], '/');
                     if sub == "remove" {
@@ -131,6 +132,18 @@ pub async fn dispatch_post(req: Request, env: &Env, rid: &str, path: &str) -> Re
         }
         "me/calendar/regenerate" => super::calendar::post_regenerate_calendar(req, env, rid, cid).await,
         "me/calendar/revoke"      => super::calendar::post_revoke_calendar(req, env, rid, cid).await,
+        t if t.starts_with("admin/templates") => {
+            let tail = &t[16..]; // after "admin/templates"
+            if tail.is_empty() || tail == "/" {
+                super::templates::post_create_template(req, env, rid, cid).await
+            } else {
+                // "/TID/delete"
+                let (tid, action) = split_once(tail.trim_start_matches('/'), '/');
+                if action == "delete" {
+                    super::templates::post_delete_template(req, env, rid, cid, tid).await
+                } else { render::not_found() }
+            }
+        }
 
         _ => render::not_found(),
     }
