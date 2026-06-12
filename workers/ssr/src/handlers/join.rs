@@ -32,7 +32,7 @@ pub async fn get_join(req: Request, env: &Env, _rid: &str) -> Result<Response> {
     // Issue a form token for the join POST (CSRF, AD-4).
     // We use a placeholder user_id for pre-auth tokens; the token is
     // bound to the purpose so it cannot be replayed for another action.
-    let pepper = get_pepper(&env);
+    let pepper = crate::crypto::pepper(&env);
     let db = env.d1("DB")?;
     let anon_token =
         form_token::issue(&db, &pepper, "", token_purpose::REDEEM_INVITE, None).await?;
@@ -66,7 +66,7 @@ pub async fn post_join(mut req: Request, env: &Env, _rid: &str) -> Result<Respon
     }
 
     // Validate the form token (CSRF).
-    let pepper = get_pepper(&env);
+    let pepper = crate::crypto::pepper(&env);
     let db = env.d1("DB")?;
     // For anon tokens we used user_id = ""
     let _ = form_token::consume(
@@ -161,7 +161,7 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
         return redirect("/join");
     }
 
-    let pepper = get_pepper(&env);
+    let pepper = crate::crypto::pepper(&env);
     let ticket_hmac = hmac_hex(&pepper, ticket_value);
 
     // Validate profile form token.
@@ -190,28 +190,36 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
     }
 
     // ── Redemption sequence ───────────────────────────────────────────────
-    // D1 via worker-rs does not support multi-statement transactions.
-    // Steps execute sequentially; partial failure (e.g. membership insert fails
-    // after user insert) leaves an orphaned users row — harmless since the user
-    // can only access communities via an active membership.
-    // The invite is marked used in step 3; if steps 1–2 fail the invite remains
-    // valid for a retry. This is acceptable: the form token prevents double-
-    // submission from the same browser session.
-    // Fetch the invite to get grants_role. The code was already validated in
-    // post_join; we look up by ID here to retrieve the role it confers.
+    // D1 via worker-rs does not support multi-statement transactions, so we
+    // make the invite the single point of serialization: claim it FIRST with
+    // a conditional UPDATE (used_at IS NULL AND not revoked AND not expired).
+    // Only the caller that wins that atomic transition proceeds to create the
+    // user/membership/session. Concurrent submissions of the same invite lose
+    // the race and are redirected without creating a second member.
+    //
+    // We need a membership_id for used_by_membership_id, so we generate IDs up
+    // front but only persist them after winning the claim.
     let grants_role = invite_db::find_by_id(&db, &invite_id)
         .await?
         .map(|inv| inv.grants_role)
         .unwrap_or_else(|| "member".to_owned());
 
-    // 1. Create user (if new)
     let user_id = random_token();
+    let membership_id = random_token();
+
+    // 1. Claim the invite atomically. If we don't win, someone already redeemed
+    //    it (or it expired/was revoked) — redirect without creating records.
+    let won = invite_db::mark_used(&db, &invite_id, &membership_id).await?;
+    if !won {
+        return redirect("/join");
+    }
+
+    // 2. Create user.
     membership_db::insert_user(&db, &user_id).await?;
 
-    // 2. Create membership — role comes from the invite code, not hardcoded.
+    // 3. Create membership — role comes from the invite code, not hardcoded.
     //    setup.mjs seeds the bootstrap invite with grants_role='admin'.
     //    Admin-generated invites for new members use grants_role='member' (default).
-    let membership_id = random_token();
     membership_db::insert_membership(
         &db,
         &membership_id,
@@ -221,9 +229,6 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
         &display_name,
     )
     .await?;
-
-    // 3. Mark invite used
-    invite_db::mark_used(&db, &invite_id, &membership_id).await?;
 
     // 4. Create session
     let session_secret = random_token();
@@ -246,7 +251,7 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
 
     // 6. Set session cookie and redirect to home.
     let cookie_domain = get_domain(&env);
-    let session_cookie = build_session_cookie(&session_secret, &cookie_domain);
+    let session_cookie = build_session_cookie(&session_secret, cookie_domain.as_deref());
     let clear_join = "__join_ticket=; Max-Age=0; Path=/join; HttpOnly; Secure; SameSite=Strict";
     let clear_ptoken = "__join_ptoken=; Max-Age=0; Path=/join; HttpOnly; Secure; SameSite=Strict";
 
@@ -259,16 +264,15 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-fn get_pepper(env: &Env) -> String {
-    env.secret("HMAC_PEPPER")
-        .map(|s| s.to_string())
-        .unwrap_or_else(|_| "dev-pepper-change-in-production".to_string())
-}
 
-fn get_domain(env: &Env) -> String {
+/// The cookie Domain attribute. Read from the `SESSION_COOKIE_DOMAIN` var
+/// (a normal `[vars]` binding — the domain is not secret material).
+/// Returns `None` when unset/empty so the cookie becomes host-only.
+fn get_domain(env: &Env) -> Option<String> {
     env.var("SESSION_COOKIE_DOMAIN")
+        .ok()
         .map(|s| s.to_string())
-        .unwrap_or_else(|_| "localhost".to_string())
+        .filter(|s| !s.is_empty())
 }
 
 fn extract_cookie(req: &Request, name: &str) -> Option<String> {
@@ -283,7 +287,7 @@ fn extract_cookie(req: &Request, name: &str) -> Option<String> {
 }
 
 async fn refresh_anon_token(env: &Env) -> Result<String> {
-    let pepper = get_pepper(env);
+    let pepper = crate::crypto::pepper(env);
     let db = env.d1("DB")?;
     form_token::issue(&db, &pepper, "", token_purpose::REDEEM_INVITE, None).await
 }

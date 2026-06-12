@@ -78,17 +78,25 @@ pub async fn find_by_id(db: &D1Database, invite_id: &str) -> Result<Option<Invit
 }
 
 /// Mark an invite code as used (atomic with session/membership creation in the handler).
-pub async fn mark_used(db: &D1Database, invite_id: &str, membership_id: &str) -> Result<()> {
+/// Atomically mark an invite used, but only if it is still valid (unused,
+/// unrevoked, unexpired). Returns `true` if THIS call performed the transition
+/// (changed exactly one row), `false` if the invite was already used/revoked/
+/// expired. Callers must check the boolean to enforce one-time use under races.
+pub async fn mark_used(db: &D1Database, invite_id: &str, membership_id: &str) -> Result<bool> {
     let now = now_utc();
-    db.prepare(
+    let res = db.prepare(
         "UPDATE invite_codes \
          SET used_at = ?1, used_by_membership_id = ?2 \
-         WHERE id = ?3",
+         WHERE id = ?3 \
+           AND used_at IS NULL \
+           AND revoked_at IS NULL \
+           AND expires_at > ?1",
     )
     .bind(&[now.as_str().into(), membership_id.into(), invite_id.into()])?
     .run()
     .await?;
-    Ok(())
+    let changed = res.meta().ok().flatten().and_then(|m| m.changes).unwrap_or(0);
+    Ok(changed == 1)
 }
 
 /// Revoke an unused invite code (admin action — sets revoked_at).

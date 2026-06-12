@@ -45,6 +45,8 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         // ── Member area ───────────────────────────────────────────────────
         (Method::Get, "/") | (Method::Get, "/c") =>
             handlers::home::redirect_to_home(req, &env, &request_id).await,
+        (Method::Get, "/switch") =>
+            handlers::community::get_switch(req, &env, &request_id).await,
         (Method::Get, p) if p.starts_with("/c/") =>
             handlers::community::dispatch_get(req, &env, &request_id, p).await,
         (Method::Post, p) if p.starts_with("/c/") =>

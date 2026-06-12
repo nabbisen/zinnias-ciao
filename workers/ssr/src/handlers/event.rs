@@ -21,11 +21,6 @@ use zinnias_ciao_domain::{
     validate_note,
 };
 
-fn pepper(env: &Env) -> String {
-    env.secret("HMAC_PEPPER")
-        .map(|s| s.to_string())
-        .unwrap_or_else(|_| "dev-pepper-change-in-production".to_string())
-}
 
 fn redirect(url: &str) -> Result<Response> {
     let mut r = Response::empty()?;
@@ -42,6 +37,7 @@ pub async fn get_event_detail(
     community_id: &str,
     event_id: &str,
     flash: Option<&str>,
+    err: Option<&str>,
 ) -> Result<Response> {
     let auth = match require_auth(&req, &env).await {
         Ok(a) => a,
@@ -49,7 +45,7 @@ pub async fn get_event_detail(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
         Some(e) => e,
@@ -100,7 +96,7 @@ pub async fn get_event_detail(
 
         // Issue a status form token
         let status_token = form_token::issue(
-            &db, &pp, &membership.membership_id,
+            &db, &pp, &auth.user_id,
             token_purpose::SET_STATUS, Some(&day.id),
         ).await.unwrap_or_default();
 
@@ -166,7 +162,7 @@ pub async fn get_event_detail(
     ).await.unwrap_or_default();
     let delete_token = if my_note.is_some() {
         Some(form_token::issue(
-            &db, &pp, &membership.membership_id,
+            &db, &pp, &auth.user_id,
             token_purpose::DELETE_NOTE, Some(event_id),
         ).await.unwrap_or_default())
     } else { None };
@@ -245,6 +241,7 @@ pub async fn get_event_detail(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
            {back}\
+           {err_banner}\
            <h1 style=\"font-size:1.25rem;font-weight:600;margin:1rem 0 .25rem\">{title}</h1>\
            {loc}{desc}\
            {cancelled}\
@@ -253,6 +250,11 @@ pub async fn get_event_detail(
            {notes_section}\
          </main>{nav}",
         header         = render::header_with_switcher(i18n::EN_EVENT_TITLE_HEADER, community_id, &_community_pairs),
+        err_banner     = err.map(|e| format!(
+            "<p role=\"alert\" style=\"background:#FFF0EF;color:#B42318;padding:.75rem;\
+             border-radius:12px;font-size:.9375rem;margin:.5rem 0\">{}</p>",
+            render::escape_html(e)
+        )).unwrap_or_default(),
         title          = render::escape_html(&event.title),
         loc            = event.location.as_deref().map(|l| format!(
             "<p style=\"color:#6e6e73;font-size:.875rem\">\u{1F4CD} {}</p>",
@@ -287,7 +289,7 @@ pub async fn post_my_status(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token  = body.get_field("_token").unwrap_or_default();
@@ -376,7 +378,7 @@ pub async fn post_my_note(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -417,7 +419,7 @@ pub async fn delete_my_note(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();

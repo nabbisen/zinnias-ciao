@@ -66,12 +66,18 @@ pub async fn create_event(
 }
 
 /// Edit title/location/description on a scheduled event (before first day start).
+/// Edit an event's details. Updates title/location/description on the event,
+/// and — for single-day events only — the date and time on its single event_day.
+/// `day` is `(day_date, starts_at_utc, ends_at_utc)`; pass `None` to edit
+/// details only (e.g. multi-day/recurring events, where per-day time editing
+/// is out of scope).
 pub async fn edit_event(
     db: &D1Database,
     event_id: &str,
     title: &str,
     location: Option<&str>,
     description: Option<&str>,
+    day: Option<(&str, &str, &str)>,
 ) -> Result<()> {
     let now = now_utc();
     db.prepare(
@@ -85,6 +91,22 @@ pub async fn edit_event(
         event_id.into(),
     ])?
     .run().await?;
+
+    // Persist the single-day time edit (seq = 1). For multi-day/recurring
+    // events `day` is None and only the details above are updated.
+    if let Some((day_date, starts_utc, ends_utc)) = day {
+        db.prepare(
+            "UPDATE event_days SET day_date=?1, starts_at_utc=?2, ends_at_utc=?3 \
+             WHERE event_id=?4 AND seq=1",
+        )
+        .bind(&[
+            day_date.into(),
+            starts_utc.into(),
+            ends_utc.into(),
+            event_id.into(),
+        ])?
+        .run().await?;
+    }
     Ok(())
 }
 

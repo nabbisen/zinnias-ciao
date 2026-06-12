@@ -22,8 +22,7 @@ pub async fn get_me(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = env.secret("HMAC_PEPPER").map(|s| s.to_string())
-        .unwrap_or_else(|_| "dev-pepper-change-in-production".to_string());
+    let pp = crate::crypto::pepper(env);
 
     let logout_token = form_token::issue(
         &db, &pp, &auth.user_id, token_purpose::LOGOUT, None,

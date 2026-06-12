@@ -21,7 +21,10 @@ id      = "local"
 # Secret bindings — set via `wrangler secret put` in each environment.
 # Never hard-coded here.
 #   HMAC_PEPPER     — server pepper for invite-code and session HMAC (AD-3)
-#   SESSION_COOKIE_DOMAIN
+#
+# SESSION_COOKIE_DOMAIN is a normal [vars] binding (not secret — the domain is
+# not sensitive). Set it per-environment below. Leave unset/empty for a
+# host-only cookie (correct for a single-host deployment).
 
 [vars]
 BUILD_VERSION = "dev"

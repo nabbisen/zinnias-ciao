@@ -17,11 +17,6 @@ use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
 
-fn pepper(env: &Env) -> String {
-    env.var("HMAC_PEPPER")
-        .map(|v| v.to_string())
-        .unwrap_or_else(|_| "dev-pepper".to_owned())
-}
 
 // ── GET /c/:cid/me/calendar ───────────────────────────────────────────────
 
@@ -37,7 +32,7 @@ pub async fn get_me_calendar(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let regen_token = form_token::issue(
         &db, &pp, &auth.user_id,
@@ -173,7 +168,7 @@ pub async fn post_regenerate_calendar(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -211,7 +206,7 @@ pub async fn post_revoke_calendar(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -240,7 +235,7 @@ pub async fn get_ics_feed(
     bearer_token: &str,
 ) -> Result<Response> {
     let db = env.d1("DB")?;
-    let _pp = pepper(env);  // pepper unused — bearer token IS the stored HMAC
+    // pepper unused here — the bearer token in the URL IS the stored HMAC.
 
     // The bearer token IS the stored HMAC — look it up directly.
     let claims = cal_db::find_by_hmac(&db, bearer_token).await?;

@@ -1,17 +1,25 @@
-// ciao.zinnias Service Worker — RFC-017 / RFC-008
-// Read-only caching only. No mutation queue. No IndexedDB private store.
+// ciao.zinnias Service Worker — RFC-017 / RFC-008 / RFC-042
+// Pilot caching policy: STATIC ASSETS ONLY.
+//
+// Authenticated HTML (/, /c/*, /join) is NEVER cached. Community pages contain
+// member names, notes, and event data; caching them risks leaving private data
+// on shared devices, and a JS-message purge is best-effort only. For the pilot
+// we cache just the static shell and an offline fallback page. A stricter
+// private-cache design may be revisited in a later RFC.
 'use strict';
 
-const CACHE_VERSION   = 'v0.19.0';
-const SHELL_CACHE     = 'shell-' + CACHE_VERSION;
-const PAGE_CACHE      = 'pages-' + CACHE_VERSION;
-const OFFLINE_URL     = '/offline';
+// Keep in sync with the release version. A release gate verifies this matches
+// the package version (see docs/src/release-checklist.md).
+const CACHE_VERSION = 'v0.23.0';
+const SHELL_CACHE   = 'shell-' + CACHE_VERSION;
+const OFFLINE_URL   = '/offline';
 
-// Static shell assets — cache-first, versioned.
+// Static, non-sensitive assets — safe to cache. Includes the offline page.
 const SHELL_ASSETS = [
   '/static/app.css',
   '/static/app.js',
   '/manifest.webmanifest',
+  OFFLINE_URL,
 ];
 
 // ── Install ───────────────────────────────────────────────────────────────
@@ -24,14 +32,14 @@ self.addEventListener('install', function(e) {
 });
 
 // ── Activate ─────────────────────────────────────────────────────────────
-// Delete all caches from previous versions (deploy cache-bust, RFC-017 §5).
+// Delete all caches from previous versions, including any legacy page cache
+// from earlier builds that cached authenticated HTML (privacy cleanup).
 self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
-        keys.filter(function(k) {
-          return k !== SHELL_CACHE && k !== PAGE_CACHE;
-        }).map(function(k) { return caches.delete(k); })
+        keys.filter(function(k) { return k !== SHELL_CACHE; })
+            .map(function(k) { return caches.delete(k); })
       );
     }).then(function() { return self.clients.claim(); })
   );
@@ -44,13 +52,13 @@ self.addEventListener('fetch', function(e) {
 
   // Never intercept non-GET requests — forms POST to the server (AD-1).
   if (req.method !== 'GET') return;
-
-  // Never cache: POSTs, session-sensitive API paths, or cross-origin.
+  // Same-origin only.
   if (url.origin !== self.location.origin) return;
+  // Never touch health/version probes.
   if (url.pathname.startsWith('/healthz') ||
       url.pathname.startsWith('/version')) return;
 
-  // Shell assets: cache-first.
+  // Static shell assets: cache-first.
   if (SHELL_ASSETS.includes(url.pathname) ||
       url.pathname === '/manifest.webmanifest') {
     e.respondWith(
@@ -63,39 +71,32 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  // Authorized GET pages (home, event detail, join): network-first, fall back to cache.
-  // Never cache /join/profile (contains a live form token) or static icons.
+  // Authenticated HTML (/, /c/*, /join): NETWORK-ONLY, never cached.
+  // On network failure, serve the static offline page — not a stale private page.
   if (url.pathname.startsWith('/c/') ||
       url.pathname === '/' ||
-      url.pathname === '/join') {
+      url.pathname.startsWith('/join')) {
     e.respondWith(
-      fetch(req)
-        .then(function(resp) {
-          // Only cache successful HTML responses — never cache redirects or errors.
-          if (resp.ok && resp.headers.get('content-type') &&
-              resp.headers.get('content-type').includes('text/html')) {
-            const clone = resp.clone();
-            caches.open(PAGE_CACHE).then(function(c) { c.put(req, clone); });
-          }
-          return resp;
-        })
-        .catch(function() {
-          // Offline: serve from cache or the offline fallback.
-          return caches.match(req).then(function(cached) {
-            return cached || caches.match(OFFLINE_URL) ||
-              new Response('<html><body><p>You are offline. Open again when connected.</p></body></html>',
-                { headers: { 'Content-Type': 'text/html' } });
-          });
-        })
+      fetch(req).catch(function() {
+        return caches.match(OFFLINE_URL).then(function(off) {
+          return off || new Response(
+            '<html><body><p>You are offline. Open again when connected.</p></body></html>',
+            { headers: { 'Content-Type': 'text/html' } });
+        });
+      })
     );
     return;
   }
 });
 
 // ── Message: PURGE_PRIVATE ────────────────────────────────────────────────
-// Triggered by app.js before logout to clear private page cache (RFC-017 §7).
+// No private page cache exists in this policy, but app.js still sends this on
+// logout. We clear everything except the static shell as a defensive measure.
 self.addEventListener('message', function(e) {
   if (e.data && e.data.type === 'PURGE_PRIVATE') {
-    caches.delete(PAGE_CACHE).catch(function() {});
+    caches.keys().then(function(keys) {
+      keys.filter(function(k) { return k !== SHELL_CACHE; })
+          .forEach(function(k) { caches.delete(k).catch(function() {}); });
+    }).catch(function() {});
   }
 });

@@ -17,11 +17,6 @@ use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
 
-fn pepper(env: &Env) -> String {
-    env.var("HMAC_PEPPER")
-        .map(|v| v.to_string())
-        .unwrap_or_else(|_| "dev-pepper".to_owned())
-}
 
 // ── GET /c/:cid/admin/export ──────────────────────────────────────────────
 
@@ -37,7 +32,7 @@ pub async fn get_export_page(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     // Issue a one-time download token bound to this admin.
     let dl_token = form_token::issue(
@@ -111,7 +106,7 @@ pub async fn get_export_json(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     // Validate the one-time download token from the query string.
     let url = req.url()?;

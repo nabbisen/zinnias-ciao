@@ -10,7 +10,7 @@ use zinnias_ciao_contracts::auth::token_purpose;
 fn session_ttl_positive_and_bounded() {
     assert!(SESSION_TTL_SECONDS > 0,  "session TTL must be positive (Max-Age=0 bug)");
     assert!(SESSION_TTL_SECONDS >= 3600, "session TTL too short");
-    assert!(SESSION_TTL_SECONDS <= 7 * 86400, "session TTL too long for MVP");
+    assert!(SESSION_TTL_SECONDS <= 31 * 86400, "session TTL too long for invite-only MVP");
 }
 
 #[test]
@@ -80,6 +80,8 @@ fn all_state_changing_routes_have_token_purpose() {
         token_purpose::COMMUNITY_EXPORT,
         token_purpose::CREATE_TEMPLATE,
         token_purpose::DELETE_TEMPLATE,
+        token_purpose::REMOVE_MEMBER,
+        token_purpose::GENERATE_INVITE,
         token_purpose::REDEEM_INVITE,
         token_purpose::JOIN_PROFILE,
         token_purpose::LOGOUT,

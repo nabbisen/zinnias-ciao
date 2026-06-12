@@ -15,11 +15,6 @@ use zinnias_ciao_domain::{validate_event, DayInput, EventInput, RecurrenceFreq, 
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::status::DayTimeState;
 
-fn pepper(env: &Env) -> String {
-    env.secret("HMAC_PEPPER")
-        .map(|s| s.to_string())
-        .unwrap_or_else(|_| "dev-pepper-change-in-production".to_string())
-}
 
 fn redirect(url: &str) -> Result<Response> {
     let mut r = Response::empty()?;
@@ -41,7 +36,7 @@ pub async fn get_create_event(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
     let token = form_token::issue(&db, &pp, &auth.user_id,
         token_purpose::CREATE_EVENT, None).await.unwrap_or_default();
 
@@ -53,6 +48,7 @@ pub async fn get_create_event(
     // RFC-032: pre-fill from template if ?template=TID is present.
     let url = req.url()?;
     let template_id = url.query_pairs().find(|(k,_)| k == "template").map(|(_,v)| v.to_string());
+    let err_msg: Option<String> = url.query_pairs().find(|(k,_)| k == "err").map(|(_,v)| v.to_string());
     let (prefill_title, prefill_location) = if let Some(ref tid) = template_id {
         let tmpl = db::event_template::find_active(&db, tid, community_id).await.ok().flatten();
         (
@@ -87,7 +83,7 @@ pub async fn get_create_event(
         header    = render::header_with_switcher(i18n::EN_ADMIN_CREATE_EVENT_TITLE, community_id, &_community_pairs),
         cid       = render::escape_html(community_id),
         tok       = render::escape_html(&token),
-        fields    = event_form_fields(prefill_title.as_deref(), prefill_location.as_deref(), None, None),
+        fields    = event_form_fields(prefill_title.as_deref(), prefill_location.as_deref(), None, err_msg.as_deref(), None, None, None, true),
         submit    = i18n::EN_ADMIN_CREATE_EVENT_SUBMIT,
         tmpl_link = templates_link,
         nav       = nav,
@@ -109,7 +105,7 @@ pub async fn post_create_event(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -157,11 +153,16 @@ pub async fn post_create_event(
         }
     };
 
-    // Convert local "HH:MM" on day_date to a UTC-like ISO string.
-    // In MVP we store times as entered (community TZ handling is RFC-018).
+    // Convert community-local "HH:MM" on day_date to true UTC (RFC-018).
+    // The community timezone determines the offset; unknown zones fall back
+    // to UTC inside tz::offset_minutes (no silent wrong conversion).
+    let community_tz = db::community::find_active(&db, community_id).await?
+        .map(|c| c.timezone)
+        .unwrap_or_else(|| "UTC".to_string());
+    let off = zinnias_ciao_contracts::tz::offset_minutes(&community_tz);
     let days_utc: Vec<(String, String, String)> = expanded.iter().map(|d| {
-        let starts = format!("{}T{}:00.000Z", d.day_date, d.starts_at);
-        let ends   = format!("{}T{}:00.000Z", d.day_date, d.ends_at);
+        let starts = zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.starts_at, off);
+        let ends   = zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.ends_at, off);
         (d.day_date.clone(), starts, ends)
     }).collect();
 
@@ -199,7 +200,7 @@ pub async fn get_cancel_event(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
     let token = form_token::issue(&db, &pp, &auth.user_id,
         token_purpose::CANCEL_EVENT, Some(event_id)).await.unwrap_or_default();
 
@@ -257,7 +258,7 @@ pub async fn post_cancel_event(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -288,9 +289,9 @@ pub async fn get_invites(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
     let gen_token = form_token::issue(&db, &pp, &auth.user_id,
-        "generate_invite", None).await.unwrap_or_default();
+        token_purpose::GENERATE_INVITE, None).await.unwrap_or_default();
 
     let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let community_pairs: Vec<(String,String)> = communities_for_switcher.iter()
@@ -394,12 +395,12 @@ pub async fn post_generate_invite(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let replay = form_token::consume(&db, &pp, &auth.user_id,
-        "generate_invite", &raw_token, None).await?;
+        token_purpose::GENERATE_INVITE, &raw_token, None).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/admin/invites"));
     }
@@ -434,7 +435,7 @@ pub async fn post_revoke_invite(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -536,7 +537,7 @@ pub async fn get_remove_member(
     }
 
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
     let token = form_token::issue(&db, &pp, &auth.user_id,
         token_purpose::REMOVE_MEMBER, Some(target_membership_id)).await.unwrap_or_default();
 
@@ -605,7 +606,7 @@ pub async fn post_remove_member(
     }
 
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -668,9 +669,25 @@ pub async fn get_edit_event(
              <p><a href=\"javascript:history.back()\">Back</a></p></main>");
     }
 
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
     let token = form_token::issue(&db, &pp, &auth.user_id,
         token_purpose::EDIT_EVENT, Some(event_id)).await.unwrap_or_default();
+
+    // Prefill date/time from the existing day, converted UTC → community-local.
+    // Only single-day events support time editing; multi-day events edit details only.
+    let is_single_day = days.len() == 1;
+    let (prefill_date, prefill_start, prefill_end) = if is_single_day {
+        let community_tz = db::community::find_active(&db, community_id).await?
+            .map(|c| c.timezone)
+            .unwrap_or_else(|| "UTC".to_string());
+        let off = zinnias_ciao_contracts::tz::offset_minutes(&community_tz);
+        let d = &days[0];
+        let (date, start) = zinnias_ciao_contracts::tz::to_local_parts(&d.starts_at_utc, off);
+        let (_, end)      = zinnias_ciao_contracts::tz::to_local_parts(&d.ends_at_utc, off);
+        (Some(date), Some(start), Some(end))
+    } else {
+        (None, None, None)
+    };
 
     let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let community_pairs: Vec<(String,String)> = communities_for_switcher.iter()
@@ -710,6 +727,10 @@ pub async fn get_edit_event(
             event.location.as_deref(),
             event.description.as_deref(),
             err.as_deref(),
+            prefill_date.as_deref(),
+            prefill_start.as_deref(),
+            prefill_end.as_deref(),
+            false, // edit hides recurrence
         ),
         nav = nav,
     );
@@ -731,7 +752,7 @@ pub async fn post_edit_event(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -775,11 +796,31 @@ pub async fn post_edit_event(
         }
     };
 
+    // Determine whether this is a single-day event. Per-day time editing is
+    // only supported for single-day events; multi-day/recurring events edit
+    // details only (RFC-040 will define multi-day edit semantics).
+    let existing_days = event_db::days_for_event(&db, event_id).await?;
+    let day_utc: Option<(String, String, String)> = if existing_days.len() == 1 {
+        let community_tz = db::community::find_active(&db, community_id).await?
+            .map(|c| c.timezone)
+            .unwrap_or_else(|| "UTC".to_string());
+        let off = zinnias_ciao_contracts::tz::offset_minutes(&community_tz);
+        let d = &validated.days[0];
+        Some((
+            d.day_date.clone(),
+            zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.starts_at, off),
+            zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.ends_at, off),
+        ))
+    } else {
+        None
+    };
+
     event_write::edit_event(
         &db, event_id,
         &validated.title,
         validated.location.as_deref(),
         validated.description.as_deref(),
+        day_utc.as_ref().map(|(d, s, e)| (d.as_str(), s.as_str(), e.as_str())),
     ).await?;
 
     let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
@@ -821,7 +862,7 @@ pub async fn get_attendance(
     let days = event_db::days_for_event(&db, event_id).await?;
     let members = membership_db::list_all_active(&db, community_id).await?;
 
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
     // One token per (event, admin) covers the whole batch form.
     let token = form_token::issue(&db, &pp, &auth.user_id,
         token_purpose::ATTENDANCE_OVERRIDE, Some(event_id)).await.unwrap_or_default();
@@ -926,7 +967,7 @@ pub async fn post_attendance(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let form = req.form_data().await?;
     let raw_token = form.get_field("_token").unwrap_or_default();
@@ -984,7 +1025,7 @@ pub async fn post_admin_hide_note(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -1023,11 +1064,17 @@ fn generate_invite_code() -> String {
 }
 
 /// Event form shared fields (create and edit).
+/// `day_date`/`starts_at`/`ends_at` prefill the date and time inputs (edit case).
+/// `show_recurrence` renders the repeat selector (create only); edit hides it.
 fn event_form_fields(
     title: Option<&str>,
     location: Option<&str>,
     description: Option<&str>,
     error: Option<&str>,
+    day_date: Option<&str>,
+    starts_at: Option<&str>,
+    ends_at: Option<&str>,
+    show_recurrence: bool,
 ) -> String {
     let err_html = error.map(|e| format!(
         "<p role=\"alert\" style=\"color:#FF3B30;font-size:.875rem\">{}</p>",
@@ -1050,8 +1097,9 @@ fn event_form_fields(
         )
     };
 
-    // RFC-022: repeat fields
-    let repeat_html = format!(
+    // RFC-022: repeat fields (create only — edit hides recurrence).
+    let repeat_html = if show_recurrence {
+        format!(
         "<div style=\"margin-bottom:1rem\">\
          <label style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{repeat_lbl}</label>\
          <div style=\"display:flex;gap:.75rem;align-items:center\">\
@@ -1076,7 +1124,10 @@ fn event_form_fields(
         opt_monthly  = i18n::EN_REPEAT_MONTHLY,
         unit       = i18n::EN_REPEAT_COUNT_UNIT,
         hint       = i18n::EN_REPEAT_COUNT_HINT,
-    );
+        )
+    } else {
+        String::new()
+    };
 
     format!(
         "{err}\
@@ -1089,9 +1140,9 @@ fn event_form_fields(
          {desc}",
         err    = err_html,
         title  = field("Title", "title", "text", title.unwrap_or(""), true),
-        date   = field("Date", "day_date", "date", "", true),
-        start  = field("Start time", "starts_at", "time", "", true),
-        end    = field("End time", "ends_at", "time", "", true),
+        date   = field("Date", "day_date", "date", day_date.unwrap_or(""), true),
+        start  = field("Start time", "starts_at", "time", starts_at.unwrap_or(""), true),
+        end    = field("End time", "ends_at", "time", ends_at.unwrap_or(""), true),
         repeat = repeat_html,
         loc    = field("Location (optional)", "location", "text",
                       location.unwrap_or(""), false),

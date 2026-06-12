@@ -17,10 +17,7 @@ pub async fn post_logout(mut req: Request, env: &Env, _rid: &str) -> Result<Resp
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
 
-    let pepper = env
-        .secret("HMAC_PEPPER")
-        .map(|s| s.to_string())
-        .unwrap_or_else(|_| "dev-pepper-change-in-production".to_string());
+    let pepper = crate::crypto::pepper(env);
     let db = env.d1("DB")?;
 
     // Validate logout form token.
@@ -40,9 +37,10 @@ pub async fn post_logout(mut req: Request, env: &Env, _rid: &str) -> Result<Resp
     // Clear cookie and redirect.
     let domain = env
         .var("SESSION_COOKIE_DOMAIN")
+        .ok()
         .map(|s| s.to_string())
-        .unwrap_or_else(|_| "localhost".to_string());
-    let clear = clear_session_cookie(&domain);
+        .filter(|s| !s.is_empty());
+    let clear = clear_session_cookie(domain.as_deref());
 
     let mut resp = redirect("/join")?;
     resp.headers_mut().set("Set-Cookie", &clear)?;

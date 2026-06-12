@@ -17,11 +17,6 @@ use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
 
-fn pepper(env: &Env) -> String {
-    env.var("HMAC_PEPPER")
-        .map(|v| v.to_string())
-        .unwrap_or_else(|_| "dev-pepper".to_owned())
-}
 
 fn redirect(location: &str) -> Result<Response> {
     let mut resp = Response::from_html("")?;
@@ -43,7 +38,7 @@ pub async fn get_templates(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let create_token = form_token::issue(
         &db, &pp, &auth.user_id,
@@ -189,7 +184,7 @@ pub async fn post_create_template(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -244,7 +239,7 @@ pub async fn post_delete_template(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = pepper(env);
+    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();

@@ -181,14 +181,20 @@ pub fn header_with_switcher(
     h.push_str("align-items:center;gap:.5rem;z-index:10'>");
     h.push_str("<span style='font-size:1.25rem;font-weight:600;white-space:nowrap'>");
     h.push_str(&title_s);
+    // No-JS: a GET form to /switch with a submit button works without scripts.
+    // Progressive enhancement: onchange auto-submits so JS users skip the button.
     h.push_str("</span>");
-    h.push_str("<select aria-label='Switch community' ");
-    h.push_str("onchange=\"location.href='/c/'+this.value+'/home';\" ");
+    h.push_str("<form method='get' action='/switch' style='margin:0'>");
+    h.push_str("<select name='community' aria-label='Switch community' ");
+    h.push_str("onchange='this.form.submit()' ");
     h.push_str("style='font-size:.8125rem;color:#6E6E73;background:none;border:none;");
     h.push_str("border-bottom:1px solid #E5E5EA;padding:.125rem .25rem;");
     h.push_str("max-width:160px;cursor:pointer'>");
     h.push_str(&options);
     h.push_str("</select>");
+    h.push_str("<noscript><button type='submit' style='font-size:.8125rem;");
+    h.push_str("margin-left:.25rem;min-height:44px;cursor:pointer'>Go</button></noscript>");
+    h.push_str("</form>");
     h.push_str("</header>");
     h
 }// ── Status chip / buttons ─────────────────────────────────────────────────

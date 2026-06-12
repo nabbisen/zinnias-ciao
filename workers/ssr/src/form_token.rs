@@ -63,63 +63,88 @@ pub async fn consume(
     raw_token: &str,
     bound_resource: Option<&str>,
 ) -> Result<Option<String>> {
-    // Returns the prior result_ref if already consumed.
+    // Returns the prior result_ref if already consumed (idempotent replay).
     let now = now_utc();
     let token_hmac = hmac_hex(pepper, raw_token);
 
+    // Atomic conditional consume: mark consumed only if currently unconsumed,
+    // matching subject + purpose + binding + not expired. The affected-row
+    // count tells us whether THIS call won the race. Two concurrent submits
+    // cannot both observe changes == 1.
+    let bound_match = bound_resource.unwrap_or("");
+    let update = db
+        .prepare(
+            "UPDATE form_tokens SET consumed_at = ?1 \
+             WHERE token_hmac = ?2 \
+               AND user_id = ?3 \
+               AND purpose = ?4 \
+               AND expires_at > ?5 \
+               AND consumed_at IS NULL \
+               AND COALESCE(bound_resource, '') = ?6",
+        )
+        .bind(&[
+            now.as_str().into(),
+            token_hmac.as_str().into(),
+            user_id.into(),
+            purpose.into(),
+            now.as_str().into(),
+            bound_match.into(),
+        ])?
+        .run()
+        .await?;
+
+    let changed = update.meta().ok().flatten()
+        .and_then(|m| m.changes)
+        .unwrap_or(0);
+
+    // Fast path: won the atomic race.
+    use zinnias_ciao_contracts::auth::{classify_token_consume, TokenConsumeOutcome};
+    if changed == 1 {
+        return Ok(None);
+    }
+
+    // changed == 0: classify why via a follow-up SELECT (no race-sensitive write).
     let row = db
         .prepare(
-            "SELECT token_hmac, consumed_at, result_ref, bound_resource \
+            "SELECT consumed_at, result_ref, bound_resource, expires_at \
              FROM form_tokens \
-             WHERE token_hmac = ?1 \
-               AND user_id = ?2 \
-               AND purpose = ?3 \
-               AND expires_at > ?4 \
+             WHERE token_hmac = ?1 AND user_id = ?2 AND purpose = ?3 \
              LIMIT 1",
         )
         .bind(&[
             token_hmac.as_str().into(),
             user_id.into(),
             purpose.into(),
-            now.as_str().into(),
         ])?
         .first::<serde_json::Value>(None)
-        .await?
-        .ok_or_else(|| {
-            worker::Error::RustError(
-                "This action could not be completed. Please try again.".to_string(),
-            )
-        })?;
-
-    // Resource binding check
-    if let Some(expected) = bound_resource {
-        let got = row
-            .get("bound_resource")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        if got != expected {
-            return Err(worker::Error::RustError(
-                "This action could not be completed. Please try again.".to_string(),
-            ));
-        }
-    }
-
-    // Already consumed → return prior result (idempotency, not an error)
-    if row.get("consumed_at").and_then(|v| v.as_str()).is_some() {
-        let result_ref = row
-            .get("result_ref")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_owned());
-        return Ok(result_ref);
-    }
-
-    // Mark consumed
-    db.prepare("UPDATE form_tokens SET consumed_at = ?1 WHERE token_hmac = ?2")
-        .bind(&[now.as_str().into(), token_hmac.as_str().into()])?
-        .run()
         .await?;
 
-    Ok(None) // None means "freshly consumed; proceed with the action"
+    let found = row.is_some();
+    let already_consumed = row.as_ref()
+        .and_then(|r| r.get("consumed_at").and_then(|v| v.as_str()))
+        .is_some();
+    let binding_ok = match (bound_resource, row.as_ref()) {
+        (Some(expected), Some(r)) => {
+            r.get("bound_resource").and_then(|v| v.as_str()).unwrap_or("") == expected
+        }
+        (None, _) => true,
+        (Some(_), None) => false,
+    };
+
+    let invalid = || worker::Error::RustError(
+        "This action could not be completed. Please try again.".to_string(),
+    );
+
+    match classify_token_consume(changed, found, already_consumed, binding_ok) {
+        TokenConsumeOutcome::Proceed => Ok(None), // unreachable for changed==0, but safe
+        TokenConsumeOutcome::Replay => {
+            let result_ref = row.as_ref()
+                .and_then(|r| r.get("result_ref").and_then(|v| v.as_str()))
+                .map(|s| s.to_owned());
+            Ok(result_ref)
+        }
+        TokenConsumeOutcome::Invalid => Err(invalid()),
+    }
 }
 
 /// Store the result ref on a consumed token (for idempotency replay).

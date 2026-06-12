@@ -2,6 +2,43 @@
 
 use worker::{Env, Request, Response, Result};
 use crate::render;
+use crate::session::require_auth;
+use crate::db::membership as membership_db;
+
+/// GET /switch?community=:id — no-JS community switcher target.
+/// Validates that the authenticated user is an active member of the target
+/// community before redirecting (prevents open-redirect / cross-community
+/// access). Falls back to the member home on any mismatch.
+pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response> {
+    let auth = match require_auth(&req, env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+
+    let url = req.url()?;
+    let target: Option<String> = url.query_pairs()
+        .find(|(k, _)| k == "community").map(|(_, v)| v.to_string());
+
+    let db = env.d1("DB")?;
+    let memberships = membership_db::list_communities_for_user(&db, &auth.user_id)
+        .await.unwrap_or_default();
+
+    // Only redirect to a community the user actually belongs to.
+    let dest = match target {
+        Some(ref cid) if memberships.iter().any(|m| &m.community_id == cid) => {
+            format!("/c/{cid}/home")
+        }
+        // Unknown / non-member target: send to their first community, or /join.
+        _ => match memberships.first() {
+            Some(m) => format!("/c/{}/home", m.community_id),
+            None => "/join".to_string(),
+        },
+    };
+
+    let mut resp = Response::from_html("")?;
+    resp.headers_mut().set("Location", &dest)?;
+    Ok(resp.with_status(303))
+}
 
 pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Result<Response> {
     let rest = &path[3..];
@@ -11,6 +48,8 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
     let url = req.url()?;
     let flash: Option<String> = url.query_pairs()
         .find(|(k, _)| k == "flash").map(|(_, v)| v.to_string());
+    let err: Option<String> = url.query_pairs()
+        .find(|(k, _)| k == "err").map(|(_, v)| v.to_string());
 
     match tail {
         "home" | "" | "/" => super::home::get_home(req, env, rid, cid).await,
@@ -18,7 +57,7 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
         t if t.starts_with("events/") => {
             let (eid, sub) = split_once(&t[7..], '/');
             if sub.is_empty() {
-                super::event::get_event_detail(req, env, rid, cid, eid, flash.as_deref()).await
+                super::event::get_event_detail(req, env, rid, cid, eid, flash.as_deref(), err.as_deref()).await
             } else { render::not_found() }
         }
 

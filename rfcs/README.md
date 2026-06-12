@@ -37,6 +37,17 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 036 | [Public Release Readiness, Security Review, and Launch Runbook](./done/036-public-release-readiness-security-review-and-launch-runbook.md) | v0.15.0 |
 | 026 | [Multi-Language and Plain-Language Localization](./done/026-multi-language-and-plain-language-localization.md) | v0.10.0 — EN/JA table complete; per-community lang selection deferred |
 
+## Done — F7 stabilization (architect deep-review remediation, 037–042)
+
+| ID | Title | Shipped in |
+|----|-------|------------|
+| 037 | [Token Subject Normalization and Form-Token Atomicity](./done/037-token-subject-and-form-token-atomicity.md) | v0.23.0 |
+| 038 | [Session and Secret Binding Hardening](./done/038-session-and-secret-binding-hardening.md) | v0.23.0 |
+| 039 | [Timezone-Correct Event Write Path](./done/039-timezone-correct-event-write-path.md) | v0.23.0 |
+| 040 | [Event Edit Contract](./done/040-event-edit-contract.md) | v0.23.0 |
+| 041 | [Atomic Invite Redemption](./done/041-atomic-invite-redemption.md) | v0.23.0 |
+| 042 | [Pilot Offline and Private Cache Contract](./done/042-pilot-offline-and-private-cache-contract.md) | v0.23.0 |
+
 ## Also Done
 
 | ID | Title | Shipped in |
@@ -58,6 +69,13 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 031 | Consentful Contact Channels and Privacy-Safe Messaging | [./proposed/031-consentful-contact-channels-and-privacy-safe-messaging.md](./proposed/031-consentful-contact-channels-and-privacy-safe-messaging.md) |
 | 033 | Subgroups, Event Visibility, and Boundary Safety | [./proposed/033-subgroups-event-visibility-and-boundary-safety.md](./proposed/033-subgroups-event-visibility-and-boundary-safety.md) |
 | 034 | Notification-Free Quiet Mode and Attention Design | [./proposed/034-notification-free-quiet-mode-and-attention-design.md](./proposed/034-notification-free-quiet-mode-and-attention-design.md) |
+
+## Proposed — F7 stabilization follow-ups (043–044)
+
+| ID | Title | File | Note |
+|----|-------|------|------|
+| 043 | Pilot UX Acceptance and Error Feedback | [./proposed/043-pilot-ux-acceptance-and-error-feedback.md](./proposed/043-pilot-ux-acceptance-and-error-feedback.md) | Error banners shipped v0.23.0; no-JS confirmations + device QA open |
+| 044 | D1 Query-Budget Gate and Integration Test Harness | [./proposed/044-d1-query-budget-gate-and-integration-test-harness.md](./proposed/044-d1-query-budget-gate-and-integration-test-harness.md) | Provides the live-D1 harness for RFC-037/040/041 deferred tests |
 
 ## Archive
 

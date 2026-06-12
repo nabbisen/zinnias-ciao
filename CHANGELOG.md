@@ -2,6 +2,84 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.23.0] — 2026-06-12
+
+Stabilization pass addressing an external architect's deep source review.
+Each finding was verified against the source before fixing. No feature
+expansion — correctness, security, and pilot-readiness only.
+
+### Fixed (P0 — pilot blockers)
+
+- **Attendance and note deletion were broken (token subject mismatch).**
+  `SET_STATUS` and `DELETE_NOTE` form tokens were *issued* keyed on
+  `membership_id` but *consumed* keyed on `user_id`, so the consume lookup
+  always failed and members could not set Going/No Go/Attended or delete their
+  own note. Both issue sites now use `user_id`, consistent with every other
+  token. (`SAVE_NOTE` was already correct.)
+- **Session cookie domain.** `SESSION_COOKIE_DOMAIN` was read via `env.var()`
+  but documented as a secret, with an unconditional `Domain=localhost`
+  fallback that breaks deployed login. Cookies are now host-only by default
+  (`Option<&str>` domain, no `Domain` attribute unless explicitly configured);
+  `wrangler.toml` clarifies it is a `[vars]` binding, not a secret.
+- **Event times stored without timezone conversion.** Admin-entered local time
+  was stored as `…Z` with no offset applied, so non-UTC communities saw wrong
+  times. Added `tz::local_to_utc` (inverse of the display-side conversion) and
+  wired community-timezone conversion into event create and edit. Includes the
+  `09:00 Asia/Tokyo → 00:00Z` case plus day-wrap and round-trip tests.
+- **Event edit silently discarded date/time.** The edit handler validated
+  `day_date`/`starts_at`/`ends_at` but persisted only title/location/
+  description. `edit_event` now persists single-day time changes; the edit form
+  prefills current values and hides the recurrence selector. Multi-day and
+  recurring events remain details-only edits.
+- **Invite redemption was not safely one-time.** `mark_used` was an
+  unconditional UPDATE with no affected-row check, so a race could redeem one
+  invite twice. It is now a conditional state transition
+  (`WHERE used_at IS NULL AND revoked_at IS NULL AND expires_at > now`) that
+  returns whether it won; redemption claims the invite *first* and aborts if it
+  loses the race.
+- **Form-token consume was not atomic.** SELECT-then-UPDATE allowed two
+  concurrent submits to both proceed. Rewritten as a single conditional UPDATE
+  (`AND consumed_at IS NULL AND COALESCE(bound_resource,'')=?`) with an
+  affected-row check; the zero-row case is classified (replay / invalid /
+  expired) by a follow-up SELECT. The decision logic is extracted to
+  `contracts::auth::classify_token_consume` and unit-tested, including an
+  exhaustive guard that `changed == 0` can never proceed.
+- **Service worker cached authenticated HTML.** Private community pages were
+  stored in a page cache that was purged only via a best-effort JS message, a
+  shared-device privacy risk; the cache version was also stale. Rewritten to
+  cache static assets only; authenticated `/`, `/c/*`, and `/join` are
+  network-only with a static offline fallback, and activate-time cleanup
+  removes any legacy page cache.
+
+### Fixed (P1)
+
+- **HMAC pepper access centralized.** Six handlers read the pepper
+  inconsistently (`env.secret` vs `env.var`, with two different dev fallbacks).
+  All now use `crypto::pepper(env)`; `require_auth` too.
+- **`generate_invite` token purpose** is now the `GENERATE_INVITE` contract
+  constant rather than a raw string. While adding it we found `REMOVE_MEMBER`
+  had never actually been added to the token-uniqueness tests; both are now in
+  the `release_gates` and regression uniqueness sets.
+- **Invisible action errors.** Create-event and event-detail error redirects
+  (`?err=`) were never rendered. Both now show a visible `role="alert"` banner.
+- **Session lifetime** raised from 24 h to 30 days. Invite-only members have no
+  password and no self-service recovery, so a 24 h expiry generated needless
+  re-invite burden. Sessions remain server-side revocable on logout.
+
+### Fixed (P2)
+
+- **No-JS community switcher.** The header switcher relied on a JS `onchange`
+  redirect while claiming to work without JS. It is now a real
+  `<form method="get" action="/switch">` with a `<noscript>` submit button;
+  `onchange` auto-submit remains as progressive enhancement. The new `/switch`
+  route validates the target is a community the user actually belongs to before
+  redirecting.
+
+### Tests
+
+- 173 passing (was 160): added `local_to_utc` conversion tests and
+  `classify_token_consume` race/idempotency tests. Zero warnings.
+
 ## [0.22.0] — 2026-06-12
 
 ### Documentation (docs verification pass)

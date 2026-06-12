@@ -22,10 +22,7 @@ pub struct AuthContext {
 /// Error variant tells the handler whether to redirect to /join (expired)
 /// or return 400 (missing cookie on a POST that should have had one).
 pub async fn require_auth(req: &Request, env: &Env) -> Result<AuthContext> {
-    let pepper = env
-        .secret("HMAC_PEPPER")
-        .map(|s| s.to_string())
-        .unwrap_or_else(|_| "dev-pepper-change-in-production".to_string());
+    let pepper = crate::crypto::pepper(env);
 
     let cookie_secret = extract_cookie(req, SESSION_COOKIE_NAME).ok_or_else(|| {
         worker::Error::RustError(AppError::session_expired().user_message.to_string())
@@ -62,22 +59,32 @@ fn extract_cookie(req: &Request, name: &str) -> Option<String> {
 ///
 /// Max-Age is set from `SESSION_TTL_SECONDS` **only** — never from an
 /// upstream token exp (regression rule, RFC-003 §8).
-pub fn build_session_cookie(secret: &str, domain: &str) -> String {
-    let max_age = SESSION_TTL_SECONDS;
+/// Build the session cookie. When `domain` is `None` or empty, a host-only
+/// cookie is produced (no `Domain` attribute) — correct for single-host
+/// deployments. A `Domain` is only emitted for explicit cross-subdomain sharing.
+pub fn build_session_cookie(secret: &str, domain: Option<&str>) -> String {
+    let domain_part = domain
+        .filter(|d| !d.is_empty())
+        .map(|d| format!("; Domain={d}"))
+        .unwrap_or_default();
     format!(
-        "{name}={secret}; Max-Age={max_age}; Path=/; HttpOnly; Secure; SameSite=Strict; Domain={domain}",
+        "{name}={secret}; Max-Age={max_age}; Path=/; HttpOnly; Secure; SameSite=Strict{domain_part}",
         name = SESSION_COOKIE_NAME,
         secret = secret,
-        max_age = max_age,
-        domain = domain,
+        max_age = SESSION_TTL_SECONDS,
+        domain_part = domain_part,
     )
 }
 
 /// Build a `Set-Cookie` header that clears the session cookie (logout).
-pub fn clear_session_cookie(domain: &str) -> String {
+pub fn clear_session_cookie(domain: Option<&str>) -> String {
+    let domain_part = domain
+        .filter(|d| !d.is_empty())
+        .map(|d| format!("; Domain={d}"))
+        .unwrap_or_default();
     format!(
-        "{name}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict; Domain={domain}",
+        "{name}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict{domain_part}",
         name = SESSION_COOKIE_NAME,
-        domain = domain,
+        domain_part = domain_part,
     )
 }
