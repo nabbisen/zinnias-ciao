@@ -1,0 +1,58 @@
+/* ciao.zinnias — base styles (design tokens from RFC-011) */
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --color-bg:            #FFFFFF;
+  --color-surface:       #F5F5F7;
+  --color-surface-strong:#E5E5EA;
+  --color-text-primary:  #1D1D1F;
+  --color-text-secondary:#6E6E73;
+  --color-text-muted:    #86868B;
+  --color-going:         #007AFF;
+  --color-not-going:     #FF3B30;
+  --color-attended:      #34C759;
+  --color-no-answer:     #8E8E93;
+  --color-warning:       #FF9500;
+  --color-danger:        #FF3B30;
+  --color-focus:         #007AFF;
+  --space-1: 4px;  --space-2: 8px;   --space-3: 12px;
+  --space-4: 16px; --space-5: 24px;  --space-6: 32px;
+  --radius-card:   16px;
+  --radius-button: 14px;
+  --radius-input:  12px;
+  --touch-min:     44px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body { margin: 0; padding: 0; }
+a { color: var(--color-going); }
+
+/* Offline banner — hidden by default; shown by SW offline fallback + app.js */
+#offline-banner {
+  background: var(--color-surface-strong);
+  color: var(--color-text-secondary);
+  text-align: center;
+  padding: var(--space-2) var(--space-4);
+  font-size: .875rem;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+/* Focus ring — visible for keyboard users */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Touch targets */
+button, a, [role="button"] { min-height: var(--touch-min); }
+
+/* Accessible reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

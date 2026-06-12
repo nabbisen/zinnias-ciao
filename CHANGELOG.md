@@ -2,6 +2,37 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.4.0] — 2026-06-12
+
+### Added
+
+- **M3 PWA + offline (read-only).**
+  - `static/manifest.webmanifest`: installable PWA — name, icons, `display:standalone`,
+    start URL `/`, theme `#007AFF`.
+  - `static/sw.js`: service worker — shell cache-first (versioned), page network-first
+    with offline cache fallback, deploy cache-bust on activate, `PURGE_PRIVATE` message
+    clears page cache on logout; never caches POSTs or cross-origin responses.
+  - `static/app.js`: SW registration, offline banner toggle on network events, Unicode-
+    aware note character counter (progressive enhancement), logout cache-purge trigger.
+  - `static/app.css`: design tokens (RFC-011 colour/spacing/radius), base reset, offline
+    banner, focus ring, reduced-motion support.
+  - `handlers/static_files`: serve manifest, `sw.js` (no-cache), CSS, JS, and
+    `/offline` fallback page from `include_str!` at compile time.
+  - `/offline` route added to router.
+
+- **M4 admin flows.**
+  - `domain/event_admin`: `validate_event` — title/location/description length,
+    ≥1 day required, per-day end-after-start check, normalisation.
+  - `db/event_write`: `create_event` (event + N day rows), `edit_event`,
+    `cancel_event` (soft).
+  - `db/membership`: `count_admins`, `get_role`, `soft_remove`.
+  - `handlers/admin`: create event (GET form + POST), cancel event (GET confirmation
+    + POST), generate invite code (GET + POST — plaintext shown once via redirect,
+    HMAC stored, audit written without plaintext), list members, remove member
+    (GET confirmation + POST with last-admin guard).
+  - Community dispatcher extended with all admin GET/POST routes.
+  - `crate alias fix`: `admin.rs` `use contracts::` → `use zinnias_ciao_contracts::`.
+
 ## [0.3.0] — 2026-06-12
 
 ### Added

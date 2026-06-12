@@ -11,43 +11,48 @@ mod session;
 
 mod handlers;
 
-/// Cloudflare Worker entrypoint — routes all requests.
 #[event(fetch)]
 pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     let request_id = generate_request_id();
-
     let url = req.url()?;
     let path = url.path();
     let method = req.method();
 
     let result: Result<Response> = match (method, path) {
-        // ── infrastructure ─────────────────────────────────────────────
+        // ── Infrastructure ────────────────────────────────────────────────
         (Method::Get, "/healthz") => handlers::health::get_health(&env).await,
         (Method::Get, "/version") => handlers::health::get_version(&env).await,
 
-        // ── join / onboarding ──────────────────────────────────────────
-        (Method::Get, "/join") => handlers::join::get_join(req, &env, &request_id).await,
-        (Method::Post, "/join") => handlers::join::post_join(req, &env, &request_id).await,
-        (Method::Get, "/join/profile") => handlers::join::get_profile(req, &env, &request_id).await,
-        (Method::Post, "/join/profile") => {
-            handlers::join::post_profile(req, &env, &request_id).await
-        }
+        // ── Static assets + PWA ───────────────────────────────────────────
+        (Method::Get, "/manifest.webmanifest") =>
+            handlers::static_files::get_manifest(req, &env).await,
+        (Method::Get, "/sw.js") =>
+            handlers::static_files::get_sw(req, &env).await,
+        (Method::Get, "/static/app.css") =>
+            handlers::static_files::get_css(req, &env).await,
+        (Method::Get, "/static/app.js") =>
+            handlers::static_files::get_app_js(req, &env).await,
+        (Method::Get, "/offline") =>
+            handlers::static_files::get_offline(req, &env).await,
 
-        // ── member area ────────────────────────────────────────────────
-        (Method::Get, "/") | (Method::Get, "/c") => {
-            handlers::home::redirect_to_home(req, &env, &request_id).await
-        }
-        (Method::Get, p) if p.starts_with("/c/") => {
-            handlers::community::dispatch_get(req, &env, &request_id, p).await
-        }
-        (Method::Post, p) if p.starts_with("/c/") => {
-            handlers::community::dispatch_post(req, &env, &request_id, p).await
-        }
+        // ── Join / onboarding ─────────────────────────────────────────────
+        (Method::Get,  "/join")         => handlers::join::get_join(req, &env, &request_id).await,
+        (Method::Post, "/join")         => handlers::join::post_join(req, &env, &request_id).await,
+        (Method::Get,  "/join/profile") => handlers::join::get_profile(req, &env, &request_id).await,
+        (Method::Post, "/join/profile") => handlers::join::post_profile(req, &env, &request_id).await,
 
-        // ── logout ─────────────────────────────────────────────────────
-        (Method::Post, "/logout") => handlers::auth::post_logout(req, &env, &request_id).await,
+        // ── Member area ───────────────────────────────────────────────────
+        (Method::Get, "/") | (Method::Get, "/c") =>
+            handlers::home::redirect_to_home(req, &env, &request_id).await,
+        (Method::Get, p) if p.starts_with("/c/") =>
+            handlers::community::dispatch_get(req, &env, &request_id, p).await,
+        (Method::Post, p) if p.starts_with("/c/") =>
+            handlers::community::dispatch_post(req, &env, &request_id, p).await,
 
-        // ── 404 ────────────────────────────────────────────────────────
+        // ── Logout ────────────────────────────────────────────────────────
+        (Method::Post, "/logout") =>
+            handlers::auth::post_logout(req, &env, &request_id).await,
+
         _ => render::not_found(),
     };
 
@@ -70,22 +75,18 @@ fn generate_request_id() -> String {
     let mut bytes = [0u8; 8];
     getrandom::getrandom(&mut bytes).unwrap_or_default();
     let mut s = String::with_capacity(16);
-    for b in bytes {
-        let _ = write!(s, "{:02x}", b);
-    }
+    for b in bytes { let _ = write!(s, "{:02x}", b); }
     s
 }
 
 fn attach_security_headers(resp: &mut Response, request_id: &str) -> Result<()> {
-    let headers = resp.headers_mut();
-    headers.set(
-        "Content-Security-Policy",
+    let h = resp.headers_mut();
+    h.set("Content-Security-Policy",
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
-         img-src 'self' data:; frame-ancestors 'none'",
-    )?;
-    headers.set("X-Content-Type-Options", "nosniff")?;
-    headers.set("X-Frame-Options", "DENY")?;
-    headers.set("Referrer-Policy", "strict-origin-when-cross-origin")?;
-    headers.set("X-Request-Id", request_id)?;
+         img-src 'self' data:; frame-ancestors 'none'")?;
+    h.set("X-Content-Type-Options", "nosniff")?;
+    h.set("X-Frame-Options", "DENY")?;
+    h.set("Referrer-Policy", "strict-origin-when-cross-origin")?;
+    h.set("X-Request-Id", request_id)?;
     Ok(())
 }

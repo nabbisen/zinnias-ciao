@@ -151,3 +151,36 @@ pub async fn list_all_active(
         })
     }).collect())
 }
+
+/// Count active admins in a community (for last-admin guard).
+pub async fn count_admins(db: &D1Database, community_id: &str) -> Result<u32> {
+    let row = db
+        .prepare(
+            "SELECT COUNT(*) AS cnt FROM community_memberships \
+             WHERE community_id = ?1 AND role = 'admin' AND removed_at IS NULL",
+        )
+        .bind(&[community_id.into()])?
+        .first::<serde_json::Value>(None)
+        .await?;
+    Ok(row.and_then(|v| v.get("cnt")?.as_u64()).unwrap_or(0) as u32)
+}
+
+/// Get role string for a membership_id.
+pub async fn get_role(db: &D1Database, membership_id: &str) -> Result<Option<String>> {
+    let row = db
+        .prepare("SELECT role FROM community_memberships WHERE id = ?1 LIMIT 1")
+        .bind(&[membership_id.into()])?
+        .first::<serde_json::Value>(None)
+        .await?;
+    Ok(row.and_then(|v| v.get("role")?.as_str().map(|s| s.to_owned())))
+}
+
+/// Soft-remove a member (sets removed_at, preserves history — RFC-010 §5).
+pub async fn soft_remove(db: &D1Database, membership_id: &str) -> Result<()> {
+    let now = crate::db::now_utc();
+    db.prepare("UPDATE community_memberships SET removed_at = ?1 WHERE id = ?2")
+        .bind(&[now.as_str().into(), membership_id.into()])?
+        .run()
+        .await?;
+    Ok(())
+}
