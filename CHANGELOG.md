@@ -2,6 +2,36 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.18.0] — 2026-06-12
+
+### Internationalisation
+
+- **i18n pass: 74 → 114 EN/JA string pairs.**
+  All user-facing strings added in v0.13.0–v0.17.0 are now wired through
+  `packages/contracts/src/i18n.rs` with full EN and JA translations:
+  - **Role labels** (`ROLE_ADMIN`, `ROLE_MEMBER`): wired in `me.rs`.
+  - **Home first-run card** (RFC-030): 4 strings covering the welcome heading,
+    no-events variant, create-first-event button, and invite-members hint.
+    `home.rs` `intro` variable now uses `i18n::EN_HOME_FIRST_RUN_*`.
+  - **Recurrence fields** (RFC-022): 7 strings covering the repeat label, all
+    four frequency options, the count unit, and the count hint. `admin.rs`
+    `event_form_fields` repeat `<select>` now uses named format args wired to
+    `i18n::EN_REPEAT_*`. The previous raw string `r#"…"#` was converted to a
+    `format!()` call.
+  - **Event templates** (RFC-032): 11 strings covering page title, description,
+    empty state, save section, field labels, and button labels. Page title and
+    header wired in `templates.rs`.
+  - **Community export** (RFC-027): 5 strings covering title, description,
+    privacy note, download button, and single-use expiry notice. Page title and
+    header wired in `export.rs`.
+  - **Me / About** (RFC-035): 5 strings covering About section label, version
+    label, ref label, Data section label, and export link. Role label wired.
+  - **Calendar feed** (RFC-023): 6 strings covering page title, subscription
+    description, and all button/action labels. Page title and header wired in
+    `calendar.rs`.
+  - Parity test (`i18n.rs` `en_ja_parity`) updated: count assertion changed
+    from 74 to 114; all 40 new key suffixes added to the checked list.
+
 ## [0.17.0] — 2026-06-12
 
 ### Added

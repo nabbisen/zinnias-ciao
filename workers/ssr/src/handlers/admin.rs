@@ -1051,25 +1051,32 @@ fn event_form_fields(
     };
 
     // RFC-022: repeat fields
-    let repeat_html = r#"<div style="margin-bottom:1rem">
-        <label style="font-size:.875rem;display:block;margin-bottom:.375rem">Repeat</label>
-        <div style="display:flex;gap:.75rem;align-items:center">
-          <select name="repeat_rule" style="padding:.625rem;border:1px solid #e5e5ea;
-            border-radius:12px;font-size:1rem;flex:1">
-            <option value="none">Do not repeat</option>
-            <option value="weekly">Every week</option>
-            <option value="biweekly">Every 2 weeks</option>
-            <option value="monthly">Every month</option>
-          </select>
-          <input type="number" name="repeat_count" value="8" min="1" max="52"
-            style="width:5rem;padding:.625rem;border:1px solid #e5e5ea;
-            border-radius:12px;font-size:1rem">
-          <span style="font-size:.875rem;color:#6e6e73">times</span>
-        </div>
-        <p style="font-size:.75rem;color:#6e6e73;margin:.25rem 0 0">
-          Number of times ignored when "Do not repeat" is selected.
-        </p>
-      </div>"#;
+    let repeat_html = format!(
+        "<div style=\"margin-bottom:1rem\">\
+         <label style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{repeat_lbl}</label>\
+         <div style=\"display:flex;gap:.75rem;align-items:center\">\
+           <select name=\"repeat_rule\" style=\"padding:.625rem;border:1px solid #e5e5ea;\
+             border-radius:12px;font-size:1rem;flex:1\">\
+             <option value=\"none\">{opt_none}</option>\
+             <option value=\"weekly\">{opt_weekly}</option>\
+             <option value=\"biweekly\">{opt_biweekly}</option>\
+             <option value=\"monthly\">{opt_monthly}</option>\
+           </select>\
+           <input type=\"number\" name=\"repeat_count\" value=\"8\" min=\"1\" max=\"52\"\
+             style=\"width:5rem;padding:.625rem;border:1px solid #e5e5ea;\
+             border-radius:12px;font-size:1rem\">\
+           <span style=\"font-size:.875rem;color:#6e6e73\">{unit}</span>\
+         </div>\
+         <p style=\"font-size:.75rem;color:#6e6e73;margin:.25rem 0 0\">{hint}</p>\
+         </div>",
+        repeat_lbl = i18n::EN_REPEAT_LABEL,
+        opt_none   = i18n::EN_REPEAT_NONE,
+        opt_weekly = i18n::EN_REPEAT_WEEKLY,
+        opt_biweekly = i18n::EN_REPEAT_BIWEEKLY,
+        opt_monthly  = i18n::EN_REPEAT_MONTHLY,
+        unit       = i18n::EN_REPEAT_COUNT_UNIT,
+        hint       = i18n::EN_REPEAT_COUNT_HINT,
+    );
 
     format!(
         "{err}\

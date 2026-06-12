@@ -12,6 +12,7 @@ use zinnias_ciao_contracts::auth::token_purpose;
 
 use crate::authz::require_admin;
 use crate::db::{self, community as community_db, membership as membership_db};
+use zinnias_ciao_contracts::i18n;
 use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
@@ -84,7 +85,7 @@ pub async fn get_export_page(
            This link is single-use and expires in 5 minutes.\
          </p>\
          </main>{nav}",
-        header  = render::header_with_switcher("Export", community_id, &community_pairs),
+        header  = render::header_with_switcher(i18n::EN_EXPORT_TITLE, community_id, &community_pairs),
         name    = render::escape_html(&community_name),
         events  = event_count,
         members = member_count,
@@ -93,7 +94,7 @@ pub async fn get_export_page(
         slug    = render::escape_html(&slugify(&community_name)),
         nav     = nav,
     );
-    render::page("Export community data", &body)
+    render::page(i18n::EN_EXPORT_TITLE, &body)
 }
 
 // ── GET /c/:cid/admin/export/json?token=… ────────────────────────────────

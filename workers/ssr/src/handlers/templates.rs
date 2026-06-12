@@ -12,6 +12,7 @@ use crate::audit;
 use crate::authz::require_admin;
 use crate::crypto::random_token;
 use crate::db::{event_template as tmpl_db, membership as membership_db};
+use zinnias_ciao_contracts::i18n;
 use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
@@ -157,7 +158,7 @@ pub async fn get_templates(
            </form>\
          </section>\
          </main>{nav}",
-        header = render::header_with_switcher("Templates", community_id, &community_pairs),
+        header = render::header_with_switcher(i18n::EN_TEMPLATES_TITLE, community_id, &community_pairs),
         flash  = flash_html,
         empty  = empty_msg,
         list   = if list_html.is_empty() { String::new() }
@@ -166,7 +167,7 @@ pub async fn get_templates(
         tok    = render::escape_html(&create_token),
         nav    = nav,
     );
-    render::page("Event Templates", &body)
+    render::page(i18n::EN_TEMPLATES_TITLE, &body)
 }
 
 // ── POST /c/:cid/admin/templates ──────────────────────────────────────────

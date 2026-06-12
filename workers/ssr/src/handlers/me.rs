@@ -33,7 +33,7 @@ pub async fn get_me(
     let community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or("");
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
-    let role_label = if membership.is_admin() { "Admin" } else { "Member" };
+    let role_label = if membership.is_admin() { i18n::EN_ROLE_ADMIN } else { i18n::EN_ROLE_MEMBER };
 
     // RFC-035: support diagnostics
     let app_version = env.var("BUILD_VERSION")

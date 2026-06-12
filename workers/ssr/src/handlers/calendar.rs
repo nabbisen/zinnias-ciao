@@ -150,13 +150,13 @@ pub async fn get_me_calendar(
          {flash}\
          {feed}\
          </main>{nav}",
-        header = render::header_with_switcher("Calendar", community_id, &community_pairs),
+        header = render::header_with_switcher(i18n::EN_CALENDAR_TITLE, community_id, &community_pairs),
         back   = back,
         flash  = flash_html,
         feed   = feed_section,
         nav    = nav,
     );
-    render::page("Calendar feed", &body)
+    render::page(i18n::EN_CALENDAR_TITLE, &body)
 }
 
 // ── POST /c/:cid/me/calendar/regenerate ───────────────────────────────────

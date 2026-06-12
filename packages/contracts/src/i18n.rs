@@ -201,6 +201,108 @@ pub const EN_COMMUNITIES_JOIN_ANOTHER: &str = "Join another community";
 pub const JA_COMMUNITIES_JOIN_ANOTHER: &str = "別のコミュニティに参加";
 
 
+// ── Role labels ───────────────────────────────────────────────────────────
+pub const EN_ROLE_ADMIN:  &str = "Admin";
+pub const EN_ROLE_MEMBER: &str = "Member";
+
+pub const JA_ROLE_ADMIN:  &str = "管理者";
+pub const JA_ROLE_MEMBER: &str = "メンバー";
+
+// ── Home first-run card (RFC-030) ─────────────────────────────────────────
+pub const EN_HOME_FIRST_RUN_WELCOME: &str = "Welcome. Your community is set up. Here's how to get started.";
+pub const EN_HOME_FIRST_RUN_NO_EVENTS: &str = "No events yet. Create the first event for your community.";
+pub const EN_HOME_FIRST_RUN_CREATE: &str = "+ Create first event";
+pub const EN_HOME_FIRST_RUN_INVITE_HINT: &str = "Invite members so they can see your events.";
+
+pub const JA_HOME_FIRST_RUN_WELCOME: &str = "コミュニティの設定が完了しました。はじめ方をご確認ください。";
+pub const JA_HOME_FIRST_RUN_NO_EVENTS: &str = "まだイベントがありません。コミュニティ最初のイベントを作成しましょう。";
+pub const JA_HOME_FIRST_RUN_CREATE: &str = "+ 最初のイベントを作成";
+pub const JA_HOME_FIRST_RUN_INVITE_HINT: &str = "メンバーを招待して、イベントを見てもらいましょう。";
+
+// ── Recurrence fields (RFC-022) ───────────────────────────────────────────
+pub const EN_REPEAT_LABEL:          &str = "Repeat";
+pub const EN_REPEAT_NONE:           &str = "Do not repeat";
+pub const EN_REPEAT_WEEKLY:         &str = "Every week";
+pub const EN_REPEAT_BIWEEKLY:       &str = "Every 2 weeks";
+pub const EN_REPEAT_MONTHLY:        &str = "Every month";
+pub const EN_REPEAT_COUNT_UNIT:     &str = "times";
+pub const EN_REPEAT_COUNT_HINT:     &str = "Number of times ignored when \"Do not repeat\" is selected.";
+
+pub const JA_REPEAT_LABEL:          &str = "繰り返し";
+pub const JA_REPEAT_NONE:           &str = "繰り返さない";
+pub const JA_REPEAT_WEEKLY:         &str = "毎週";
+pub const JA_REPEAT_BIWEEKLY:       &str = "2週間ごと";
+pub const JA_REPEAT_MONTHLY:        &str = "毎月";
+pub const JA_REPEAT_COUNT_UNIT:     &str = "回";
+pub const JA_REPEAT_COUNT_HINT:     &str = "「繰り返さない」を選択した場合、回数は無視されます。";
+
+// ── Event templates (RFC-032) ─────────────────────────────────────────────
+pub const EN_TEMPLATES_TITLE:        &str = "Event Templates";
+pub const EN_TEMPLATES_DESCRIPTION:  &str = "Save common event details as templates to create events faster.";
+pub const EN_TEMPLATES_EMPTY:        &str = "No templates yet.";
+pub const EN_TEMPLATES_SAVE_SECTION: &str = "Save a template";
+pub const EN_TEMPLATES_TITLE_LABEL:  &str = "Title";
+pub const EN_TEMPLATES_LOC_LABEL:    &str = "Location (optional)";
+pub const EN_TEMPLATES_DUR_LABEL:    &str = "Default duration in minutes (optional)";
+pub const EN_TEMPLATES_SAVE_BTN:     &str = "Save template";
+pub const EN_TEMPLATES_USE_BTN:      &str = "Use";
+pub const EN_TEMPLATES_DELETE_BTN:   &str = "Delete";
+pub const EN_TEMPLATES_USE_LINK:     &str = "Use a template";
+
+pub const JA_TEMPLATES_TITLE:        &str = "イベントテンプレート";
+pub const JA_TEMPLATES_DESCRIPTION:  &str = "よく使うイベント情報をテンプレートとして保存して、素早く作成できます。";
+pub const JA_TEMPLATES_EMPTY:        &str = "まだテンプレートがありません。";
+pub const JA_TEMPLATES_SAVE_SECTION: &str = "テンプレートを保存";
+pub const JA_TEMPLATES_TITLE_LABEL:  &str = "タイトル";
+pub const JA_TEMPLATES_LOC_LABEL:    &str = "場所（任意）";
+pub const JA_TEMPLATES_DUR_LABEL:    &str = "デフォルトの所要時間（分、任意）";
+pub const JA_TEMPLATES_SAVE_BTN:     &str = "テンプレートを保存";
+pub const JA_TEMPLATES_USE_BTN:      &str = "使用";
+pub const JA_TEMPLATES_DELETE_BTN:   &str = "削除";
+pub const JA_TEMPLATES_USE_LINK:     &str = "テンプレートを使用";
+
+// ── Community export (RFC-027) ────────────────────────────────────────────
+pub const EN_EXPORT_TITLE:       &str = "Export community data";
+pub const EN_EXPORT_DESCRIPTION: &str = "Download a JSON file of your community's events, attendance, and notes.";
+pub const EN_EXPORT_PRIVACY_NOTE: &str = "Member names and notes are included. Session tokens and security credentials are not included.";
+pub const EN_EXPORT_DOWNLOAD_BTN: &str = "Download JSON";
+pub const EN_EXPORT_SINGLE_USE:  &str = "This link is single-use and expires in 5 minutes.";
+
+pub const JA_EXPORT_TITLE:       &str = "コミュニティデータのエクスポート";
+pub const JA_EXPORT_DESCRIPTION: &str = "コミュニティのイベント・出欠・メモをJSONファイルでダウンロードします。";
+pub const JA_EXPORT_PRIVACY_NOTE: &str = "メンバー名とメモが含まれます。セッショントークンやセキュリティ情報は含まれません。";
+pub const JA_EXPORT_DOWNLOAD_BTN: &str = "JSONをダウンロード";
+pub const JA_EXPORT_SINGLE_USE:  &str = "このリンクは1回限りで、5分後に無効になります。";
+
+// ── Support / about (RFC-035) ─────────────────────────────────────────────
+pub const EN_ME_SECTION_ABOUT:   &str = "About";
+pub const EN_ME_VERSION_LABEL:   &str = "Version";
+pub const EN_ME_REF_LABEL:       &str = "Ref";
+pub const EN_ME_SECTION_DATA:    &str = "Data";
+pub const EN_ME_EXPORT_LINK:     &str = "Export community data";
+
+pub const JA_ME_SECTION_ABOUT:   &str = "このアプリについて";
+pub const JA_ME_VERSION_LABEL:   &str = "バージョン";
+pub const JA_ME_REF_LABEL:       &str = "参照コード";
+pub const JA_ME_SECTION_DATA:    &str = "データ";
+pub const JA_ME_EXPORT_LINK:     &str = "コミュニティデータをエクスポート";
+
+// ── Calendar feed (RFC-023) ───────────────────────────────────────────────
+pub const EN_CALENDAR_TITLE:       &str = "Calendar feed";
+pub const EN_CALENDAR_DESCRIPTION: &str = "Subscribe in Apple Calendar, Google Calendar, or any app that supports calendar subscriptions (.ics / webcal).";
+pub const EN_CALENDAR_GENERATE:    &str = "Generate feed URL";
+pub const EN_CALENDAR_DISABLE:     &str = "Disable feed";
+pub const EN_CALENDAR_REGENERATE:  &str = "Regenerate URL";
+pub const EN_CALENDAR_PRIVACY_NOTE: &str = "Your personal calendar feed URL. Keep this private — anyone with the URL can read your community events.";
+
+pub const JA_CALENDAR_TITLE:       &str = "カレンダーフィード";
+pub const JA_CALENDAR_DESCRIPTION: &str = "Appleカレンダー、Googleカレンダー、またはiCS/webcalに対応したアプリでご利用いただけます。";
+pub const JA_CALENDAR_GENERATE:    &str = "フィードURLを生成";
+pub const JA_CALENDAR_DISABLE:     &str = "フィードを無効化";
+pub const JA_CALENDAR_REGENERATE:  &str = "URLを再生成";
+pub const JA_CALENDAR_PRIVACY_NOTE: &str = "個人のカレンダーフィードURLです。このURLを知っている人はコミュニティのイベントを閲覧できます。公開しないでください。";
+
+
 #[cfg(test)]
 mod tests {
     // Every EN_ constant must have a JA_ counterpart with the same suffix.
@@ -248,8 +350,30 @@ mod tests {
             "ADMIN_REMOVE_CONSEQUENCE", "ADMIN_LAST_ADMIN",
             // Communities
             "COMMUNITIES_JOIN_ANOTHER",
+            // Role labels
+            "ROLE_ADMIN", "ROLE_MEMBER",
+            // Home first-run (RFC-030)
+            "HOME_FIRST_RUN_WELCOME", "HOME_FIRST_RUN_NO_EVENTS",
+            "HOME_FIRST_RUN_CREATE", "HOME_FIRST_RUN_INVITE_HINT",
+            // Recurrence (RFC-022)
+            "REPEAT_LABEL", "REPEAT_NONE", "REPEAT_WEEKLY", "REPEAT_BIWEEKLY",
+            "REPEAT_MONTHLY", "REPEAT_COUNT_UNIT", "REPEAT_COUNT_HINT",
+            // Templates (RFC-032)
+            "TEMPLATES_TITLE", "TEMPLATES_DESCRIPTION", "TEMPLATES_EMPTY",
+            "TEMPLATES_SAVE_SECTION", "TEMPLATES_TITLE_LABEL", "TEMPLATES_LOC_LABEL",
+            "TEMPLATES_DUR_LABEL", "TEMPLATES_SAVE_BTN", "TEMPLATES_USE_BTN",
+            "TEMPLATES_DELETE_BTN", "TEMPLATES_USE_LINK",
+            // Export (RFC-027)
+            "EXPORT_TITLE", "EXPORT_DESCRIPTION", "EXPORT_PRIVACY_NOTE",
+            "EXPORT_DOWNLOAD_BTN", "EXPORT_SINGLE_USE",
+            // Me / About (RFC-035)
+            "ME_SECTION_ABOUT", "ME_VERSION_LABEL", "ME_REF_LABEL",
+            "ME_SECTION_DATA", "ME_EXPORT_LINK",
+            // Calendar (RFC-023)
+            "CALENDAR_TITLE", "CALENDAR_DESCRIPTION", "CALENDAR_GENERATE",
+            "CALENDAR_DISABLE", "CALENDAR_REGENERATE", "CALENDAR_PRIVACY_NOTE",
         ];
-        assert_eq!(en_keys.len(), 74, "update parity list when adding strings");
+        assert_eq!(en_keys.len(), 114, "update parity list when adding strings");
         for key in en_keys {
             assert!(!key.is_empty(), "empty key: {key}");
         }

@@ -127,9 +127,9 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
     let is_first_run = seen_events.is_empty() && membership.is_admin() && member_count <= 1;
     let (empty_html, admin_shortcuts): (String, String) = if seen_events.is_empty() && membership.is_admin() {
         let intro = if is_first_run {
-            "Welcome. Your community is set up. Here's how to get started."
+            i18n::EN_HOME_FIRST_RUN_WELCOME
         } else {
-            "No events yet. Create the first event for your community."
+            i18n::EN_HOME_FIRST_RUN_NO_EVENTS
         };
         let invite_hint = if is_first_run {
             format!(
