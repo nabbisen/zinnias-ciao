@@ -91,6 +91,64 @@ pub async fn mark_used(db: &D1Database, invite_id: &str, membership_id: &str) ->
     Ok(())
 }
 
+/// Revoke an unused invite code (admin action — sets revoked_at).
+pub async fn revoke(db: &D1Database, invite_id: &str, community_id: &str) -> Result<()> {
+    let now = now_utc();
+    // Scoped to community_id to prevent cross-community revocation.
+    db.prepare(
+        "UPDATE invite_codes \
+         SET revoked_at = ?1 \
+         WHERE id = ?2 AND community_id = ?3 \
+           AND used_at IS NULL AND revoked_at IS NULL",
+    )
+    .bind(&[now.as_str().into(), invite_id.into(), community_id.into()])?
+    .run()
+    .await?;
+    Ok(())
+}
+
+/// Active (unused, unrevoked, unexpired) invite codes for a community.
+/// Returns (id, expires_at, grants_role) ordered newest first.
+/// Code HMACs are never returned — admins see only metadata.
+pub struct InviteMetaRow {
+    pub id: String,
+    pub expires_at: String,
+    pub grants_role: String,
+}
+
+pub async fn list_active_for_community(
+    db: &D1Database,
+    community_id: &str,
+) -> Result<Vec<InviteMetaRow>> {
+    let now = now_utc();
+    let rows = db
+        .prepare(
+            "SELECT id, expires_at, grants_role \
+             FROM invite_codes \
+             WHERE community_id = ?1 \
+               AND used_at IS NULL \
+               AND revoked_at IS NULL \
+               AND expires_at > ?2 \
+             ORDER BY expires_at DESC \
+             LIMIT 20",
+        )
+        .bind(&[community_id.into(), now.as_str().into()])?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?;
+
+    Ok(rows.into_iter().filter_map(|v| {
+        Some(InviteMetaRow {
+            id:          v.get("id")?.as_str()?.to_owned(),
+            expires_at:  v.get("expires_at")?.as_str()?.to_owned(),
+            grants_role: v.get("grants_role")
+                          .and_then(|x| x.as_str())
+                          .unwrap_or("member")
+                          .to_owned(),
+        })
+    }).collect())
+}
+
 /// Insert a new invite code (admin action).
 pub async fn insert(
     db: &D1Database,

@@ -243,48 +243,93 @@ pub async fn get_invites(
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let pp = pepper(env);
-    let token = form_token::issue(&db, &pp, &auth.user_id,
+    let gen_token = form_token::issue(&db, &pp, &auth.user_id,
         "generate_invite", None).await.unwrap_or_default();
 
-    let community = db::community::find_active(&db, community_id).await?;
-    let community_name = community.map(|c| c.name).unwrap_or_default();
-    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
-    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
+    let community_pairs: Vec<(String,String)> = communities_for_switcher.iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
 
-    // Check for a just-generated code in query param
     let url = req.url()?;
     let new_code: Option<String> = url.query_pairs()
-        .find(|(k, _)| k == "code")
-        .map(|(_, v)| v.to_string());
+        .find(|(k, _)| k == "code").map(|(_, v)| v.to_string());
+    let flash: Option<String> = url.query_pairs()
+        .find(|(k, _)| k == "flash").map(|(_, v)| v.to_string());
 
-    let code_html = new_code.as_deref().map(|c| format!(
-        "<div style=\"background:#f5f5f7;border-radius:12px;padding:1rem;margin:1rem 0\">\
-         <p style=\"font-size:.875rem;color:#6e6e73;margin-bottom:.5rem\">\
-         Share this with one person. It expires in 24 hours.</p>\
-         <div style=\"font-size:1.5rem;font-weight:700;letter-spacing:.2em;color:#1D1D1F\">{code}</div>\
+    let new_code_html = new_code.as_deref().map(|c| format!(
+        "<div style=\"background:#edfaf0;border-radius:12px;padding:1rem;margin:1rem 0;border:1px solid #34C759\">\
+         <p style=\"font-size:.8125rem;color:#167A34;margin:0 0 .5rem\">Share with one person only — expires in 24 hours.</p>\
+         <div style=\"font-size:1.5rem;font-weight:700;letter-spacing:.2em;color:#1D1D1F\" aria-label=\"Invite code\">{code}</div>\
          </div>",
         code = render::escape_html(c)
     )).unwrap_or_default();
 
-    let nav  = render::bottom_nav(community_id, "home");
+    let flash_html = flash.map(|f| format!(
+        "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0\">{}</p>",
+        render::escape_html(&f)
+    )).unwrap_or_default();
+
+    // List active codes with per-row revoke tokens.
+    let active_codes = invite_db::list_active_for_community(&db, community_id).await
+        .unwrap_or_default();
+
+    let mut code_rows = String::new();
+    for inv in &active_codes {
+        let revoke_tok = form_token::issue(&db, &pp, &auth.user_id,
+            token_purpose::REVOKE_INVITE, Some(&inv.id)).await.unwrap_or_default();
+        let role_label = if inv.grants_role == "admin" { " · admin invite" } else { "" };
+        let exp_display = inv.expires_at.get(..16).unwrap_or(&inv.expires_at);
+        code_rows.push_str(&format!(
+            "<li style=\"display:flex;align-items:center;justify-content:space-between;\
+             padding:.625rem 0;border-bottom:1px solid #f5f5f7;gap:.5rem\">\
+             <span style=\"font-size:.875rem;color:#1D1D1F\">Expires {exp}{role}</span>\
+             <form method=\"post\" action=\"/c/{cid}/admin/invites/{iid}/revoke\" style=\"margin:0\">\
+               <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
+               <button type=\"submit\" \
+                 style=\"font-size:.8125rem;color:#FF3B30;background:none;border:none;\
+                 padding:.375rem .5rem;cursor:pointer;min-height:44px\" \
+                 aria-label=\"Revoke this invite code\">Revoke</button>\
+             </form></li>",
+            exp  = render::escape_html(exp_display),
+            role = role_label,
+            cid  = render::escape_html(community_id),
+            iid  = render::escape_html(&inv.id),
+            tok  = render::escape_html(&revoke_tok),
+        ));
+    }
+    let codes_html = if active_codes.is_empty() {
+        "<p style=\"font-size:.875rem;color:#6e6e73\">No unused codes.</p>".to_owned()
+    } else {
+        format!("<ul style=\"list-style:none;padding:0;margin:.75rem 0\">{code_rows}</ul>")
+    };
+
+    let nav = render::bottom_nav(community_id, "home");
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
          <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">Invite Members</h1>\
-         <p style=\"font-size:.875rem;color:#6e6e73\">Generate a one-time invite code.</p>\
-         {code_html}\
+         <p style=\"font-size:.875rem;color:#6e6e73\">Generate a one-time code for one person.</p>\
+         {flash}{new_code}\
          <form method=\"post\" action=\"/c/{cid}/admin/invites\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            <button type=\"submit\" \
              style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
              border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-             min-height:44px;cursor:pointer;margin-top:1rem\">Generate Code</button>\
-         </form></main>{nav}",
-        header    = render::header_with_switcher("Invite Members", community_id, &_community_pairs),
-        cid       = render::escape_html(community_id),
-        tok       = render::escape_html(&token),
-        code_html = code_html,
-        nav       = nav,
+             min-height:44px;cursor:pointer;margin-top:.5rem\">Generate Code</button>\
+         </form>\
+         <section style=\"margin-top:1.5rem\">\
+           <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
+             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">Active codes</h2>\
+           {codes}\
+         </section>\
+         </main>{nav}",
+        header   = render::header_with_switcher("Invite Members", community_id, &community_pairs),
+        cid      = render::escape_html(community_id),
+        tok      = render::escape_html(&gen_token),
+        new_code = new_code_html,
+        flash    = flash_html,
+        codes    = codes_html,
+        nav      = nav,
     );
     render::page("Invite Members", &body)
 }
@@ -313,13 +358,11 @@ pub async fn post_generate_invite(
         return redirect(&format!("/c/{community_id}/admin/invites"));
     }
 
-    // Generate code from the safe alphabet (no ambiguous chars)
     let code = generate_invite_code();
     let normalized = normalize_invite_code(&code);
     let code_hmac = hmac_hex(&pp, &normalized);
-
     let invite_id = random_token()[..24].to_owned();
-    let expires_at = db::add_seconds_to_now(86_400); // 24 hours
+    let expires_at = db::add_seconds_to_now(86_400);
 
     invite_db::insert(&db, &invite_id, community_id, &code_hmac,
         &membership.membership_id, &expires_at, "member").await?;
@@ -327,8 +370,40 @@ pub async fn post_generate_invite(
     let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
         "invite_code", Some(&invite_id), "generated", None).await;
 
-    // Show the plaintext code once via redirect query param (never stored)
     redirect(&format!("/c/{community_id}/admin/invites?code={code}"))
+}
+
+// ── POST /c/:cid/admin/invites/:iid/revoke ───────────────────────────────
+
+pub async fn post_revoke_invite(
+    mut req: Request,
+    env: &Env,
+    rid: &str,
+    community_id: &str,
+    invite_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_admin(&env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let pp = pepper(env);
+
+    let body = req.form_data().await?;
+    let raw_token = body.get_field("_token").unwrap_or_default();
+    let replay = form_token::consume(&db, &pp, &auth.user_id,
+        token_purpose::REVOKE_INVITE, &raw_token, Some(invite_id)).await?;
+    if replay.is_some() {
+        return redirect(&format!("/c/{community_id}/admin/invites"));
+    }
+
+    invite_db::revoke(&db, invite_id, community_id).await?;
+
+    let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
+        "invite_code", Some(invite_id), "revoked", None).await;
+
+    redirect(&format!("/c/{community_id}/admin/invites?flash=Code+revoked"))
 }
 
 // ── GET /c/:cid/admin/members ────────────────────────────────────────────

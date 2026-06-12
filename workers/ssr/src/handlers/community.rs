@@ -104,6 +104,12 @@ pub async fn dispatch_post(req: Request, env: &Env, rid: &str, path: &str) -> Re
                     }
                 }
                 "invites" => super::admin::post_generate_invite(req, env, rid, cid).await,
+                t if t.starts_with("invites/") => {
+                    let (iid, action) = split_once(&t[8..], '/');
+                    if action == "revoke" {
+                        super::admin::post_revoke_invite(req, env, rid, cid, iid).await
+                    } else { render::not_found() }
+                }
                 t if t.starts_with("members/") => {
                     let (mid, sub) = split_once(&t[8..], '/');
                     if sub == "remove" {

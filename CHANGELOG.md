@@ -2,6 +2,31 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.8.0] — 2026-06-12
+
+### Added
+
+- **Invite code revocation — closes the last functional release gate.**
+  - `db/invite.rs`: `revoke(invite_id, community_id)` soft-sets `revoked_at`; scoped to
+    `community_id` to prevent cross-community revocation. `list_active_for_community`
+    returns metadata (id, expires_at, grants_role) for unused/unrevoked/unexpired codes
+    — never the HMAC. `InviteMetaRow` struct.
+  - `contracts/src/auth.rs`: new `token_purpose::REVOKE_INVITE`.
+  - `handlers/admin.rs`: `post_revoke_invite` — CSRF-guarded, community-scoped, audited.
+    `get_invites` rewritten: shows active codes list with per-row revoke buttons (token
+    issued per code at render time); new-code confirmation banner uses AA-passing green.
+  - Route wired: `POST /c/:cid/admin/invites/:iid/revoke`.
+
+- **Release checklist ticked.** `docs/src/release-checklist.md` updated with
+  code-verified `[x]` items (28 gates confirmed by inspection/tests) and `[~]` for
+  browser/ops items that require a human pass. Four operator tasks remain `[ ]`
+  (staging migration rehearsal, production secrets, Logpush, final security review).
+
+### Changed
+
+- `release_gates.rs` and `token_and_color_regression.rs`: `REVOKE_INVITE` added to
+  token completeness and uniqueness tests (12 total purposes).
+
 ## [0.7.0] — 2026-06-12
 
 ### Added
