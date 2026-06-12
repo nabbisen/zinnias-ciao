@@ -50,6 +50,8 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 043 | [Pilot UX Acceptance and Error Feedback](./done/043-pilot-ux-acceptance-and-error-feedback.md) | v0.23.0 / v0.24.0 |
 | 046 | [Event-Bound Status Token](./done/046-event-bound-status-token.md) | v0.27.0 |
 | 047 | [Japanese Date/Time Presentation](./done/047-japanese-date-time-presentation.md) | v0.27.0 |
+| 048 | [Pilot Security Headers and Cache-Control Gate](./done/048-pilot-security-headers.md) | v0.30.0 |
+| 049 | [Japanese-Language Pilot Rendering](./done/049-japanese-language-pilot-rendering.md) | v0.30.0 |
 
 ## Also Done
 
@@ -73,7 +75,7 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 033 | Subgroups, Event Visibility, and Boundary Safety | [./proposed/033-subgroups-event-visibility-and-boundary-safety.md](./proposed/033-subgroups-event-visibility-and-boundary-safety.md) |
 | 034 | Notification-Free Quiet Mode and Attention Design | [./proposed/034-notification-free-quiet-mode-and-attention-design.md](./proposed/034-notification-free-quiet-mode-and-attention-design.md) |
 
-## Proposed — F7 stabilization follow-ups (044–045)
+## Proposed — F7/F8 follow-ups (044–045)
 
 | ID | Title | File | Note |
 |----|-------|------|------|

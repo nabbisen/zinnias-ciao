@@ -78,15 +78,15 @@ pub async fn get_create_event(
          </form>\
          {tmpl_link}\
          </main>{nav}",
-        header    = render::header_with_switcher(i18n::EN_ADMIN_CREATE_EVENT_TITLE, community_id, &_community_pairs),
+        header    = render::header_with_switcher(i18n::JA_ADMIN_CREATE_EVENT_TITLE, community_id, &_community_pairs),
         cid       = render::escape_html(community_id),
         tok       = render::escape_html(&token),
         fields    = event_form_fields(prefill_title.as_deref(), prefill_location.as_deref(), None, err_msg.as_deref(), None, None, None, true),
-        submit    = i18n::EN_ADMIN_CREATE_EVENT_SUBMIT,
+        submit    = i18n::JA_ADMIN_CREATE_EVENT_SUBMIT,
         tmpl_link = templates_link,
         nav       = nav,
     );
-    render::page(i18n::EN_ADMIN_CREATE_EVENT_TITLE, &body)
+    render::page(i18n::JA_ADMIN_CREATE_EVENT_TITLE, &body)
 }
 
 // ── POST /c/:cid/admin/events ────────────────────────────────────────────
@@ -152,12 +152,19 @@ pub async fn post_create_event(
     };
 
     // Convert community-local "HH:MM" on day_date to true UTC (RFC-018).
-    // The community timezone determines the offset; unknown zones fall back
-    // to UTC inside tz::offset_minutes (no silent wrong conversion).
+    // The community timezone determines the offset for local→UTC conversion.
+    // Unknown timezone names are a hard configuration error — we must not
+    // silently store wrong UTC times (P1-timezone, architect review v0.29.0).
     let community_tz = db::community::find_active(&db, community_id).await?
         .map(|c| c.timezone)
         .unwrap_or_else(|| "UTC".to_string());
-    let off = zinnias_ciao_contracts::tz::offset_minutes(&community_tz);
+    let off = match zinnias_ciao_contracts::tz::offset_minutes(&community_tz) {
+        Some(o) => o,
+        None => return render::page(
+            "Configuration error",
+            "<p style=\"color:#FF3B30\">Community timezone is not configured correctly. Please ask the operator to set a valid timezone.</p>"
+        ),
+    };
     let days_utc: Vec<(String, String, String)> = expanded.iter().map(|d| {
         let starts = zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.starts_at, off);
         let ends   = zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.ends_at, off);
@@ -231,7 +238,7 @@ pub async fn get_cancel_event(
                Cancel Event</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher(i18n::EN_ADMIN_CANCEL_EVENT_TITLE, community_id, &_community_pairs),
+        header = render::header_with_switcher(i18n::JA_ADMIN_CANCEL_EVENT_TITLE, community_id, &_community_pairs),
         title  = render::escape_html(&event.title),
         cid    = render::escape_html(community_id),
         eid    = render::escape_html(event_id),
@@ -321,7 +328,9 @@ pub async fn get_edit_event(
         let community_tz = db::community::find_active(&db, community_id).await?
             .map(|c| c.timezone)
             .unwrap_or_else(|| "UTC".to_string());
-        let off = zinnias_ciao_contracts::tz::offset_minutes(&community_tz);
+        // Display path: fall back to UTC for unknown zones (shows UTC times rather
+        // than wrong local times; correct config should be enforced at write time).
+        let off = zinnias_ciao_contracts::tz::offset_minutes_or_utc(&community_tz);
         let d = &days[0];
         let (date, start) = zinnias_ciao_contracts::tz::to_local_parts(&d.starts_at_utc, off);
         let (_, end)      = zinnias_ciao_contracts::tz::to_local_parts(&d.ends_at_utc, off);
@@ -445,7 +454,14 @@ pub async fn post_edit_event(
         let community_tz = db::community::find_active(&db, community_id).await?
             .map(|c| c.timezone)
             .unwrap_or_else(|| "UTC".to_string());
-        let off = zinnias_ciao_contracts::tz::offset_minutes(&community_tz);
+        // Write path: unknown timezone is a hard error (P1-timezone).
+        let off = match zinnias_ciao_contracts::tz::offset_minutes(&community_tz) {
+            Some(o) => o,
+            None => return render::page(
+                "Configuration error",
+                "<p style=\"color:#FF3B30\">Community timezone is not configured correctly. Please ask the operator to set a valid timezone.</p>"
+            ),
+        };
         let d = &validated.days[0];
         Some((
             d.day_date.clone(),
@@ -581,7 +597,7 @@ pub async fn get_attendance(
              Back to event</a>\
          </div>\
          </main>{nav}",
-        header = render::header_with_switcher(i18n::EN_ADMIN_ATTEND_TITLE, community_id, &community_pairs),
+        header = render::header_with_switcher(i18n::JA_ADMIN_ATTEND_TITLE, community_id, &community_pairs),
         title  = render::escape_html(&event.title),
         cid    = render::escape_html(community_id),
         eid    = render::escape_html(event_id),
@@ -810,13 +826,13 @@ fn event_form_fields(
          </div>\
          <p style=\"font-size:.75rem;color:#6e6e73;margin:.25rem 0 0\">{hint}</p>\
          </div>",
-        repeat_lbl = i18n::EN_REPEAT_LABEL,
-        opt_none   = i18n::EN_REPEAT_NONE,
-        opt_weekly = i18n::EN_REPEAT_WEEKLY,
-        opt_biweekly = i18n::EN_REPEAT_BIWEEKLY,
-        opt_monthly  = i18n::EN_REPEAT_MONTHLY,
-        unit       = i18n::EN_REPEAT_COUNT_UNIT,
-        hint       = i18n::EN_REPEAT_COUNT_HINT,
+        repeat_lbl = i18n::JA_REPEAT_LABEL,
+        opt_none   = i18n::JA_REPEAT_NONE,
+        opt_weekly = i18n::JA_REPEAT_WEEKLY,
+        opt_biweekly = i18n::JA_REPEAT_BIWEEKLY,
+        opt_monthly  = i18n::JA_REPEAT_MONTHLY,
+        unit       = i18n::JA_REPEAT_COUNT_UNIT,
+        hint       = i18n::JA_REPEAT_COUNT_HINT,
         )
     } else {
         String::new()

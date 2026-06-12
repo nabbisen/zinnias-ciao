@@ -102,9 +102,9 @@ pub async fn get_event_detail(
 
         let can_set_attended = membership.is_admin() && time_state == DayTimeState::Ended;
         let attended_reason  = if time_state != DayTimeState::Ended {
-            i18n::EN_EVENT_ATTENDED_UNAVAILABLE
+            i18n::JA_EVENT_ATTENDED_UNAVAILABLE
         } else if !membership.is_admin() {
-            i18n::EN_EVENT_ATTENDED_ADMIN_ONLY
+            i18n::JA_EVENT_ATTENDED_ADMIN_ONLY
         } else { "" };
 
         // Day header (status token issued once before the loop, RFC-046)
@@ -180,7 +180,7 @@ pub async fn get_event_detail(
     let mut others_html = String::new();
     for n in all_notes.iter().filter(|n| n.membership_id != membership.membership_id) {
         let name = name_map.get(&n.membership_id)
-            .map(|s| s.as_str()).unwrap_or(i18n::EN_EVENT_MEMBER_FALLBACK);
+            .map(|s| s.as_str()).unwrap_or(i18n::JA_EVENT_MEMBER_FALLBACK);
         // The hide button is now a link to GET …/notes/:mid/hide (RFC-043).
         // Token is issued on that confirmation page — no per-note DB write here.
         let hide_btn = if membership.is_admin() {
@@ -233,7 +233,7 @@ pub async fn get_event_detail(
            {note}\
            {notes_section}\
          </main>{nav}",
-        header         = render::header_with_switcher(i18n::EN_EVENT_TITLE_HEADER, community_id, &_community_pairs),
+        header         = render::header_with_switcher(i18n::JA_EVENT_TITLE_HEADER, community_id, &_community_pairs),
         err_banner     = err.map(|e| format!(
             "<p role=\"alert\" style=\"background:#FFF0EF;color:#B42318;padding:.75rem;\
              border-radius:12px;font-size:.9375rem;margin:.5rem 0\">{}</p>",

@@ -88,7 +88,7 @@ pub async fn get_invites(
         ));
     }
     let codes_html = if active_codes.is_empty() {
-        format!("<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>", i18n::EN_ADMIN_INVITES_NONE)
+        format!("<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>", i18n::JA_ADMIN_INVITES_NONE)
     } else {
         format!("<ul style=\"list-style:none;padding:0;margin:.75rem 0\">{code_rows}</ul>")
     };
@@ -113,7 +113,7 @@ pub async fn get_invites(
            {codes}\
          </section>\
          </main>{nav}",
-        header   = render::header_with_switcher(i18n::EN_ADMIN_INVITES_TITLE, community_id, &community_pairs),
+        header   = render::header_with_switcher(i18n::JA_ADMIN_INVITES_TITLE, community_id, &community_pairs),
         cid      = render::escape_html(community_id),
         tok      = render::escape_html(&gen_token),
         new_code = new_code_html,
@@ -251,7 +251,7 @@ pub async fn get_members(
             color:#007AFF;text-decoration:none;font-weight:600\">\
             Generate invite code</a>\
          </main>{nav}",
-        header = render::header_with_switcher(i18n::EN_ADMIN_MEMBERS_TITLE, community_id, &_community_pairs),
+        header = render::header_with_switcher(i18n::JA_ADMIN_MEMBERS_TITLE, community_id, &_community_pairs),
         rows   = member_rows,
         cid    = render::escape_html(community_id),
         nav    = nav,

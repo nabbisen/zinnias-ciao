@@ -99,10 +99,10 @@ pub async fn get_communities(
               color:#007AFF;text-decoration:none;font-weight:600\">\
               {join_another}</a>\
          </main>{nav}",
-        header       = render::header_with_switcher(i18n::EN_NAV_COMMUNITIES, community_id, &community_pairs),
+        header       = render::header_with_switcher(i18n::JA_NAV_COMMUNITIES, community_id, &community_pairs),
         rows         = rows,
-        join_another = i18n::EN_COMMUNITIES_JOIN_ANOTHER,
+        join_another = i18n::JA_COMMUNITIES_JOIN_ANOTHER,
         nav          = nav,
     );
-    render::page(i18n::EN_NAV_COMMUNITIES, &body)
+    render::page(i18n::JA_NAV_COMMUNITIES, &body)
 }

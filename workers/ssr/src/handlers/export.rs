@@ -80,7 +80,7 @@ pub async fn get_export_page(
            This link is single-use and expires in 5 minutes.\
          </p>\
          </main>{nav}",
-        header  = render::header_with_switcher(i18n::EN_EXPORT_TITLE, community_id, &community_pairs),
+        header  = render::header_with_switcher(i18n::JA_EXPORT_TITLE, community_id, &community_pairs),
         name    = render::escape_html(&community_name),
         events  = event_count,
         members = member_count,
@@ -89,7 +89,7 @@ pub async fn get_export_page(
         slug    = render::escape_html(&slugify(&community_name)),
         nav     = nav,
     );
-    render::page(i18n::EN_EXPORT_TITLE, &body)
+    render::page(i18n::JA_EXPORT_TITLE, &body)
 }
 
 // ── GET /c/:cid/admin/export/json?token=… ────────────────────────────────

@@ -2,16 +2,20 @@
 
 ## Status
 
-**v0.29.0** — 39 of 47 RFCs implemented (8 proposed). 207 passing unit tests across all three crates. Zero warnings.
+**v0.30.0** — 41 of 49 RFCs implemented (8 proposed). 208 passing unit tests. Zero warnings.
 
-The core product has completed all in-repo code work. Release gates cover session
-TTL, token uniqueness, SW/package version alignment, D1 query budgets, full 120-pair
-i18n parity, tested XSS escape boundary, and pre-existing broken ssr test fixed.
-All handlers, domain logic, and contracts are at or below their ELOC split targets.
+**Pre-pilot hardening complete.** This release closes the actionable in-repo items
+from the v0.29.0 architect review: P0 HANDOFF doc fix; security headers
+(`Cache-Control: no-store`, CSP extension, `Permissions-Policy`, `Referrer-Policy`)
+via RFC-048; Japanese-first rendering via RFC-049; timezone write-path hardened to
+fail closed on unknown zones; query budget corrected post-RFC-046.
 
-The remaining work before a production pilot is human/operator work only:
-Cloudflare staging deployment, timezone round-trip smoke test, concurrent race
-verification (RFC-045 §6), and phone/browser usability QA.
+The remaining work before a production pilot is entirely human/operator work:
+- Cloudflare staging deployment and RFC-045 §6 runtime verification matrix
+- Phone/browser usability QA
+- Operator setup (secrets, migrations, Logpush)
+
+No code changes can be made without a live Cloudflare environment.
 
 ---
 

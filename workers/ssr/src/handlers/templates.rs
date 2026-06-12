@@ -107,7 +107,7 @@ pub async fn get_templates(
     }
 
     let empty_msg = if templates.is_empty() {
-        &format!("<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>", i18n::EN_TEMPLATES_EMPTY)
+        &format!("<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>", i18n::JA_TEMPLATES_EMPTY)
     } else { "" };
 
     let nav  = render::bottom_nav(community_id, "home");
@@ -151,14 +151,14 @@ pub async fn get_templates(
            </form>\
          </section>\
          </main>{nav}",
-        title_h1     = i18n::EN_TEMPLATES_TITLE,
-        desc         = i18n::EN_TEMPLATES_DESCRIPTION,
-        save_section_h2 = i18n::EN_TEMPLATES_SAVE_SECTION,
-        lbl_title    = i18n::EN_TEMPLATES_TITLE_LABEL,
-        lbl_loc      = i18n::EN_TEMPLATES_LOC_LABEL,
-        lbl_dur      = i18n::EN_TEMPLATES_DUR_LABEL,
-        btn_save     = i18n::EN_TEMPLATES_SAVE_BTN,
-        header       = render::header_with_switcher(i18n::EN_TEMPLATES_TITLE, community_id, &community_pairs),
+        title_h1     = i18n::JA_TEMPLATES_TITLE,
+        desc         = i18n::JA_TEMPLATES_DESCRIPTION,
+        save_section_h2 = i18n::JA_TEMPLATES_SAVE_SECTION,
+        lbl_title    = i18n::JA_TEMPLATES_TITLE_LABEL,
+        lbl_loc      = i18n::JA_TEMPLATES_LOC_LABEL,
+        lbl_dur      = i18n::JA_TEMPLATES_DUR_LABEL,
+        btn_save     = i18n::JA_TEMPLATES_SAVE_BTN,
+        header       = render::header_with_switcher(i18n::JA_TEMPLATES_TITLE, community_id, &community_pairs),
         flash  = flash_html,
         empty  = empty_msg,
         list   = if list_html.is_empty() { String::new() }
@@ -167,7 +167,7 @@ pub async fn get_templates(
         tok    = render::escape_html(&create_token),
         nav    = nav,
     );
-    render::page(i18n::EN_TEMPLATES_TITLE, &body)
+    render::page(i18n::JA_TEMPLATES_TITLE, &body)
 }
 
 // ── POST /c/:cid/admin/templates ──────────────────────────────────────────

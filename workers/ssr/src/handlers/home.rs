@@ -127,9 +127,9 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
     let is_first_run = seen_events.is_empty() && membership.is_admin() && member_count <= 1;
     let (empty_html, admin_shortcuts): (String, String) = if seen_events.is_empty() && membership.is_admin() {
         let intro = if is_first_run {
-            i18n::EN_HOME_FIRST_RUN_WELCOME
+            i18n::JA_HOME_FIRST_RUN_WELCOME
         } else {
-            i18n::EN_HOME_FIRST_RUN_NO_EVENTS
+            i18n::JA_HOME_FIRST_RUN_NO_EVENTS
         };
         let invite_hint = if is_first_run {
             format!(
@@ -166,7 +166,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
         // Member empty state
         let msg = format!(
             "<p style=\"color:#6e6e73;padding:2rem 0\">{}</p>",
-            i18n::EN_EMPTY_EVENTS_HINT
+            i18n::JA_EMPTY_EVENTS_HINT
         );
         (msg, String::new())
     } else {
@@ -202,9 +202,9 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
          {nav}",
         header    = render::header_with_switcher("Home", community_id, &_community_pairs),
         shortcuts = admin_shortcuts,
-        today    = section(i18n::EN_HOME_TODAY, &today_cards),
-        thisweek = section(i18n::EN_HOME_THIS_WEEK, &thisweek_cards),
-        later    = section(i18n::EN_HOME_LATER, &later_cards),
+        today    = section(i18n::JA_HOME_TODAY, &today_cards),
+        thisweek = section(i18n::JA_HOME_THIS_WEEK, &thisweek_cards),
+        later    = section(i18n::JA_HOME_LATER, &later_cards),
         empty    = empty_html,
         nav      = nav,
     );

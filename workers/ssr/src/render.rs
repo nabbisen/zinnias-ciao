@@ -65,7 +65,7 @@ const THEME: &str    = "#007AFF";
 fn shell(title: &str, body: &str) -> String {
     format!(
         "<!DOCTYPE html>\n\
-<html lang=\"en\">\n\
+<html lang=\"ja\">\n\
 <head>\n\
   <meta charset=\"utf-8\">\n\
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
@@ -125,9 +125,9 @@ pub fn bottom_nav(community_id: &str, active: &str) -> String {
          padding-bottom:env(safe-area-inset-bottom)\">\
          {home}{communities}{me}\
          </nav>",
-        home        = tab(i18n::EN_NAV_HOME, &format!("/c/{community_id}/home"), "home"),
-        communities = tab(i18n::EN_NAV_COMMUNITIES, &format!("/c/{community_id}/communities"), "communities"),
-        me          = tab(i18n::EN_NAV_ME, &format!("/c/{community_id}/me"), "me"),
+        home        = tab(i18n::JA_NAV_HOME, &format!("/c/{community_id}/home"), "home"),
+        communities = tab(i18n::JA_NAV_COMMUNITIES, &format!("/c/{community_id}/communities"), "communities"),
+        me          = tab(i18n::JA_NAV_ME, &format!("/c/{community_id}/me"), "me"),
     )
 }
 
@@ -198,10 +198,10 @@ pub fn header_with_switcher(
 pub fn status_display(status: Option<&str>) -> (&'static str, &'static str, &'static str) {
     // returns (fg_color, icon, label)
     match status {
-        Some("going")     => (CZ_STATUS_GOING_FG,    ICON_GOING,     i18n::EN_STATUS_GOING),
-        Some("not_going") => (CZ_STATUS_NOT_GOING_FG, ICON_NOT_GOING, i18n::EN_STATUS_NOT_GOING),
-        Some("attended")  => (CZ_STATUS_ATTENDED_FG,  ICON_ATTENDED,  i18n::EN_STATUS_ATTENDED),
-        _                 => (CZ_STATUS_NO_ANSWER_FG, ICON_NO_ANSWER, i18n::EN_STATUS_NO_ANSWER),
+        Some("going")     => (CZ_STATUS_GOING_FG,    ICON_GOING,     i18n::JA_STATUS_GOING),
+        Some("not_going") => (CZ_STATUS_NOT_GOING_FG, ICON_NOT_GOING, i18n::JA_STATUS_NOT_GOING),
+        Some("attended")  => (CZ_STATUS_ATTENDED_FG,  ICON_ATTENDED,  i18n::JA_STATUS_ATTENDED),
+        _                 => (CZ_STATUS_NO_ANSWER_FG, ICON_NO_ANSWER, i18n::JA_STATUS_NO_ANSWER),
     }
 }
 
@@ -260,10 +260,10 @@ pub fn status_form(
         )
     };
 
-    let going_btn    = btn(Some("going"),     i18n::EN_STATUS_GOING,     ICON_GOING,     false, "");
-    let notgoing_btn = btn(Some("not_going"), i18n::EN_STATUS_NOT_GOING, ICON_NOT_GOING, false, "");
+    let going_btn    = btn(Some("going"),     i18n::JA_STATUS_GOING,     ICON_GOING,     false, "");
+    let notgoing_btn = btn(Some("not_going"), i18n::JA_STATUS_NOT_GOING, ICON_NOT_GOING, false, "");
     let attended_btn = btn(
-        Some("attended"), i18n::EN_STATUS_ATTENDED, ICON_ATTENDED,
+        Some("attended"), i18n::JA_STATUS_ATTENDED, ICON_ATTENDED,
         !can_set_attended, attended_disabled_reason,
     );
 
@@ -273,8 +273,8 @@ pub fn status_form(
             "<button type=\"submit\" name=\"status\" value=\"clear\" \
              style=\"font-size:.75rem;color:#6E6E73;background:none;border:none;\
              padding:.25rem;cursor:pointer\" aria-label=\"{clear_label}\">{clear}</button>",
-                clear_label = i18n::EN_STATUS_CLEAR_LABEL,
-                clear       = i18n::EN_STATUS_CLEAR,
+                clear_label = i18n::JA_STATUS_CLEAR_LABEL,
+                clear       = i18n::JA_STATUS_CLEAR,
         )
     } else {
         String::new()
@@ -363,11 +363,11 @@ pub fn note_form(
         muted             = CZ_COLOR_TEXT_SECONDARY,
         border            = CZ_BORDER,
         going_border      = CZ_STATUS_GOING_BORDER,
-        note_section_label    = i18n::EN_NOTE_SECTION_LABEL,
-        note_placeholder_label = i18n::EN_NOTE_PLACEHOLDER_LABEL,
-        note_char_hint        = i18n::EN_NOTE_CHAR_HINT,
-        note_visibility       = i18n::EN_NOTE_VISIBILITY,
-        note_save             = i18n::EN_NOTE_SAVE,
+        note_section_label    = i18n::JA_NOTE_SECTION_LABEL,
+        note_placeholder_label = i18n::JA_NOTE_PLACEHOLDER_LABEL,
+        note_char_hint        = i18n::JA_NOTE_CHAR_HINT,
+        note_visibility       = i18n::JA_NOTE_VISIBILITY,
+        note_save             = i18n::JA_NOTE_SAVE,
     )
 }
 
@@ -475,7 +475,7 @@ fn format_day_time(day: &CardDay<'_>) -> String {
 
 /// Fixed UTC-offset map for IANA names — delegates to contracts::tz (RFC-018).
 fn tz_offset_minutes(tz: &str) -> i32 {
-    zinnias_ciao_contracts::tz::offset_minutes(tz)
+    zinnias_ciao_contracts::tz::offset_minutes_or_utc(tz)
 }
 
 /// Apply a UTC offset and return ("YYYY-MM-DD", "HH:MM") in local time.
@@ -579,7 +579,7 @@ pub fn placeholder() -> Result<Response> {
   <p>Private community schedule sharing.</p>\
   <p style=\"color:#6E6E73;font-size:.875rem\">This environment is not ready for members yet.</p>\
 </main>";
-    Response::from_html(shell(i18n::EN_JOIN_HEADING, body))
+    Response::from_html(shell(i18n::JA_JOIN_HEADING, body))
 }
 
 pub fn not_found() -> Result<Response> {

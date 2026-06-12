@@ -84,12 +84,25 @@ fn generate_request_id() -> String {
 
 fn attach_security_headers(resp: &mut Response, request_id: &str) -> Result<()> {
     let h = resp.headers_mut();
+    // Content Security Policy.
+    // style-src 'unsafe-inline': the SSR templates use inline style= attributes
+    // pervasively (~272 occurrences). Removing them requires a full CSS extraction
+    // pass; tracked for a future RFC. All other directives are strict.
     h.set("Content-Security-Policy",
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
-         img-src 'self' data:; frame-ancestors 'none'")?;
+         img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; \
+         form-action 'self'; object-src 'none'")?;
     h.set("X-Content-Type-Options", "nosniff")?;
     h.set("X-Frame-Options", "DENY")?;
-    h.set("Referrer-Policy", "strict-origin-when-cross-origin")?;
+    h.set("Referrer-Policy", "same-origin")?;
+    h.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")?;
+    // Cache-Control: prevent browsers and intermediaries from caching responses.
+    // Static asset handlers (CSS, JS, manifest) set public/max-age headers before
+    // this function runs; we only set no-store when the handler has not already
+    // set a Cache-Control header, preserving intentional caching for static assets.
+    if h.get("Cache-Control").ok().flatten().is_none() {
+        h.set("Cache-Control", "no-store")?;
+    }
     h.set("X-Request-Id", request_id)?;
     Ok(())
 }

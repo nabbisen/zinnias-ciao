@@ -10,8 +10,16 @@
 
 /// Return the UTC offset in minutes for an IANA timezone name.
 /// Positive = east of UTC (e.g. Asia/Tokyo = +540).
-pub fn offset_minutes(tz: &str) -> i32 {
-    match tz {
+/// Return the UTC offset in minutes for a known IANA timezone name.
+/// Returns `None` for unrecognized names.
+///
+/// Call sites that write event times **must** use this function and reject
+/// unknown zones — a silent UTC fallback would store wrong times for
+/// communities with a misconfigured timezone (P1-timezone, architect review).
+///
+/// Call sites that only *display* times may use `offset_minutes_or_utc`.
+pub fn offset_minutes(tz: &str) -> Option<i32> {
+    Some(match tz {
         // UTC
         "UTC" | "Etc/UTC" | "Etc/GMT" => 0,
         // Asia
@@ -65,9 +73,17 @@ pub fn offset_minutes(tz: &str) -> i32 {
         "Australia/Darwin"                              =>  9 * 60 + 30,
         "Australia/Perth"                               =>  8 * 60,
         "Pacific/Auckland" | "NZ"                       =>  12 * 60,
-        // Unknown → display as UTC
-        _ => 0,
-    }
+        // Unknown → None (callers must reject or fall back explicitly)
+        _ => return None,
+    })
+}
+
+/// Return the UTC offset in minutes for display purposes only.
+/// Falls back to UTC (0) for unknown zones — incorrect for scheduling, but
+/// safe for display since the user sees UTC times rather than silently wrong
+/// local times. Write paths must use `offset_minutes` and reject None.
+pub fn offset_minutes_or_utc(tz: &str) -> i32 {
+    offset_minutes(tz).unwrap_or(0)
 }
 
 /// Apply a UTC offset (minutes) to a UTC ISO timestamp.
@@ -186,21 +202,21 @@ mod tests {
     #[test]
     fn tokyo_local_to_utc_subtracts_nine_hours() {
         // Architect acceptance case: 09:00 Asia/Tokyo -> 00:00Z same day.
-        let off = offset_minutes("Asia/Tokyo");
+        let off = offset_minutes("Asia/Tokyo").unwrap();
         assert_eq!(local_to_utc("2026-06-14", "09:00", off), "2026-06-14T00:00:00.000Z");
     }
 
     #[test]
     fn tokyo_local_to_utc_wraps_to_previous_day() {
         // 06:00 JST -> 21:00Z the previous day.
-        let off = offset_minutes("Asia/Tokyo");
+        let off = offset_minutes("Asia/Tokyo").unwrap();
         assert_eq!(local_to_utc("2026-06-14", "06:00", off), "2026-06-13T21:00:00.000Z");
     }
 
     #[test]
     fn new_york_local_to_utc_adds_five_hours() {
         // -5h zone: 20:00 local -> 01:00Z next day.
-        let off = offset_minutes("America/New_York");
+        let off = offset_minutes("America/New_York").unwrap();
         assert_eq!(local_to_utc("2026-06-14", "20:00", off), "2026-06-15T01:00:00.000Z");
     }
 
@@ -211,7 +227,7 @@ mod tests {
 
     #[test]
     fn local_to_utc_round_trips_with_to_local_parts() {
-        let off = offset_minutes("Asia/Tokyo");
+        let off = offset_minutes("Asia/Tokyo").unwrap();
         let utc = local_to_utc("2026-06-14", "09:00", off);
         let (d, t) = to_local_parts(&utc, off);
         assert_eq!((d.as_str(), t.as_str()), ("2026-06-14", "09:00"));
@@ -220,7 +236,7 @@ mod tests {
     #[test]
     fn local_to_utc_month_boundary_backward() {
         // 00:30 JST on the 1st -> 15:30Z on the last day of previous month.
-        let off = offset_minutes("Asia/Tokyo");
+        let off = offset_minutes("Asia/Tokyo").unwrap();
         assert_eq!(local_to_utc("2026-07-01", "00:30", off), "2026-06-30T15:30:00.000Z");
     }
 
@@ -232,27 +248,34 @@ mod tests {
 
     #[test]
     fn utc_offset_is_zero() {
-        assert_eq!(offset_minutes("UTC"), 0);
+        assert_eq!(offset_minutes("UTC"), Some(0));
     }
 
     #[test]
     fn tokyo_is_plus_nine_hours() {
-        assert_eq!(offset_minutes("Asia/Tokyo"), 9 * 60);
+        assert_eq!(offset_minutes("Asia/Tokyo"), Some(9 * 60));
     }
 
     #[test]
     fn new_york_is_minus_five() {
-        assert_eq!(offset_minutes("America/New_York"), -5 * 60);
+        assert_eq!(offset_minutes("America/New_York"), Some(-5 * 60));
     }
 
     #[test]
     fn kolkata_half_hour_offset() {
-        assert_eq!(offset_minutes("Asia/Kolkata"), 5 * 60 + 30);
+        assert_eq!(offset_minutes("Asia/Kolkata"), Some(5 * 60 + 30));
     }
 
     #[test]
-    fn unknown_tz_falls_back_to_utc() {
-        assert_eq!(offset_minutes("Atlantis/Underwater"), 0);
+    fn unknown_tz_returns_none() {
+        assert_eq!(offset_minutes("Atlantis/Underwater"), None,
+            "unknown timezone must return None, not a silent UTC fallback");
+    }
+
+    #[test]
+    fn offset_minutes_or_utc_falls_back_to_utc() {
+        assert_eq!(offset_minutes_or_utc("Atlantis/Underwater"), 0,
+            "display-path helper must fall back to UTC (0) for unknown zones");
     }
 
     #[test]

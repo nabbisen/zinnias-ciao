@@ -32,7 +32,7 @@ pub async fn get_me(
     let community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or("");
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
-    let role_label = if membership.is_admin() { i18n::EN_ROLE_ADMIN } else { i18n::EN_ROLE_MEMBER };
+    let role_label = if membership.is_admin() { i18n::JA_ROLE_ADMIN } else { i18n::JA_ROLE_MEMBER };
 
     // RFC-035: support diagnostics
     let app_version = env.var("BUILD_VERSION")
@@ -91,24 +91,24 @@ pub async fn get_me(
                {lbl_logout}</button>\
            </form>\
          </main>{nav}",
-        header    = render::header_with_switcher(i18n::EN_NAV_ME, community_id, &_community_pairs),
+        header    = render::header_with_switcher(i18n::JA_NAV_ME, community_id, &_community_pairs),
         name      = render::escape_html(&membership.display_name),
         community = render::escape_html(community_name),
         role      = role_label,
         cid       = render::escape_html(community_id),
-        lbl_name      = i18n::EN_ME_SECTION_NAME,
-        lbl_community = i18n::EN_ME_SECTION_COMMUNITY,
-        lbl_help      = i18n::EN_ME_SECTION_HELP,
-        help_body     = i18n::EN_ME_HELP_BODY,
-        lbl_logout    = i18n::EN_LOGOUT,
-        lbl_about     = i18n::EN_ME_SECTION_ABOUT,
-        lbl_version   = i18n::EN_ME_VERSION_LABEL,
-        lbl_ref       = i18n::EN_ME_REF_LABEL,
+        lbl_name      = i18n::JA_ME_SECTION_NAME,
+        lbl_community = i18n::JA_ME_SECTION_COMMUNITY,
+        lbl_help      = i18n::JA_ME_SECTION_HELP,
+        help_body     = i18n::JA_ME_HELP_BODY,
+        lbl_logout    = i18n::JA_LOGOUT,
+        lbl_about     = i18n::JA_ME_SECTION_ABOUT,
+        lbl_version   = i18n::JA_ME_VERSION_LABEL,
+        lbl_ref       = i18n::JA_ME_REF_LABEL,
         version       = render::escape_html(&app_version),
         ref_code      = render::escape_html(support_ref),
         admin_export  = admin_export_html,
         tok           = render::escape_html(&logout_token),
         nav       = nav,
     );
-    render::page(i18n::EN_NAV_ME, &body)
+    render::page(i18n::JA_NAV_ME, &body)
 }

@@ -131,7 +131,7 @@ pub async fn get_me_calendar(
     let nav  = render::bottom_nav(community_id, "me");
     let back = format!(
         "<a href=\"/c/{}/me\" style=\"color:#007AFF;font-size:.9375rem\">\u{2190} {}</a>",
-        render::escape_html(community_id), i18n::EN_NAV_ME,
+        render::escape_html(community_id), i18n::JA_NAV_ME,
     );
     let body = format!(
         "{header}\
@@ -145,13 +145,13 @@ pub async fn get_me_calendar(
          {flash}\
          {feed}\
          </main>{nav}",
-        header = render::header_with_switcher(i18n::EN_CALENDAR_TITLE, community_id, &community_pairs),
+        header = render::header_with_switcher(i18n::JA_CALENDAR_TITLE, community_id, &community_pairs),
         back   = back,
         flash  = flash_html,
         feed   = feed_section,
         nav    = nav,
     );
-    render::page(i18n::EN_CALENDAR_TITLE, &body)
+    render::page(i18n::JA_CALENDAR_TITLE, &body)
 }
 
 // ── POST /c/:cid/me/calendar/regenerate ───────────────────────────────────

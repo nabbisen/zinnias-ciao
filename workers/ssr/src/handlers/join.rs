@@ -53,7 +53,7 @@ pub async fn post_join(mut req: Request, env: &Env, _rid: &str) -> Result<Respon
     if rate_limit::is_rate_limited(&env, &client_ip).await {
         return render_join_form(
             &refresh_anon_token(&env).await?,
-            Some(zinnias_ciao_contracts::i18n::EN_JOIN_CODE_HINT),
+            Some(zinnias_ciao_contracts::i18n::JA_JOIN_CODE_HINT),
         );
     }
 
@@ -61,7 +61,7 @@ pub async fn post_join(mut req: Request, env: &Env, _rid: &str) -> Result<Respon
     if let Err(_) = validate_invite_input(&raw_code) {
         return render_join_form(
             &refresh_anon_token(&env).await?,
-            Some(i18n::EN_JOIN_CODE_HINT), // re-use hint as generic error position
+            Some(i18n::JA_JOIN_CODE_HINT), // re-use hint as generic error position
         );
     }
 
@@ -90,7 +90,7 @@ pub async fn post_join(mut req: Request, env: &Env, _rid: &str) -> Result<Respon
         rate_limit::record_failure(&env, &client_ip).await;
         return render_join_form(
             &refresh_anon_token(&env).await?,
-            Some(i18n::EN_JOIN_CODE_HINT),
+            Some(i18n::JA_JOIN_CODE_HINT),
         );
     }
     let invite = invite.unwrap();
@@ -325,14 +325,14 @@ fn render_join_form(token: &str, error: Option<&str>) -> Result<Response> {
          </form>\
          <p style=\"margin-top:1.5rem;color:#6e6e73;font-size:.8125rem\">{hint}</p>\
          </main>",
-        heading = i18n::EN_JOIN_HEADING,
-        sub = i18n::EN_JOIN_SUBHEADING,
-        label = i18n::EN_JOIN_CODE_LABEL,
+        heading = i18n::JA_JOIN_HEADING,
+        sub = i18n::JA_JOIN_SUBHEADING,
+        label = i18n::JA_JOIN_CODE_LABEL,
         token = escape_html(token),
-        submit = i18n::EN_JOIN_SUBMIT,
-        hint = i18n::EN_JOIN_CODE_HINT,
+        submit = i18n::JA_JOIN_SUBMIT,
+        hint = i18n::JA_JOIN_CODE_HINT,
     );
-    render::page(i18n::EN_JOIN_PAGE_TITLE, &body)
+    render::page(i18n::JA_JOIN_PAGE_TITLE, &body)
 }
 
 fn render_profile_form(
@@ -374,11 +374,11 @@ fn render_profile_form(
                    font-size:1rem;font-weight:600;cursor:pointer\">{submit}</button>\
          </form>\
          </main>",
-        heading = i18n::EN_JOIN_PROFILE_HEADING,
-        hint = i18n::EN_JOIN_PROFILE_HINT,
-        label = i18n::EN_JOIN_PROFILE_LABEL,
+        heading = i18n::JA_JOIN_PROFILE_HEADING,
+        hint = i18n::JA_JOIN_PROFILE_HINT,
+        label = i18n::JA_JOIN_PROFILE_LABEL,
         token = escape_html(token),
-        submit = i18n::EN_JOIN_PROFILE_SUBMIT,
+        submit = i18n::JA_JOIN_PROFILE_SUBMIT,
     );
-    render::page(i18n::EN_JOIN_PROFILE_PAGE_TITLE, &body)
+    render::page(i18n::JA_JOIN_PROFILE_PAGE_TITLE, &body)
 }

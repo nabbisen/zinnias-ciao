@@ -250,42 +250,44 @@ fn i18n_en_ja_parity_count() {
 //
 // The remaining per-day SET_STATUS token issue in Event Detail is bounded:
 // single-day events = 1 token issue; recurring events bounded by
-// RECURRENCE_MAX_COUNT = 52 (RFC-022) so the worst case is 9 fixed queries
-// + 1 batch attendance + 52 token issues = 62 ops, documented below.
+// After RFC-046 (event-bound SET_STATUS token), Event Detail issues exactly
+// one token regardless of day count. The max-recurring budget collapses to
+// the same value as single-day: 13 ops for any event.
 
 /// Fixed D1 queries for Home (no loops above 1 per route):
 /// memberships, events, member_count, my_statuses (IN), counts (IN),
 /// communities_for_switcher + 2 spares = 8 total.
 const QUERY_BUDGET_HOME: usize = 8;
 
-/// Fixed D1 queries for Event Detail (single-day event):
+/// Fixed D1 ops for Event Detail — any event, any recurrence count (RFC-046):
 /// find_event, days, member_count, my_note, all_notes, all_members,
 /// community, my_statuses (IN), counts (IN), all_day_attendances (IN),
-/// 1 SET_STATUS token issue, 1 SAVE_NOTE token issue,
+/// 1 SET_STATUS token issue (event-bound, not per-day), 1 SAVE_NOTE token issue,
 /// communities_for_switcher = 13 total.
+/// Before RFC-046, max-recurring was 65 (52 per-day token writes). Now flat.
 const QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY: usize = 13;
-
-/// Worst-case D1 ops for Event Detail (recurring, RECURRENCE_MAX_COUNT days):
-/// 10 fixed + 1 batch attendance + 52 SET_STATUS token issues + 1 SAVE_NOTE
-/// + 1 communities_for_switcher = 65.
-const QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING: usize = 65;
+const QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING: usize = 13; // same: 1 token regardless of days
 
 /// D1 queries for Export (any community size): 5 fixed + 3 IN batches = 8.
-/// Was O(events * days) before v0.24.0; now a flat 8 regardless of size.
+/// Was O(events * days) before v0.25.0; now a flat 8 regardless of size.
 const QUERY_BUDGET_EXPORT: usize = 8;
 
 #[test]
 fn query_budgets_are_positive_and_ordered() {
     assert!(QUERY_BUDGET_HOME > 0);
     assert!(QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY > QUERY_BUDGET_HOME);
-    assert!(QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING >= QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY);
+    // After RFC-046 both single-day and max-recurring are identical (13).
+    assert_eq!(QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING, QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY,
+        "RFC-046: event-bound token makes recurring cost identical to single-day");
     assert!(QUERY_BUDGET_EXPORT > 0);
     // Export must be flat (well under the old per-event worst case):
     assert!(QUERY_BUDGET_EXPORT < 20,
         "Export budget {QUERY_BUDGET_EXPORT} exceeds expected flat upper bound");
-    // Event detail single-day must be well under the old per-note worst case:
+    // Event detail must be well under the old per-day worst case of 65:
     assert!(QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY < 20,
         "Event detail budget {QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY} suggests an N+1 regression");
+    assert!(QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING < 20,
+        "Event detail recurring budget suggests an N+1 regression");
 }
 
 // ── Service worker version gate (RFC-044 §11 step 1) ─────────────────────

@@ -2,6 +2,57 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.30.0] — 2026-06-12
+
+Pre-pilot hardening: security headers, Japanese rendering, timezone safety, query budget correction.
+
+### Fixed
+
+- **HANDOFF §4 stale version string (P0 doc).** The directory section said
+  `version = "0.26.0"` — a stale inline comment from an earlier copy-paste.
+  Corrected to match the actual workspace version. The architect review flagged
+  this as a P0 because version identity matters for the SW gate and runbook.
+
+- **Query budget for max-recurring Event Detail (P2).** The release gate
+  constant `QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING` was still 65 — the
+  pre-RFC-046 value. After RFC-046 (event-bound token) the budget for any
+  Event Detail render is 13 regardless of recurrence count. Updated to 13 and
+  the regression guard changed to `assert_eq!(recurring, single_day)`.
+
+### Security (RFC-048)
+
+- **`Cache-Control: no-store` on all authenticated responses.** Applied
+  globally via `attach_security_headers` when the handler has not already set
+  a cache header. Static assets (CSS, JS, manifest) retain `public, max-age=N`
+  since they set their own headers first. ICS and export retain `no-store, private`.
+  This closes the browser-cache-after-logout risk on shared devices.
+- **CSP extended.** Added `base-uri 'self'`, `form-action 'self'`,
+  `object-src 'none'` to the Content Security Policy. The `style-src 'unsafe-inline'`
+  exception is documented in code (272 inline `style=` attributes; extraction
+  deferred to a future RFC).
+- **`Permissions-Policy` header added.** Disables camera, microphone, and
+  geolocation APIs.
+- **`Referrer-Policy` tightened** from `strict-origin-when-cross-origin` to
+  `same-origin`.
+
+### Changed
+
+- **Japanese-first rendering (RFC-049).** All UI strings now render from
+  `JA_*` constants instead of `EN_*`. The HTML `lang` attribute is `"ja"`.
+  86 call sites across 12 handler/render files updated. EN strings are
+  retained in `i18n.rs` for future runtime locale switching. Zero new
+  compile errors — guaranteed by the 120-pair parity gate and Rust's type system.
+- **Unknown timezone is a hard error on write paths.** `tz::offset_minutes`
+  now returns `Option<i32>`. Admin event create/edit returns a user-facing
+  "Community timezone is not configured" error for unknown IANA zone names
+  instead of silently using UTC. Display paths use the new
+  `offset_minutes_or_utc` helper (UTC fallback safe for display). Tests updated.
+
+### Testing
+
+- 208 passing (was 207): +1 `offset_minutes_or_utc_falls_back_to_utc` test.
+  Zero warnings. SW version gate passes.
+
 ## [0.29.0] — 2026-06-12
 
 SSR crate tests fixed; admin handler split; ssr tests included in standard run.

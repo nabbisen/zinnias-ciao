@@ -75,6 +75,18 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
+## Pre-pilot hardening gates (v0.30.0 — RFC-048, RFC-049 + timezone hardening)
+
+- [x] `Cache-Control: no-store` on all authenticated HTML responses (RFC-048); static assets retain public/max-age.
+- [x] CSP extended: `base-uri 'self'`, `form-action 'self'`, `object-src 'none'` added; `unsafe-inline` exception documented (RFC-048).
+- [x] `Permissions-Policy` header added (RFC-048).
+- [x] `Referrer-Policy` changed to `same-origin` (RFC-048).
+- [x] All UI strings render in Japanese (`JA_*`); HTML `lang="ja"` (RFC-049).
+- [x] Unknown community timezone returns a hard error on write paths, not a silent UTC fallback (P1-timezone).
+- [x] HANDOFF directory section stale version string fixed (P0 doc).
+- [x] Query budget for max-recurring Event Detail updated from ≤65 to ≤13 (correct after RFC-046).
+- [~] Security header values verified in a real browser on staging. *(staging runtime)*
+
 ## Operational gates
 
 - [x] `GET /healthz` returns `{"ok":true}`. *(health.rs get_health)*
