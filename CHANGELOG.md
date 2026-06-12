@@ -2,6 +2,21 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.2.1] — 2026-06-12
+
+### Fixed
+
+- `wrangler.toml`: `worker-build` was invoked from the workspace root, where
+  `Cargo.toml` has only `[workspace]` and no `[package]`. `worker-build` requires
+  a crate-level manifest. Fixed by passing the crate path as a **positional**
+  argument — `worker-build --release workers/ssr`. The `--path` flag does not
+  exist in `worker-build`; passing it caused it to be forwarded to `cargo` as an
+  unknown flag, leaving the crate path unset and the root manifest found again.
+- `wrangler.toml`: `main` was pointing at `workers/ssr/src/lib.rs` (the Rust source
+  file). Wrangler must point at the build output. Changed to
+  `workers/ssr/build/index.js`, which is where `worker-build` writes its output
+  (default `out-dir = "build"` relative to the crate root).
+
 ## [0.2.0] — 2026-06-12
 
 ### Added

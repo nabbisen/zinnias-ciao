@@ -1,11 +1,11 @@
 name = "zinnias-ciao"
-main = "workers/ssr/src/lib.rs"
+main = "workers/ssr/build/index.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 # Build via worker-build (Rust -> wasm32-unknown-unknown)
 [build]
-command = "worker-build --release"
+command = "worker-build --release workers/ssr"
 
 # D1 database binding
 [[d1_databases]]
