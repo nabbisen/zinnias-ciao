@@ -1,12 +1,13 @@
 {
   "name": "zinnias-ciao",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "dev": "bunx wrangler dev --env dev --local",
     "build": "worker-build --release",
     "migrate:dev": "bunx wrangler d1 migrations apply zinnias-ciao-dev --local --env dev",
+    "migrate:staging": "bunx wrangler d1 migrations apply zinnias-ciao-staging --env staging",
     "migrate:prod": "bunx wrangler d1 migrations apply zinnias-ciao --env production",
     "test": "cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts",
     "lint": "cargo clippy -p zinnias-ciao-domain -p zinnias-ciao-contracts -- -D warnings",

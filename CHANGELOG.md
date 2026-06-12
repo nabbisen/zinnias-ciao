@@ -2,6 +2,30 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.9.0] — 2026-06-12
+
+### Added
+
+- **Launch runbook (`docs/src/launch-runbook.md`).** Step-by-step operator guide
+  covering all seven phases: resource provisioning (D1 + KV for staging and
+  production), secret generation and setting, migration application, build and
+  deploy, staging QA, production seed, Logpush configuration, and final security
+  review. Includes a rollback procedure and post-launch monitoring thresholds.
+
+- **Staging environment (`wrangler.toml`, `package.json`).** `[env.staging]` block
+  added to `wrangler.toml` with D1 and KV placeholders. `migrate:staging` script
+  added to `package.json`. The deployment docs referenced staging but it was never
+  actually configured.
+
+### Changed
+
+- **`docs/src/operations.md`** updated: bootstrap section now references `setup.mjs`
+  and migration 0003's `grants_role` column (the old raw-SQL example was missing it);
+  incident-response and log-access sections improved with exact `wrangler d1 execute`
+  commands and a note on Logpush.
+
+- **`docs/src/SUMMARY.md`**: launch runbook added to the docs navigation.
+
 ## [0.8.0] — 2026-06-12
 
 ### Added

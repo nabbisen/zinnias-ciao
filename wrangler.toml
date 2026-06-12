@@ -42,6 +42,21 @@ database_id   = "local"
 binding = "RATE_LIMIT"
 id      = "local"
 
+[env.staging]
+name = "zinnias-ciao-ssr-stg"
+[env.staging.vars]
+LOG_LEVEL     = "info"
+BUILD_VERSION = "staging"
+
+[[env.staging.d1_databases]]
+binding       = "DB"
+database_name = "zinnias-ciao-staging"
+database_id   = "REPLACE_WITH_STAGING_D1_ID"   # create with: wrangler d1 create zinnias-ciao-staging
+
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT"
+id      = "REPLACE_WITH_STAGING_KV_ID"         # create with: wrangler kv:namespace create RATE_LIMIT --env staging
+
 [env.production]
 name = "zinnias-ciao-ssr-prd"
 [env.production.vars]
