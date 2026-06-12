@@ -2,20 +2,23 @@
 
 ## Status
 
-**v0.30.0** — 41 of 49 RFCs implemented (8 proposed). 208 passing unit tests. Zero warnings.
+**v0.31.0** — 42 of 55 RFCs implemented (13 proposed). 208 passing unit tests. Zero warnings.
 
-**Pre-pilot hardening complete.** This release closes the actionable in-repo items
-from the v0.29.0 architect review: P0 HANDOFF doc fix; security headers
-(`Cache-Control: no-store`, CSP extension, `Permissions-Policy`, `Referrer-Policy`)
-via RFC-048; Japanese-first rendering via RFC-049; timezone write-path hardened to
-fail closed on unknown zones; query budget corrected post-RFC-046.
+**Pre-pilot hardening complete.** All in-repo code work for the pilot is done.
+RFC-055 (offline read-only contract) closed with a one-line app.js enhancement
+that disables status/note submit buttons while offline and shows Japanese copy.
+The ICS feed scope (RFC-053) was verified in source: title and times only,
+no participant or member data.
 
-The remaining work before a production pilot is entirely human/operator work:
-- Cloudflare staging deployment and RFC-045 §6 runtime verification matrix
-- Phone/browser usability QA
-- Operator setup (secrets, migrations, Logpush)
-
-No code changes can be made without a live Cloudflare environment.
+All remaining pilot gates require a live Cloudflare environment, human review,
+or explicit product/operator decisions — none can be progressed in-repo:
+- RFC-050: staging deployment and runtime evidence pack
+- RFC-051: multi-day edit semantics (product decision needed)
+- RFC-052: audit retention policy (document first)
+- RFC-053: ICS privacy UX copy (needs RFC-054)
+- RFC-054: Japanese copy review (native-speaker reviewer)
+- RFC-044/049: live-D1 integration harness (gates beta)
+- Operator tasks: secrets, migrations, Logpush
 
 ---
 

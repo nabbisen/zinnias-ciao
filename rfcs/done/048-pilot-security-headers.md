@@ -13,7 +13,7 @@
 The v0.29.0 architect review identified two gaps in browser security headers:
 
 1. Authenticated HTML pages did not send `Cache-Control: no-store`. Although the service worker already refuses to cache authenticated HTML (RFC-042), the browser's own HTTP cache and any intermediary proxy could still cache responses without an explicit no-store directive.
-2. The Content Security Policy was missing `base-uri 'self'`, `form-action 'self'`, and `object-src 'none'` directives, and the `Referrer-Policy` was `strict-origin-when-cross-origin` rather than the stricter `same-origin` recommended for a private community service.
+2. The Content Security Policy was missing `base-uri 'none'`, `form-action 'self'`, and `object-src 'none'` directives, and the `Referrer-Policy` was `strict-origin-when-cross-origin` rather than the stricter `same-origin` recommended for a private community service.
 3. `Permissions-Policy` was absent entirely.
 
 This RFC adds all missing headers to `attach_security_headers` in `lib.rs`, which is called on every response.
@@ -63,7 +63,7 @@ Static asset handlers (CSS, JS, manifest) set `Cache-Control: public, max-age=N`
 
 ## 7. Security Analysis
 
-**`base-uri 'self'`:** prevents `<base>` tag injection redirecting form submissions to an attacker's domain.
+**`base-uri 'none'`:** prevents `<base>` tag injection redirecting form submissions to an attacker's domain.
 
 **`form-action 'self'`:** ensures all form POSTs must target the same origin. ciao.zinnias only posts to its own paths; this is a defense-in-depth restriction.
 

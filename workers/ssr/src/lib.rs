@@ -90,7 +90,7 @@ fn attach_security_headers(resp: &mut Response, request_id: &str) -> Result<()> 
     // pass; tracked for a future RFC. All other directives are strict.
     h.set("Content-Security-Policy",
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
-         img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; \
+         img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; \
          form-action 'self'; object-src 'none'")?;
     h.set("X-Content-Type-Options", "nosniff")?;
     h.set("X-Frame-Options", "DENY")?;

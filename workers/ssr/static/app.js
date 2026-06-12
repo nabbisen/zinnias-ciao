@@ -8,13 +8,41 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 
-// ── Offline banner ────────────────────────────────────────────────────────
-// Shown by the SW via the offline fallback page; also toggled here for
-// network change events so the banner clears when connectivity returns.
+// ── Offline banner + submit-button contract ────────────────────────────────
+// When offline, show the banner AND disable submit buttons on status/note
+// forms so users see a clear message rather than a confusing network error.
+// The app is read-only while offline by design (RFC-055): authenticated HTML
+// is not cached, so pages already in the browser tab are readable but no
+// writes can succeed. Disabling buttons makes this contract visible.
+//
+// AD-1: every form still works without this script. Disabling is enhancement only;
+// if JS is off the server returns a normal error on POST which is acceptable.
+var OFFLINE_SUBMIT_SELECTOR = 'form[action*="/my-status"] button[type="submit"], '
+  + 'form[action*="/my-note"] button[type="submit"], '
+  + 'form[action*="/attendance"] button[type="submit"]';
+var OFFLINE_TITLE = 'オフラインです。保存はできません。';
+
+function setOfflineSubmitState(isOffline) {
+  document.querySelectorAll(OFFLINE_SUBMIT_SELECTOR).forEach(function(btn) {
+    if (isOffline) {
+      btn.disabled = true;
+      if (!btn.dataset.offlineTitle) {
+        btn.dataset.offlineTitle = btn.title || '';
+      }
+      btn.title = OFFLINE_TITLE;
+    } else {
+      btn.disabled = false;
+      if (btn.dataset.offlineTitle !== undefined) {
+        btn.title = btn.dataset.offlineTitle;
+      }
+    }
+  });
+}
+
 function updateOfflineBanner() {
-  const banner = document.getElementById('offline-banner');
-  if (!banner) return;
-  banner.hidden = navigator.onLine;
+  var banner = document.getElementById('offline-banner');
+  if (banner) banner.hidden = navigator.onLine;
+  setOfflineSubmitState(!navigator.onLine);
 }
 window.addEventListener('online',  updateOfflineBanner);
 window.addEventListener('offline', updateOfflineBanner);

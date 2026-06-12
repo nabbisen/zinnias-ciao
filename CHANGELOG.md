@@ -2,6 +2,38 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.31.0] — 2026-06-12
+
+Final in-repo pre-pilot work: offline submit-button contract.
+
+### Changed
+
+- **Offline submit-button disabling (RFC-055).** `app.js` now disables status,
+  note, and attendance submit buttons while the browser is offline
+  (`navigator.onLine === false`), restoring them on reconnect. A Japanese
+  tooltip `オフラインです。保存はできません。` is shown. This makes the
+  read-only offline contract visible to users instead of letting them hit a
+  confusing network error. AD-1 preserved: without JS the form behaves
+  normally (server returns a network error, which is acceptable for no-JS users).
+
+### Verified in source
+
+- **ICS feed scope (RFC-053 §3).** `get_ics_feed` and `build_vcalendar` emit
+  SUMMARY (title), DTSTART/DTEND, LOCATION, and STATUS only. No participant
+  status, notes, invite codes, or member names are included. The RFC-053
+  content-scope concern from the architect review is satisfied in the existing
+  code; remaining work is UX copy review.
+
+### Documentation
+
+- ROADMAP RFC counts corrected: 42 of 55 done, 13 proposed.
+- RFC-055 moved from `proposed/` to `done/`.
+- RFC-053 updated with source-verification note.
+
+### Testing
+
+- 208 passing. Zero warnings. SW version gate passes at v0.31.0.
+
 ## [0.30.0] — 2026-06-12
 
 Pre-pilot hardening: security headers, Japanese rendering, timezone safety, query budget correction.
