@@ -63,6 +63,10 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
     let mut thisweek_cards = String::new();
     let mut later_cards   = String::new();
 
+    // Batch-fetch all day counts in a single query (RFC-029: no N+1).
+    let all_day_ids: Vec<&str> = rows.iter().map(|r| r.day_id.as_str()).collect();
+    let all_counts = attendance_db::counts_for_days(&db, &all_day_ids, member_count).await?;
+
     // Deduplicate by event_id (home query returns one row per day; take nearest day per event)
     let mut seen_events: std::collections::HashSet<String> = std::collections::HashSet::new();
 
@@ -71,7 +75,10 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
         seen_events.insert(row.event_id.clone());
 
         let my_status = my_attendances.get(&row.day_id).map(|s| s.as_str());
-        let counts = attendance_db::counts_for_day(&db, &row.day_id, member_count).await?;
+        let empty_counts = attendance_db::DayCountRow {
+            going: 0, not_going: 0, attended: 0, no_answer: member_count
+        };
+        let counts = all_counts.get(&row.day_id).unwrap_or(&empty_counts);
 
         let card = render::event_card(
             community_id,

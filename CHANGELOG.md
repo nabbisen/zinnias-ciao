@@ -2,6 +2,44 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.12.0] — 2026-06-12
+
+### Performance (RFC-029 — Scalability and Query Performance Discipline)
+
+- **N+1 query elimination on Home and Event Detail pages.**
+
+  Home page previously issued one `counts_for_day` query per event card (N events
+  = N queries, on top of the initial home_upcoming fetch). Event Detail issued
+  `find_mine` + `counts_for_day` per event day (3 queries × N days).
+
+  **New batch functions in `db/attendance.rs`:**
+  - `counts_for_days(db, day_ids, member_count)` — single `GROUP BY event_day_id`
+    query returning a `HashMap<day_id, DayCountRow>` for all requested days.
+    Zero-fills days with no attendance rows (no_answer = member_count).
+  - `list_mine_for_days` — rewritten from an N-query loop to a single
+    `IN (?1, ?2, …)` query, using runtime-built positional placeholders.
+    D1 supports positional `?N` placeholders; the previous comment claiming
+    it did not was incorrect.
+
+  **`contracts/src/lib.rs`:** `build_in_placeholders(count, offset)` — shared
+  helper for building positional placeholder strings. 4 inline tests.
+
+  **`handlers/home.rs`:** batch-fetches counts before the card loop using
+  `counts_for_days`; removed the per-event `counts_for_day` call.
+
+  **`handlers/event.rs`:** batch-fetches all per-day data using
+  `list_mine_for_days` and `counts_for_days` before the day loop; removed
+  the per-day `find_mine` and `counts_for_day` calls.
+
+  Query count for a Home page with 10 events: **7 + N → 7** (constant).
+  Query count for an Event Detail with 3 days: **8 + 3×3 → 8** (constant).
+
+- RFC-029 moved to `rfcs/done/` (v0.12.0).
+
+### Changed
+
+- Total tests: 148 → 152 (+4 placeholder tests).
+
 ## [0.11.0] — 2026-06-12
 
 ### Fixed

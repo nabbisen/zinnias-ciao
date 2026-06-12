@@ -158,8 +158,9 @@ pub async fn upsert(
     Ok(())
 }
 
-/// My attendances keyed by day_id, for a list of day IDs.
-/// Used by the Home handler to get my status for all listed days efficiently.
+/// My attendances keyed by day_id, for a list of day IDs (RFC-029: no N+1).
+/// Builds a single `IN (?,?,...)`  query at runtime — D1 supports positional
+/// placeholders when spelled out individually.
 pub async fn list_mine_for_days(
     db: &D1Database,
     membership_id: &str,
@@ -168,23 +169,103 @@ pub async fn list_mine_for_days(
     if day_ids.is_empty() {
         return Ok(std::collections::HashMap::new());
     }
-    // D1 doesn't support IN(?) with arrays, so we use individual queries
-    // for the Home list (bounded to ~100 events / 30-day window).
+
+    // Build "?1, ?2, ..., ?N" and bind values [day_id_0, ..., day_id_{N-1}, membership_id]
+    let placeholders = zinnias_ciao_contracts::build_in_placeholders(day_ids.len(), 0);
+    let membership_ph = format!("?{}", day_ids.len() + 1);
+
+    let sql = format!(
+        "SELECT event_day_id, status FROM attendances \
+         WHERE event_day_id IN ({placeholders}) AND membership_id = {membership_ph}"
+    );
+
+    // Build bind array: [day_id_0, ..., day_id_{N-1}, membership_id]
+    // Use owned Strings so .into() can convert to JsValue.
+    let mut bind_values: Vec<_> = day_ids
+        .iter()
+        .map(|id| worker::wasm_bindgen::JsValue::from_str(id))
+        .collect();
+    bind_values.push(worker::wasm_bindgen::JsValue::from_str(membership_id));
+
+    let rows = db
+        .prepare(&sql)
+        .bind(&bind_values)?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?;
+
     let mut map = std::collections::HashMap::new();
-    for day_id in day_ids {
-        let row = db
-            .prepare(
-                "SELECT event_day_id, status FROM attendances \
-                 WHERE event_day_id = ?1 AND membership_id = ?2 LIMIT 1",
-            )
-            .bind(&[(*day_id).into(), membership_id.into()])?
-            .first::<serde_json::Value>(None)
-            .await?;
-        if let Some(v) = row {
-            if let Some(s) = v.get("status").and_then(|x| x.as_str()) {
-                map.insert(day_id.to_string(), s.to_owned());
-            }
+    for v in rows {
+        if let (Some(day_id), Some(status)) = (
+            v.get("event_day_id").and_then(|x| x.as_str()),
+            v.get("status").and_then(|x| x.as_str()),
+        ) {
+            map.insert(day_id.to_owned(), status.to_owned());
         }
     }
     Ok(map)
 }
+
+/// Status counts for multiple days in a single query (RFC-029: no N+1).
+/// Returns a HashMap<day_id, DayCountRow>.
+/// `active_member_count` is used to derive `no_answer` for each day.
+pub async fn counts_for_days(
+    db: &D1Database,
+    day_ids: &[&str],
+    active_member_count: u32,
+) -> Result<std::collections::HashMap<String, DayCountRow>> {
+    if day_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    let placeholders = zinnias_ciao_contracts::build_in_placeholders(day_ids.len(), 0);
+
+    let sql = format!(
+        "SELECT \
+           event_day_id, \
+           SUM(CASE WHEN status = 'going'     THEN 1 ELSE 0 END) AS going, \
+           SUM(CASE WHEN status = 'not_going' THEN 1 ELSE 0 END) AS not_going, \
+           SUM(CASE WHEN status = 'attended'  THEN 1 ELSE 0 END) AS attended, \
+           COUNT(*) AS total_rows \
+         FROM attendances \
+         WHERE event_day_id IN ({placeholders}) \
+         GROUP BY event_day_id"
+    );
+
+    let bind_values: Vec<_> = day_ids
+        .iter()
+        .map(|id| worker::wasm_bindgen::JsValue::from_str(id))
+        .collect();
+
+    let rows = db
+        .prepare(&sql)
+        .bind(&bind_values)?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?;
+
+    let mut map = std::collections::HashMap::new();
+    for v in rows {
+        let day_id = match v.get("event_day_id").and_then(|x| x.as_str()) {
+            Some(id) => id.to_owned(),
+            None => continue,
+        };
+        let g  = v.get("going")     .and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+        let ng = v.get("not_going") .and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+        let a  = v.get("attended")  .and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+        let t  = v.get("total_rows").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+        let no_answer = active_member_count.saturating_sub(t);
+        map.insert(day_id, DayCountRow { going: g, not_going: ng, attended: a, no_answer });
+    }
+
+    // Days with zero attendances have no row in the result — fill them in.
+    for day_id in day_ids {
+        map.entry(day_id.to_string()).or_insert(DayCountRow {
+            going: 0, not_going: 0, attended: 0,
+            no_answer: active_member_count,
+        });
+    }
+
+    Ok(map)
+}
+

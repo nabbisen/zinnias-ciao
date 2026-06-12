@@ -2,7 +2,7 @@
 
 > **Stub (backlog).** Direction only. Sections 7–13 are shared scaffolding to be detailed when this RFC is accepted; do not treat as finished design.
 
-**Status.** Proposed  
+**Status.** Implemented (v0.12.0)
 **Phase:** F6 / Data Stewardship and Operations  
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  

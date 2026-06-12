@@ -73,13 +73,22 @@ pub async fn get_event_detail(
 
     let now_utc = db::now_utc();
 
+    // ── Batch-fetch all per-day data before the loop (RFC-029: no N+1) ───
+    let day_id_strs: Vec<&str> = days.iter().map(|d| d.id.as_str()).collect();
+    let my_statuses = attendance_db::list_mine_for_days(
+        &db, &membership.membership_id, &day_id_strs,
+    ).await?;
+    let day_counts = attendance_db::counts_for_days(&db, &day_id_strs, member_count).await?;
+
     // ── Days section ─────────────────────────────────────────────────────
     let mut days_html = String::new();
     for day in &days {
         let time_state = classify_day(&day.starts_at_utc, &day.ends_at_utc, &now_utc);
-        let my_att = attendance_db::find_mine(&db, &day.id, &membership.membership_id).await?;
-        let current_status = my_att.as_ref().and_then(|a| a.status.as_deref());
-        let counts = attendance_db::counts_for_day(&db, &day.id, member_count).await?;
+        let current_status = my_statuses.get(&day.id).map(|s| s.as_str());
+        let empty_counts = attendance_db::DayCountRow {
+            going: 0, not_going: 0, attended: 0, no_answer: member_count
+        };
+        let counts = day_counts.get(&day.id).unwrap_or(&empty_counts);
 
         let can_set_attended = membership.is_admin() && time_state == DayTimeState::Ended;
         let attended_reason  = if time_state != DayTimeState::Ended {
