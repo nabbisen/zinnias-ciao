@@ -1,6 +1,6 @@
 # RFC 003 — Invite Redemption and Session Authentication
 
-**Status.** Proposed
+**Status.** Implemented (v0.2.0)
 **Phase:** M1 / Trust Boundary Foundation
 **Project:** ciao.zinnias
 **Date:** 2026-06-11

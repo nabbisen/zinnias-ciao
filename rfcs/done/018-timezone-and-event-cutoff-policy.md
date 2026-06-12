@@ -1,6 +1,6 @@
 # RFC 018 — Time-Zone and Event Cutoff Policy
 
-**Status.** Proposed  
+**Status.** Implemented (v0.7.0)
 **Phase:** M6 / Deployment Readiness  
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  

@@ -61,6 +61,10 @@ pub async fn get_event_detail(
     let all_notes = note_db::list_for_event(&db, event_id).await?;
     let all_members = membership_db::list_all_active(&db, community_id).await?;
 
+    // Fetch community early — needed for timezone display inside the day loop.
+    let community_row = db::community::find_active(&db, community_id).await?;
+    let community_tz_early = community_row.as_ref().map(|c| c.timezone.as_str()).unwrap_or("UTC");
+
     // Build a display-name map for participant list
     let name_map: std::collections::HashMap<String, String> = all_members
         .iter()
@@ -91,7 +95,7 @@ pub async fn get_event_detail(
         ).await.unwrap_or_default();
 
         // Day header
-        let label = format_day_label(&day.day_date, &day.starts_at_utc, &day.ends_at_utc, days.len() > 1, day.seq);
+        let label = format_day_label(&day.day_date, &day.starts_at_utc, &day.ends_at_utc, days.len() > 1, day.seq, community_tz_early);
 
         let status_form = render::status_form(
             community_id, event_id, &day.id,
@@ -188,8 +192,9 @@ pub async fn get_event_detail(
         )
     } else { String::new() };
 
-    let community = db::community::find_active(&db, community_id).await?;
-    let community_name = community.map(|c| c.name).unwrap_or_default();
+    let community = community_row;
+    let community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or_default();
+    let community_tz   = community.as_ref().map(|c| c.timezone.as_str()).unwrap_or("UTC");
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav  = render::bottom_nav(community_id, "home");
@@ -396,7 +401,7 @@ pub async fn delete_my_note(
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-fn classify_day(starts: &str, ends: &str, now: &str) -> DayTimeState {
+pub fn classify_day(starts: &str, ends: &str, now: &str) -> DayTimeState {
     if now < starts {
         DayTimeState::Upcoming
     } else if now < ends {
@@ -406,12 +411,14 @@ fn classify_day(starts: &str, ends: &str, now: &str) -> DayTimeState {
     }
 }
 
-fn format_day_label(day_date: &str, starts: &str, ends: &str, multi: bool, seq: u32) -> String {
-    let start_time = starts.splitn(2, 'T').nth(1).and_then(|t| t.get(..5)).unwrap_or("");
-    let end_time   = ends.splitn(2, 'T').nth(1).and_then(|t| t.get(..5)).unwrap_or("");
+fn format_day_label(day_date: &str, starts: &str, ends: &str, multi: bool, seq: u32, tz: &str) -> String {
+    let offset = render::tz_offset_minutes_pub(tz);
+    let (local_date, start_hm) = render::utc_to_local_parts_pub(starts, offset);
+    let end_hm = render::apply_offset_time_pub(ends, offset);
+    let display_date = if local_date.is_empty() { day_date } else { &local_date };
     if multi {
-        format!("Day {seq} — {day_date} {start_time}–{end_time}")
+        format!("Day {seq} — {display_date} {start_hm}–{end_hm}")
     } else {
-        format!("{day_date} {start_time}–{end_time}")
+        format!("{display_date} {start_hm}–{end_hm}")
     }
 }

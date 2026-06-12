@@ -1,6 +1,6 @@
 # RFC 019 — Retention, Soft Delete, and Data Lifecycle
 
-**Status.** Proposed  
+**Status.** Implemented (v0.4.0)
 **Phase:** M6 / Deployment Readiness  
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  

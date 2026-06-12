@@ -1,6 +1,6 @@
 # RFC 001 — Project Bootstrap: Cloudflare Workers, Leptos SSR, D1
 
-**Status.** Proposed
+**Status.** Implemented (v0.1.0)
 **Phase:** M0 / Project Foundation
 **Project:** ciao.zinnias
 **Date:** 2026-06-11

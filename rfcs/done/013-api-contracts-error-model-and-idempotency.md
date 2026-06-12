@@ -1,6 +1,6 @@
 # RFC 013 — Internal Contracts, Error Model, and Idempotency
 
-**Status.** Proposed
+**Status.** Implemented (v0.3.0)
 **Phase:** M2/M5 / Boundary
 **Project:** ciao.zinnias
 **Date:** 2026-06-11

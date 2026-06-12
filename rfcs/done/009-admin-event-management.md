@@ -1,6 +1,6 @@
 # RFC 009 — Admin Event Management
 
-**Status.** Proposed
+**Status.** Implemented (v0.4.0)
 **Phase:** M4 / Admin MVP Flow
 **Project:** ciao.zinnias
 **Date:** 2026-06-11

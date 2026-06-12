@@ -1,6 +1,6 @@
 # RFC 017 — PWA Installability and Service Worker
 
-**Status.** Proposed
+**Status.** Implemented (v0.4.0)
 **Phase:** M3 / Read-only Offline + PWA
 **Project:** ciao.zinnias
 **Date:** 2026-06-11

@@ -3,7 +3,9 @@
 use worker::{Env, Request, Response, Result};
 
 use crate::authz::require_membership;
-use crate::db::{self, event as event_db, attendance as attendance_db, membership as membership_db};
+use crate::db::{
+    self, attendance as attendance_db, event as event_db, membership as membership_db,
+};
 use crate::render;
 use crate::session::require_auth;
 
@@ -20,7 +22,8 @@ pub async fn redirect_to_home(req: Request, env: &Env, rid: &str) -> Result<Resp
     // Use the first community as default; M3+ will add a selected-community cookie.
     let cid = &memberships[0].community_id;
     let mut resp = Response::empty()?;
-    resp.headers_mut().set("Location", &format!("/c/{cid}/home"))?;
+    resp.headers_mut()
+        .set("Location", &format!("/c/{cid}/home"))?;
     Ok(resp.with_status(303))
 }
 
@@ -34,7 +37,7 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
 
     // Home window: today through 30 days ahead
     let from_utc = db::now_utc();
-    let to_utc   = db::utc_days_ahead(30);
+    let to_utc = db::utc_days_ahead(30);
     let rows = event_db::home_upcoming(&db, community_id, &from_utc, &to_utc).await?;
 
     // Active member count for no_answer calculation
@@ -47,21 +50,42 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
         &db,
         &membership.membership_id,
         &rows.iter().map(|r| r.day_id.as_str()).collect::<Vec<_>>(),
-    ).await?;
+    )
+    .await?;
 
     // Build cards grouped by section: Today / This Week / Later
     let now_prefix = db::now_utc();
     let today_date = &now_prefix[..10]; // "2026-06-12"
 
-    let mut today_cards   = String::new();
+    // Fetch community (name + timezone) for the header and time display
+    let community = db::community::find_active(&db, community_id).await?;
+    let community_name = community
+        .as_ref()
+        .map(|c| c.name.as_str())
+        .unwrap_or_default();
+    let community_tz = community
+        .as_ref()
+        .map(|c| c.timezone.as_str())
+        .unwrap_or("UTC");
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
+        .await
+        .unwrap_or_default();
+    let _community_pairs: Vec<(String, String)> = _communities_for_switcher
+        .iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone()))
+        .collect();
+
+    let mut today_cards = String::new();
     let mut thisweek_cards = String::new();
-    let mut later_cards   = String::new();
+    let mut later_cards = String::new();
 
     // Deduplicate by event_id (home query returns one row per day; take nearest day per event)
     let mut seen_events: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for row in &rows {
-        if seen_events.contains(&row.event_id) { continue; }
+        if seen_events.contains(&row.event_id) {
+            continue;
+        }
         seen_events.insert(row.event_id.clone());
 
         let my_status = my_attendances.get(&row.day_id).map(|s| s.as_str());
@@ -75,12 +99,15 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
             row.event_status == "cancelled",
             &render::CardDay {
                 starts_at_utc: &row.starts_at_utc,
-                ends_at_utc:   &row.ends_at_utc,
-                day_date:      &row.day_date,
+                ends_at_utc: &row.ends_at_utc,
+                day_date: &row.day_date,
             },
             row.total_days,
             my_status,
-            counts.going, counts.not_going, counts.no_answer,
+            counts.going,
+            counts.not_going,
+            counts.no_answer,
+            community_tz,
         );
 
         if row.day_date == today_date {
@@ -93,7 +120,9 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
     }
 
     let section = |label: &str, cards: &str| -> String {
-        if cards.is_empty() { return String::new(); }
+        if cards.is_empty() {
+            return String::new();
+        }
         format!(
             "<section style=\"margin-bottom:1.5rem\">\
              <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
@@ -108,13 +137,9 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
         } else {
             "<p style=\"color:#6e6e73;padding:2rem 0\">No events yet. Ask your community admin to add one.</p>"
         }
-    } else { "" };
-
-    // Fetch community name for the header
-    let community = db::community::find_active(&db, community_id).await?;
-    let community_name = community.map(|c| c.name).unwrap_or_default();
-    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
-    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    } else {
+        ""
+    };
 
     let nav = render::bottom_nav(community_id, "home");
 
@@ -147,13 +172,13 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
            {today}{thisweek}{later}{empty}\
          </main>\
          {nav}",
-        header    = render::header_with_switcher("Home", community_id, &_community_pairs),
+        header = render::header_with_switcher("Home", community_id, &_community_pairs),
         shortcuts = admin_shortcuts,
-        today    = section("Today", &today_cards),
+        today = section("Today", &today_cards),
         thisweek = section("This Week", &thisweek_cards),
-        later    = section("Later", &later_cards),
-        empty    = empty_html,
-        nav      = nav,
+        later = section("Later", &later_cards),
+        empty = empty_html,
+        nav = nav,
     );
     render::page("Home", &body)
 }

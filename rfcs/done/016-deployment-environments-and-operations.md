@@ -1,6 +1,6 @@
 # RFC 016 — Deployment Environments and Operations
 
-**Status.** Proposed  
+**Status.** Implemented (v0.5.0)
 **Phase:** M6 / Deployment Readiness  
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  

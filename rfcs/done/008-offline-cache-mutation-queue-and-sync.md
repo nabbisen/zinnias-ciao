@@ -1,6 +1,6 @@
 # RFC 008 — Offline Read Behavior and Honest State
 
-**Status.** Proposed
+**Status.** Implemented (v0.4.0)
 **Phase:** M3 / Read-only Offline + PWA
 **Project:** ciao.zinnias
 **Date:** 2026-06-11

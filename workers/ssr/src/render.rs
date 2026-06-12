@@ -411,6 +411,7 @@ pub fn event_card(
     total_days: u32,
     my_status: Option<&str>,
     going: u32, not_going: u32, no_answer: u32,
+    tz: &str,
 ) -> String {
     let (_, icon, label) = status_display(my_status);
     let (sc, _, _) = status_display(my_status);
@@ -448,7 +449,7 @@ pub fn event_card(
         title     = escape_html(title),
         cancelled = cancelled_badge,
         multi     = multi_badge,
-        time      = format_day_time(nearest_day),
+        time      = format_day_time_tz(nearest_day, tz),
         loc       = loc_html,
         going     = going,
         ng        = not_going,
@@ -456,20 +457,57 @@ pub fn event_card(
     )
 }
 
-/// Format a day's time range for display (UTC strings → compact label).
+/// Format a day's time range for display, adjusted for the community timezone.
+/// `tz` is an IANA timezone name (e.g. "Asia/Tokyo"). Falls back to UTC display.
+pub fn format_day_time_tz(day: &CardDay<'_>, tz: &str) -> String {
+    let offset_mins = tz_offset_minutes(tz);
+    let starts = apply_offset_display(day.starts_at_utc, offset_mins);
+    let ends   = apply_offset_time(day.ends_at_utc,   offset_mins);
+    format!("{starts}–{ends}")
+}
+
+/// Format a day's time range for display (UTC — used when timezone is unknown).
 fn format_day_time(day: &CardDay<'_>) -> String {
-    // Parse "2026-06-14T09:00:00.000Z" -> "Jun 14, 09:00–10:30"
     let starts = parse_utc_display(day.starts_at_utc);
     let ends   = parse_utc_time(day.ends_at_utc);
     format!("{starts}–{ends}")
+}
+
+/// Fixed UTC-offset map for IANA names — delegates to contracts::tz (RFC-018).
+fn tz_offset_minutes(tz: &str) -> i32 {
+    zinnias_ciao_contracts::tz::offset_minutes(tz)
+}
+
+/// Apply a UTC offset and return ("YYYY-MM-DD", "HH:MM") in local time.
+fn utc_to_local_parts(utc: &str, offset_mins: i32) -> (String, String) {
+    zinnias_ciao_contracts::tz::to_local_parts(utc, offset_mins)
+}
+
+/// Apply a UTC offset and return "Mon D, HH:MM" in local time.
+fn apply_offset_display(utc: &str, offset_mins: i32) -> String {
+    let (date, time_hm) = utc_to_local_parts(utc, offset_mins);
+    let segments: Vec<&str> = date.split('-').collect();
+    if segments.len() < 3 { return parse_utc_display(utc); }
+    let month = match segments[1] {
+        "01" => "Jan", "02" => "Feb", "03" => "Mar", "04" => "Apr",
+        "05" => "May", "06" => "Jun", "07" => "Jul", "08" => "Aug",
+        "09" => "Sep", "10" => "Oct", "11" => "Nov", _   => "Dec",
+    };
+    let day = segments[2].trim_start_matches('0');
+    format!("{month} {day}, {time_hm}")
+}
+
+/// Apply a UTC offset and return only "HH:MM" in local time.
+fn apply_offset_time(utc: &str, offset_mins: i32) -> String {
+    utc_to_local_parts(utc, offset_mins).1
 }
 
 fn parse_utc_display(utc: &str) -> String {
     // "2026-06-14T09:00:00.000Z" -> "Jun 14, 09:00"
     let parts: Vec<&str> = utc.splitn(2, 'T').collect();
     if parts.len() < 2 { return utc.to_owned(); }
-    let date = parts[0]; // "2026-06-14"
-    let time = parts[1].get(..5).unwrap_or(""); // "09:00"
+    let date = parts[0];
+    let time = parts[1].get(..5).unwrap_or("");
     let segments: Vec<&str> = date.split('-').collect();
     if segments.len() < 3 { return utc.to_owned(); }
     let month = match segments[1] {
@@ -482,13 +520,17 @@ fn parse_utc_display(utc: &str) -> String {
 }
 
 fn parse_utc_time(utc: &str) -> String {
-    // "2026-06-14T10:30:00.000Z" -> "10:30"
     utc.splitn(2, 'T')
         .nth(1)
         .and_then(|t| t.get(..5))
         .unwrap_or("")
         .to_owned()
 }
+
+/// Public re-export for handlers that need offset arithmetic (e.g. event.rs).
+pub fn tz_offset_minutes_pub(tz: &str) -> i32 { tz_offset_minutes(tz) }
+pub fn utc_to_local_parts_pub(utc: &str, offset: i32) -> (String, String) { utc_to_local_parts(utc, offset) }
+pub fn apply_offset_time_pub(utc: &str, offset: i32) -> String { apply_offset_time(utc, offset) }
 
 // ── Participant list ──────────────────────────────────────────────────────
 

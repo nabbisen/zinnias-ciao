@@ -2,9 +2,40 @@
 
 All notable changes to ciao.zinnias are documented here.
 
-# Changelog
+## [0.7.0] — 2026-06-12
 
-All notable changes to ciao.zinnias are documented here.
+### Added
+
+- **RFC-018 — Timezone display (completes RFC-018).**
+  - `packages/contracts/src/tz.rs`: IANA timezone name → UTC offset table (pure Rust,
+    no OS timezone data). Covers UTC, major Asia/Pacific, Europe, Americas, Oceania zones.
+    Unknown names fall back to UTC. `to_local_parts(utc, offset)` handles month-end,
+    year-end, and leap-year Feb boundaries correctly.
+  - `render.rs`: `format_day_time_tz(day, tz)` applies the community timezone for event
+    time display. Internal helpers delegate to `contracts::tz`. Public re-exports for
+    handler use (`tz_offset_minutes_pub`, `utc_to_local_parts_pub`, `apply_offset_time_pub`).
+  - `handlers/home.rs`: fetches `community.timezone` and passes it to every
+    `render::event_card` call. Previously all Home times displayed as UTC.
+  - `handlers/event.rs`: fetches `community.timezone` before the day loop;
+    `format_day_label` applies the offset for Event Detail time display.
+    `classify_day` made `pub` for use by `admin.rs`.
+  - `handlers/admin.rs`: `get_edit_event` / `post_edit_event` now reject edits once any
+    day of the event has started or ended (RFC-018 §5 cutoff requirement). Previously
+    only cancelled events were blocked.
+
+- **16 new timezone tests (`contracts/src/tz.rs`).**
+  Covers: UTC identity, Tokyo (same-day, next-day), New York (previous-day), Kolkata
+  (half-hour offset), month boundary (both directions), year boundary, leap and non-leap
+  Feb, unknown fallback, exact midnight, `days_in_month` table.
+
+### Changed
+
+- **RFC audit — 19 RFCs moved to `rfcs/done/`** (RFC-000 lifecycle policy).
+  001–017 + 018 + 019. Status fields set to `Implemented (vX.Y.Z)`.
+  `rfcs/README.md` rewritten with Done / Proposed / Backlog sections.
+
+- **CI `migration-check` job** now validates all `migrations/*.sql` files: existence,
+  non-empty, sequential numbering. Previously only checked `0001_initial.sql`.
 
 ## [0.6.0] — 2026-06-12
 

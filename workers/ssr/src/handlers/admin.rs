@@ -10,7 +10,9 @@ use crate::db::{self, event as event_db, event_write, invite as invite_db, membe
 use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
+use crate::handlers::event::classify_day;
 use zinnias_ciao_domain::{validate_event, DayInput, EventInput};
+use zinnias_ciao_domain::status::DayTimeState;
 
 fn pepper(env: &Env) -> String {
     env.secret("HMAC_PEPPER")
@@ -533,6 +535,17 @@ pub async fn get_edit_event(
             "<main style=\"padding:2rem\"><p>Cancelled events cannot be edited.</p>\
              <p><a href=\"javascript:history.back()\">Back</a></p></main>");
     }
+    // RFC-018: editing is only allowed while the event is still upcoming (before first day starts).
+    let days = event_db::days_for_event(&db, event_id).await?;
+    let now_utc = db::now_utc();
+    let already_started = days.iter().any(|d| {
+        classify_day(&d.starts_at_utc, &d.ends_at_utc, &now_utc) != DayTimeState::Upcoming
+    });
+    if already_started {
+        return render::page("Cannot edit",
+            "<main style=\"padding:2rem\"><p>This event has already started and cannot be edited.</p>\
+             <p><a href=\"javascript:history.back()\">Back</a></p></main>");
+    }
 
     let pp = pepper(env);
     let token = form_token::issue(&db, &pp, &auth.user_id,
@@ -614,6 +627,12 @@ pub async fn post_edit_event(
     };
     if event.status == "cancelled" {
         return render::not_found();
+    }
+    // RFC-018: reject POST edits if the event has already started.
+    let days_check = event_db::days_for_event(&db, event_id).await?;
+    let now_check  = db::now_utc();
+    if days_check.iter().any(|d| classify_day(&d.starts_at_utc, &d.ends_at_utc, &now_check) != DayTimeState::Upcoming) {
+        return render::not_found(); // same generic response — consistent with GET guard
     }
 
     let input = EventInput {

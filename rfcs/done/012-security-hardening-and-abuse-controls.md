@@ -1,6 +1,6 @@
 # RFC 012 — Security Hardening and Abuse Controls
 
-**Status.** Proposed
+**Status.** Implemented (v0.5.0)
 **Phase:** M5 / UX and Release Hardening
 **Project:** ciao.zinnias
 **Date:** 2026-06-11

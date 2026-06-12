@@ -1,6 +1,6 @@
 # RFC 002 — Data Model and D1 Migrations
 
-**Status.** Proposed
+**Status.** Implemented (v0.1.0)
 **Phase:** M1 / Trust Boundary Foundation
 **Project:** ciao.zinnias
 **Date:** 2026-06-11

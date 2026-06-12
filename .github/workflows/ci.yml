@@ -41,8 +41,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate SQL syntax
+      - name: Validate migrations
         run: |
-          # Basic well-formedness: file exists and is non-empty
-          test -s migrations/0001_initial.sql
-          echo "Migration file OK"
+          # Every file in migrations/ must exist and be non-empty.
+          # Numbering must be sequential with no gaps.
+          set -e
+          files=$(ls migrations/*.sql | sort)
+          count=0
+          for f in $files; do
+            test -s "$f" || (echo "EMPTY or missing: $f" && exit 1)
+            count=$((count + 1))
+          done
+          echo "Migration files found: $count"
+          # Verify sequential numbering (0001, 0002, ..., 000N)
+          seq=1
+          for f in $files; do
+            base=$(basename "$f")
+            num=$(echo "$base" | grep -oE '^[0-9]+')
+            expected=$(printf "%04d" $seq)
+            if [ "$num" != "$expected" ]; then
+              echo "Gap or misnumbering: expected $expected, got $num in $base"
+              exit 1
+            fi
+            seq=$((seq + 1))
+          done
+          echo "All $count migration files OK and sequentially numbered."

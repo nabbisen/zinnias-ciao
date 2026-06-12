@@ -1,6 +1,6 @@
 # RFC 004 — Community Isolation and Authorization
 
-**Status.** Proposed  
+**Status.** Implemented (v0.2.0)
 **Phase:** M1 / Trust Boundary Foundation  
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  

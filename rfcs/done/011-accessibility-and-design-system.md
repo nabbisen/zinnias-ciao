@@ -1,6 +1,6 @@
 # RFC 011 — Accessibility and Design System
 
-**Status.** Proposed  
+**Status.** Implemented (v0.5.0)
 **Phase:** M5 / UX and Release Hardening  
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  

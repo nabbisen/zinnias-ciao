@@ -1,6 +1,6 @@
 # RFC 010 — Admin Invite and Member Management
 
-**Status.** Proposed  
+**Status.** Implemented (v0.4.0)
 **Phase:** M4 / Admin MVP Flow  
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  

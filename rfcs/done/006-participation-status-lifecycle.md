@@ -1,6 +1,6 @@
 # RFC 006 — Participation Status Lifecycle
 
-**Status.** Proposed
+**Status.** Implemented (v0.3.0)
 **Phase:** M2 / Member MVP Flow
 **Project:** ciao.zinnias
 **Date:** 2026-06-11
