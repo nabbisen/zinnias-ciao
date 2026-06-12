@@ -75,6 +75,8 @@ fn all_state_changing_routes_have_token_purpose() {
         token_purpose::ATTENDANCE_OVERRIDE,
         token_purpose::ADMIN_HIDE_NOTE,
         token_purpose::REVOKE_INVITE,
+        token_purpose::CALENDAR_REGENERATE,
+        token_purpose::CALENDAR_REVOKE,
         token_purpose::REDEEM_INVITE,
         token_purpose::JOIN_PROFILE,
         token_purpose::LOGOUT,

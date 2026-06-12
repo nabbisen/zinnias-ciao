@@ -4,6 +4,7 @@
 pub mod auth;
 pub mod error;
 pub mod i18n;
+pub mod ics;
 pub mod tz;
 pub mod views;
 

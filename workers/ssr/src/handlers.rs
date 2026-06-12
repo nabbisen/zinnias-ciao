@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod auth;
+pub mod calendar;
 pub mod communities;
 pub mod community;
 pub mod event;

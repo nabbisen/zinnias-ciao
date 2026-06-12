@@ -12,6 +12,7 @@ use crate::render;
 use crate::session::require_auth;
 use crate::handlers::event::classify_day;
 use zinnias_ciao_domain::{validate_event, DayInput, EventInput};
+use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::status::DayTimeState;
 
 fn pepper(env: &Env) -> String {
@@ -59,15 +60,16 @@ pub async fn get_create_event(
            {fields}\
            <button type=\"submit\" style=\"width:100%;padding:.875rem;background:#007AFF;\
            color:#fff;border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-           min-height:44px;cursor:pointer;margin-top:1rem\">Create Event</button>\
+           min-height:44px;cursor:pointer;margin-top:1rem\">{submit}</button>\
          </form></main>{nav}",
-        header = render::header_with_switcher("Create Event", community_id, &_community_pairs),
-        cid    = render::escape_html(community_id),
-        tok    = render::escape_html(&token),
-        fields = event_form_fields(None, None, None, None),
-        nav    = nav,
+        header  = render::header_with_switcher(i18n::EN_ADMIN_CREATE_EVENT_TITLE, community_id, &_community_pairs),
+        cid     = render::escape_html(community_id),
+        tok     = render::escape_html(&token),
+        fields  = event_form_fields(None, None, None, None),
+        submit  = i18n::EN_ADMIN_CREATE_EVENT_SUBMIT,
+        nav     = nav,
     );
-    render::page("Create Event", &body)
+    render::page(i18n::EN_ADMIN_CREATE_EVENT_TITLE, &body)
 }
 
 // ── POST /c/:cid/admin/events ────────────────────────────────────────────
@@ -186,7 +188,7 @@ pub async fn get_cancel_event(
                Cancel Event</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher("Cancel Event", community_id, &_community_pairs),
+        header = render::header_with_switcher(i18n::EN_ADMIN_CANCEL_EVENT_TITLE, community_id, &_community_pairs),
         title  = render::escape_html(&event.title),
         cid    = render::escape_html(community_id),
         eid    = render::escape_html(event_id),
@@ -298,7 +300,7 @@ pub async fn get_invites(
         ));
     }
     let codes_html = if active_codes.is_empty() {
-        "<p style=\"font-size:.875rem;color:#6e6e73\">No unused codes.</p>".to_owned()
+        format!("<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>", i18n::EN_ADMIN_INVITES_NONE)
     } else {
         format!("<ul style=\"list-style:none;padding:0;margin:.75rem 0\">{code_rows}</ul>")
     };
@@ -323,7 +325,7 @@ pub async fn get_invites(
            {codes}\
          </section>\
          </main>{nav}",
-        header   = render::header_with_switcher("Invite Members", community_id, &community_pairs),
+        header   = render::header_with_switcher(i18n::EN_ADMIN_INVITES_TITLE, community_id, &community_pairs),
         cid      = render::escape_html(community_id),
         tok      = render::escape_html(&gen_token),
         new_code = new_code_html,
@@ -461,7 +463,7 @@ pub async fn get_members(
             color:#007AFF;text-decoration:none;font-weight:600\">\
             Generate invite code</a>\
          </main>{nav}",
-        header = render::header_with_switcher("Members", community_id, &_community_pairs),
+        header = render::header_with_switcher(i18n::EN_ADMIN_MEMBERS_TITLE, community_id, &_community_pairs),
         rows   = member_rows,
         cid    = render::escape_html(community_id),
         nav    = nav,
@@ -853,7 +855,7 @@ pub async fn get_attendance(
              Back to event</a>\
          </div>\
          </main>{nav}",
-        header = render::header_with_switcher("Mark Attendance", community_id, &community_pairs),
+        header = render::header_with_switcher(i18n::EN_ADMIN_ATTEND_TITLE, community_id, &community_pairs),
         title  = render::escape_html(&event.title),
         cid    = render::escape_html(community_id),
         eid    = render::escape_html(event_id),

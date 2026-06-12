@@ -4,6 +4,7 @@ use zinnias_ciao_contracts::auth::token_purpose;
 use worker::{Env, Request, Response, Result};
 
 use crate::authz::require_membership;
+use zinnias_ciao_contracts::i18n;
 use crate::db::{self, membership as membership_db};
 use crate::form_token;
 use crate::render;
@@ -40,20 +41,27 @@ pub async fn get_me(
          <main style=\"padding:1rem 1rem 5rem\">\
            <section style=\"margin-bottom:1.5rem\">\
              <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">Name</h2>\
+             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{lbl_name}</h2>\
              <p style=\"font-size:1rem;margin:0\">{name}</p>\
            </section>\
            <section style=\"margin-bottom:1.5rem\">\
              <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
              text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">\
-             Current community</h2>\
+             {lbl_community}</h2>\
              <p style=\"font-size:1rem;margin:0\">{community} · {role}</p>\
            </section>\
            <section style=\"margin-bottom:1.5rem\">\
              <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">Help</h2>\
+             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{lbl_help}</h2>\
              <p style=\"font-size:.875rem;color:#6e6e73;margin:0\">\
-             Ask your community admin if you cannot enter or lost access.</p>\
+             {help_body}</p>\
+           </section>\
+           <section style=\"margin-top:1.5rem\">\
+             <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
+               text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">Calendar</h2>\
+             <a href=\"/c/{cid}/me/calendar\" \
+               style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;\
+               min-height:44px;line-height:44px\">Calendar feed</a>\
            </section>\
            <form method=\"post\" action=\"/logout\" style=\"margin-top:2rem\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
@@ -61,15 +69,21 @@ pub async fn get_me(
                style=\"width:100%;padding:.875rem;background:#fff;\
                color:#FF3B30;border:2px solid #FF3B30;border-radius:14px;\
                font-size:1rem;font-weight:600;min-height:44px;cursor:pointer\">\
-               Log out</button>\
+               {lbl_logout}</button>\
            </form>\
          </main>{nav}",
-        header    = render::header_with_switcher("Me", community_id, &_community_pairs),
+        header    = render::header_with_switcher(i18n::EN_NAV_ME, community_id, &_community_pairs),
         name      = render::escape_html(&membership.display_name),
         community = render::escape_html(community_name),
         role      = role_label,
-        tok       = render::escape_html(&logout_token),
+        cid       = render::escape_html(community_id),
+        lbl_name      = i18n::EN_ME_SECTION_NAME,
+        lbl_community = i18n::EN_ME_SECTION_COMMUNITY,
+        lbl_help      = i18n::EN_ME_SECTION_HELP,
+        help_body     = i18n::EN_ME_HELP_BODY,
+        lbl_logout    = i18n::EN_LOGOUT,
+        tok           = render::escape_html(&logout_token),
         nav       = nav,
     );
-    render::page("Me", &body)
+    render::page(i18n::EN_NAV_ME, &body)
 }

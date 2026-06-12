@@ -43,6 +43,36 @@ pub async fn find_active(
     }))
 }
 
+/// Verify a membership_id is still active in a given community.
+/// Used by the ICS feed handler to confirm access without a session.
+pub async fn find_active_by_id(
+    db: &D1Database,
+    membership_id: &str,
+    community_id: &str,
+) -> Result<Option<MembershipRow>> {
+    let row = db
+        .prepare(
+            "SELECT id, community_id, user_id, role, display_name \
+             FROM community_memberships \
+             WHERE id = ?1 AND community_id = ?2 AND removed_at IS NULL \
+             LIMIT 1",
+        )
+        .bind(&[membership_id.into(), community_id.into()])?
+        .first::<serde_json::Value>(None)
+        .await?;
+
+    Ok(row.and_then(|v| {
+        Some(MembershipRow {
+            id: v.get("id")?.as_str()?.to_owned(),
+            community_id: v.get("community_id")?.as_str()?.to_owned(),
+            user_id: v.get("user_id")?.as_str()?.to_owned(),
+            role: v.get("role")?.as_str()?.to_owned(),
+            display_name: v.get("display_name")?.as_str()?.to_owned(),
+            is_active: true,
+        })
+    }))
+}
+
 /// All active memberships for a user (for the communities list / session boot).
 pub async fn list_active_for_user(db: &D1Database, user_id: &str) -> Result<Vec<MembershipRow>> {
     let rows = db

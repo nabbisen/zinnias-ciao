@@ -4,6 +4,7 @@ use worker::{Env, Request, Response, Result};
 
 use crate::db::membership as membership_db;
 use crate::render;
+use zinnias_ciao_contracts::i18n;
 use crate::session::require_auth;
 
 pub async fn get_communities(
@@ -96,11 +97,12 @@ pub async fn get_communities(
               style=\"display:block;margin-top:1.5rem;text-align:center;\
               padding:.875rem;border:2px solid #007AFF;border-radius:14px;\
               color:#007AFF;text-decoration:none;font-weight:600\">\
-              Join another community</a>\
+              {join_another}</a>\
          </main>{nav}",
-        header = render::header_with_switcher("Communities", community_id, &community_pairs),
-        rows   = rows,
-        nav    = nav,
+        header       = render::header_with_switcher(i18n::EN_NAV_COMMUNITIES, community_id, &community_pairs),
+        rows         = rows,
+        join_another = i18n::EN_COMMUNITIES_JOIN_ANOTHER,
+        nav          = nav,
     );
-    render::page("Communities", &body)
+    render::page(i18n::EN_NAV_COMMUNITIES, &body)
 }

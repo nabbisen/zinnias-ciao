@@ -1,6 +1,7 @@
 //! HTML render helpers — shared shell, escape, and UI components.
 
 use worker::{Response, Result};
+use zinnias_ciao_contracts::i18n;
 
 // ── CSS design tokens (RFC-011 §5 / RFC-020 v1.2 §E) ─────────────────────
 // Must stay in sync with workers/ssr/static/app.css --cz-* custom properties.
@@ -125,9 +126,9 @@ pub fn bottom_nav(community_id: &str, active: &str) -> String {
          padding-bottom:env(safe-area-inset-bottom)\">\
          {home}{communities}{me}\
          </nav>",
-        home        = tab("Home", &format!("/c/{community_id}/home"), "home"),
-        communities = tab("Communities", &format!("/c/{community_id}/communities"), "communities"),
-        me          = tab("Me", &format!("/c/{community_id}/me"), "me"),
+        home        = tab(i18n::EN_NAV_HOME, &format!("/c/{community_id}/home"), "home"),
+        communities = tab(i18n::EN_NAV_COMMUNITIES, &format!("/c/{community_id}/communities"), "communities"),
+        me          = tab(i18n::EN_NAV_ME, &format!("/c/{community_id}/me"), "me"),
     )
 }
 
@@ -192,10 +193,10 @@ pub fn header_with_switcher(
 pub fn status_display(status: Option<&str>) -> (&'static str, &'static str, &'static str) {
     // returns (fg_color, icon, label)
     match status {
-        Some("going")     => (CZ_STATUS_GOING_FG,    ICON_GOING,     "Going"),
-        Some("not_going") => (CZ_STATUS_NOT_GOING_FG, ICON_NOT_GOING, "No Go"),
-        Some("attended")  => (CZ_STATUS_ATTENDED_FG,  ICON_ATTENDED,  "Attended"),
-        _                 => (CZ_STATUS_NO_ANSWER_FG, ICON_NO_ANSWER, "No answer"),
+        Some("going")     => (CZ_STATUS_GOING_FG,    ICON_GOING,     i18n::EN_STATUS_GOING),
+        Some("not_going") => (CZ_STATUS_NOT_GOING_FG, ICON_NOT_GOING, i18n::EN_STATUS_NOT_GOING),
+        Some("attended")  => (CZ_STATUS_ATTENDED_FG,  ICON_ATTENDED,  i18n::EN_STATUS_ATTENDED),
+        _                 => (CZ_STATUS_NO_ANSWER_FG, ICON_NO_ANSWER, i18n::EN_STATUS_NO_ANSWER),
     }
 }
 
@@ -254,10 +255,10 @@ pub fn status_form(
         )
     };
 
-    let going_btn    = btn(Some("going"),     "Going",    ICON_GOING,     false, "");
-    let notgoing_btn = btn(Some("not_going"), "No Go",    ICON_NOT_GOING, false, "");
+    let going_btn    = btn(Some("going"),     i18n::EN_STATUS_GOING,     ICON_GOING,     false, "");
+    let notgoing_btn = btn(Some("not_going"), i18n::EN_STATUS_NOT_GOING, ICON_NOT_GOING, false, "");
     let attended_btn = btn(
-        Some("attended"), "Attended", ICON_ATTENDED,
+        Some("attended"), i18n::EN_STATUS_ATTENDED, ICON_ATTENDED,
         !can_set_attended, attended_disabled_reason,
     );
 
@@ -266,7 +267,9 @@ pub fn status_form(
         format!(
             "<button type=\"submit\" name=\"status\" value=\"clear\" \
              style=\"font-size:.75rem;color:#6E6E73;background:none;border:none;\
-             padding:.25rem;cursor:pointer\" aria-label=\"Clear answer\">Clear</button>"
+             padding:.25rem;cursor:pointer\" aria-label=\"{clear_label}\">{clear}</button>",
+                clear_label = i18n::EN_STATUS_CLEAR_LABEL,
+                clear       = i18n::EN_STATUS_CLEAR,
         )
     } else {
         String::new()
@@ -331,23 +334,23 @@ pub fn note_form(
     };
 
     format!(
-        "<section aria-label=\"Your note\" style=\"margin:1.5rem 0\">\
-         <h2 style=\"font-size:1.0625rem;font-weight:600;margin-bottom:.75rem\">Your note</h2>\
+        "<section aria-label=\"{note_section_label}\" style=\"margin:1.5rem 0\">\
+         <h2 style=\"font-size:1.0625rem;font-weight:600;margin-bottom:.75rem\">{note_section_label}</h2>\
          {flash}\
-         <p style=\"font-size:.75rem;color:{muted};margin-bottom:.5rem\">\
-         Community members can see this note.</p>\
+         <p style=\"font-size:.75rem;color:{muted};margin-bottom:.5rem\" aria-live=\"polite\">\
+         {note_visibility}</p>\
          <form method=\"post\" action=\"/c/{cid}/events/{eid}/my-note\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            <textarea name=\"note\" rows=\"3\" maxlength=\"200\" \
              style=\"width:100%;padding:.75rem;border:1px solid {border};\
              border-radius:12px;font-size:1rem;resize:vertical;box-sizing:border-box\" \
-             aria-label=\"Note (up to 200 characters)\">{existing}</textarea>\
+             aria-label=\"{note_placeholder_label}\">{existing}</textarea>\
            <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:.5rem\">\
-             <span style=\"font-size:.75rem;color:{muted}\">Up to 200 characters</span>\
+             <span style=\"font-size:.75rem;color:{muted}\">{note_char_hint}</span>\
              <button type=\"submit\" \
                style=\"padding:.625rem 1.25rem;background:{going_border};color:#FFFFFF;\
                border:none;border-radius:14px;font-size:.9375rem;font-weight:600;\
-               min-height:44px;cursor:pointer\">Save Note</button>\
+               min-height:44px;cursor:pointer\">{note_save}</button>\
            </div>\
          </form>\
          {delete}\
@@ -358,9 +361,14 @@ pub fn note_form(
         existing     = escape_html(existing_note.unwrap_or("")),
         flash        = flash_html,
         delete       = delete_btn,
-        muted        = CZ_COLOR_TEXT_SECONDARY,
-        border       = CZ_BORDER,
-        going_border = CZ_STATUS_GOING_BORDER,
+        muted             = CZ_COLOR_TEXT_SECONDARY,
+        border            = CZ_BORDER,
+        going_border      = CZ_STATUS_GOING_BORDER,
+        note_section_label    = i18n::EN_NOTE_SECTION_LABEL,
+        note_placeholder_label = i18n::EN_NOTE_PLACEHOLDER_LABEL,
+        note_char_hint        = i18n::EN_NOTE_CHAR_HINT,
+        note_visibility       = i18n::EN_NOTE_VISIBILITY,
+        note_save             = i18n::EN_NOTE_SAVE,
     )
 }
 
@@ -579,7 +587,7 @@ pub fn placeholder() -> Result<Response> {
   <p>Private community schedule sharing.</p>\
   <p style=\"color:#6E6E73;font-size:.875rem\">This environment is not ready for members yet.</p>\
 </main>";
-    Response::from_html(shell("ciao.zinnias", body))
+    Response::from_html(shell(i18n::EN_JOIN_HEADING, body))
 }
 
 pub fn not_found() -> Result<Response> {

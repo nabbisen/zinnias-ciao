@@ -2,6 +2,50 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.10.0] — 2026-06-12
+
+### Added
+
+- **RFC-026 — i18n wiring: all user-visible strings through constants (partial).**
+  - `packages/contracts/src/i18n.rs`: expanded from 26 to 74 EN/JA constant pairs.
+    Added: Nav, Home section labels, admin shortcuts, Status Clear, Note form labels,
+    Me section headings, all Admin event/invite/member strings. Parity lint updated
+    from 26 to 74 keys — any new string without a JA counterpart fails immediately.
+  - `render.rs`, `home.rs`, `me.rs`, `communities.rs`, `admin.rs`: all user-visible
+    strings wired to `i18n::EN_*` constants.
+  - RFC-026 moved to `rfcs/done/` (v0.10.0). Partial: EN/JA string table complete and
+    enforced; per-community language selection deferred post-MVP.
+
+- **RFC-023 — ICS calendar export (fully implements RFC-023).**
+  - `migrations/0004_calendar_tokens.sql`: `calendar_tokens` table — one active token
+    per (membership_id, community_id), HMAC stored, revocable via `revoked_at`.
+  - `packages/contracts/src/ics.rs`: pure-Rust ICS formatting — `build_vcalendar`,
+    `ics_text` (RFC 5545 escaping), `fold_line` (75-octet folding, UTF-8 boundary
+    safe), `utc_to_ics_dt`, `sanitize_filename`. 17 inline tests.
+  - `db/calendar.rs`: `find_by_hmac`, `find_active_for_membership`, `insert`,
+    `revoke_for_membership`, `events_for_feed`.
+  - `handlers/calendar.rs`: four routes wired in `community.rs`:
+    - `GET  /c/:cid/me/calendar` — member calendar page (show URL, revoke, regenerate).
+    - `POST /c/:cid/me/calendar/regenerate` — rotate token (CSRF-guarded).
+    - `POST /c/:cid/me/calendar/revoke` — disable feed (CSRF-guarded).
+    - `GET  /c/:cid/cal/:token` — unauthenticated ICS bearer feed; validates HMAC,
+      checks membership still active, returns `text/calendar; charset=utf-8` with
+      `Cache-Control: no-store, private`.
+  - Feed content: title, times, location, cancellation status only — no names, notes,
+    invite codes, or participant counts.
+  - Me page: "Calendar feed" link added. `db/membership.rs`: `find_active_by_id` added.
+  - `contracts/src/auth.rs`: `CALENDAR_REGENERATE` and `CALENDAR_REVOKE` token purposes.
+  - RFC-023 moved to `rfcs/done/` (v0.10.0).
+
+- **SSR crate build verified.** `admin.rs` (i18n wiring syntax errors fixed),
+  `home.rs` (community fetch moved before event loop), `community.rs` — all compile
+  clean under `--target wasm32-unknown-unknown`, zero errors.
+
+### Changed
+
+- Parity lint count: 26 → 74. Token purpose count: 12 → 14.
+- Total tests: 131 → 148.
+
 ## [0.9.0] — 2026-06-12
 
 ### Added

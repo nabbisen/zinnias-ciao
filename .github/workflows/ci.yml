@@ -11,21 +11,7 @@ env:
 
 jobs:
   test:
-    name: Test (native)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Format check
-        run: cargo fmt --all -- --check
-      - name: Clippy (domain + contracts)
-        run: cargo clippy -p zinnias-ciao-domain -p zinnias-ciao-contracts -- -D warnings
-      - name: Tests (domain + contracts)
-        run: cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts
-
-  check-wasm:
-    name: Type-check (wasm32)
+    name: Test (native) + type-check (wasm32)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +19,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - name: Check SSR worker
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: Clippy (domain + contracts)
+        run: cargo clippy -p zinnias-ciao-domain -p zinnias-ciao-contracts -- -D warnings
+      - name: Tests (domain + contracts)
+        run: cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts
+      - name: Type-check SSR worker (wasm32)
         run: cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown
 
   migration-check:

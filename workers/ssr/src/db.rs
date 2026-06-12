@@ -2,6 +2,7 @@
 //! D1 data-access layer.
 
 pub mod attendance;
+pub mod calendar;
 pub mod community;
 pub mod event;
 pub mod event_note;

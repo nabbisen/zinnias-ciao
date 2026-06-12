@@ -24,6 +24,14 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
 
         "communities" => super::communities::get_communities(req, env, rid, cid).await,
         "me"          => super::me::get_me(req, env, rid, cid).await,
+        "me/calendar" => super::calendar::get_me_calendar(req, env, rid, cid).await,
+
+        // ── Unauthenticated ICS feed ──────────────────────────────────────
+        t if t.starts_with("cal/") => {
+            let token = &t[4..];
+            if token.is_empty() { render::not_found() }
+            else { super::calendar::get_ics_feed(req, env, rid, cid, token).await }
+        }
 
         // ── Admin GET routes ─────────────────────────────────────────────
         "admin" | "admin/" => render::not_found(),
@@ -119,6 +127,9 @@ pub async fn dispatch_post(req: Request, env: &Env, rid: &str, path: &str) -> Re
                 _ => render::not_found(),
             }
         }
+        "me/calendar/regenerate" => super::calendar::post_regenerate_calendar(req, env, rid, cid).await,
+        "me/calendar/revoke"      => super::calendar::post_revoke_calendar(req, env, rid, cid).await,
+
         _ => render::not_found(),
     }
 }

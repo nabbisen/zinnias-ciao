@@ -1,9 +1,9 @@
-# RFC 026 — Multi-Language and Plain-Language Localization
+# RFC 023 — Optional Calendar Export and ICS Interop
 
-> **Stub (backlog).** Direction only. Sections 7–13 are shared scaffolding to be detailed when this RFC is accepted; do not treat as finished design.
+> **Stub (backlog).** Direction only. Sections 7–13 are shared scaffolding to be detailed when this RFC is accepted; do not treat as finished design. A basic ICS download route already exists in the codebase; this RFC formalizes the per-membership hashed-token feed.
 
-**Status.** Proposed  
-**Phase:** F5 / Internationalization and Plain Language  
+**Status.** Implemented (v0.10.0)
+**Phase:** F2 / Scheduling Power Carefully  
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  
 **Relationship:** Continuation RFC; not required for the first MVP unless explicitly accepted
@@ -12,7 +12,7 @@
 
 ## 1. Summary
 
-This RFC defines localization and plain-language strategy. The MVP may ship in one language, but the product should be prepared for communities whose members are more comfortable in another language.
+This RFC defines optional calendar export. Some members may want to see community events in their phone calendar, but ciao.zinnias should not require Google, Apple, or Outlook accounts and should not become dependent on external calendar platforms.
 
 ---
 
@@ -24,19 +24,19 @@ The first release of ciao.zinnias must stay small and trustworthy. However, impl
 
 ## 3. Goals
 
-- Prepare UI text for localization.
-- Keep terminology simple and culturally adaptable.
-- Support longer translated labels without breaking layouts.
-- Allow community-specific terminology only where safe.
+- Provide privacy-safe read-only event export where appropriate.
+- Keep export optional per member and per community policy.
+- Avoid writing into external calendars in the first release.
+- Define revocation behavior for exported feeds.
 
 ---
 
 ## 4. Non-Goals
 
-- No machine translation of user comments.
-- No per-user mixed-language administration complexity in the first release.
-- No user-generated HTML or markdown for localized copy.
-- No locale-specific business rules unless separately designed.
+- No two-way sync.
+- No OAuth integration with Google or Microsoft in this RFC.
+- No exposing comments or participant lists in calendar feeds by default.
+- No public unguessable URL treated as full authorization for sensitive data without revocation.
 
 ---
 
@@ -44,10 +44,10 @@ The first release of ciao.zinnias must stay small and trustworthy. However, impl
 
 | Scenario | Required behavior |
 |---|---|
-| Japanese deployment | Core UI strings can be translated cleanly. |
-| Long text stress | Buttons and cards remain usable with longer translated labels. |
-| Community term | A community may call events “Meetups” or “Practice” if configured later. |
-| Fallback | Missing translation falls back predictably. |
+| Subscribe to feed | Member copies/subscribes to a personal feed URL. |
+| Revoke feed | Member regenerates or disables the feed URL. |
+| Admin disable | Admin disables calendar export for a community. |
+| Minimal event data | Calendar entry shows title, time, and location only. |
 
 The visible language must remain plain and calm. The user should understand what happened, what they can do next, and whether the action is optional.
 
@@ -55,7 +55,7 @@ The visible language must remain plain and calm. The user should understand what
 
 ## 6. Internal Design
 
-Externalize all user-facing strings into message catalogs. Components must be designed with text expansion in mind. Status values should have stable internal codes and localized labels. Avoid embedding English strings in API error payloads; send stable error codes plus frontend-localized messages. For community-specific wording, store controlled label overrides such as `event_label_singular`, not arbitrary UI templates.
+Use per-membership export tokens stored as hashed secrets. A feed request authenticates by token and returns only events visible to that membership. The feed must not include comments, participant names, invite codes, or admin-only metadata. Feed tokens should be revocable and rotatable. Generated calendar output should be derived from canonical event data; the feed itself is not a storage authority.
 
 Implementation should be behind an explicit feature gate, migration step, or product decision. No future RFC may silently change MVP behavior.
 
@@ -81,10 +81,10 @@ APIs must expose stable error codes and avoid English-only backend messages. UI 
 
 ## 9. Security, Privacy, and Safety
 
-- Translations must preserve safety meaning, especially errors and destructive confirmations.
-- Do not localize internal enum values.
-- Text truncation must not hide important warnings.
-- Accessibility labels must be localized alongside visible text.
+- Export URLs are bearer secrets and must be displayed with clear privacy wording.
+- Revocation must immediately invalidate old feed tokens.
+- Event cancellation should be visible as cancellation or title prefix depending on supported client behavior.
+- Feeds must be rate-limited.
 
 ---
 
