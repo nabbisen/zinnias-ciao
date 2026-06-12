@@ -4,7 +4,7 @@ This document is the step-by-step operator guide for taking ciao.zinnias from a
 clean tarball to a running production deployment. It is intended to be followed
 exactly, in order, by one operator. Tick each step as you complete it.
 
-**Version this runbook was written for:** v0.8.0  
+**Version this runbook was written for:** v0.21.0  
 **Estimated time:** 60–90 minutes for a first deployment.
 
 ---
@@ -136,7 +136,7 @@ bunx wrangler secret put SESSION_COOKIE_DOMAIN --env production
 bun run migrate:staging
 ```
 
-Confirm output shows all three migrations applied (`0001`, `0002`, `0003`).
+Confirm output shows all six migrations applied (`0001` through `0006`).
 
 - [ ] Done.
 
@@ -146,7 +146,7 @@ Confirm output shows all three migrations applied (`0001`, `0002`, `0003`).
 bun run migrate:prod
 ```
 
-Confirm all three migrations applied.
+Confirm all six migrations applied.
 
 - [ ] Done.
 

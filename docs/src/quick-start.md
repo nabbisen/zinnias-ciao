@@ -15,7 +15,7 @@ bun run setup
 # or: npm run setup
 ```
 
-This installs wrangler and applies the D1 migration to the local dev database.
+This installs wrangler and applies all D1 migrations to the local dev database, then seeds one community, one admin user, and a bootstrap invite code. The invite code is printed at the end — visit `http://localhost:8787/join` to use it.
 
 ## Development
 

@@ -19,5 +19,5 @@ Admins manage events, generate invite codes, and maintain the member list.
 | Runtime | Cloudflare Workers (V8 isolate) |
 | Language | Rust (Rust 2024 edition) |
 | Database | Cloudflare D1 (SQLite-compatible) |
-| Frontend | Leptos SSR + minimal plain JS |
+| Frontend | Plain Rust SSR + minimal plain JS (no browser WASM, no Leptos — AD-1) |
 | Auth | Invite-code + HTTP-only cookie session |

@@ -2,6 +2,42 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.22.0] — 2026-06-12
+
+### Documentation (docs verification pass)
+
+All documentation was verified against the codebase. Issues found and corrected:
+
+- **`docs/src/overview.md`:** Stack table said "Leptos SSR + minimal plain JS".
+  The actual implementation uses no Leptos — plain Rust string-template SSR per
+  AD-1. Corrected to "Plain Rust SSR + minimal plain JS (no browser WASM,
+  no Leptos — AD-1)".
+
+- **`wrangler.toml`:** The `[env.production]` section was missing
+  `[[env.production.d1_databases]]`, `[[env.production.kv_namespaces]]`, and
+  `BUILD_VERSION`. Without these, `bunx wrangler deploy --env production` would
+  use the root-level bindings (which have `database_id = "local"`) or fail.
+  Added the three missing blocks with `REPLACE_WITH_PRODUCTION_*` placeholders
+  matching the staging pattern.
+
+- **`docs/src/launch-runbook.md`:** Version header said "v0.8.0" (the version
+  when the runbook was written). Updated to v0.21.0. Two places said "all three
+  migrations applied (`0001`, `0002`, `0003`)" — there are now six migrations
+  (0001–0006). Updated both to "all six migrations".
+
+- **`docs/src/quick-start.md`:** Setup description said "applies the D1
+  migration" (singular). Updated to describe what `bun run setup` actually does:
+  runs all migrations, seeds a community + admin + invite code, and prints the
+  code for first use.
+
+### Confirmed accurate (no changes needed)
+
+- `docs/src/deployment.md` — environment names, secrets, deploy commands, rollback all match.
+- `docs/src/operations.md` — bootstrap SQL matches schema (incl. `grants_role` column from migration 0003); session/invite revocation SQL matches schema; audit_log query accurate.
+- `docs/src/backup-recovery.md` — export command uses correct production database name.
+- `docs/src/release-checklist.md` — all `[x]` claims verified against code in the audit pass.
+- `docs/src/architecture.md` — rewritten in v0.19.0; accurate.
+
 ## [0.21.0] — 2026-06-12
 
 ### Security
