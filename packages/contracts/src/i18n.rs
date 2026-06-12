@@ -303,6 +303,25 @@ pub const JA_CALENDAR_REGENERATE:  &str = "URLを再生成";
 pub const JA_CALENDAR_PRIVACY_NOTE: &str = "個人のカレンダーフィードURLです。このURLを知っている人はコミュニティのイベントを閲覧できます。公開しないでください。";
 
 
+// ── Event detail page (RFC-006 / RFC-025) ─────────────────────────────────
+pub const EN_EVENT_TITLE_HEADER:           &str = "Event";
+pub const EN_EVENT_ATTENDED_UNAVAILABLE:   &str = "Available after the event";
+pub const EN_EVENT_ATTENDED_ADMIN_ONLY:    &str = "Only admins can mark Attended";
+pub const EN_EVENT_MEMBER_FALLBACK:        &str = "Member";
+
+pub const JA_EVENT_TITLE_HEADER:           &str = "イベント";
+pub const JA_EVENT_ATTENDED_UNAVAILABLE:   &str = "イベント終了後に選択できます";
+pub const JA_EVENT_ATTENDED_ADMIN_ONLY:    &str = "出席の記録は管理者のみ行えます";
+pub const JA_EVENT_MEMBER_FALLBACK:        &str = "メンバー";
+
+// ── Join page (RFC-003) ────────────────────────────────────────────────────
+pub const EN_JOIN_PAGE_TITLE:              &str = "Join";
+pub const EN_JOIN_PROFILE_PAGE_TITLE:      &str = "Your name";
+
+pub const JA_JOIN_PAGE_TITLE:              &str = "参加";
+pub const JA_JOIN_PROFILE_PAGE_TITLE:      &str = "お名前";
+
+
 #[cfg(test)]
 mod tests {
     // Every EN_ constant must have a JA_ counterpart with the same suffix.
@@ -372,8 +391,13 @@ mod tests {
             // Calendar (RFC-023)
             "CALENDAR_TITLE", "CALENDAR_DESCRIPTION", "CALENDAR_GENERATE",
             "CALENDAR_DISABLE", "CALENDAR_REGENERATE", "CALENDAR_PRIVACY_NOTE",
+            // Event detail (RFC-006/025)
+            "EVENT_TITLE_HEADER", "EVENT_ATTENDED_UNAVAILABLE",
+            "EVENT_ATTENDED_ADMIN_ONLY", "EVENT_MEMBER_FALLBACK",
+            // Join page (RFC-003)
+            "JOIN_PAGE_TITLE", "JOIN_PROFILE_PAGE_TITLE",
         ];
-        assert_eq!(en_keys.len(), 114, "update parity list when adding strings");
+        assert_eq!(en_keys.len(), 120, "update parity list when adding strings");
         for key in en_keys {
             assert!(!key.is_empty(), "empty key: {key}");
         }

@@ -195,21 +195,26 @@ pub async fn count_admins(db: &D1Database, community_id: &str) -> Result<u32> {
     Ok(row.and_then(|v| v.get("cnt")?.as_u64()).unwrap_or(0) as u32)
 }
 
-/// Get role string for a membership_id.
-pub async fn get_role(db: &D1Database, membership_id: &str) -> Result<Option<String>> {
+/// Get role string for a membership_id, scoped to community_id.
+pub async fn get_role(db: &D1Database, membership_id: &str, community_id: &str) -> Result<Option<String>> {
     let row = db
-        .prepare("SELECT role FROM community_memberships WHERE id = ?1 LIMIT 1")
-        .bind(&[membership_id.into()])?
+        .prepare(
+            "SELECT role FROM community_memberships \
+             WHERE id = ?1 AND community_id = ?2 AND removed_at IS NULL LIMIT 1")
+        .bind(&[membership_id.into(), community_id.into()])?
         .first::<serde_json::Value>(None)
         .await?;
     Ok(row.and_then(|v| v.get("role")?.as_str().map(|s| s.to_owned())))
 }
 
 /// Soft-remove a member (sets removed_at, preserves history — RFC-010 §5).
-pub async fn soft_remove(db: &D1Database, membership_id: &str) -> Result<()> {
+/// Scoped to community_id to prevent cross-community removal.
+pub async fn soft_remove(db: &D1Database, membership_id: &str, community_id: &str) -> Result<()> {
     let now = crate::db::now_utc();
-    db.prepare("UPDATE community_memberships SET removed_at = ?1 WHERE id = ?2")
-        .bind(&[now.as_str().into(), membership_id.into()])?
+    db.prepare(
+        "UPDATE community_memberships SET removed_at = ?1 \
+         WHERE id = ?2 AND community_id = ?3 AND removed_at IS NULL")
+        .bind(&[now.as_str().into(), membership_id.into(), community_id.into()])?
         .run()
         .await?;
     Ok(())

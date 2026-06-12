@@ -1,6 +1,7 @@
 # RFC 003 — Invite Redemption and Session Authentication
 
-**Status.** Implemented (v0.2.0)
+**Status.** Implemented
+**Audit note (2026-06-12):** RFC claimed atomic multi-step redemption. D1 via `worker-rs` does not support multi-statement transactions; the implementation uses sequential individual queries. Partial failure leaves an orphaned `users` row (harmless) but the invite remains redeemable on retry. The form token prevents double-submission within the same session. Full atomicity is deferred until D1 transaction support is available. (v0.2.0)
 **Phase:** M1 / Trust Boundary Foundation
 **Project:** ciao.zinnias
 **Date:** 2026-06-11

@@ -2,6 +2,62 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.21.0] — 2026-06-12
+
+### Security
+
+- **Cross-community member removal (RFC-004/RFC-010 audit finding).**
+  `soft_remove(db, membership_id)` accepted any `membership_id` without verifying
+  it belonged to the current community. An admin of community A could remove a
+  member of community B by crafting a POST to
+  `/c/community_a_id/admin/members/community_b_membership_id/remove`.
+  **Fixed:** `soft_remove` now requires `community_id` and adds
+  `AND community_id = ?3 AND removed_at IS NULL` to the UPDATE.
+  Same gap in `get_role(db, membership_id)` — now adds
+  `AND community_id = ?2 AND removed_at IS NULL`. Both call sites in `admin.rs`
+  updated.
+
+### Correctness
+
+- **Token purpose raw string literal (RFC-010 audit finding).**
+  `form_token::issue`/`consume` for member removal used the raw string
+  `"remove_member"` instead of a `token_purpose::` constant. This was outside
+  the uniqueness test and not guaranteed to remain distinct from other purposes.
+  **Fixed:** `REMOVE_MEMBER` constant added to `contracts/src/auth.rs`; wired
+  in `admin.rs`; added to token uniqueness tests. Total token purposes: 18.
+
+### Documentation accuracy
+
+- **RFC-001 title corrected.**
+  RFC-001 was titled "Cloudflare Workers, Leptos SSR, D1" and described a
+  "Rust/Leptos SSR frontend". The actual implementation uses no Leptos at all —
+  only `worker::*` with plain Rust string templating (per AD-1, adopted before
+  coding began). RFC title and summary updated; implementation note added.
+
+- **RFC-003 atomicity claim corrected.**
+  RFC-003 and the code comment both claimed "atomic redemption". D1 via
+  `worker-rs` does not support multi-statement transactions; the implementation
+  uses four sequential individual queries. The code comment has been rewritten
+  to accurately describe the sequential approach and its acceptable failure modes.
+  RFC-003 header updated with an audit note.
+
+### Internationalisation
+
+- **`event.rs`:** 4 hardcoded strings wired to i18n constants — event page header
+  title, "Available after the event", "Only admins can mark Attended", "Member"
+  fallback name. `i18n` import added.
+
+- **`join.rs`:** Page titles "Join" and "Your name" wired to i18n constants.
+
+- **`templates.rs`:** All body strings wired — page h1, description, Save section
+  h2, Title/Location/Duration field labels, Save button. Empty state wired.
+
+- **`me.rs`:** About section heading, Version label, Ref label wired to i18n
+  constants.
+
+- **`i18n.rs`:** 6 new EN/JA pairs added (event page title, two attendee-status
+  reasons, member fallback, two join page titles). Parity count: 114 → 120.
+
 ## [0.20.0] — 2026-06-12
 
 ### Added

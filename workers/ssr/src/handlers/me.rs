@@ -79,9 +79,9 @@ pub async fn get_me(
            {admin_export}\
            <section style=\"margin-top:1.5rem\">\
              <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-               text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">About</h2>\
-             <p style=\"font-size:.8125rem;color:#6e6e73;margin:0\">Version {version}</p>\
-             <p style=\"font-size:.8125rem;color:#6e6e73;margin:.25rem 0 0\">Ref: {ref_code}</p>\
+               text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{lbl_about}</h2>\
+             <p style=\"font-size:.8125rem;color:#6e6e73;margin:0\">{lbl_version} {version}</p>\
+             <p style=\"font-size:.8125rem;color:#6e6e73;margin:.25rem 0 0\">{lbl_ref}: {ref_code}</p>\
            </section>\
            <form method=\"post\" action=\"/logout\" style=\"margin-top:2rem\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
@@ -102,6 +102,9 @@ pub async fn get_me(
         lbl_help      = i18n::EN_ME_SECTION_HELP,
         help_body     = i18n::EN_ME_HELP_BODY,
         lbl_logout    = i18n::EN_LOGOUT,
+        lbl_about     = i18n::EN_ME_SECTION_ABOUT,
+        lbl_version   = i18n::EN_ME_VERSION_LABEL,
+        lbl_ref       = i18n::EN_ME_REF_LABEL,
         version       = render::escape_html(&app_version),
         ref_code      = render::escape_html(support_ref),
         admin_export  = admin_export_html,

@@ -538,7 +538,7 @@ pub async fn get_remove_member(
     let db = env.d1("DB")?;
     let pp = pepper(env);
     let token = form_token::issue(&db, &pp, &auth.user_id,
-        "remove_member", Some(target_membership_id)).await.unwrap_or_default();
+        token_purpose::REMOVE_MEMBER, Some(target_membership_id)).await.unwrap_or_default();
 
     // Find the target member name
     let all = membership_db::list_all_active(&db, community_id).await?;
@@ -610,21 +610,21 @@ pub async fn post_remove_member(
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let replay = form_token::consume(&db, &pp, &auth.user_id,
-        "remove_member", &raw_token, Some(target_membership_id)).await?;
+        token_purpose::REMOVE_MEMBER, &raw_token, Some(target_membership_id)).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/admin/members"));
     }
 
     // Last-admin guard (RFC-010 §5)
     let admin_count = membership_db::count_admins(&db, community_id).await?;
-    let target_role = membership_db::get_role(&db, target_membership_id).await?;
+    let target_role = membership_db::get_role(&db, target_membership_id, community_id).await?;
     if admin_count <= 1 && target_role.as_deref() == Some("admin") {
         return render::page("Cannot remove",
             "<main style=\"padding:2rem\"><p>Cannot remove the last admin. \
              Transfer the admin role first.</p></main>");
     }
 
-    membership_db::soft_remove(&db, target_membership_id).await?;
+    membership_db::soft_remove(&db, target_membership_id, community_id).await?;
     let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
         "membership", Some(target_membership_id), "removed", None).await;
 

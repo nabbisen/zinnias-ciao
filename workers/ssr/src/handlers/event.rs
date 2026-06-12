@@ -5,6 +5,7 @@ use worker::{Env, Request, Response, Result};
 
 use crate::audit;
 use crate::authz::require_membership;
+use zinnias_ciao_contracts::i18n;
 use crate::db::{
     self,
     attendance as attendance_db,
@@ -92,9 +93,9 @@ pub async fn get_event_detail(
 
         let can_set_attended = membership.is_admin() && time_state == DayTimeState::Ended;
         let attended_reason  = if time_state != DayTimeState::Ended {
-            "Available after the event"
+            i18n::EN_EVENT_ATTENDED_UNAVAILABLE
         } else if !membership.is_admin() {
-            "Only admins can mark Attended"
+            i18n::EN_EVENT_ATTENDED_ADMIN_ONLY
         } else { "" };
 
         // Issue a status form token
@@ -181,7 +182,7 @@ pub async fn get_event_detail(
     let mut others_html = String::new();
     for n in all_notes.iter().filter(|n| n.membership_id != membership.membership_id) {
         let name = name_map.get(&n.membership_id)
-            .map(|s| s.as_str()).unwrap_or("Member");
+            .map(|s| s.as_str()).unwrap_or(i18n::EN_EVENT_MEMBER_FALLBACK);
         let hide_btn = if membership.is_admin() {
             let hide_tok = form_token::issue(
                 &db, &pp, &auth.user_id,
@@ -251,7 +252,7 @@ pub async fn get_event_detail(
            {note}\
            {notes_section}\
          </main>{nav}",
-        header         = render::header_with_switcher("Event", community_id, &_community_pairs),
+        header         = render::header_with_switcher(i18n::EN_EVENT_TITLE_HEADER, community_id, &_community_pairs),
         title          = render::escape_html(&event.title),
         loc            = event.location.as_deref().map(|l| format!(
             "<p style=\"color:#6e6e73;font-size:.875rem\">\u{1F4CD} {}</p>",

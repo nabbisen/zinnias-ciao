@@ -112,40 +112,38 @@ pub async fn get_templates(
     }
 
     let empty_msg = if templates.is_empty() {
-        "<p style=\"font-size:.875rem;color:#6e6e73\">No templates yet.</p>"
+        &format!("<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>", i18n::EN_TEMPLATES_EMPTY)
     } else { "" };
 
     let nav  = render::bottom_nav(community_id, "home");
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.25rem\">Event Templates</h1>\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.25rem\">{title_h1}</h1>\
          <p style=\"font-size:.875rem;color:#6e6e73;margin-bottom:1rem\">\
-           Save common event details as templates to create events faster.\
+           {desc}\
          </p>\
          {flash}\
          {empty}\
          {list}\
          <section style=\"margin-top:2rem\">\
-           <h2 style=\"font-size:1rem;font-weight:600;margin-bottom:.75rem\">Save a template</h2>\
+           <h2 style=\"font-size:1rem;font-weight:600;margin-bottom:.75rem\">{save_section_h2}</h2>\
            <form method=\"post\" action=\"/c/{cid}/admin/templates\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
              <label style=\"display:block;margin-bottom:.75rem\">\
-               <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">Title</span>\
+               <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{lbl_title}</span>\
                <input type=\"text\" name=\"title\" required maxlength=\"80\"\
                  style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
                  border-radius:12px;font-size:1rem\">\
              </label>\
              <label style=\"display:block;margin-bottom:.75rem\">\
-               <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">\
-               Location (optional)</span>\
+               <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{lbl_loc}</span>\
                <input type=\"text\" name=\"location\" maxlength=\"120\"\
                  style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
                  border-radius:12px;font-size:1rem\">\
              </label>\
              <label style=\"display:block;margin-bottom:.75rem\">\
-               <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">\
-               Default duration in minutes (optional)</span>\
+               <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{lbl_dur}</span>\
                <input type=\"number\" name=\"duration_minutes\" min=\"1\" max=\"1440\"\
                  style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
                  border-radius:12px;font-size:1rem\">\
@@ -154,11 +152,18 @@ pub async fn get_templates(
                style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
                border:none;border-radius:14px;font-size:1rem;font-weight:600;\
                min-height:44px;cursor:pointer\">\
-               Save template</button>\
+               {btn_save}</button>\
            </form>\
          </section>\
          </main>{nav}",
-        header = render::header_with_switcher(i18n::EN_TEMPLATES_TITLE, community_id, &community_pairs),
+        title_h1     = i18n::EN_TEMPLATES_TITLE,
+        desc         = i18n::EN_TEMPLATES_DESCRIPTION,
+        save_section_h2 = i18n::EN_TEMPLATES_SAVE_SECTION,
+        lbl_title    = i18n::EN_TEMPLATES_TITLE_LABEL,
+        lbl_loc      = i18n::EN_TEMPLATES_LOC_LABEL,
+        lbl_dur      = i18n::EN_TEMPLATES_DUR_LABEL,
+        btn_save     = i18n::EN_TEMPLATES_SAVE_BTN,
+        header       = render::header_with_switcher(i18n::EN_TEMPLATES_TITLE, community_id, &community_pairs),
         flash  = flash_html,
         empty  = empty_msg,
         list   = if list_html.is_empty() { String::new() }

@@ -189,7 +189,14 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
         return redirect("/join");
     }
 
-    // ── Atomic redemption ────────────────────────────────────────────────
+    // ── Redemption sequence ───────────────────────────────────────────────
+    // D1 via worker-rs does not support multi-statement transactions.
+    // Steps execute sequentially; partial failure (e.g. membership insert fails
+    // after user insert) leaves an orphaned users row — harmless since the user
+    // can only access communities via an active membership.
+    // The invite is marked used in step 3; if steps 1–2 fail the invite remains
+    // valid for a retry. This is acceptable: the form token prevents double-
+    // submission from the same browser session.
     // Fetch the invite to get grants_role. The code was already validated in
     // post_join; we look up by ID here to retrieve the role it confers.
     let grants_role = invite_db::find_by_id(&db, &invite_id)
@@ -321,7 +328,7 @@ fn render_join_form(token: &str, error: Option<&str>) -> Result<Response> {
         submit = i18n::EN_JOIN_SUBMIT,
         hint = i18n::EN_JOIN_CODE_HINT,
     );
-    render::page("Join", &body)
+    render::page(i18n::EN_JOIN_PAGE_TITLE, &body)
 }
 
 fn render_profile_form(
@@ -369,5 +376,5 @@ fn render_profile_form(
         token = escape_html(token),
         submit = i18n::EN_JOIN_PROFILE_SUBMIT,
     );
-    render::page("Your name", &body)
+    render::page(i18n::EN_JOIN_PROFILE_PAGE_TITLE, &body)
 }
