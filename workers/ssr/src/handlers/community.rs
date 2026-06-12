@@ -56,9 +56,11 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
 
         t if t.starts_with("events/") => {
             let (eid, sub) = split_once(&t[7..], '/');
-            if sub.is_empty() {
-                super::event::get_event_detail(req, env, rid, cid, eid, flash.as_deref(), err.as_deref()).await
-            } else { render::not_found() }
+            match sub {
+                "" => super::event::get_event_detail(req, env, rid, cid, eid, flash.as_deref(), err.as_deref()).await,
+                "my-note/delete" => super::event::get_delete_note_confirm(req, env, rid, cid, eid).await,
+                _ => render::not_found(),
+            }
         }
 
         "communities" => super::communities::get_communities(req, env, rid, cid).await,
@@ -85,6 +87,12 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
                         "cancel"     => super::admin::get_cancel_event(req, env, rid, cid, eid).await,
                         "edit"       => super::admin::get_edit_event(req, env, rid, cid, eid).await,
                         "attendance" => super::admin::get_attendance(req, env, rid, cid, eid).await,
+                        s if s.starts_with("notes/") => {
+                            let (mid, action) = split_once(&s[6..], '/');
+                            if action == "hide" {
+                                super::admin::get_admin_hide_note_confirm(req, env, rid, cid, eid, mid).await
+                            } else { render::not_found() }
+                        }
                         _ => render::not_found(),
                     }
                 }

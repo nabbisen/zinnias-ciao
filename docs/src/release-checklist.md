@@ -28,14 +28,14 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Removed members lose access on next request. *(membership.rs find_active: AND removed_at IS NULL)*
 - [x] Invite codes are single-use. *(invite.rs find_valid: AND used_at IS NULL; mark_used sets it atomically)*
 - [x] Failed invite redemptions are rate-limited. *(rate_limit.rs: 10 failures / 5-min window per IP, KV-backed)*
-- [x] Session cookies have `HttpOnly; Secure; SameSite=Strict`. *(session.rs build_session_cookie: verified in string literal)*
-- [x] Form token absent/replayed → POST rejected. *(form_token.rs consume: single-use; all POST handlers call consume)*
+- [x] Session cookies have `HttpOnly; Secure; SameSite=Strict`. Host-only by default (no `Domain` attribute unless `SESSION_COOKIE_DOMAIN` var is set). *(session.rs build_session_cookie — RFC-038)*
+- [x] Form token absent/replayed → POST rejected. Token subject is always `user_id`; consume is a single conditional UPDATE. *(form_token.rs consume — RFC-037)*
 - [x] Script tag in note/title/name renders as text (not executed). *(render.rs escape_html used at every user-content insertion; test: escape_script_tag)*
-- [x] Private page cache cleared on logout. *(sw.js PURGE_PRIVATE message; app.js sends it before logout POST)*
+- [x] Private page cache cleared on logout. *(RFC-042: authenticated HTML is never cached; only static shell assets are stored. No private cache exists to clear — the property holds trivially. PURGE_PRIVATE is retained for defence-in-depth.)*
 
 ## Offline gates
 
-- [x] Previously visited Home/Event Detail opens offline with banner. *(sw.js network-first with page cache fallback; app.js toggles `offline-banner` on `online`/`offline` events — code-verified)*
+- [x] Previously visited Home/Event Detail opens offline with banner. *(RFC-042: authenticated routes are network-only; offline navigation returns the pre-cached static `/offline` page. No stale private page is served.)*
 - [x] Unvisited page shows the offline fallback. *(sw.js `OFFLINE_URL = '/offline'`; shell assets pre-cached on install — code-verified)*
 - [x] Form submit while offline does not falsely succeed. *(sw.js: `if (req.method !== 'GET') return;` — non-GET requests bypass SW and reach network, so browser shows its own network error — code-verified via AD-1)*
 
@@ -48,6 +48,21 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Reduced-motion mode disables animations. *(app.css: `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }` — code-verified)*
 - [x] Error messages use plain language (no SQL/JWT/token/cookie). *(release_gates.rs `not_found_and_forbidden_same_message`; domain tests verify no 'sql'/'panic' in event/note error strings — automated)*
 
+## Stabilization gates (v0.23.0 — RFC-037–042)
+
+- [x] Member can set Going/No Go/Attended (form token uses `user_id` at both issue and consume — RFC-037).
+- [x] Member can delete their own note (same token-subject fix — RFC-037).
+- [x] Form-token consume is a conditional UPDATE; concurrent double-submit executes at most once (RFC-037).
+- [x] Session cookie is host-only when `SESSION_COOKIE_DOMAIN` is unset; no `Domain=localhost` fallback (RFC-038).
+- [x] All handlers use `crypto::pepper` — no divergent `env.var`/`env.secret` mix (RFC-038).
+- [x] Event create converts community-local time to UTC at write time. Tokyo admin entering 09:00 stores 00:00Z (RFC-039).
+- [x] Event edit persists date/time for single-day events; form prefills current values (RFC-040).
+- [x] Invite redemption claims the invite atomically first; a lost race aborts without creating a second member (RFC-041).
+- [x] Authenticated HTML (`/c/*`, `/`, `/join`) is never stored in the service-worker cache (RFC-042).
+- [x] `sw.js CACHE_VERSION` matches the package version. *(verify: `grep CACHE_VERSION workers/ssr/static/sw.js` matches `version` in `Cargo.toml`)*
+- [~] Admin creating 09:00 in a non-UTC community displays 09:00 after round-trip. *(staging smoke test)*
+- [~] No-JS destructive confirmations (cancel event, remove member, delete note) work without scripting. *(implementation in v0.24.0 — verify on a JS-disabled browser)*
+
 ## Operational gates
 
 - [x] `GET /healthz` returns `{"ok":true}`. *(health.rs get_health)*
@@ -55,6 +70,6 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Rollback procedure documented and understood. *(docs/src/deployment.md §Rollback: `wrangler rollback --env production`)*
 - [x] Log persistence approach documented. *(docs/src/deployment.md §Log persistence: Cloudflare Logpush to R2/S3)*
 - [ ] D1 migration applied to staging and rehearsed. *(operator task: `bun run migrate:prod` against staging env)*
-- [ ] Secrets (`HMAC_PEPPER`, `SESSION_COOKIE_DOMAIN`) set in production. *(operator task: `wrangler secret put`)*
+- [ ] Secrets (`HMAC_PEPPER`) set in production via `wrangler secret put`. `SESSION_COOKIE_DOMAIN` is a **`[vars]` binding** (not a secret) — set it per environment in `wrangler.toml`; leave unset for a host-only cookie. *(operator task — RFC-038)*
 - [ ] Logpush configured for production. *(operator task: Cloudflare dashboard)*
 - [ ] No critical open security issues. *(final security review before go-live)*

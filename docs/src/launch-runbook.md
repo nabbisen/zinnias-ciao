@@ -4,7 +4,7 @@ This document is the step-by-step operator guide for taking ciao.zinnias from a
 clean tarball to a running production deployment. It is intended to be followed
 exactly, in order, by one operator. Tick each step as you complete it.
 
-**Version this runbook was written for:** v0.21.0  
+**Version this runbook was written for:** v0.23.0  
 **Estimated time:** 60–90 minutes for a first deployment.
 
 ---
@@ -103,10 +103,18 @@ Copy the output — you will not see it again after setting it.
 ```sh
 bunx wrangler secret put HMAC_PEPPER --env staging
 # paste the pepper value when prompted
-
-bunx wrangler secret put SESSION_COOKIE_DOMAIN --env staging
-# enter the staging domain, e.g.: zinnias-ciao-stg.workers.dev
 ```
+
+`SESSION_COOKIE_DOMAIN` is **not a secret** — it is a plain `[vars]` binding (RFC-038).
+Set it in `wrangler.toml` under `[env.staging]`:
+
+```toml
+[env.staging]
+vars = { SESSION_COOKIE_DOMAIN = "zinnias-ciao-stg.workers.dev", ... }
+```
+
+Leave it unset (or set to an empty string) for a host-only cookie scoped to the
+exact deployment host. Only set it if you need cross-subdomain cookie sharing.
 
 - [ ] Done.
 
@@ -119,10 +127,17 @@ openssl rand -hex 32   # generate a new pepper — different from staging
 
 bunx wrangler secret put HMAC_PEPPER --env production
 # paste the new pepper
-
-bunx wrangler secret put SESSION_COOKIE_DOMAIN --env production
-# enter the production domain, e.g.: your-domain.com or zinnias-ciao.workers.dev
 ```
+
+Set `SESSION_COOKIE_DOMAIN` in `wrangler.toml` under `[env.production]` (same as
+staging — it is a var, not a secret):
+
+```toml
+[env.production]
+vars = { SESSION_COOKIE_DOMAIN = "your-domain.com", ... }
+```
+
+Or leave unset for a host-only cookie.
 
 - [ ] Done.
 

@@ -311,7 +311,6 @@ pub fn note_form(
     community_id: &str,
     event_id: &str,
     save_token: &str,
-    delete_token: Option<&str>,
     existing_note: Option<&str>,
     flash: Option<&str>,
 ) -> String {
@@ -323,20 +322,15 @@ pub fn note_form(
         ))
         .unwrap_or_default();
 
-    let delete_btn = if let (Some(tok), Some(_)) = (delete_token, existing_note) {
+    // The delete button navigates to a route-backed confirmation page (RFC-043).
+    // No form token needed here — the confirmation page issues its own token.
+    let delete_btn = if existing_note.is_some() {
         format!(
-            "<form method=\"post\" \
-             action=\"/c/{cid}/events/{eid}/my-note/delete\" \
-             style=\"display:inline\">\
-             <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
-             <button type=\"submit\" \
-             onclick=\"return confirm('Delete your note?')\" \
-             style=\"font-size:.875rem;color:{danger};background:none;border:none;\
-             padding:.25rem;cursor:pointer\">Delete Note</button>\
-             </form>",
+            "<a href=\"/c/{cid}/events/{eid}/my-note/delete\" \
+             style=\"display:inline-block;font-size:.875rem;color:{danger};padding:.25rem;\
+             min-height:44px;line-height:44px;text-decoration:none\">Delete Note</a>",
             cid    = escape_html(community_id),
             eid    = escape_html(event_id),
-            tok    = escape_html(tok),
             danger = CZ_COLOR_DANGER,
         )
     } else {
@@ -388,24 +382,17 @@ pub fn admin_note_hide_form(
     community_id: &str,
     event_id: &str,
     target_membership_id: &str,
-    token: &str,
+    _token: &str, // token now issued on the confirmation page (RFC-043)
 ) -> String {
+    // Navigate to the route-backed confirmation page; no JS confirm() needed.
     format!(
-        "<form method=\"post\" \
-         action=\"/c/{cid}/admin/events/{eid}/notes/{mid}/hide\" \
-         style=\"display:inline;margin-left:.5rem\">\
-         <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
-         <button type=\"submit\" \
-           onclick=\"return confirm('Remove this note?')\" \
-           style=\"font-size:.75rem;color:{danger};background:none;border:none;\
-           padding:.25rem .375rem;cursor:pointer;min-height:44px\" \
-           aria-label=\"Remove note\">\
-           Remove note</button>\
-         </form>",
+        "<a href=\"/c/{cid}/admin/events/{eid}/notes/{mid}/hide\" \
+         style=\"font-size:.75rem;color:{danger};padding:.25rem .375rem;\
+         min-height:44px;line-height:44px;display:inline-block;text-decoration:none\" \
+         aria-label=\"Remove note\">Remove note</a>",
         cid    = escape_html(community_id),
         eid    = escape_html(event_id),
         mid    = escape_html(target_membership_id),
-        tok    = escape_html(token),
         danger = CZ_COLOR_DANGER,
     )
 }

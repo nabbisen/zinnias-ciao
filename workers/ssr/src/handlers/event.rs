@@ -160,16 +160,10 @@ pub async fn get_event_detail(
         &db, &pp, &auth.user_id,
         token_purpose::SAVE_NOTE, Some(event_id),
     ).await.unwrap_or_default();
-    let delete_token = if my_note.is_some() {
-        Some(form_token::issue(
-            &db, &pp, &auth.user_id,
-            token_purpose::DELETE_NOTE, Some(event_id),
-        ).await.unwrap_or_default())
-    } else { None };
 
     let note_html = render::note_form(
         community_id, event_id,
-        &save_token, delete_token.as_deref(),
+        &save_token,
         my_note.as_ref().map(|n| n.note.as_str()),
         flash,
     );
@@ -402,6 +396,73 @@ pub async fn post_my_note(
 
     note_db::upsert(&db, event_id, &membership.membership_id, &note).await?;
     redirect(&format!("/c/{community_id}/events/{event_id}?flash=saved"))
+}
+
+// ── GET /c/:cid/events/:eid/my-note/delete ───────────────────────────────
+// No-JS confirmation page (RFC-043). The delete button in Event Detail links
+// here; the page renders a server-issued token form; POST proceeds to delete.
+
+pub async fn get_delete_note_confirm(
+    req: Request,
+    env: &Env,
+    _rid: &str,
+    community_id: &str,
+    event_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_membership(env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let pp = crate::crypto::pepper(env);
+
+    // Issue a fresh DELETE_NOTE token (the Event Detail page's token is not
+    // carried here — this is a new page with its own server-issued token).
+    let token = form_token::issue(
+        &db, &pp, &auth.user_id,
+        token_purpose::DELETE_NOTE, Some(event_id),
+    ).await.unwrap_or_default();
+
+    // Only show the confirmation if the member actually has a note.
+    let my_note = note_db::find_mine(&db, event_id, &membership.membership_id).await?;
+    if my_note.is_none() {
+        return redirect(&format!("/c/{community_id}/events/{event_id}"));
+    }
+
+    let communities = membership_db::list_communities_for_user(&db, &auth.user_id)
+        .await.unwrap_or_default();
+    let pairs: Vec<(String, String)> = communities.iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    let nav = render::bottom_nav(community_id, "home");
+
+    let body = format!(
+        "{header}\
+         <main style=\"padding:1rem 1rem 5rem\">\
+           <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">Delete note?</h1>\
+           <p style=\"font-size:.9375rem;color:#6E6E73;margin-bottom:1.5rem\">\
+             Your note will be removed. This cannot be undone.</p>\
+           <div style=\"display:flex;gap:.75rem\">\
+             <a href=\"/c/{cid}/events/{eid}\" \
+                style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
+                text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600;min-height:44px;\
+                display:flex;align-items:center;justify-content:center\">Keep note</a>\
+             <form method=\"post\" action=\"/c/{cid}/events/{eid}/my-note/delete\" style=\"flex:1\">\
+               <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
+               <button type=\"submit\" \
+                 style=\"width:100%;padding:.875rem;background:#FF3B30;color:#fff;\
+                 border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
+                 Delete note</button>\
+             </form>\
+           </div>\
+         </main>{nav}",
+        header = render::header_with_switcher("Delete note", community_id, &pairs),
+        cid    = render::escape_html(community_id),
+        eid    = render::escape_html(event_id),
+        tok    = render::escape_html(&token),
+        nav    = nav,
+    );
+    render::page("Delete note", &body)
 }
 
 // ── POST /c/:cid/events/:eid/my-note/delete ──────────────────────────────

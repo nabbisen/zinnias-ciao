@@ -2,6 +2,37 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.24.0] — 2026-06-12
+
+Completes RFC-043 (pilot UX acceptance): all destructive actions now have
+route-backed confirmation pages that work without JavaScript.
+
+### Changed
+
+- **No-JS confirmations for all destructive actions (RFC-043).** The three
+  remaining `onclick="return confirm(…)"` guards were replaced with proper
+  route-backed `GET` confirmation pages, matching the pattern already used by
+  cancel-event and remove-member:
+  - **Member delete own note:** `DELETE Note` button in Event Detail is now an
+    `<a>` link to `GET /c/:cid/events/:eid/my-note/delete`, which renders a
+    confirmation page with a server-issued `DELETE_NOTE` form token. The token
+    is no longer pre-issued during Event Detail render (one fewer D1 write per
+    page load for users who have a note).
+  - **Admin remove note:** `Remove note` link in Event Detail navigates to
+    `GET /c/:cid/admin/events/:eid/notes/:mid/hide`, which renders a
+    confirmation page with an `ADMIN_HIDE_NOTE` token.
+  - `render::note_form` signature simplified: `delete_token` parameter removed
+    (the delete button is now a plain link; no token embedded in the form).
+- **Docs and release-checklist corrections (RFC-038, RFC-042):**
+  - Release checklist offline gates updated to reflect RFC-042 (no page cache;
+    static offline fallback only).
+  - Session cookie gate updated for RFC-038 host-only default.
+  - Operational gate corrected: `SESSION_COOKIE_DOMAIN` is a `[vars]` binding,
+    not `wrangler secret put`.
+  - Launch runbook §2.2 / §2.3 corrected accordingly; version updated to v0.23.0.
+  - ROADMAP status, RFC counts, and pre-pilot checklist updated.
+- **SW `CACHE_VERSION`** updated to `v0.24.0`.
+
 ## [0.23.0] — 2026-06-12
 
 Stabilization pass addressing an external architect's deep source review.

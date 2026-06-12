@@ -2,11 +2,12 @@
 
 ## Status
 
-**v0.19.0** — 32 of 36 RFCs implemented. Passing 160 unit tests. Zero warnings.
+**v0.23.0** — 38 of 44 RFCs implemented (6 proposed). 173 passing unit tests. Zero warnings.
 
-The core product is functionally complete for pilot deployment. Remaining RFC backlog
-requires either external infrastructure (notifications), an explicit product decision
-(subgroups), or is self-healing once OIDC lands (account relinking).
+The core product has completed a deep architect review and stabilization pass
+(RFC-037–042). All P0/P1 pilot blockers are resolved. The remaining open work
+before a first pilot is: RFC-043 (no-JS destructive confirmations + device QA)
+and four operator tasks (secrets, migrations, Logpush, security review).
 
 ---
 
@@ -44,6 +45,12 @@ requires either external infrastructure (notifications), an explicit product dec
 | 032 | Event templates and quick-create | v0.16.0 |
 | 035 | Support diagnostics and user help | v0.15.0 |
 | 036 | Public release readiness | v0.15.0 |
+| 037 | Token subject normalization and form-token atomicity | v0.23.0 |
+| 038 | Session and secret binding hardening | v0.23.0 |
+| 039 | Timezone-correct event write path | v0.23.0 |
+| 040 | Event edit contract | v0.23.0 |
+| 041 | Atomic invite redemption | v0.23.0 |
+| 042 | Pilot offline and private cache contract | v0.23.0 |
 
 ---
 
@@ -57,6 +64,8 @@ requires either external infrastructure (notifications), an explicit product dec
 | 031 | Consentful contact channels | Requires notification infrastructure (RFC-021 first) |
 | 033 | Subgroups and event visibility | Needs explicit product decision on scope |
 | 034 | Notification-free quiet mode | Depends on RFC-021 notification system |
+| 043 | Pilot UX acceptance and error feedback | Error banners (v0.23.0) + no-JS confirmations (v0.24.0) done; device QA pending |
+| 044 | D1 query-budget gate and integration test harness | CI tooling; gates beta (not first pilot) |
 
 ---
 
@@ -67,7 +76,8 @@ These are the remaining gates before the first real community can use the servic
 ### Operator tasks (not in code)
 
 - [ ] Apply all 6 D1 migrations to staging; rehearse rollback.
-- [ ] Set `HMAC_PEPPER` and `SESSION_COOKIE_DOMAIN` secrets via `wrangler secret put`.
+- [ ] Set `HMAC_PEPPER` secret via `wrangler secret put` (one per environment, different values).
+- [ ] Set `SESSION_COOKIE_DOMAIN` as a **`[vars]` binding** in `wrangler.toml` (not a secret — see RFC-038; leave unset for host-only cookie).
 - [ ] Configure Logpush for production (Cloudflare dashboard → R2 or S3).
 - [ ] Run security review against the release checklist.
 
@@ -75,6 +85,7 @@ These are the remaining gates before the first real community can use the servic
 
 - [ ] Core join-and-mark-attendance flow under 2 minutes on a real phone.
 - [ ] Event Detail readable and usable at 200% system text scaling.
+- [ ] No-JS destructive confirmations work without scripting (cancel event, remove member, delete own note, admin remove note). *(implementation ships with v0.23.x; verify on a browser with scripting disabled)*
 
 ### Release gate (process)
 
