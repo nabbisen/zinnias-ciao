@@ -35,6 +35,19 @@ pub async fn get_me(
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let role_label = if membership.is_admin() { "Admin" } else { "Member" };
 
+    // RFC-035: support diagnostics
+    let app_version = env.var("BUILD_VERSION")
+        .map(|v| v.to_string()).unwrap_or_else(|_| "dev".to_owned());
+    // Short community reference (first 8 chars of community_id) for support context.
+    let support_ref = community_id.get(..8).unwrap_or(community_id);
+
+    let admin_export_html: String = if membership.is_admin() {
+        format!(
+            "<section style=\"margin-top:1.5rem\"><h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">Data</h2><a href=\"/c/{cid}/admin/export\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">Export community data</a></section>",
+            cid = render::escape_html(community_id)
+        )
+    } else { String::new() };
+
     let nav  = render::bottom_nav(community_id, "me");
     let body = format!(
         "{header}\
@@ -63,6 +76,13 @@ pub async fn get_me(
                style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;\
                min-height:44px;line-height:44px\">Calendar feed</a>\
            </section>\
+           {admin_export}\
+           <section style=\"margin-top:1.5rem\">\
+             <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
+               text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">About</h2>\
+             <p style=\"font-size:.8125rem;color:#6e6e73;margin:0\">Version {version}</p>\
+             <p style=\"font-size:.8125rem;color:#6e6e73;margin:.25rem 0 0\">Ref: {ref_code}</p>\
+           </section>\
            <form method=\"post\" action=\"/logout\" style=\"margin-top:2rem\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
              <button type=\"submit\" \
@@ -82,6 +102,9 @@ pub async fn get_me(
         lbl_help      = i18n::EN_ME_SECTION_HELP,
         help_body     = i18n::EN_ME_HELP_BODY,
         lbl_logout    = i18n::EN_LOGOUT,
+        version       = render::escape_html(&app_version),
+        ref_code      = render::escape_html(support_ref),
+        admin_export  = admin_export_html,
         tok           = render::escape_html(&logout_token),
         nav       = nav,
     );

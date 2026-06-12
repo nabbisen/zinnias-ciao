@@ -26,10 +26,13 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 018 | [Time-Zone and Event Cutoff Policy](./done/018-timezone-and-event-cutoff-policy.md) | v0.7.0 |
 | 019 | [Retention, Soft Delete, and Data Lifecycle](./done/019-retention-soft-delete-and-data-lifecycle.md) | v0.4.0 |
 | 023 | [Optional Calendar Export and ICS Interop](./done/023-optional-calendar-export-and-ics-interop.md) | v0.10.0 |
+| 027 | [Import, Export, Human-Readable Backup, and Data Portability](./done/027-import-export-human-readable-backup-and-data-portability.md) | v0.15.0 |
 | 028 | [Backup, Restore, and Disaster Recovery Operations](./done/028-backup-restore-and-disaster-recovery-operations.md) | v0.14.0 |
+| 035 | [Support, Diagnostics, and User Help Without Data Leakage](./done/035-support-diagnostics-and-user-help-without-data-leakage.md) | v0.15.0 |
 | 029 | [Scalability and Query Performance Discipline](./done/029-scalability-and-query-performance-discipline.md) | v0.12.0 |
 | 025 | [Community Moderation, Abuse Response, and Member Safety](./done/025-community-moderation-abuse-response-and-member-safety.md) | v0.13.0 |
 | 030 | [Admin Onboarding, First Community Setup, and Empty States](./done/030-admin-onboarding-first-community-setup-and-empty-states.md) | v0.14.0 |
+| 036 | [Public Release Readiness, Security Review, and Launch Runbook](./done/036-public-release-readiness-security-review-and-launch-runbook.md) | v0.15.0 |
 | 026 | [Multi-Language and Plain-Language Localization](./done/026-multi-language-and-plain-language-localization.md) | v0.10.0 — EN/JA table complete; per-community lang selection deferred |
 
 ## Also Done
@@ -51,13 +54,10 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 021 | Post-MVP Notification Strategy and Reminder Digests | [./proposed/021-post-mvp-notification-strategy-and-reminder-digests.md](./proposed/021-post-mvp-notification-strategy-and-reminder-digests.md) |
 | 022 | Recurring Events and Event Series | [./proposed/022-recurring-events-and-event-series.md](./proposed/022-recurring-events-and-event-series.md) |
 | 024 | Display Name Recovery and Admin-Mediated Account Relinking | [./proposed/024-display-name-recovery-and-admin-mediated-account-relinking.md](./proposed/024-display-name-recovery-and-admin-mediated-account-relinking.md) |
-| 027 | Import, Export, Human-Readable Backup, and Data Portability | [./proposed/027-import-export-human-readable-backup-and-data-portability.md](./proposed/027-import-export-human-readable-backup-and-data-portability.md) |
 | 031 | Consentful Contact Channels and Privacy-Safe Messaging | [./proposed/031-consentful-contact-channels-and-privacy-safe-messaging.md](./proposed/031-consentful-contact-channels-and-privacy-safe-messaging.md) |
 | 032 | Event Templates and Quick Create for Non-Technical Admins | [./proposed/032-event-templates-and-quick-create-for-non-technical-admins.md](./proposed/032-event-templates-and-quick-create-for-non-technical-admins.md) |
 | 033 | Subgroups, Event Visibility, and Boundary Safety | [./proposed/033-subgroups-event-visibility-and-boundary-safety.md](./proposed/033-subgroups-event-visibility-and-boundary-safety.md) |
 | 034 | Notification-Free Quiet Mode and Attention Design | [./proposed/034-notification-free-quiet-mode-and-attention-design.md](./proposed/034-notification-free-quiet-mode-and-attention-design.md) |
-| 035 | Support, Diagnostics, and User Help Without Data Leakage | [./proposed/035-support-diagnostics-and-user-help-without-data-leakage.md](./proposed/035-support-diagnostics-and-user-help-without-data-leakage.md) |
-| 036 | Public Release Readiness, Security Review, and Launch Runbook | [./proposed/036-public-release-readiness-security-review-and-launch-runbook.md](./proposed/036-public-release-readiness-security-review-and-launch-runbook.md) |
 
 ## Archive
 

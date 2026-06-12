@@ -2,6 +2,40 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.15.0] — 2026-06-12
+
+### Added
+
+- **RFC-027 — Admin community data export.**
+  - New routes: `GET /c/:cid/admin/export` (landing page) and
+    `GET /c/:cid/admin/export/json?token=…` (authenticated JSON download).
+  - `handlers/export.rs`: export landing page shows community summary (event
+    and member count) and a single-use download link. JSON download validates a
+    `COMMUNITY_EXPORT` form token (single-use, 5-minute TTL), builds the payload,
+    audits the export action, and returns `Content-Disposition: attachment` with
+    `Cache-Control: no-store, private`.
+  - Export payload (v1): `community` metadata, `members` list (id, display name,
+    role, joined date, removed flag), `events` with days, per-day attendance
+    (member name + status), and visible notes (member name + text). Admin-hidden
+    and member-deleted notes are excluded. Session tokens, invite HMACs, and the
+    HMAC pepper are never included.
+  - `contracts/src/auth.rs`: `COMMUNITY_EXPORT` token purpose.
+  - Token uniqueness tests updated (15 total purposes).
+  - RFC-027 moved to `rfcs/done/` (v0.15.0).
+
+- **RFC-035 — Support diagnostics in Me page.**
+  - Me page now shows an "About" section with app version (`BUILD_VERSION` env var)
+    and a short community reference code (first 8 chars of community ID) for use
+    in support communication.
+  - Admin Me page now shows an "Export community data" link under a "Data" section.
+  - RFC-035 moved to `rfcs/done/` (v0.15.0).
+
+- **RFC-036 — Public release readiness (formalised).**
+  The launch runbook, backup/recovery doc, and release checklist collectively
+  satisfy RFC-036's goals (release criteria, security review checkpoint, rollback
+  procedure). No new code is needed beyond what has already shipped.
+  RFC-036 moved to `rfcs/done/` (v0.15.0).
+
 ## [0.14.0] — 2026-06-12
 
 ### Added

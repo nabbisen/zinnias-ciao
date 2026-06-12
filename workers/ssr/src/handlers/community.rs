@@ -51,6 +51,8 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
                 }
                 "invites" => super::admin::get_invites(req, env, rid, cid).await,
                 "members" => super::admin::get_members(req, env, rid, cid).await,
+                "export" => super::export::get_export_page(req, env, rid, cid).await,
+                "export/json" => super::export::get_export_json(req, env, rid, cid).await,
                 t if t.starts_with("members/") => {
                     let (mid, sub) = split_once(&t[8..], '/');
                     if sub == "remove" {

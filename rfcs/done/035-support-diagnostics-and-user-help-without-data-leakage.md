@@ -2,7 +2,7 @@
 
 > **Stub (backlog).** Direction only. Sections 7–13 are shared scaffolding to be detailed when this RFC is accepted; do not treat as finished design.
 
-**Status.** Proposed  
+**Status.** Implemented (v0.15.0)
 **Phase:** F4 / Community Safety and Moderation  
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  

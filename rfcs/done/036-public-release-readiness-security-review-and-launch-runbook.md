@@ -1,8 +1,8 @@
-# RFC 027 — Import, Export, Human-Readable Backup, and Data Portability
+# RFC 036 — Public Release Readiness, Security Review, and Launch Runbook
 
 > **Stub (backlog).** Direction only. Sections 7–13 are shared scaffolding to be detailed when this RFC is accepted; do not treat as finished design.
 
-**Status.** Proposed  
+**Status.** Implemented (v0.15.0)
 **Phase:** F6 / Data Stewardship and Operations  
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  
@@ -12,7 +12,7 @@
 
 ## 1. Summary
 
-This RFC defines data export and portability. Even a small community service should let administrators preserve essential records in a comprehensible form.
+This RFC defines the final release-readiness process before public or broader production use. It turns engineering completion into an explicit launch decision.
 
 ---
 
@@ -24,19 +24,19 @@ The first release of ciao.zinnias must stay small and trustworthy. However, impl
 
 ## 3. Goals
 
-- Allow admins to export community data in human-readable formats.
-- Separate operational backup from user-facing export.
-- Avoid exporting session secrets, invite secrets, or private technical logs.
-- Make export behavior predictable and auditable.
+- Define release candidate criteria.
+- Require security, privacy, accessibility, and usability review.
+- Define rollback and incident communication procedure.
+- Prevent accidental launch without owner confirmation.
 
 ---
 
 ## 4. Non-Goals
 
-- No full analytics dashboard.
-- No bulk import from arbitrary calendar systems in this RFC.
-- No export of hidden/deleted content except in admin/legal archive mode.
-- No self-service member export beyond membership-scoped data unless designed separately.
+- No marketing launch plan.
+- No paid plan/billing scope.
+- No automatic production promotion from CI without human approval.
+- No relaxing MVP release gates for schedule pressure.
 
 ---
 
@@ -44,10 +44,10 @@ The first release of ciao.zinnias must stay small and trustworthy. However, impl
 
 | Scenario | Required behavior |
 |---|---|
-| Community export | Admin downloads events, attendance, and notes for their community. |
-| Member-safe export | Export labels former/deleted members appropriately. |
-| Audit record | Export action is logged. |
-| Redacted export | Sensitive operational details are omitted. |
+| Release candidate | Team tags a candidate and deploys to staging. |
+| Review checklist | Security/a11y/usability/ops checks are completed. |
+| Go/no-go | Project owner approves production launch explicitly. |
+| Rollback | Operator can revert to previous version and database state policy is known. |
 
 The visible language must remain plain and calm. The user should understand what happened, what they can do next, and whether the action is optional.
 
@@ -55,7 +55,7 @@ The visible language must remain plain and calm. The user should understand what
 
 ## 6. Internal Design
 
-Create an export service that reads canonical data and emits structured JSON plus optional CSV summaries. The export should include community metadata, active members, events, participation statuses, visible notes, cancellation state, and timestamps. It must exclude session tokens, invite code hashes, internal mutation IDs unless needed for support, and raw logs. Exports should be generated on demand with authorization and rate limits.
+Create a launch runbook with environment versions, migration status, known limitations, rollback steps, monitoring checks, contact points, and go/no-go signoff. Release candidates should freeze schema migrations unless a blocker fix is required. Production launch must require explicit confirmation by the project owner. Post-launch, collect pilot feedback without enabling invasive analytics.
 
 Implementation should be behind an explicit feature gate, migration step, or product decision. No future RFC may silently change MVP behavior.
 
@@ -81,10 +81,10 @@ APIs must expose stable error codes and avoid English-only backend messages. UI 
 
 ## 9. Security, Privacy, and Safety
 
-- Exports contain personal data and must be treated as sensitive downloads.
-- Only admins should export whole-community data.
-- Export links should expire quickly if asynchronous export is introduced.
-- Redaction rules must be tested.
+- Security review must include community isolation tests.
+- Privacy review must check exports, logs, cache, and support diagnostics.
+- Accessibility review must include large text and reduced motion.
+- Rollback must not silently lose accepted user mutations without documented decision.
 
 ---
 

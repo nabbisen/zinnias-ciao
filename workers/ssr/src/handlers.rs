@@ -4,6 +4,7 @@ pub mod calendar;
 pub mod communities;
 pub mod community;
 pub mod event;
+pub mod export;
 pub mod health;
 pub mod home;
 pub mod join;
