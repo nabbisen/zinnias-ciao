@@ -91,19 +91,14 @@ pub fn page(title: &str, body: &str) -> Result<Response> {
 
 /// Escape a string for safe HTML text node insertion (RFC-012 / RFC-007).
 /// This is the single escape function used everywhere — never emit raw user text.
+/// Escape a string for safe insertion into HTML text or attribute values.
+///
+/// This is the single authoritative HTML escape path (XSS prevention, RFC-013 §8).
+/// The implementation lives in `zinnias_ciao_contracts::html::escape_html` where
+/// it can be unit-tested natively. Every user-generated string on a page must
+/// pass through this function.
 pub fn escape_html(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 16);
-    for c in s.chars() {
-        match c {
-            '&'  => out.push_str("&amp;"),
-            '<'  => out.push_str("&lt;"),
-            '>'  => out.push_str("&gt;"),
-            '"'  => out.push_str("&quot;"),
-            '\'' => out.push_str("&#x27;"),
-            other => out.push(other),
-        }
-    }
-    out
+    zinnias_ciao_contracts::html::escape_html(s)
 }
 
 // ── Navigation shell ──────────────────────────────────────────────────────

@@ -2,6 +2,30 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.28.0] — 2026-06-12
+
+Release-gate hardening: full i18n parity coverage, tested XSS escape boundary.
+
+### Testing / release gates
+
+- **i18n parity gate expanded from 9 to 120 pairs.** The `i18n_en_ja_parity_count`
+  test in `release_gates.rs` now covers every `EN_*`/`JA_*` constant in
+  `i18n.rs`. Previously only 9 of 120 pairs were spot-checked; a JA string
+  going empty or missing would have silently shipped. The gate now also asserts
+  `en != ja` (catches copy-paste where a JA string was accidentally set to the
+  EN value), with a whitelist for the one intentionally-identical pair
+  (`ciao.zinnias` product name). The gate was verified to catch a deliberate
+  regression (temporarily emptying `JA_LOGOUT`).
+- **`escape_html` moved to tested `contracts::html` module.** Previously the
+  function lived in `workers/ssr/src/render.rs` (a `cdylib` crate, not natively
+  runnable), making it impossible to unit-test. The authoritative implementation
+  is now in `packages/contracts/src/html.rs` with 10 unit tests: plain text,
+  each of the five escaped characters, an XSS vector, an attribute-injection
+  vector, the combined `&<>"'` case, Japanese text preservation, and a
+  multi-byte/special mix. `render::escape_html` now delegates to the contracts
+  implementation so every production call exercises exactly the tested code path.
+- **194 passing** (was 184): +10 from escape_html tests. Zero warnings.
+
 ## [0.27.0] — 2026-06-12
 
 Handoff-review remediation: source verification, event-bound token, Japanese

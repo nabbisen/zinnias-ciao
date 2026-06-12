@@ -2,20 +2,18 @@
 
 ## Status
 
-**v0.27.0** — 39 of 47 RFCs implemented (8 proposed). 184 passing unit tests. Zero warnings.
+**v0.28.0** — 39 of 47 RFCs implemented (8 proposed). 194 passing unit tests. Zero warnings.
 
-The core product has completed two architect reviews (deep source review + handoff
-review), a stabilization pass (RFC-037–043, RFC-046, RFC-047), a query-performance
-pass (RFC-029/RFC-044), and release-gate hardening. The v0.26.0 handoff review's §8
-**source-verification checklist is fully discharged** (RFC-045 §5): all 11 source
-claims confirmed against code. The event-bound status token (RFC-046) removed the
-last hot-path loop write; Japanese date presentation (RFC-047) shipped; audit
-coverage now includes logout and calendar-token events.
+The core product has completed two architect reviews, stabilization passes
+(RFC-037–043, RFC-046, RFC-047), query-performance work, and release-gate
+hardening. The v0.26.0 handoff review's §8 source-verification checklist is
+fully discharged. Release gates now cover: session TTL, token uniqueness,
+SW/package version alignment, D1 query budgets, full 120-pair i18n parity
+(catches empty JA strings and copy-paste), and a tested XSS escape boundary.
 
-The remaining work before a production pilot is the **staging-runtime verification**
-half of RFC-045 §6 — deploy to Cloudflare staging, timezone round-trip, and the
-concurrent invite/token race tests — which requires a deployed environment, plus
-human usability QA. These cannot be done in-repo.
+The remaining work before a production pilot is the staging-runtime half of
+RFC-045 §6 (Cloudflare staging deployment, timezone round-trip, concurrent
+race tests) plus human usability QA.
 
 ---
 

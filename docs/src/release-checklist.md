@@ -63,6 +63,18 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [~] Admin creating 09:00 in a non-UTC community displays 09:00 after round-trip. *(staging smoke test)*
 - [~] No-JS destructive confirmations (cancel event, remove member, delete note) work without scripting. *(implementation in v0.24.0 — verify on a JS-disabled browser)*
 
+## Stabilization gates (v0.27.0 — RFC-045–047 + i18n/XSS hardening)
+
+- [x] All 11 source-verification claims from architect handoff review §8 confirmed against code (RFC-045 §5 — see HANDOFF.md §5).
+- [x] `SET_STATUS` token issued once per Event Detail render, bound to `event_id`; day validated via days_for_event lookup (RFC-046).
+- [x] Day labels render in Japanese convention (`6月14日（土）`); no English month abbreviation (RFC-047).
+- [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
+- [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
+- [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
+- [x] i18n parity test covers all 120 EN/JA string pairs (expanded from 9); catches empty strings and copy-paste errors.
+- [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
+- [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
+
 ## Operational gates
 
 - [x] `GET /healthz` returns `{"ok":true}`. *(health.rs get_health)*
