@@ -110,7 +110,7 @@ const statements = [
   `INSERT OR IGNORE INTO communities (id, name, timezone, is_active, created_at) VALUES ('${COMMUNITY_ID}', '${esc(communityName)}', 'Asia/Tokyo', 1, '${now}')`,
   `INSERT OR IGNORE INTO users (id, created_at) VALUES ('${USER_ID}', '${now}')`,
   `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${MEMBERSHIP_ID}', '${COMMUNITY_ID}', '${USER_ID}', 'admin', '${esc(adminName)}', '${now}')`,
-  `INSERT OR IGNORE INTO invite_codes (id, community_id, code_hmac, created_by_membership_id, expires_at, created_at) VALUES ('${INVITE_ID}', '${COMMUNITY_ID}', '${codeHmac}', '${MEMBERSHIP_ID}', '${INVITE_EXPIRES}', '${now}')`,
+  `INSERT OR IGNORE INTO invite_codes (id, community_id, code_hmac, created_by_membership_id, expires_at, grants_role, created_at) VALUES ('${INVITE_ID}', '${COMMUNITY_ID}', '${codeHmac}', '${MEMBERSHIP_ID}', '${INVITE_EXPIRES}', 'admin', '${now}')`,
 ];
 
 for (const stmt of statements) {

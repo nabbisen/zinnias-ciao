@@ -2,7 +2,7 @@
 
 use worker::{Env, Request, Response, Result};
 
-use crate::db::{self, membership as membership_db};
+use crate::db::membership as membership_db;
 use crate::render;
 use crate::session::require_auth;
 
@@ -17,40 +17,75 @@ pub async fn get_communities(
         Err(_) => return render::session_expired(),
     };
     let db = env.d1("DB")?;
+
+    // list_communities_for_user gives both community_id and community_name.
+    let summaries = membership_db::list_communities_for_user(&db, &auth.user_id).await?;
+
+    // We also need roles — fetch memberships for the role check.
     let memberships = membership_db::list_active_for_user(&db, &auth.user_id).await?;
+    let role_map: std::collections::HashMap<&str, &str> = memberships.iter()
+        .map(|m| (m.community_id.as_str(), m.role.as_str()))
+        .collect();
 
-    let current = memberships.iter().find(|m| m.community_id == community_id);
-    let current_name = if let Some(m) = current {
-        db::community::find_active(&db, &m.community_id).await?
-            .map(|c| c.name).unwrap_or_default()
-    } else { String::new() };
+    let current_name = summaries.iter()
+        .find(|s| s.community_id == community_id)
+        .map(|s| s.community_name.as_str())
+        .unwrap_or("");
 
-    let rows: String = memberships.iter().map(|m| {
-        let is_current = m.community_id == community_id;
-        let role_label = if m.role == "admin" { "Admin" } else { "Member" };
+    let rows: String = summaries.iter().map(|s| {
+        let is_current = s.community_id == community_id;
+        let role = role_map.get(s.community_id.as_str()).copied().unwrap_or("member");
+        let is_admin = role == "admin";
+        let role_label = if is_admin { "Admin" } else { "Member" };
+
         let current_badge = if is_current {
             "<span style=\"font-size:.75rem;background:#007AFF;color:#fff;\
              border-radius:99px;padding:.125rem .5rem;margin-left:.5rem\">Current</span>"
         } else { "" };
-        let cname = ""; // we'd fetch per community — kept simple here
+
+        // Admin management links — shown only for communities where user is admin.
+        let admin_links = if is_admin {
+            format!(
+                "<div style=\"display:flex;gap:1rem;margin-top:.5rem\">\
+                   <a href=\"/c/{cid}/admin/invites\" \
+                      style=\"font-size:.8125rem;color:#007AFF;text-decoration:none\">\
+                      Invite members</a>\
+                   <a href=\"/c/{cid}/admin/members\" \
+                      style=\"font-size:.8125rem;color:#007AFF;text-decoration:none\">\
+                      Manage members</a>\
+                 </div>",
+                cid = render::escape_html(&s.community_id),
+            )
+        } else {
+            String::new()
+        };
+
         format!(
-            "<li>\
-             <a href=\"/c/{cid}/home\" \
-                style=\"display:flex;align-items:center;justify-content:space-between;\
-                padding:.875rem 0;border-bottom:1px solid #f5f5f7;text-decoration:none;color:inherit\">\
-               <span>\
-                 <span style=\"font-size:1rem;font-weight:{w}\">{cid_display}{badge}</span><br>\
-                 <span style=\"font-size:.8125rem;color:#6e6e73\">{role}</span>\
-               </span>\
-               <span style=\"color:#c7c7cc;font-size:1.25rem\">\u{203A}</span>\
-             </a></li>",
-            cid         = render::escape_html(&m.community_id),
-            cid_display = render::escape_html(&m.community_id), // replaced by name when fetched
+            "<li style=\"padding:.875rem 0;border-bottom:1px solid #f5f5f7\">\
+               <a href=\"/c/{cid}/home\" \
+                  style=\"display:flex;align-items:center;justify-content:space-between;\
+                  text-decoration:none;color:inherit\">\
+                 <span>\
+                   <span style=\"font-size:1rem;font-weight:{w}\">{name}{badge}</span><br>\
+                   <span style=\"font-size:.8125rem;color:#6e6e73\">{role}</span>\
+                 </span>\
+                 <span style=\"color:#c7c7cc;font-size:1.25rem\">\u{203A}</span>\
+               </a>\
+               {admin_links}\
+             </li>",
+            cid         = render::escape_html(&s.community_id),
+            name        = render::escape_html(&s.community_name),
             badge       = current_badge,
             role        = role_label,
             w           = if is_current { "600" } else { "400" },
+            admin_links = admin_links,
         )
     }).collect();
+
+    // Header uses list_communities_for_user result as switcher pairs.
+    let community_pairs: Vec<(String, String)> = summaries.iter()
+        .map(|s| (s.community_id.clone(), s.community_name.clone()))
+        .collect();
 
     let nav  = render::bottom_nav(community_id, "communities");
     let body = format!(
@@ -63,7 +98,7 @@ pub async fn get_communities(
               color:#007AFF;text-decoration:none;font-weight:600\">\
               Join another community</a>\
          </main>{nav}",
-        header = render::header("Communities", &current_name),
+        header = render::header_with_switcher("Communities", community_id, &community_pairs),
         rows   = rows,
         nav    = nav,
     );

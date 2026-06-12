@@ -1,7 +1,7 @@
 //! Security tests for domain-level validation (RFC-012 / RFC-015).
 //! Tests that require contracts live in packages/contracts/tests/release_gates.rs.
 
-use zinnias_ciao_domain::{validate_note, validate_display_name, validate_invite_input};
+use zinnias_ciao_domain::{validate_note, validate_display_name};
 
 #[test]
 fn xss_script_tag_passes_validation() {

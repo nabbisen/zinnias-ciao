@@ -117,13 +117,38 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
 
     let nav = render::bottom_nav(community_id, "home");
+
+    let admin_shortcuts = if membership.is_admin() {
+        format!(
+            "<div style=\"display:flex;gap:.75rem;margin-bottom:1.25rem\">\
+               <a href=\"/c/{cid}/admin/events/new\" \
+                  style=\"flex:1;padding:.75rem;background:#007AFF;color:#fff;\
+                  border-radius:14px;font-size:.9375rem;font-weight:600;\
+                  text-align:center;text-decoration:none;min-height:44px;\
+                  display:flex;align-items:center;justify-content:center\">\
+                  + Create event</a>\
+               <a href=\"/c/{cid}/admin/invites\" \
+                  style=\"flex:1;padding:.75rem;background:#F5F5F7;color:#1D1D1F;\
+                  border-radius:14px;font-size:.9375rem;font-weight:600;\
+                  text-align:center;text-decoration:none;min-height:44px;\
+                  display:flex;align-items:center;justify-content:center\">\
+                  Invite members</a>\
+             </div>",
+            cid = render::escape_html(community_id),
+        )
+    } else {
+        String::new()
+    };
+
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
+           {shortcuts}\
            {today}{thisweek}{later}{empty}\
          </main>\
          {nav}",
-        header   = render::header_with_switcher("Home", community_id, &_community_pairs),
+        header    = render::header_with_switcher("Home", community_id, &_community_pairs),
+        shortcuts = admin_shortcuts,
         today    = section("Today", &today_cards),
         thisweek = section("This Week", &thisweek_cards),
         later    = section("Later", &later_cards),

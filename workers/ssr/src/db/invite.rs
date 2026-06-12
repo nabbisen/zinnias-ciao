@@ -10,6 +10,8 @@ use worker::{D1Database, Result};
 pub struct InviteRow {
     pub id: String,
     pub community_id: String,
+    /// Role to grant the joining user — 'admin' or 'member'.
+    pub grants_role: String,
     /// Whether the code has already been used or revoked or is expired
     pub is_valid: bool,
 }
@@ -20,7 +22,7 @@ pub async fn find_valid(db: &D1Database, code_hmac: &str) -> Result<Option<Invit
     let now = now_utc();
     let row = db
         .prepare(
-            "SELECT id, community_id \
+            "SELECT id, community_id, grants_role \
              FROM invite_codes \
              WHERE code_hmac = ?1 \
                AND used_at IS NULL \
@@ -34,8 +36,42 @@ pub async fn find_valid(db: &D1Database, code_hmac: &str) -> Result<Option<Invit
 
     Ok(row.and_then(|v| {
         Some(InviteRow {
-            id: v.get("id")?.as_str()?.to_owned(),
+            id:           v.get("id")?.as_str()?.to_owned(),
             community_id: v.get("community_id")?.as_str()?.to_owned(),
+            grants_role:  v.get("grants_role")
+                           .and_then(|x| x.as_str())
+                           .unwrap_or("member")
+                           .to_owned(),
+            is_valid: true,
+        })
+    }))
+}
+
+/// Look up an invite code by its ID to retrieve grants_role at redemption time.
+/// Used by post_profile after the ticket is validated — the HMAC check already
+/// happened in post_join; here we just need the role the code confers.
+pub async fn find_by_id(db: &D1Database, invite_id: &str) -> Result<Option<InviteRow>> {
+    let row = db
+        .prepare(
+            "SELECT id, community_id, grants_role \
+             FROM invite_codes \
+             WHERE id = ?1 \
+               AND used_at IS NULL \
+               AND revoked_at IS NULL \
+             LIMIT 1",
+        )
+        .bind(&[invite_id.into()])?
+        .first::<serde_json::Value>(None)
+        .await?;
+
+    Ok(row.and_then(|v| {
+        Some(InviteRow {
+            id:           v.get("id")?.as_str()?.to_owned(),
+            community_id: v.get("community_id")?.as_str()?.to_owned(),
+            grants_role:  v.get("grants_role")
+                           .and_then(|x| x.as_str())
+                           .unwrap_or("member")
+                           .to_owned(),
             is_valid: true,
         })
     }))
@@ -63,12 +99,13 @@ pub async fn insert(
     code_hmac: &str,
     created_by_membership_id: &str,
     expires_at: &str,
+    grants_role: &str,
 ) -> Result<()> {
     let now = now_utc();
     db.prepare(
         "INSERT INTO invite_codes \
-         (id, community_id, code_hmac, created_by_membership_id, expires_at, created_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+         (id, community_id, code_hmac, created_by_membership_id, expires_at, grants_role, created_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )
     .bind(&[
         id.into(),
@@ -76,6 +113,7 @@ pub async fn insert(
         code_hmac.into(),
         created_by_membership_id.into(),
         expires_at.into(),
+        grants_role.into(),
         now.as_str().into(),
     ])?
     .run()

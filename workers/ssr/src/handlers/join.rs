@@ -191,18 +191,27 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
     }
 
     // ── Atomic redemption ────────────────────────────────────────────────
+    // Fetch the invite to get grants_role. The code was already validated in
+    // post_join; we look up by ID here to retrieve the role it confers.
+    let grants_role = invite_db::find_by_id(&db, &invite_id)
+        .await?
+        .map(|inv| inv.grants_role)
+        .unwrap_or_else(|| "member".to_owned());
+
     // 1. Create user (if new)
     let user_id = random_token();
     membership_db::insert_user(&db, &user_id).await?;
 
-    // 2. Create membership
+    // 2. Create membership — role comes from the invite code, not hardcoded.
+    //    setup.mjs seeds the bootstrap invite with grants_role='admin'.
+    //    Admin-generated invites for new members use grants_role='member' (default).
     let membership_id = random_token();
     membership_db::insert_membership(
         &db,
         &membership_id,
         &community_id,
         &user_id,
-        "member",
+        &grants_role,
         &display_name,
     )
     .await?;

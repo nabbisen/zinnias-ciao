@@ -1,24 +1,44 @@
 /* ciao.zinnias — base styles
  * Design tokens use the --cz- prefix (RFC-011 §5).
- * Token names map 1-to-1 with the JSON token file (RFC-020 future).
+ * Token names map 1-to-1 with the JSON token file (RFC-020 v1.2).
  */
 *, *::before, *::after { box-sizing: border-box; }
 
 :root {
-  /* Colour tokens */
+  /* Colour tokens — base palette */
   --cz-color-bg:             #FFFFFF;
   --cz-color-surface:        #F5F5F7;
   --cz-color-surface-strong: #E5E5EA;
   --cz-color-text-primary:   #1D1D1F;
   --cz-color-text-secondary: #6E6E73;
   --cz-color-text-muted:     #86868B;
-  --cz-color-going:          #007AFF;
-  --cz-color-not-going:      #FF3B30;
-  --cz-color-attended:       #34C759;
-  --cz-color-no-answer:      #8E8E93;
   --cz-color-warning:        #FF9500;
   --cz-color-danger:         #FF3B30;
   --cz-color-focus:          #007AFF;
+
+  /* Status triplets (RFC-020 v1.2 §E) — fg passes WCAG AA on white and on its own bg.
+   * Use -fg for text/icons, -bg for surface fills, -border for outlines.
+   * The raw -going/-not-going/-attended/-no-answer vars below are kept only
+   * for decorative fills (avatar rings, progress tints) where AA on white is
+   * not required. */
+  --cz-status-going-fg:        #005BBB;  /* 5.0:1 on white */
+  --cz-status-going-bg:        #EAF3FF;
+  --cz-status-going-border:    #007AFF;
+  --cz-status-not-going-fg:    #B42318;  /* 5.9:1 on white */
+  --cz-status-not-going-bg:    #FFF0EF;
+  --cz-status-not-going-border:#FF3B30;
+  --cz-status-attended-fg:     #167A34;  /* 4.7:1 on white */
+  --cz-status-attended-bg:     #EDFAF0;
+  --cz-status-attended-border: #34C759;
+  --cz-status-no-answer-fg:    #6E6E73;  /* 4.5:1 on white */
+  --cz-status-no-answer-bg:    #F5F5F7;
+  --cz-status-no-answer-border:#D1D1D6;
+
+  /* Raw status colors — decorative use only (avatar rings, tints) */
+  --cz-color-going:     #007AFF;
+  --cz-color-not-going: #FF3B30;
+  --cz-color-attended:  #34C759;
+  --cz-color-no-answer: #8E8E93;
 
   /* Spacing tokens */
   --cz-space-1: 4px;

@@ -1,7 +1,7 @@
 //! Release-gate checks (RFC-015).
 //! Every item here maps to a row in the MVP release-gate matrix.
 
-use zinnias_ciao_contracts::{AppError, ErrorCode, SESSION_TTL_SECONDS, FORM_TOKEN_TTL_SECONDS};
+use zinnias_ciao_contracts::{AppError, SESSION_TTL_SECONDS, FORM_TOKEN_TTL_SECONDS};
 use zinnias_ciao_contracts::auth::token_purpose;
 
 // ── Session / auth gates ──────────────────────────────────────────────────
@@ -70,7 +70,10 @@ fn all_state_changing_routes_have_token_purpose() {
         token_purpose::SAVE_NOTE,
         token_purpose::DELETE_NOTE,
         token_purpose::CREATE_EVENT,
+        token_purpose::EDIT_EVENT,
         token_purpose::CANCEL_EVENT,
+        token_purpose::ATTENDANCE_OVERRIDE,
+        token_purpose::ADMIN_HIDE_NOTE,
         token_purpose::REDEEM_INVITE,
         token_purpose::JOIN_PROFILE,
         token_purpose::LOGOUT,

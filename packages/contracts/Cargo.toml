@@ -15,3 +15,12 @@ thiserror  = { workspace = true }
 
 [dev-dependencies]
 # nothing extra
+
+[[test]]
+name = "release_gates"
+
+[[test]]
+name = "session_regression"
+
+[[test]]
+name = "token_and_color_regression"

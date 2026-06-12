@@ -2,6 +2,73 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+# Changelog
+
+All notable changes to ciao.zinnias are documented here.
+
+## [0.6.0] — 2026-06-12
+
+### Added
+
+- **RFC-020 v1.2 — Status token triplets and WCAG AA fix.**
+  - `app.css`: status triplet CSS variables (`--cz-status-{going,not-going,attended,no-answer}-{fg,bg,border}`).
+    Raw `--cz-color-*` retained for decorative fills only.
+  - `render.rs`: `CZ_STATUS_*` Rust consts mirror the CSS vars 1:1. `status_display` returns
+    AA-passing foreground values. New `status_triplet` helper returns `(fg, bg, border)`.
+  - `render::status_form`: buttons use triplet bg/border; selected state no longer inverts to
+    `#FFFFFF` text on a raw iOS color (which failed AA for all three status colors).
+  - `render::note_form`: flash uses AA-passing green; added "Community members can see this note."
+    visibility disclosure (RFC-020 §19.3).
+  - New `render::admin_note_hide_form`: scoped remove-note form for admin moderation.
+
+- **RFC-020 v1.2 — Three scheduled admin handlers (decision 3).**
+  - `get_edit_event` / `post_edit_event`: edit title/location/description on a scheduled event.
+  - `get_attendance` / `post_attendance`: per-member attendance-correction screen distinct from
+    admin's own status (RFC-020 §18.7). Batch `<select>` per member per day.
+  - `post_admin_hide_note`: soft-hide any member's note without copying body to audit (RFC-014).
+  - Two new token purposes: `ATTENDANCE_OVERRIDE`, `ADMIN_HIDE_NOTE`.
+  - Routes wired: GET/POST `…/admin/events/:eid/edit`, `…/admin/events/:eid/attendance`,
+    POST `…/admin/events/:eid/notes/:mid/hide`.
+
+- **Tests — 9 new contracts tests (`token_and_color_regression.rs`).**
+  - WCAG AA contrast verified via computed relative-luminance for all four status fg values.
+  - Negative test confirms old iOS colors fail AA on text (proving the fix was necessary).
+  - Token-purpose uniqueness guard across all 11 purpose strings.
+
+- **`migrations/0003_invite_grants_role.sql`**: adds `grants_role TEXT NOT NULL DEFAULT 'member'`
+  to `invite_codes` (CHECK: `'admin'` or `'member'`). Enables the setup bootstrap invite to
+  grant admin role on first sign-in; admin-generated invites continue to grant member role.
+
+### Fixed
+
+- **Admin bootstrap: join handler hardcoded `role = 'member'`** for every invite redemption.
+  First sign-in via the setup-printed code was silently created as a member; all admin routes
+  returned generic 404 and admin UI was invisible.
+  - `db/invite.rs`: `InviteRow` carries `grants_role`; `find_valid` and new `find_by_id` select it;
+    `insert` accepts it as a parameter.
+  - `handlers/join.rs` (`post_profile`): fetches invite by ID and uses `invite.grants_role`.
+  - `handlers/admin.rs` (`post_generate_invite`): passes `"member"` explicitly.
+  - `scripts/setup.mjs`: seeds bootstrap invite with `grants_role = 'admin'`.
+
+- **Communities page showed raw IDs instead of community names.**
+  `get_communities` used `list_active_for_user` (no community name); fixed to
+  `list_communities_for_user` which JOINs `communities`.
+
+- **Admin management links missing from Communities page.** "Invite members" and
+  "Manage members" links added for communities where `role == "admin"`.
+
+- **Admin shortcuts missing from Home page.** "+ Create event" and "Invite members"
+  buttons added at top of Home `<main>` for admin users.
+
+- `release_gates.rs`: extended token-purpose completeness test to include `EDIT_EVENT`,
+  `ATTENDANCE_OVERRIDE`, `ADMIN_HIDE_NOTE`; removed two pre-existing unused-import warnings.
+
+### Changed (RFC-020 v1.2 reconciliation)
+
+- Token CSS vars and Rust consts split into AA-passing triplets; semantic names unchanged.
+- `note_form` hint text and border reference `CZ_COLOR_TEXT_SECONDARY` / `CZ_BORDER` consts
+  (were hardcoded hex).
+
 ## [0.5.0] — 2026-06-12
 
 ### Added
