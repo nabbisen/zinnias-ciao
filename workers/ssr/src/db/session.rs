@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Session table access — RFC-003 / RFC-002.
 //!
 //! Sessions are stored as HMAC hashes; the plaintext secret lives only in the

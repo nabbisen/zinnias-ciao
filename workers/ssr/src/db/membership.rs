@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Membership and user table access — RFC-002 / RFC-004.
 
 use crate::db::now_utc;
@@ -107,4 +108,46 @@ pub async fn insert_membership(
     .run()
     .await?;
     Ok(())
+}
+
+/// Count active memberships in a community (for no_answer calculation).
+pub async fn count_active(db: &D1Database, community_id: &str) -> Result<u32> {
+    let row = db
+        .prepare(
+            "SELECT COUNT(*) AS cnt FROM community_memberships \
+             WHERE community_id = ?1 AND removed_at IS NULL",
+        )
+        .bind(&[community_id.into()])?
+        .first::<serde_json::Value>(None)
+        .await?;
+    Ok(row.and_then(|v| v.get("cnt")?.as_u64()).unwrap_or(0) as u32)
+}
+
+/// All active memberships for a community (for participant list).
+pub struct MemberSummary {
+    pub id: String,
+    pub display_name: String,
+}
+
+pub async fn list_all_active(
+    db: &D1Database,
+    community_id: &str,
+) -> Result<Vec<MemberSummary>> {
+    let rows = db
+        .prepare(
+            "SELECT id, display_name FROM community_memberships \
+             WHERE community_id = ?1 AND removed_at IS NULL \
+             ORDER BY display_name ASC",
+        )
+        .bind(&[community_id.into()])?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?;
+
+    Ok(rows.into_iter().filter_map(|v| {
+        Some(MemberSummary {
+            id:           v.get("id")?.as_str()?.to_owned(),
+            display_name: v.get("display_name")?.as_str()?.to_owned(),
+        })
+    }).collect())
 }

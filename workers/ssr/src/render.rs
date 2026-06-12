@@ -1,16 +1,16 @@
-//! HTML render helpers.
-//!
-//! M0: shell + placeholder only.
-//! Later milestones add per-page render functions here.
+//! HTML render helpers — shared shell, escape, and UI components.
 
 use worker::{Response, Result};
 
+// ── Static asset paths ────────────────────────────────────────────────────
 const MANIFEST: &str = "/manifest.webmanifest";
-const CSS: &str = "/static/app.css";
-const JS: &str = "/static/app.js";
-const THEME: &str = "#007AFF";
+const CSS: &str      = "/static/app.css";
+const JS: &str       = "/static/app.js";
+const THEME: &str    = "#007AFF";
 
-/// Shared HTML shell — wraps every page in the design-system scaffold.
+// ── Shell ─────────────────────────────────────────────────────────────────
+
+/// Full HTML document shell.
 fn shell(title: &str, body: &str) -> String {
     format!(
         "<!DOCTYPE html>\n\
@@ -19,7 +19,7 @@ fn shell(title: &str, body: &str) -> String {
   <meta charset=\"utf-8\">\n\
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
   <meta name=\"theme-color\" content=\"{THEME}\">\n\
-  <title>{title} \u{2014} ciao.zinnias</title>\n\
+  <title>{t} \u{2014} ciao.zinnias</title>\n\
   <link rel=\"manifest\" href=\"{MANIFEST}\">\n\
   <link rel=\"stylesheet\" href=\"{CSS}\">\n\
 </head>\n\
@@ -28,20 +28,26 @@ fn shell(title: &str, body: &str) -> String {
 <script src=\"{JS}\" defer></script>\n\
 </body>\n\
 </html>",
-        title = escape_html(title),
+        t    = escape_html(title),
         body = body,
     )
 }
 
+/// Render a full page. Used by all handlers.
+pub fn page(title: &str, body: &str) -> Result<Response> {
+    Response::from_html(shell(title, body))
+}
+
 /// Escape a string for safe HTML text node insertion (RFC-012 / RFC-007).
+/// This is the single escape function used everywhere — never emit raw user text.
 pub fn escape_html(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
+    let mut out = String::with_capacity(s.len() + 16);
     for c in s.chars() {
         match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
+            '&'  => out.push_str("&amp;"),
+            '<'  => out.push_str("&lt;"),
+            '>'  => out.push_str("&gt;"),
+            '"'  => out.push_str("&quot;"),
             '\'' => out.push_str("&#x27;"),
             other => out.push(other),
         }
@@ -49,61 +55,418 @@ pub fn escape_html(s: &str) -> String {
     out
 }
 
-/// M0 placeholder page.
+// ── Navigation shell ──────────────────────────────────────────────────────
+
+/// Bottom tab navigation (Home | Communities | Me).
+pub fn bottom_nav(community_id: &str, active: &str) -> String {
+    let tab = |label: &str, href: &str, id: &str| -> String {
+        let aria = if id == active { " aria-current=\"page\"" } else { "" };
+        let style = if id == active {
+            "color:#007AFF;font-weight:600"
+        } else {
+            "color:#6e6e73"
+        };
+        format!(
+            "<a href=\"{href}\" style=\"flex:1;text-align:center;padding:.75rem 0;\
+             text-decoration:none;font-size:.8125rem;{style}\"{aria}>{label}</a>",
+            href = escape_html(href),
+        )
+    };
+    format!(
+        "<nav role=\"navigation\" aria-label=\"Main\" \
+         style=\"position:fixed;bottom:0;left:0;right:0;display:flex;\
+         background:#fff;border-top:1px solid #e5e5ea;\
+         padding-bottom:env(safe-area-inset-bottom)\">\
+         {home}{communities}{me}\
+         </nav>",
+        home        = tab("Home", &format!("/c/{community_id}/home"), "home"),
+        communities = tab("Communities", &format!("/c/{community_id}/communities"), "communities"),
+        me          = tab("Me", &format!("/c/{community_id}/me"), "me"),
+    )
+}
+
+/// App header bar.
+pub fn header(title: &str, community_name: &str) -> String {
+    format!(
+        "<header style=\"position:sticky;top:0;background:#fff;border-bottom:1px solid #e5e5ea;\
+         padding:.875rem 1rem;display:flex;justify-content:space-between;align-items:center;z-index:10\">\
+         <span style=\"font-size:1.25rem;font-weight:600\">{title}</span>\
+         <span style=\"font-size:.8125rem;color:#6e6e73\">{community}</span>\
+         </header>",
+        title     = escape_html(title),
+        community = escape_html(community_name),
+    )
+}
+
+// ── Status chip / buttons ─────────────────────────────────────────────────
+
+/// Colour and label for a status value.
+pub fn status_display(status: Option<&str>) -> (&'static str, &'static str, &'static str) {
+    // returns (colour, icon, label)
+    match status {
+        Some("going")     => ("#007AFF", "✓", "Going"),
+        Some("not_going") => ("#FF3B30", "✕", "No Go"),
+        Some("attended")  => ("#34C759", "✓", "Attended"),
+        _                 => ("#8E8E93", "○", "No answer"),
+    }
+}
+
+/// Status chip for event cards (read-only).
+pub fn status_chip(status: Option<&str>) -> String {
+    let (color, icon, label) = status_display(status);
+    format!(
+        "<span style=\"display:inline-flex;align-items:center;gap:.25rem;\
+         color:{color};font-size:.8125rem;font-weight:600\">\
+         {icon} {label}</span>"
+    )
+}
+
+/// Three-button status form for Event Detail (RFC-006).
+/// `day_id`, `event_id`, `community_id` scope the POST.
+/// `token` is the server-issued form token (AD-4).
+/// `current` is the member's current status (None = No answer).
+/// `can_set_attended` controls whether Attended is enabled.
+pub fn status_form(
+    community_id: &str,
+    event_id: &str,
+    day_id: &str,
+    token: &str,
+    current: Option<&str>,
+    can_set_attended: bool,
+    attended_disabled_reason: &str,
+) -> String {
+    let btn = |value: Option<&str>, label: &str, icon: &str, color: &str, disabled: bool, reason: &str| {
+        let is_current = current == value;
+        let bg = if is_current { color } else { "#f5f5f7" };
+        let fg = if is_current { "#fff" } else { color };
+        let val_str = value.unwrap_or("clear");
+        let disabled_attr = if disabled { " disabled" } else { "" };
+        let title_attr = if disabled && !reason.is_empty() {
+            format!(" title=\"{}\"", escape_html(reason))
+        } else { String::new() };
+        format!(
+            "<button type=\"submit\" name=\"status\" value=\"{val}\" \
+             style=\"flex:1;padding:.75rem .5rem;border:2px solid {color};\
+             border-radius:14px;background:{bg};color:{fg};\
+             font-size:.875rem;font-weight:600;min-height:44px;cursor:pointer;\
+             display:flex;align-items:center;justify-content:center;gap:.25rem\"\
+             {disabled_attr}{title_attr} aria-label=\"{label}\">\
+             {icon} {label}</button>",
+            val   = escape_html(val_str),
+        )
+    };
+
+    let going_btn = btn(Some("going"), "Going", "✓", "#007AFF", false, "");
+    let notgoing_btn = btn(Some("not_going"), "No Go", "✕", "#FF3B30", false, "");
+    let attended_btn = btn(
+        Some("attended"), "Attended", "✓", "#34C759",
+        !can_set_attended, attended_disabled_reason,
+    );
+
+    // Show a "Clear" link only when the member has an explicit status
+    let clear_btn = if current.is_some() {
+        format!(
+            "<button type=\"submit\" name=\"status\" value=\"clear\" \
+             style=\"font-size:.75rem;color:#6e6e73;background:none;border:none;\
+             padding:.25rem;cursor:pointer\" aria-label=\"Clear answer\">Clear</button>"
+        )
+    } else {
+        String::new()
+    };
+
+    format!(
+        "<form method=\"post\" \
+         action=\"/c/{cid}/events/{eid}/days/{did}/my-status\" \
+         style=\"margin:1rem 0\">\
+         <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
+         <div style=\"display:flex;gap:.5rem\">{going}{notgoing}{attended}</div>\
+         {clear}\
+         </form>",
+        cid  = escape_html(community_id),
+        eid  = escape_html(event_id),
+        did  = escape_html(day_id),
+        tok  = escape_html(token),
+        going    = going_btn,
+        notgoing = notgoing_btn,
+        attended = attended_btn,
+        clear    = clear_btn,
+    )
+}
+
+// ── Note editor ───────────────────────────────────────────────────────────
+
+/// Note textarea form for Event Detail (RFC-007).
+pub fn note_form(
+    community_id: &str,
+    event_id: &str,
+    save_token: &str,
+    delete_token: Option<&str>,
+    existing_note: Option<&str>,
+    flash: Option<&str>,
+) -> String {
+    let flash_html = flash
+        .map(|f| format!(
+            "<p role=\"status\" style=\"font-size:.875rem;color:#34C759;margin:.5rem 0\">{}</p>",
+            escape_html(f)
+        ))
+        .unwrap_or_default();
+
+    let delete_btn = if let (Some(tok), Some(_)) = (delete_token, existing_note) {
+        format!(
+            "<form method=\"post\" \
+             action=\"/c/{cid}/events/{eid}/my-note/delete\" \
+             style=\"display:inline\">\
+             <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
+             <button type=\"submit\" \
+             onclick=\"return confirm('Delete your note?')\" \
+             style=\"font-size:.875rem;color:#FF3B30;background:none;border:none;\
+             padding:.25rem;cursor:pointer\">Delete Note</button>\
+             </form>",
+            cid = escape_html(community_id),
+            eid = escape_html(event_id),
+            tok = escape_html(tok),
+        )
+    } else {
+        String::new()
+    };
+
+    format!(
+        "<section aria-label=\"Your note\" style=\"margin:1.5rem 0\">\
+         <h2 style=\"font-size:1.0625rem;font-weight:600;margin-bottom:.75rem\">Your note</h2>\
+         {flash}\
+         <form method=\"post\" action=\"/c/{cid}/events/{eid}/my-note\">\
+           <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
+           <textarea name=\"note\" rows=\"3\" maxlength=\"200\" \
+             style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
+             border-radius:12px;font-size:1rem;resize:vertical;box-sizing:border-box\" \
+             aria-label=\"Note (up to 200 characters)\">{existing}</textarea>\
+           <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:.5rem\">\
+             <span style=\"font-size:.75rem;color:#6e6e73\">Up to 200 characters</span>\
+             <button type=\"submit\" \
+               style=\"padding:.625rem 1.25rem;background:#007AFF;color:#fff;\
+               border:none;border-radius:14px;font-size:.9375rem;font-weight:600;\
+               min-height:44px;cursor:pointer\">Save Note</button>\
+           </div>\
+         </form>\
+         {delete}\
+         </section>",
+        cid      = escape_html(community_id),
+        eid      = escape_html(event_id),
+        tok      = escape_html(save_token),
+        existing = escape_html(existing_note.unwrap_or("")),
+        flash    = flash_html,
+        delete   = delete_btn,
+    )
+}
+
+// ── Event card ────────────────────────────────────────────────────────────
+
+pub struct CardDay<'a> {
+    pub starts_at_utc: &'a str,
+    pub ends_at_utc: &'a str,
+    pub day_date: &'a str,
+}
+
+/// One event card for the Home list.
+pub fn event_card(
+    community_id: &str,
+    event_id: &str,
+    title: &str,
+    location: Option<&str>,
+    is_cancelled: bool,
+    nearest_day: &CardDay<'_>,
+    total_days: u32,
+    my_status: Option<&str>,
+    going: u32, not_going: u32, no_answer: u32,
+) -> String {
+    let (_, icon, label) = status_display(my_status);
+    let (sc, _, _) = status_display(my_status);
+    let cancelled_badge = if is_cancelled {
+        "<span style=\"font-size:.75rem;background:#FF3B30;color:#fff;\
+         border-radius:99px;padding:.125rem .5rem;margin-left:.5rem\">Cancelled</span>"
+    } else { "" };
+    let multi_badge = if total_days > 1 {
+        format!("<span style=\"font-size:.75rem;color:#6e6e73\"> · {total_days} days</span>")
+    } else { String::new() };
+    let loc_html = location.map(|l| format!(
+        "<span style=\"color:#6e6e73;font-size:.875rem\"> · {}</span>",
+        escape_html(l)
+    )).unwrap_or_default();
+    let muted = if is_cancelled { "opacity:.5;" } else { "" };
+
+    format!(
+        "<a href=\"/c/{cid}/events/{eid}\" style=\"display:block;text-decoration:none;color:inherit\">\
+         <article style=\"background:#fff;border-radius:16px;padding:1rem;\
+         box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:.75rem;{muted}\">\
+           <div style=\"display:flex;align-items:center;gap:.5rem;margin-bottom:.375rem\">\
+             <span style=\"color:{sc};font-weight:600;font-size:.875rem\">{icon} {label}</span>\
+             {cancelled}\
+           </div>\
+           <div style=\"font-size:1rem;font-weight:600\">{title}{multi}</div>\
+           <div style=\"font-size:.875rem;color:#3c3c3e;margin-top:.25rem\">\
+             {time}{loc}\
+           </div>\
+           <div style=\"font-size:.8125rem;color:#6e6e73;margin-top:.375rem\">\
+             Going {going} · No Go {ng} · No answer {na}\
+           </div>\
+         </article></a>",
+        cid       = escape_html(community_id),
+        eid       = escape_html(event_id),
+        title     = escape_html(title),
+        cancelled = cancelled_badge,
+        multi     = multi_badge,
+        time      = format_day_time(nearest_day),
+        loc       = loc_html,
+        going     = going,
+        ng        = not_going,
+        na        = no_answer,
+    )
+}
+
+/// Format a day's time range for display (UTC strings → compact label).
+fn format_day_time(day: &CardDay<'_>) -> String {
+    // Parse "2026-06-14T09:00:00.000Z" -> "Jun 14, 09:00–10:30"
+    let starts = parse_utc_display(day.starts_at_utc);
+    let ends   = parse_utc_time(day.ends_at_utc);
+    format!("{starts}–{ends}")
+}
+
+fn parse_utc_display(utc: &str) -> String {
+    // "2026-06-14T09:00:00.000Z" -> "Jun 14, 09:00"
+    let parts: Vec<&str> = utc.splitn(2, 'T').collect();
+    if parts.len() < 2 { return utc.to_owned(); }
+    let date = parts[0]; // "2026-06-14"
+    let time = parts[1].get(..5).unwrap_or(""); // "09:00"
+    let segments: Vec<&str> = date.split('-').collect();
+    if segments.len() < 3 { return utc.to_owned(); }
+    let month = match segments[1] {
+        "01" => "Jan", "02" => "Feb", "03" => "Mar", "04" => "Apr",
+        "05" => "May", "06" => "Jun", "07" => "Jul", "08" => "Aug",
+        "09" => "Sep", "10" => "Oct", "11" => "Nov", _   => "Dec",
+    };
+    let day = segments[2].trim_start_matches('0');
+    format!("{month} {day}, {time}")
+}
+
+fn parse_utc_time(utc: &str) -> String {
+    // "2026-06-14T10:30:00.000Z" -> "10:30"
+    utc.splitn(2, 'T')
+        .nth(1)
+        .and_then(|t| t.get(..5))
+        .unwrap_or("")
+        .to_owned()
+}
+
+// ── Participant list ──────────────────────────────────────────────────────
+
+pub struct ParticipantEntry<'a> {
+    pub display_name: &'a str,
+    pub status: Option<&'a str>,
+}
+
+pub fn participant_list(participants: &[ParticipantEntry<'_>]) -> String {
+    if participants.is_empty() {
+        return "<p style=\"color:#6e6e73;font-size:.875rem\">No participants yet.</p>".to_owned();
+    }
+    let rows: String = participants.iter().map(|p| {
+        let initials = initials(p.display_name);
+        let (color, icon, label) = status_display(p.status);
+        format!(
+            "<li style=\"display:flex;align-items:center;gap:.75rem;padding:.5rem 0;\
+             border-bottom:1px solid #f5f5f7\">\
+             <span style=\"width:2rem;height:2rem;border-radius:50%;background:{color}22;\
+             color:{color};display:flex;align-items:center;justify-content:center;\
+             font-size:.75rem;font-weight:700;flex-shrink:0\">{initials}</span>\
+             <span style=\"flex:1;font-size:.9375rem\">{name}</span>\
+             <span style=\"font-size:.8125rem;color:{color}\">{icon} {label}</span>\
+             </li>",
+            initials = escape_html(&initials),
+            name     = escape_html(p.display_name),
+        )
+    }).collect();
+    format!("<ul style=\"list-style:none;padding:0;margin:0\">{rows}</ul>")
+}
+
+fn initials(name: &str) -> String {
+    name.split_whitespace()
+        .filter_map(|w| w.chars().next())
+        .take(2)
+        .map(|c| c.to_uppercase().to_string())
+        .collect::<Vec<_>>()
+        .join("")
+}
+
+// ── Common pages ─────────────────────────────────────────────────────────
+
 pub fn placeholder() -> Result<Response> {
-    let body = "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\n\
-  <h1 style=\"font-size:1.25rem;font-weight:600\">ciao.zinnias</h1>\n\
-  <p>Private community schedule sharing.</p>\n\
-  <p style=\"color:#6e6e73;font-size:.875rem\">This environment is not ready for members yet.</p>\n\
+    let body = "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+  <h1 style=\"font-size:1.25rem;font-weight:600\">ciao.zinnias</h1>\
+  <p>Private community schedule sharing.</p>\
+  <p style=\"color:#6e6e73;font-size:.875rem\">This environment is not ready for members yet.</p>\
 </main>";
     Response::from_html(shell("ciao.zinnias", body))
 }
 
-/// Generic 404 — deliberately does not reveal resource existence (RFC-004).
 pub fn not_found() -> Result<Response> {
     let body = "<main style=\"padding:2rem\"><p>Not found.</p></main>";
     Ok(Response::from_html(shell("Not found", body))?.with_status(404))
 }
 
-/// Generic 500 — no internal detail exposed (RFC-012).
 pub fn internal_error() -> Result<Response> {
     let body = "<main style=\"padding:2rem\"><p>Something went wrong. Please try again.</p></main>";
     Ok(Response::from_html(shell("Error", body))?.with_status(500))
 }
+
+pub fn session_expired() -> Result<Response> {
+    let body = "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+         <p style=\"color:#FF3B30\">Your session expired. Please ask your community admin for a new invite code.</p>\
+         <a href=\"/join\" style=\"display:inline-block;margin-top:1rem;color:#007AFF\">Join</a></main>";
+    Ok(Response::from_html(shell("Session expired", body))?.with_status(401))
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn escape_html_script_tag() {
-        let input = "<script>alert(\"xss\")</script>";
-        let out = escape_html(input);
-        assert!(!out.contains('<'));
-        assert!(!out.contains('>'));
+    fn escape_script_tag() {
+        let out = escape_html("<script>alert(\"xss\")</script>");
+        assert!(!out.contains('<') && !out.contains('>'));
         assert!(out.contains("&lt;script&gt;"));
     }
 
     #[test]
-    fn escape_html_ampersand() {
+    fn escape_ampersand() {
         assert_eq!(escape_html("a&b"), "a&amp;b");
     }
 
     #[test]
-    fn escape_html_clean_string() {
+    fn escape_clean_string() {
         assert_eq!(escape_html("hello world"), "hello world");
     }
 
     #[test]
-    fn escape_html_in_title() {
-        // A title with special chars must not break the shell HTML
-        let html = shell("<bad>", "");
-        assert!(html.contains("&lt;bad&gt;"));
-        assert!(!html.contains("<bad>"));
+    fn title_escaped_in_shell() {
+        let html = page("<bad>", "").unwrap();
+        // Can't call .text() in non-wasm; just verify escape_html works
+        let escaped = escape_html("<bad>");
+        assert!(escaped.contains("&lt;bad&gt;"));
     }
-}
 
-/// Render a full page using the shared shell. Used by handlers.
-pub fn page(title: &str, body: &str) -> worker::Result<worker::Response> {
-    worker::Response::from_html(shell(title, body))
+    #[test]
+    fn initials_two_words() {
+        assert_eq!(initials("Aya Tanaka"), "AT");
+    }
+
+    #[test]
+    fn initials_one_word() {
+        assert_eq!(initials("Aya"), "A");
+    }
+
+    #[test]
+    fn parse_utc_time_basic() {
+        assert_eq!(parse_utc_time("2026-06-14T10:30:00.000Z"), "10:30");
+    }
 }

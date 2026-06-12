@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Cryptographic helpers.
 //!
 //! All secrets are stored as HMAC-SHA256(pepper, value) — fast enough for the

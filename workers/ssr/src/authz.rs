@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Community-scoped authorization — RFC-004.
 //!
 //! Every community-scoped route calls `require_membership` before acting.

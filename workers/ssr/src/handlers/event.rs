@@ -1,0 +1,415 @@
+//! Event Detail, status, and note handlers (RFC-005/006/007).
+
+use zinnias_ciao_contracts::auth::token_purpose;
+use worker::{Env, Request, Response, Result};
+
+use crate::audit;
+use crate::authz::require_membership;
+use crate::db::{
+    self,
+    attendance as attendance_db,
+    event as event_db,
+    event_note as note_db,
+    membership as membership_db,
+};
+use crate::form_token;
+use crate::render::{self, ParticipantEntry};
+use crate::session::require_auth;
+use zinnias_ciao_domain::{
+    status::{validate_status_transition, AttendanceStatus, DayTimeState, Role},
+    validate_note,
+};
+
+fn pepper(env: &Env) -> String {
+    env.secret("HMAC_PEPPER")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|_| "dev-pepper-change-in-production".to_string())
+}
+
+fn redirect(url: &str) -> Result<Response> {
+    let mut r = Response::empty()?;
+    r.headers_mut().set("Location", url)?;
+    Ok(r.with_status(303))
+}
+
+// ── GET /c/:cid/events/:eid ──────────────────────────────────────────────
+
+pub async fn get_event_detail(
+    req: Request,
+    env: &Env,
+    rid: &str,
+    community_id: &str,
+    event_id: &str,
+    flash: Option<&str>,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_membership(&env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let pp = pepper(env);
+
+    let event = match event_db::find_for_community(&db, event_id, community_id).await? {
+        Some(e) => e,
+        None    => return render::not_found(),
+    };
+
+    let days  = event_db::days_for_event(&db, event_id).await?;
+    let member_count = membership_db::count_active(&db, community_id).await?;
+    let my_note = note_db::find_mine(&db, event_id, &membership.membership_id).await?;
+    let all_notes = note_db::list_for_event(&db, event_id).await?;
+    let all_members = membership_db::list_all_active(&db, community_id).await?;
+
+    // Build a display-name map for participant list
+    let name_map: std::collections::HashMap<String, String> = all_members
+        .iter()
+        .map(|m| (m.id.clone(), m.display_name.clone()))
+        .collect();
+
+    let now_utc = db::now_utc();
+
+    // ── Days section ─────────────────────────────────────────────────────
+    let mut days_html = String::new();
+    for day in &days {
+        let time_state = classify_day(&day.starts_at_utc, &day.ends_at_utc, &now_utc);
+        let my_att = attendance_db::find_mine(&db, &day.id, &membership.membership_id).await?;
+        let current_status = my_att.as_ref().and_then(|a| a.status.as_deref());
+        let counts = attendance_db::counts_for_day(&db, &day.id, member_count).await?;
+
+        let can_set_attended = membership.is_admin() && time_state == DayTimeState::Ended;
+        let attended_reason  = if time_state != DayTimeState::Ended {
+            "Available after the event"
+        } else if !membership.is_admin() {
+            "Only admins can mark Attended"
+        } else { "" };
+
+        // Issue a status form token
+        let status_token = form_token::issue(
+            &db, &pp, &membership.membership_id,
+            token_purpose::SET_STATUS, Some(&day.id),
+        ).await.unwrap_or_default();
+
+        // Day header
+        let label = format_day_label(&day.day_date, &day.starts_at_utc, &day.ends_at_utc, days.len() > 1, day.seq);
+
+        let status_form = render::status_form(
+            community_id, event_id, &day.id,
+            &status_token, current_status,
+            can_set_attended, attended_reason,
+        );
+
+        let (cg, cng, cna) = (counts.going, counts.not_going, counts.no_answer);
+        let counts_html = format!(
+            "<p style=\"font-size:.875rem;color:#6e6e73\">Going {cg} · No Go {cng} · No answer {cna}</p>",
+        );
+
+        // Participant rows for this day
+        let mut participants: Vec<ParticipantEntry> = Vec::new();
+        let day_attendances = attendance_db::list_for_day(&db, &day.id).await?;
+        let att_map: std::collections::HashMap<&str, Option<&str>> = day_attendances
+            .iter()
+            .map(|a| (a.membership_id.as_str(), a.status.as_deref()))
+            .collect();
+        // All active members, in Going → No Go → No answer order
+        let mut ordered = all_members.iter().collect::<Vec<_>>();
+        ordered.sort_by_key(|m| {
+            match att_map.get(m.id.as_str()).copied().flatten() {
+                Some("going")     => 0u8,
+                Some("attended")  => 1,
+                Some("not_going") => 2,
+                _                 => 3,
+            }
+        });
+        for m in &ordered {
+            participants.push(ParticipantEntry {
+                display_name: &m.display_name,
+                status: att_map.get(m.id.as_str()).copied().flatten(),
+            });
+        }
+        let plist = render::participant_list(&participants);
+
+        days_html.push_str(&format!(
+            "<div style=\"border:1px solid #e5e5ea;border-radius:16px;padding:1rem;margin-bottom:1rem\">\
+             <h3 style=\"font-size:.9375rem;font-weight:600;margin-bottom:.5rem\">{label}</h3>\
+             {status_form}{counts_html}\
+             <details style=\"margin-top:.75rem\">\
+               <summary style=\"font-size:.875rem;color:#007AFF;cursor:pointer\">Who's going?</summary>\
+               <div style=\"margin-top:.5rem\">{plist}</div>\
+             </details>\
+             </div>",
+            label       = render::escape_html(&label),
+            status_form = status_form,
+            counts_html = counts_html,
+            plist       = plist,
+        ));
+    }
+
+    // ── Note section ─────────────────────────────────────────────────────
+    let save_token = form_token::issue(
+        &db, &pp, &membership.membership_id,
+        token_purpose::SAVE_NOTE, Some(event_id),
+    ).await.unwrap_or_default();
+    let delete_token = if my_note.is_some() {
+        Some(form_token::issue(
+            &db, &pp, &membership.membership_id,
+            token_purpose::DELETE_NOTE, Some(event_id),
+        ).await.unwrap_or_default())
+    } else { None };
+
+    let note_html = render::note_form(
+        community_id, event_id,
+        &save_token, delete_token.as_deref(),
+        my_note.as_ref().map(|n| n.note.as_str()),
+        flash,
+    );
+
+    // ── Other members' notes ──────────────────────────────────────────────
+    let others_html: String = all_notes.iter()
+        .filter(|n| n.membership_id != membership.membership_id)
+        .map(|n| {
+            let name = name_map.get(&n.membership_id)
+                .map(|s| s.as_str()).unwrap_or("Member");
+            format!(
+                "<div style=\"padding:.75rem 0;border-bottom:1px solid #f5f5f7\">\
+                 <span style=\"font-weight:600;font-size:.875rem\">{name}</span>\
+                 <p style=\"margin:.25rem 0 0;font-size:.9375rem\">{note}</p>\
+                 </div>",
+                name = render::escape_html(name),
+                note = render::escape_html(&n.note),
+            )
+        }).collect();
+
+    let notes_section = if !others_html.is_empty() {
+        format!(
+            "<section style=\"margin-top:1.5rem\">\
+             <h2 style=\"font-size:1.0625rem;font-weight:600;margin-bottom:.5rem\">Notes</h2>\
+             {others_html}</section>"
+        )
+    } else { String::new() };
+
+    let community = db::community::find_active(&db, community_id).await?;
+    let community_name = community.map(|c| c.name).unwrap_or_default();
+    let nav  = render::bottom_nav(community_id, "home");
+    let back = format!(
+        "<a href=\"/c/{}/home\" style=\"color:#007AFF;font-size:.9375rem\">\u{2190} Home</a>",
+        render::escape_html(community_id)
+    );
+    let cancelled_banner = if event.status == "cancelled" {
+        "<div style=\"background:#FF3B3022;color:#FF3B30;padding:.75rem;border-radius:12px;margin-bottom:1rem\">This event was cancelled.</div>"
+    } else { "" };
+
+    let body = format!(
+        "{header}\
+         <main style=\"padding:1rem 1rem 5rem\">\
+           {back}\
+           <h1 style=\"font-size:1.25rem;font-weight:600;margin:1rem 0 .25rem\">{title}</h1>\
+           {loc}{desc}\
+           {cancelled}\
+           {days}\
+           {note}\
+           {notes_section}\
+         </main>{nav}",
+        header         = render::header("Event", &community_name),
+        title          = render::escape_html(&event.title),
+        loc            = event.location.as_deref().map(|l| format!(
+            "<p style=\"color:#6e6e73;font-size:.875rem\">\u{1F4CD} {}</p>",
+            render::escape_html(l)
+        )).unwrap_or_default(),
+        desc           = event.description.as_deref().map(|d| format!(
+            "<p style=\"font-size:.9375rem;margin:.5rem 0\">{}</p>",
+            render::escape_html(d)
+        )).unwrap_or_default(),
+        cancelled      = cancelled_banner,
+        days           = days_html,
+        note           = note_html,
+        notes_section  = notes_section,
+        nav            = nav,
+    );
+    render::page(&event.title, &body)
+}
+
+// ── POST /c/:cid/events/:eid/days/:dayId/my-status ───────────────────────
+
+pub async fn post_my_status(
+    mut req: Request,
+    env: &Env,
+    rid: &str,
+    community_id: &str,
+    event_id: &str,
+    day_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_membership(&env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let pp = pepper(env);
+
+    let body = req.form_data().await?;
+    let raw_token  = body.get_field("_token").unwrap_or_default();
+    let raw_status = body.get_field("status").unwrap_or_default();
+
+    // Validate and consume form token (CSRF + idempotency, AD-4)
+    let replay = form_token::consume(
+        &db, &pp, &membership.membership_id,
+        token_purpose::SET_STATUS, &raw_token, Some(day_id),
+    ).await?;
+
+    if replay.is_some() {
+        // Already processed — redirect to detail (idempotent)
+        return redirect(&format!("/c/{community_id}/events/{event_id}"));
+    }
+
+    // Load the day to compute time state
+    let days = event_db::days_for_event(&db, event_id).await?;
+    let day  = days.iter().find(|d| d.id == day_id)
+        .ok_or_else(|| worker::Error::RustError("Day not found".to_string()))?;
+    let event = event_db::find_for_community(&db, event_id, community_id).await?
+        .ok_or_else(|| worker::Error::RustError("Event not found".to_string()))?;
+
+    let now_utc    = db::now_utc();
+    let time_state = classify_day(&day.starts_at_utc, &day.ends_at_utc, &now_utc);
+    let role = if membership.is_admin() { Role::Admin } else { Role::Member };
+    let is_cancelled = event.status == "cancelled";
+
+    // Parse requested status ("clear" means None = No answer)
+    let requested: Option<AttendanceStatus> = match raw_status.as_str() {
+        "going"     => Some(AttendanceStatus::Going),
+        "not_going" => Some(AttendanceStatus::NotGoing),
+        "attended"  => Some(AttendanceStatus::Attended),
+        _           => None, // "clear" or anything else
+    };
+
+    let current_att = attendance_db::find_mine(&db, day_id, &membership.membership_id).await?;
+    let current = current_att.as_ref()
+        .and_then(|a| a.status.as_deref())
+        .and_then(|s| match s {
+            "going"     => Some(AttendanceStatus::Going),
+            "not_going" => Some(AttendanceStatus::NotGoing),
+            "attended"  => Some(AttendanceStatus::Attended),
+            _           => None,
+        });
+
+    if let Err(e) = validate_status_transition(role, time_state, is_cancelled, current, requested) {
+        // Return to detail with error in query param (simple, no flash cookie needed)
+        let msg = render::escape_html(&e.to_string());
+        return redirect(&format!("/c/{community_id}/events/{event_id}?err={msg}"));
+    }
+
+    // Persist
+    let status_str: Option<&str> = match requested {
+        Some(AttendanceStatus::Going)    => Some("going"),
+        Some(AttendanceStatus::NotGoing) => Some("not_going"),
+        Some(AttendanceStatus::Attended) => Some("attended"),
+        None                             => None,
+    };
+    attendance_db::upsert(&db, day_id, &membership.membership_id, status_str).await?;
+
+    // Audit admin attendance correction
+    if membership.is_admin() && matches!(requested, Some(AttendanceStatus::Attended)) {
+        let _ = audit::write(
+            &db, rid, Some(community_id), Some(&membership.membership_id),
+            "attendance", Some(day_id), "admin_set_attended",
+            Some(serde_json::json!({ "event_id": event_id })),
+        ).await;
+    }
+
+    redirect(&format!("/c/{community_id}/events/{event_id}"))
+}
+
+// ── POST /c/:cid/events/:eid/my-note ────────────────────────────────────
+
+pub async fn post_my_note(
+    mut req: Request,
+    env: &Env,
+    rid: &str,
+    community_id: &str,
+    event_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_membership(&env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let pp = pepper(env);
+
+    let body = req.form_data().await?;
+    let raw_token = body.get_field("_token").unwrap_or_default();
+    let raw_note  = body.get_field("note").unwrap_or_default();
+
+    let replay = form_token::consume(
+        &db, &pp, &membership.membership_id,
+        token_purpose::SAVE_NOTE, &raw_token, Some(event_id),
+    ).await?;
+    if replay.is_some() {
+        return redirect(&format!("/c/{community_id}/events/{event_id}?flash=saved"));
+    }
+
+    let note: String = match validate_note(&raw_note) {
+        Ok(n)  => n,
+        Err(e) => {
+            let msg = render::escape_html(&e.to_string());
+            return redirect(&format!("/c/{community_id}/events/{event_id}?err={msg}"));
+        }
+    };
+
+    note_db::upsert(&db, event_id, &membership.membership_id, &note).await?;
+    redirect(&format!("/c/{community_id}/events/{event_id}?flash=saved"))
+}
+
+// ── POST /c/:cid/events/:eid/my-note/delete ──────────────────────────────
+
+pub async fn delete_my_note(
+    mut req: Request,
+    env: &Env,
+    rid: &str,
+    community_id: &str,
+    event_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, &env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let membership = require_membership(&env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let pp = pepper(env);
+
+    let body = req.form_data().await?;
+    let raw_token = body.get_field("_token").unwrap_or_default();
+
+    let replay = form_token::consume(
+        &db, &pp, &membership.membership_id,
+        token_purpose::DELETE_NOTE, &raw_token, Some(event_id),
+    ).await?;
+    if replay.is_some() {
+        return redirect(&format!("/c/{community_id}/events/{event_id}"));
+    }
+
+    note_db::soft_delete(&db, event_id, &membership.membership_id).await?;
+    redirect(&format!("/c/{community_id}/events/{event_id}"))
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+fn classify_day(starts: &str, ends: &str, now: &str) -> DayTimeState {
+    if now < starts {
+        DayTimeState::Upcoming
+    } else if now < ends {
+        DayTimeState::Started
+    } else {
+        DayTimeState::Ended
+    }
+}
+
+fn format_day_label(day_date: &str, starts: &str, ends: &str, multi: bool, seq: u32) -> String {
+    let start_time = starts.splitn(2, 'T').nth(1).and_then(|t| t.get(..5)).unwrap_or("");
+    let end_time   = ends.splitn(2, 'T').nth(1).and_then(|t| t.get(..5)).unwrap_or("");
+    if multi {
+        format!("Day {seq} — {day_date} {start_time}–{end_time}")
+    } else {
+        format!("{day_date} {start_time}–{end_time}")
+    }
+}

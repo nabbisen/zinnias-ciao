@@ -2,6 +2,42 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.3.0] — 2026-06-12
+
+### Added
+
+- **M2 member flow complete.**
+- `domain`: `note` module — Unicode-aware ≤200-char validation, control-char guard,
+  newline/tab allowed; XSS payload passthrough (escaping is the renderer's job).
+- `db/event`: `find_for_community`, `days_for_event`, `home_upcoming` (bounded
+  date-window query with per-day JOIN, no N+1).
+- `db/attendance`: `find_mine`, `list_for_day`, `counts_for_day` (NULL = No answer
+  preserved), `upsert` (INSERT OR REPLACE with explicit NULL for clear),
+  `list_mine_for_days` (Home batch helper).
+- `db/event_note`: `find_mine`, `list_for_event`, `upsert`, `soft_delete`,
+  `admin_hide`.
+- `db/membership`: `count_active`, `list_all_active`, `MemberSummary`.
+- `handlers/home`: upcoming list grouped Today / This Week / Later; per-card
+  status chip, counts, multi-day badge; empty state (member/admin variants).
+- `handlers/event`: `get_event_detail` (full day loop — status form per day,
+  counts, participant list ordered Going→Attended→No Go→No answer, notes list);
+  `post_my_status` (form-token CSRF + idempotency, `validate_status_transition`,
+  upsert, audit for admin attendance correction); `post_my_note` (form-token,
+  `validate_note`, upsert); `delete_my_note` (form-token, soft-delete).
+- `handlers/community`: full GET and POST dispatcher — parses `/c/:cid/...` to
+  home, event detail, status, note, and note-delete routes.
+- `render`: shell, `escape_html`, `bottom_nav`, `header`, `status_chip`,
+  `status_form` (three-button group with Clear, disabled+reason for Attended),
+  `note_form` (Save + Delete, character counter hint), `event_card`,
+  `participant_list`, `session_expired` page.
+- Crate alias fix: all test files and handler `use` paths updated to
+  `zinnias_ciao_domain` / `zinnias_ciao_contracts`.
+- `#![allow(dead_code)]` on forward-declared DB structs and helpers (used M3+).
+
+### Fixed
+
+- Inner `use domain::` in test functions updated to `zinnias_ciao_domain`.
+
 ## [0.2.1] — 2026-06-12
 
 ### Fixed
