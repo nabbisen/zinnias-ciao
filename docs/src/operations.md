@@ -44,6 +44,21 @@ INSERT INTO invite_codes
 VALUES ('inv_xxx', 'com_xxx', '<computed_hmac>', 'mem_xxx', '2099-12-31T23:59:59Z', 'admin', datetime('now'));
 ```
 
+### Timezone scope (important)
+
+The `communities.timezone` column accepts an IANA zone name (e.g. `Asia/Tokyo`).
+Event times entered by an admin are converted from community-local time to UTC
+at write time and back to local at display time.
+
+> **MVP timezone conversion is validated for fixed-offset zones such as
+> `Asia/Tokyo`. Zones that observe daylight saving time (e.g.
+> `America/New_York`, `Europe/London`) are not yet supported for correct
+> summer-time scheduling** — conversion uses each zone's standard-time offset
+> year-round, so events in a DST-observing zone will be off by one hour during
+> that zone's summer. For the Japan-first pilot this is not a concern (Japan
+> does not observe DST). Do not provision communities in DST-observing zones
+> until DST support lands (tracked as a future RFC-018 amendment).
+
 ## Session revocation
 
 To revoke a compromised session immediately:

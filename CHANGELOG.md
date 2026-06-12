@@ -2,6 +2,54 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.27.0] — 2026-06-12
+
+Handoff-review remediation: source verification, event-bound token, Japanese
+dates, audit coverage.
+
+### Verification (RFC-045)
+
+- Discharged the entire handoff-review §8 **source-verification checklist** (11
+  items) against actual source: token subjects all `auth.user_id`; atomic
+  conditional consume; invite-claim-before-create ordering; HMAC-only invite
+  storage; centralized `crypto::pepper`; host-only cookie default; SW caches no
+  authenticated HTML; SW version gate; flat-batched export; tz conversion on
+  write and display paths. All confirmed. The staging-runtime half (deploy,
+  timezone round-trip, race tests) is documented in RFC-045 and remains pending
+  a Cloudflare environment.
+
+### Changed
+
+- **Event-bound `SET_STATUS` token (RFC-046).** Event Detail now issues one
+  status token bound to the event, reused for every day's form, instead of one
+  token per day. Eliminates up to 52 D1 writes per render on max-recurring
+  events — the last loop-based write in the hot path. Day-level authorization
+  (day∈event∈community) is preserved and is now the explicit guard. The POST
+  handler consumes the token bound to `event_id`.
+- **Japanese date presentation (RFC-047).** Day labels now render in Japanese
+  convention, e.g. `6月14日（土）09:00–10:30`, instead of `14 Jun 09:00–10:30`.
+  Added pure, tested formatters to `contracts::tz`: `weekday_index` (Zeller's
+  congruence), `weekday_ja`, `month_abbr_en`, `date_label_ja`, `date_label_en`.
+
+### Added
+
+- **Audit coverage for security-relevant non-admin events (review P1-5):**
+  logout, calendar-token generation, and calendar-token revocation are now
+  written to the audit log (no secrets logged). Invite redemption was already
+  audited.
+
+### Documentation
+
+- **DST scope statement (review P1-2)** added to `docs/src/operations.md`:
+  timezone conversion is validated for fixed-offset zones (e.g. `Asia/Tokyo`);
+  DST-observing zones are not yet supported and must not be provisioned until
+  DST support lands.
+
+### Testing
+
+- 184 passing (was 179): +5 date-formatter/weekday tests. Zero warnings.
+- SW `CACHE_VERSION` updated to `v0.27.0`.
+
 ## [0.26.0] — 2026-06-12
 
 RFC-044 partial: SW version gate and coverage completion.

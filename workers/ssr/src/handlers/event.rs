@@ -79,6 +79,17 @@ pub async fn get_event_detail(
     // Batch-fetch all per-day attendances in one IN query (RFC-029/RFC-044).
     let all_day_attendances = attendance_db::list_for_event_days(&db, &day_id_strs).await?;
 
+    // ── Status form token (RFC-046) ──────────────────────────────────────
+    // One token bound to the EVENT, reused for every day's status form on this
+    // page. The POST handler validates that the submitted day belongs to this
+    // event (and community) before mutating, so a single event-bound token is
+    // safe and removes the per-day D1 write that previously scaled with the
+    // number of recurring occurrences.
+    let status_token = form_token::issue(
+        &db, &pp, &auth.user_id,
+        token_purpose::SET_STATUS, Some(event_id),
+    ).await.unwrap_or_default();
+
     // ── Days section ─────────────────────────────────────────────────────
     let mut days_html = String::new();
     for day in &days {
@@ -96,13 +107,7 @@ pub async fn get_event_detail(
             i18n::EN_EVENT_ATTENDED_ADMIN_ONLY
         } else { "" };
 
-        // Issue a status form token
-        let status_token = form_token::issue(
-            &db, &pp, &auth.user_id,
-            token_purpose::SET_STATUS, Some(&day.id),
-        ).await.unwrap_or_default();
-
-        // Day header
+        // Day header (status token issued once before the loop, RFC-046)
         let label = format_day_label(&day.day_date, &day.starts_at_utc, &day.ends_at_utc, days.len() > 1, day.seq, community_tz_early);
 
         let status_form = render::status_form(
@@ -274,10 +279,12 @@ pub async fn post_my_status(
     let raw_token  = body.get_field("_token").unwrap_or_default();
     let raw_status = body.get_field("status").unwrap_or_default();
 
-    // Validate and consume form token (CSRF + idempotency, AD-4)
+    // Validate and consume form token (CSRF + idempotency, AD-4).
+    // The token is bound to the EVENT (RFC-046); the day is identified by the
+    // URL path and validated for event/community ownership below.
     let replay = form_token::consume(
         &db, &pp, &auth.user_id,
-        token_purpose::SET_STATUS, &raw_token, Some(day_id),
+        token_purpose::SET_STATUS, &raw_token, Some(event_id),
     ).await?;
 
     if replay.is_some() {
@@ -498,7 +505,11 @@ fn format_day_label(day_date: &str, starts: &str, ends: &str, multi: bool, seq: 
     let offset = render::tz_offset_minutes_pub(tz);
     let (local_date, start_hm) = render::utc_to_local_parts_pub(starts, offset);
     let end_hm = render::apply_offset_time_pub(ends, offset);
-    let display_date = if local_date.is_empty() { day_date } else { &local_date };
+    // Japan-first deployment: render the calendar date in Japanese convention,
+    // e.g. "6月14日（土）", instead of an English month abbreviation (RFC-047).
+    // The source date string is the local "YYYY-MM-DD" produced above.
+    let date_src = if local_date.is_empty() { day_date } else { &local_date };
+    let display_date = zinnias_ciao_contracts::tz::date_label_ja(date_src);
     if multi {
         format!("Day {seq} — {display_date} {start_hm}–{end_hm}")
     } else {

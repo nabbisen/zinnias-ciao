@@ -351,3 +351,104 @@ mod tests {
         assert_eq!(t, "11:00");
     }
 }
+
+// ── Date label formatting (RFC-047) ──────────────────────────────────────
+//
+// Day-of-week for a Gregorian date via Zeller's congruence. Returns 0=Sunday
+// .. 6=Saturday. Pure arithmetic, no external deps.
+pub fn weekday_index(year: i32, month: i32, day: i32) -> i32 {
+    // Zeller's congruence (Gregorian). Treat Jan/Feb as months 13/14 of prior year.
+    let (m, y) = if month < 3 { (month + 12, year - 1) } else { (month, year) };
+    let k = y % 100;
+    let j = y / 100;
+    let h = (day + (13 * (m + 1)) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
+    // Zeller: 0=Saturday..6=Friday. Convert to 0=Sunday..6=Saturday.
+    (h + 6) % 7
+}
+
+/// Japanese single-character weekday label for 0=Sunday..6=Saturday.
+pub fn weekday_ja(index: i32) -> &'static str {
+    match index.rem_euclid(7) {
+        0 => "日", 1 => "月", 2 => "火", 3 => "水",
+        4 => "木", 5 => "金", _ => "土",
+    }
+}
+
+/// English 3-letter month abbreviation for 1..=12.
+pub fn month_abbr_en(month: i32) -> &'static str {
+    match month {
+        1 => "Jan", 2 => "Feb", 3 => "Mar", 4 => "Apr",
+        5 => "May", 6 => "Jun", 7 => "Jul", 8 => "Aug",
+        9 => "Sep", 10 => "Oct", 11 => "Nov", 12 => "Dec",
+        _ => "",
+    }
+}
+
+/// Format a `YYYY-MM-DD` local date as a Japanese calendar label with weekday,
+/// e.g. `"6月14日（土）"`. Falls back to the raw string if unparseable.
+pub fn date_label_ja(local_date: &str) -> String {
+    let segs: Vec<&str> = local_date.split('-').collect();
+    if segs.len() < 3 { return local_date.to_owned(); }
+    let (y, m, d) = match (segs[0].parse::<i32>(), segs[1].parse::<i32>(), segs[2].parse::<i32>()) {
+        (Ok(y), Ok(m), Ok(d)) => (y, m, d),
+        _ => return local_date.to_owned(),
+    };
+    let wd = weekday_ja(weekday_index(y, m, d));
+    format!("{m}月{d}日（{wd}）")
+}
+
+/// Format a `YYYY-MM-DD` local date as an English calendar label,
+/// e.g. `"14 Jun"`. Falls back to the raw string if unparseable.
+pub fn date_label_en(local_date: &str) -> String {
+    let segs: Vec<&str> = local_date.split('-').collect();
+    if segs.len() < 3 { return local_date.to_owned(); }
+    let (m, d) = match (segs[1].parse::<i32>(), segs[2].parse::<i32>()) {
+        (Ok(m), Ok(d)) => (m, d),
+        _ => return local_date.to_owned(),
+    };
+    format!("{d} {}", month_abbr_en(m))
+}
+
+#[cfg(test)]
+mod date_label_tests {
+    use super::*;
+
+    #[test]
+    fn weekday_known_dates() {
+        // 2026-06-14 is a Sunday.
+        assert_eq!(weekday_index(2026, 6, 14), 0);
+        // 2026-06-13 is a Saturday.
+        assert_eq!(weekday_index(2026, 6, 13), 6);
+        // 2000-01-01 was a Saturday.
+        assert_eq!(weekday_index(2000, 1, 1), 6);
+        // 2026-01-01 is a Thursday.
+        assert_eq!(weekday_index(2026, 1, 1), 4);
+    }
+
+    #[test]
+    fn ja_label_has_month_day_weekday() {
+        // 2026-06-13 is Saturday → 土
+        assert_eq!(date_label_ja("2026-06-13"), "6月13日（土）");
+        // 2026-06-14 is Sunday → 日
+        assert_eq!(date_label_ja("2026-06-14"), "6月14日（日）");
+    }
+
+    #[test]
+    fn ja_label_no_english_month() {
+        let label = date_label_ja("2026-06-14");
+        assert!(!label.contains("Jun"), "JA label must not contain English month: {label}");
+        assert!(label.contains("月"), "JA label must use 月");
+    }
+
+    #[test]
+    fn en_label_format() {
+        assert_eq!(date_label_en("2026-06-14"), "14 Jun");
+        assert_eq!(date_label_en("2026-12-01"), "1 Dec");
+    }
+
+    #[test]
+    fn malformed_date_falls_back() {
+        assert_eq!(date_label_ja("not-a-date-x"), "not-a-date-x");
+        assert_eq!(date_label_en("garbage"), "garbage");
+    }
+}

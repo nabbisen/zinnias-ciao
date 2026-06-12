@@ -159,7 +159,7 @@ pub async fn get_me_calendar(
 pub async fn post_regenerate_calendar(
     mut req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = match require_auth(&req, &env).await {
@@ -189,6 +189,13 @@ pub async fn post_regenerate_calendar(
     let token_hmac = hmac_hex(&pp, &token_id);
     cal_db::insert(&db, &token_id, community_id, &membership.membership_id, &token_hmac, &now).await?;
 
+    // Audit calendar token generation (security-relevant, RFC-045 P1-5).
+    // The token secret is never logged — only that a feed was (re)generated.
+    let _ = crate::audit::write(
+        &db, rid, Some(community_id), Some(&membership.membership_id),
+        "calendar_feed", None, "calendar_token_generated", None,
+    ).await;
+
     redirect(&format!("/c/{community_id}/me/calendar?flash=Feed+URL+generated"))
 }
 
@@ -197,7 +204,7 @@ pub async fn post_regenerate_calendar(
 pub async fn post_revoke_calendar(
     mut req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = match require_auth(&req, &env).await {
@@ -220,6 +227,12 @@ pub async fn post_revoke_calendar(
 
     let now = db::now_utc();
     cal_db::revoke_for_membership(&db, &membership.membership_id, community_id, &now).await?;
+
+    // Audit calendar token revocation (security-relevant, RFC-045 P1-5).
+    let _ = crate::audit::write(
+        &db, rid, Some(community_id), Some(&membership.membership_id),
+        "calendar_feed", None, "calendar_token_revoked", None,
+    ).await;
 
     redirect(&format!("/c/{community_id}/me/calendar?flash=Feed+disabled"))
 }

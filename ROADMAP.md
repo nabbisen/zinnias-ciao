@@ -2,13 +2,20 @@
 
 ## Status
 
-**v0.26.0** — 39 of 44 RFCs implemented (5 proposed). 179 passing unit tests. Zero warnings.
+**v0.27.0** — 39 of 47 RFCs implemented (8 proposed). 184 passing unit tests. Zero warnings.
 
-The core product has completed a deep architect review, stabilization pass (RFC-037–043),
-query-performance pass (RFC-029/RFC-044 partial), and release-gate hardening (SW version
-gate, Role invariants). All P0/P1 pilot blockers are resolved; all N+1 query patterns
-eliminated; the SW version is checked at every `cargo test` run. The remaining open
-work before a first pilot is four operator tasks and three QA tasks.
+The core product has completed two architect reviews (deep source review + handoff
+review), a stabilization pass (RFC-037–043, RFC-046, RFC-047), a query-performance
+pass (RFC-029/RFC-044), and release-gate hardening. The v0.26.0 handoff review's §8
+**source-verification checklist is fully discharged** (RFC-045 §5): all 11 source
+claims confirmed against code. The event-bound status token (RFC-046) removed the
+last hot-path loop write; Japanese date presentation (RFC-047) shipped; audit
+coverage now includes logout and calendar-token events.
+
+The remaining work before a production pilot is the **staging-runtime verification**
+half of RFC-045 §6 — deploy to Cloudflare staging, timezone round-trip, and the
+concurrent invite/token race tests — which requires a deployed environment, plus
+human usability QA. These cannot be done in-repo.
 
 ---
 

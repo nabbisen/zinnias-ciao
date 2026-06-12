@@ -7,7 +7,7 @@ use crate::db::session as session_db;
 use crate::form_token;
 use crate::session::{clear_session_cookie, require_auth};
 
-pub async fn post_logout(mut req: Request, env: &Env, _rid: &str) -> Result<Response> {
+pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
     // Require a valid session first.
     let auth = match require_auth(&req, env).await {
         Ok(a) => a,
@@ -33,6 +33,13 @@ pub async fn post_logout(mut req: Request, env: &Env, _rid: &str) -> Result<Resp
 
     // Revoke session.
     let _ = session_db::revoke(&db, &auth.session_id).await;
+
+    // Audit the logout (security-relevant non-admin event, RFC-045 P1-5).
+    // Not community-scoped; no content logged beyond the session subject.
+    let _ = crate::audit::write(
+        &db, rid, None, None,
+        "session", Some(&auth.session_id), "logout", None,
+    ).await;
 
     // Clear cookie and redirect.
     let domain = env

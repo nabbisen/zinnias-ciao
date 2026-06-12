@@ -48,6 +48,8 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 041 | [Atomic Invite Redemption](./done/041-atomic-invite-redemption.md) | v0.23.0 |
 | 042 | [Pilot Offline and Private Cache Contract](./done/042-pilot-offline-and-private-cache-contract.md) | v0.23.0 |
 | 043 | [Pilot UX Acceptance and Error Feedback](./done/043-pilot-ux-acceptance-and-error-feedback.md) | v0.23.0 / v0.24.0 |
+| 046 | [Event-Bound Status Token](./done/046-event-bound-status-token.md) | v0.27.0 |
+| 047 | [Japanese Date/Time Presentation](./done/047-japanese-date-time-presentation.md) | v0.27.0 |
 
 ## Also Done
 
@@ -71,11 +73,12 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 033 | Subgroups, Event Visibility, and Boundary Safety | [./proposed/033-subgroups-event-visibility-and-boundary-safety.md](./proposed/033-subgroups-event-visibility-and-boundary-safety.md) |
 | 034 | Notification-Free Quiet Mode and Attention Design | [./proposed/034-notification-free-quiet-mode-and-attention-design.md](./proposed/034-notification-free-quiet-mode-and-attention-design.md) |
 
-## Proposed — F7 stabilization follow-ups (043–044)
+## Proposed — F7 stabilization follow-ups (044–045)
 
 | ID | Title | File | Note |
 |----|-------|------|------|
-| 044 | D1 Query-Budget Gate and Integration Test Harness | [./proposed/044-d1-query-budget-gate-and-integration-test-harness.md](./proposed/044-d1-query-budget-gate-and-integration-test-harness.md) | Provides the live-D1 harness for RFC-037/040/041 deferred tests |
+| 044 | D1 Query-Budget Gate and Integration Test Harness | [./proposed/044-d1-query-budget-gate-and-integration-test-harness.md](./proposed/044-d1-query-budget-gate-and-integration-test-harness.md) | Budget constants + SW gate shipped; live-D1 harness deferred (gates beta) |
+| 045 | Pre-Pilot Runtime Verification Matrix | [./proposed/045-pre-pilot-runtime-verification-matrix.md](./proposed/045-pre-pilot-runtime-verification-matrix.md) | Source verification discharged; staging-runtime matrix pending environment |
 
 ## Archive
 
