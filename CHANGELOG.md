@@ -2,6 +2,25 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.13.0] — 2026-06-12
+
+### Added
+
+- **RFC-025 — Community moderation UI (completes RFC-025).**
+  The `post_admin_hide_note` handler and `admin_hide` DB function have existed
+  since v0.6.0, but the hide button was never surfaced to admins in the event
+  detail view. This release wires the UI:
+  - `handlers/event.rs`: the other-members' notes loop converted from a sync
+    `.map().collect()` to an async `for` loop that issues a per-note
+    `ADMIN_HIDE_NOTE` form token for admin users. Each note card shows a "Hide"
+    button (red, min-height 44px, aria-label) that POSTs to
+    `/c/:cid/admin/events/:eid/notes/:mid/hide`. For non-admins the button is
+    absent and no token is issued.
+  - Route was already wired in `community.rs`; handler was already implemented
+    and audits without preserving note body (RFC-014).
+  - RFC-025 moved to `rfcs/done/` (v0.13.0). All three goals met: admin note
+    hiding, member removal, and audit without harmful content exposure.
+
 ## [0.12.0] — 2026-06-12
 
 ### Performance (RFC-029 — Scalability and Query Performance Discipline)

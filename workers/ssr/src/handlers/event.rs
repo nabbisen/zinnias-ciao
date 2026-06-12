@@ -177,22 +177,47 @@ pub async fn get_event_detail(
         flash,
     );
 
-    // ── Other members' notes ──────────────────────────────────────────────
-    let others_html: String = all_notes.iter()
-        .filter(|n| n.membership_id != membership.membership_id)
-        .map(|n| {
-            let name = name_map.get(&n.membership_id)
-                .map(|s| s.as_str()).unwrap_or("Member");
+    // ── Other members' notes (admin gets a hide button per note) ────
+    let mut others_html = String::new();
+    for n in all_notes.iter().filter(|n| n.membership_id != membership.membership_id) {
+        let name = name_map.get(&n.membership_id)
+            .map(|s| s.as_str()).unwrap_or("Member");
+        let hide_btn = if membership.is_admin() {
+            let hide_tok = form_token::issue(
+                &db, &pp, &auth.user_id,
+                token_purpose::ADMIN_HIDE_NOTE, Some(event_id),
+            ).await.unwrap_or_default();
             format!(
-                "<div style=\"padding:.75rem 0;border-bottom:1px solid #f5f5f7\">\
-                 <span style=\"font-weight:600;font-size:.875rem\">{name}</span>\
-                 <p style=\"margin:.25rem 0 0;font-size:.9375rem\">{note}</p>\
-                 </div>",
-                name = render::escape_html(name),
-                note = render::escape_html(&n.note),
+                "<form method=\"post\" \
+                  action=\"/c/{cid}/admin/events/{eid}/notes/{mid}/hide\" \
+                  style=\"display:inline;margin-left:.5rem\">\
+                  <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
+                  <button type=\"submit\" \
+                    style=\"font-size:.75rem;color:#FF3B30;background:none;border:none;\
+                    cursor:pointer;padding:.125rem .25rem;min-height:44px\" \
+                    aria-label=\"Hide this note\">\
+                    Hide\
+                  </button>\
+                </form>",
+                cid = render::escape_html(community_id),
+                eid = render::escape_html(event_id),
+                mid = render::escape_html(&n.membership_id),
+                tok = render::escape_html(&hide_tok),
             )
-        }).collect();
-
+        } else { String::new() };
+        others_html.push_str(&format!(
+            "<div style=\"padding:.75rem 0;border-bottom:1px solid #f5f5f7\">\
+             <div style=\"display:flex;align-items:baseline;justify-content:space-between\">\
+               <span style=\"font-weight:600;font-size:.875rem\">{name}</span>\
+               {hide}\
+             </div>\
+             <p style=\"margin:.25rem 0 0;font-size:.9375rem\">{note}</p>\
+             </div>",
+            name = render::escape_html(name),
+            note = render::escape_html(&n.note),
+            hide = hide_btn,
+        ));
+    }
     let notes_section = if !others_html.is_empty() {
         format!(
             "<section style=\"margin-top:1.5rem\">\
