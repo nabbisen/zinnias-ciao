@@ -2,6 +2,51 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.38.3] — 2026-06-15
+
+Documentation: update all operator and verification docs to reflect codlet
+integration; remove stale RFC-052 pending entry from ROADMAP.
+
+### Changed
+
+- **`ROADMAP.md`** — removed stale "RFC-052: audit retention policy (document
+  first)" from the blocking-items list. RFC-052 has been in `rfcs/done/` since
+  v0.36.0.
+
+- **`docs/src/release-checklist.md`** — four gates updated with codlet-accurate
+  evidence:
+  - *Rate-limit gate*: `rate_limit.rs: 10 failures / 5-min` →
+    `codlet.rs: 5 failures / 15-min window via CODLET_RL KV`.
+  - *Admin invite gate*: `invite_db::revoke` →
+    `codlet::revoke_invite (codlet_codes first, then invite_codes)`.
+  - *Form-token safety gate*: `form_token.rs consume` →
+    `codlet::consume_token → FormTokenManager → codlet_form_tokens (wasm32);
+    form_token.rs → form_tokens (non-wasm fallback)`.
+  - *Invite single-use gate*: `mark_used sets it atomically` →
+    `codlet_codes conditional UPDATE (wasm32) / invite.rs::mark_used (non-wasm)`.
+  - *Member status gate*: updated to reference `codlet::issue_token(SET_STATUS)`.
+
+- **`rfcs/proposed/045-pre-pilot-runtime-verification-matrix.md`** — source
+  verification table (§5) updated for items 1–6 with codlet evidence:
+  - #1 (token subject): `codlet::issue_token/consume_token` with
+    `TokenSubject::Authenticated(user_id)` on wasm32.
+  - #2 (conditional UPDATE): `codlet-worker/d1/token.rs` `codlet_form_tokens`
+    conditional UPDATE + `classify_token_consume`.
+  - #3 (invite claimed first): `codlet::code_auth.claim()` → `ClaimOutcome::Won`
+    required before membership/session creation on wasm32.
+  - #4 (no plaintext stored): `CodeSecret` via `codlet::issue_code`; codlet
+    xtask `no-plaintext-store` gate passes.
+  - #5 (single key provider): `WorkerKeyProvider::from_env(env, "v1",
+    "CODLET_HMAC_KEY_V1", &[])` on wasm32; `crypto::pepper` on non-wasm.
+  - #6 (domain-optional cookie): `CookiePolicy::production_strict` on wasm32.
+  - Staging tests S1, S5, S6 reference `codlet_codes`/`codlet_form_tokens`.
+  - Test count updated: 218 → 223.
+
+### Testing
+
+- 223 passing. Zero warnings (native). wasm32: zero errors, zero warnings.
+- No code changes in this version — documentation only.
+
 ## [0.38.2] — 2026-06-15
 
 Housekeeping: remove stale allow(dead_code), fix cfg gating on helpers,

@@ -28,7 +28,6 @@ All remaining pilot gates require a live Cloudflare environment, human review,
 or explicit product/operator decisions — none can be progressed in-repo:
 - **RFC-050:** staging deployment and runtime evidence pack
 - **RFC-051:** multi-day edit semantics (product decision needed from nabbisen)
-- **RFC-052:** audit retention policy (document first)
 - **RFC-053:** ICS privacy UX copy (needs RFC-054)
 - **RFC-054:** Japanese copy review (native-speaker reviewer)
 - **RFC-044:** live-D1 integration harness (gates beta, not pilot)

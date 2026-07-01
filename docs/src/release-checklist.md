@@ -18,7 +18,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Member can save, edit, and delete own note. *(event.rs post_my_note, delete_my_note)*
 - [x] Admin can create event (single and multi-day). *(admin.rs post_create_event + event_write::create_event)*
 - [x] Admin can cancel event (confirmation required). *(admin.rs get_cancel_event shows confirmation; post_cancel_event soft-cancels)*
-- [x] Admin can generate and revoke invite codes. *(admin.rs post_generate_invite + post_revoke_invite; invite_db::revoke)*
+- [x] Admin can generate and revoke invite codes. *(admin/members.rs: `codlet::code_auth.issue_code()` on wasm32, rejection-sampling fallback on non-wasm; `codlet::revoke_invite` tries `codlet_codes` first, then `invite_codes`)*
 - [x] Admin can remove member (last-admin guard active). *(admin.rs post_remove_member: count_admins guard)*
 - [x] Admin can mark Attended after event day ends. *(admin.rs get_attendance / post_attendance; classify_day gate)*
 
@@ -26,10 +26,10 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 - [x] Cross-community data access blocked (manual test: direct URL to another community's event). *(authz.rs require_membership: community_id check on every request)*
 - [x] Removed members lose access on next request. *(membership.rs find_active: AND removed_at IS NULL)*
-- [x] Invite codes are single-use. *(invite.rs find_valid: AND used_at IS NULL; mark_used sets it atomically)*
-- [x] Failed invite redemptions are rate-limited. *(rate_limit.rs: 10 failures / 5-min window per IP, KV-backed)*
+- [x] Invite codes are single-use. On wasm32: `codlet_codes` conditional UPDATE (`WHERE used_at IS NULL …`); `ClaimOutcome::Won/Lost` enforces one-winner. On non-wasm: `invite.rs::mark_used` conditional UPDATE; returns `bool`; caller aborts if `false`. Both paths require a won claim before user/membership/session creation. *(codlet-worker D1CodeStore::claim_code; invite.rs::mark_used — RFC-041)*
+- [x] Failed invite redemptions are rate-limited. *(codlet.rs: 5 failures / 15-min window per IP, KV-backed via `CODLET_RL`; `RateLimitUnavailable::FailOpen` — see `codlet.rs::build()` `rl_policy`)*
 - [x] Session cookies have `HttpOnly; Secure; SameSite=Strict`. Host-only by default (no `Domain` attribute unless `SESSION_COOKIE_DOMAIN` var is set). *(session.rs build_session_cookie — RFC-038)*
-- [x] Form token absent/replayed → POST rejected. Token subject is always `user_id`; consume is a single conditional UPDATE. *(form_token.rs consume — RFC-037)*
+- [x] Form token absent/replayed → POST rejected. On wasm32: `codlet::consume_token` → `FormTokenManager::consume` → conditional UPDATE on `codlet_form_tokens`; on non-wasm: `form_token.rs::consume` → conditional UPDATE on `form_tokens`. Subject is always `TokenSubject::Authenticated(user_id)`. Replay returns `Ok(Some(…))`, invalid returns `Err`. *(codlet.rs, form_token.rs — RFC-037)*
 - [x] Script tag in note/title/name renders as text (not executed). *(render.rs escape_html used at every user-content insertion; test: escape_script_tag)*
 - [x] Private page cache cleared on logout. *(RFC-042: authenticated HTML is never cached; only static shell assets are stored. No private cache exists to clear — the property holds trivially. PURGE_PRIVATE is retained for defence-in-depth.)*
 
@@ -67,7 +67,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Stabilization gates (v0.23.0 — RFC-037–042)
 
-- [x] Member can set Going/No Go/Attended (form token uses `user_id` at both issue and consume — RFC-037).
+- [x] Member can set Going/No Go/Attended. Form token issued via `codlet::issue_token(SET_STATUS, event_id)`, consumed via `codlet::consume_token` bound to event_id. *(event.rs — RFC-037)*
 - [x] Member can delete their own note (same token-subject fix — RFC-037).
 - [x] Form-token consume is a conditional UPDATE; concurrent double-submit executes at most once (RFC-037).
 - [x] Session cookie is host-only when `SESSION_COOKIE_DOMAIN` is unset; no `Domain=localhost` fallback (RFC-038).
