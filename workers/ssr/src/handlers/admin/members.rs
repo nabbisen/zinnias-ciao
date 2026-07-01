@@ -8,7 +8,9 @@ use crate::authz::require_admin;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::crypto::{hmac_hex, normalize_invite_code};
 use crate::crypto::random_token;
-use crate::db::{self, invite as invite_db, membership as membership_db};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::db::invite as invite_db;
+use crate::db::{self, membership as membership_db};
 use crate::render;
 use crate::session::require_auth;
 use zinnias_ciao_contracts::i18n;
@@ -65,9 +67,8 @@ pub async fn get_invites(
         render::escape_html(&f)
     )).unwrap_or_default();
 
-    // List active codes with per-row revoke tokens.
-    let active_codes = invite_db::list_active_for_community(&db, community_id).await
-        .unwrap_or_default();
+    // List active invite codes from both codlet_codes (new) and invite_codes (legacy).
+    let active_codes = crate::codlet::list_active_invites(env, community_id).await;
 
     let mut code_rows = String::new();
     for inv in &active_codes {
@@ -250,7 +251,7 @@ pub async fn post_revoke_invite(
         return redirect(&format!("/c/{community_id}/admin/invites"));
     }
 
-    invite_db::revoke(&db, invite_id, community_id).await?;
+    crate::codlet::revoke_invite(env, invite_id, community_id).await?;
 
     let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
         "invite_code", Some(invite_id), "revoked", None).await;

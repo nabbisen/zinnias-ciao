@@ -2,6 +2,66 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.38.1] — 2026-06-15
+
+Fix functional bug: admin invite listing and revocation now cover both codlet and legacy tables.
+
+### Fixed
+
+- **Admin invite listing showed no codes after codlet integration.**
+  `get_invites` was querying `invite_codes` (legacy) only. New invite codes
+  generated since v0.37.0 are stored in `codlet_codes`. The page showed an
+  empty list even when active codes existed.
+
+  Fix: `codlet::list_active_invites(env, community_id)` returns codes from both
+  tables — `codlet_codes` first (wasm32, via `D1CodeStore::list_codes` with
+  `CodeListFilter::active_in_scope(community_id)`), then `invite_codes` (all
+  paths, grace-period legacy codes). Both sets of codes are displayed on the
+  admin invite page.
+
+- **Admin invite revocation silently failed for codlet-issued codes.**
+  `post_revoke_invite` called `invite_db::revoke` which targets `invite_codes`.
+  Codlet-issued codes live in `codlet_codes` and were never matched, so the
+  revoke was a no-op that returned `Ok(())` (zero rows updated, no error).
+
+  Fix: `codlet::revoke_invite(env, invite_id, community_id)` tries
+  `CodeAuth::revoke_code` (codlet_codes) first, then falls through to
+  `invite_db::revoke` (invite_codes) if the code is not found in the codlet
+  table. `community_id` is passed as the scope guard in both paths to prevent
+  cross-community revocation.
+
+### Added
+
+- **`codlet::list_active_invites`** — unified listing across both tables.
+- **`codlet::revoke_invite`** — dual-path revocation with codlet-first try.
+- **`codlet::InviteCodeMeta`** — normalized display struct used by the render loop.
+- **`unix_secs_to_display` / `days_since_epoch_to_ymd`** — pure date formatting
+  for codlet's Unix-seconds timestamps (the legacy table stores ISO-8601 strings;
+  codlet stores integer seconds).
+
+### Changed
+
+- `admin/members.rs`: `invite as invite_db` import gated
+  `#[cfg(not(target_arch = "wasm32"))]` since the `invite_db::insert` call in
+  `post_generate_invite` lives in the non-wasm legacy fallback block.
+
+### Migration status after v0.38.1
+
+| Component | Status |
+|---|---|
+| Invite code issuance | ✅ codlet on wasm32; legacy fallback on non-wasm |
+| Invite code listing | ✅ both tables (codlet first, legacy second) |
+| Invite code revocation | ✅ both tables (codlet first, legacy second) |
+| Session issuance | ✅ codlet on wasm32 |
+| Session validation | ✅ codlet first, legacy fallback |
+| Session revocation (logout) | ✅ both tables |
+| Form tokens (all handlers) | ✅ codlet on wasm32 |
+| Legacy table removal | ⏳ Task 1 — after 30-day grace period |
+
+### Testing
+
+- 223 passing. Zero warnings (native). wasm32: zero errors, zero warnings.
+
 ## [0.38.0] — 2026-06-15
 
 Codlet integration Phase 2: all remaining form tokens migrated to `codlet_form_tokens`.

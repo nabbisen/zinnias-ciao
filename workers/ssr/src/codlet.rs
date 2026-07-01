@@ -231,3 +231,119 @@ pub async fn consume_token(
     let pepper = crate::crypto::pepper(env);
     crate::form_token::consume(&db, &pepper, user_id, purpose, raw_token, bound_resource).await
 }
+
+// ── Unified invite admin helpers ──────────────────────────────────────────
+
+/// Metadata for one active invite code — unified across codlet and legacy tables.
+pub struct InviteCodeMeta {
+    pub id:          String,
+    /// ISO-8601 prefix for display (first 16 chars).
+    pub expires_at:  String,
+    /// "admin" or "member".
+    pub grants_role: String,
+}
+
+/// List active invite codes for a community from both `codlet_codes` (wasm32)
+/// and the legacy `invite_codes` table. Codlet codes are listed first.
+pub async fn list_active_invites(env: &Env, community_id: &str) -> Vec<InviteCodeMeta> {
+    let mut result = Vec::new();
+
+    // ── Codlet codes (wasm32 production) ────────────────────────────────────
+    #[cfg(target_arch = "wasm32")]
+    {
+        use codlet_core::{
+            admin::{CodeAdminStore, CodeListFilter},
+            clock::{Clock, SystemClock},
+            secret::ScopeKey,
+        };
+        use codlet_worker::D1TableConfig;
+
+        if let Ok(db) = env.d1("DB") {
+            let store = D1CodeStore::new(Rc::new(db), D1TableConfig::default());
+            let now   = SystemClock::new().unix_now();
+            let filter = CodeListFilter::active_in_scope(
+                ScopeKey::new(community_id.to_string()),
+            );
+            if let Ok(metas) = store.list_codes(&filter, now).await {
+                for m in metas {
+                    result.push(InviteCodeMeta {
+                        id:          m.id.as_str().to_owned(),
+                        expires_at:  unix_secs_to_display(m.expires_at),
+                        grants_role: m.grant
+                            .as_deref()
+                            .and_then(|g| g.strip_prefix("role:"))
+                            .unwrap_or("member")
+                            .to_owned(),
+                    });
+                }
+            }
+        }
+    }
+
+    // ── Legacy codes (all paths, grace period) ──────────────────────────────
+    if let Ok(db) = env.d1("DB") {
+        if let Ok(rows) = crate::db::invite::list_active_for_community(&db, community_id).await {
+            for inv in rows {
+                result.push(InviteCodeMeta {
+                    id:          inv.id,
+                    expires_at:  inv.expires_at,
+                    grants_role: inv.grants_role,
+                });
+            }
+        }
+    }
+
+    result
+}
+
+/// Revoke an invite code by ID, trying codlet first then the legacy table.
+/// `community_id` is passed as scope to prevent cross-community revocation.
+pub async fn revoke_invite(
+    env:          &Env,
+    invite_id:    &str,
+    community_id: &str,
+) -> worker::Result<()> {
+    // ── Codlet path (wasm32) ────────────────────────────────────────────────
+    #[cfg(target_arch = "wasm32")]
+    {
+        use codlet_core::secret::CodeId;
+        if let Ok(mgrs) = build(env).await {
+            let code_id = CodeId::new(invite_id.to_owned().into());
+            if mgrs.code_auth.revoke_code(&code_id, Some(community_id)).await.is_ok() {
+                return Ok(());
+            }
+            // Not found in codlet_codes — fall through to legacy.
+        }
+    }
+
+    // ── Legacy path (all targets) ───────────────────────────────────────────
+    let db = env.d1("DB")?;
+    crate::db::invite::revoke(&db, invite_id, community_id).await
+}
+
+/// Format a Unix timestamp (seconds since epoch) as an ISO-8601 display prefix.
+/// Returns "YYYY-MM-DDTHH:MM" — the first 16 characters of ISO-8601.
+fn unix_secs_to_display(ts: u64) -> String {
+    let s = ts % 60;
+    let m = (ts / 60) % 60;
+    let h = (ts / 3600) % 24;
+    let (year, month, day) = days_since_epoch_to_ymd(ts / 86400);
+    let _ = s; // seconds not needed for display
+    format!("{year:04}-{month:02}-{day:02}T{h:02}:{m:02}")
+}
+
+/// Convert days since Unix epoch to (year, month, day) via the
+/// Fliegel–Van Flandern proleptic Gregorian algorithm.
+fn days_since_epoch_to_ymd(days: u64) -> (u64, u64, u64) {
+    let z   = days + 719468;
+    let era = z / 146097;
+    let doe = z % 146097;
+    let yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
+    let y   = yoe + era * 400;
+    let doy = doe - (365*yoe + yoe/4 - yoe/100);
+    let mp  = (5*doy + 2) / 153;
+    let d   = doy - (153*mp + 2)/5 + 1;
+    let m   = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y   = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
+}
