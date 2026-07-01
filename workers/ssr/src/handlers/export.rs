@@ -56,7 +56,7 @@ pub async fn get_export_page(
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">Export community data</h1>\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{exp_title}</h1>\
          <p style=\"font-size:.875rem;color:#6E6E73;margin-bottom:1.5rem\">\
            Download a JSON file of your community's events, attendance, and notes.\
            Member names and notes are included. Session tokens and security credentials\
@@ -80,7 +80,8 @@ pub async fn get_export_page(
            This link is single-use and expires in 5 minutes.\
          </p>\
          </main>{nav}",
-        header  = render::header_with_switcher(i18n::JA_EXPORT_TITLE, community_id, &community_pairs),
+        exp_title = i18n::JA_EXPORT_TITLE,
+        header    = render::header_with_switcher(i18n::JA_EXPORT_TITLE, community_id, &community_pairs),
         name    = render::escape_html(&community_name),
         events  = event_count,
         members = member_count,

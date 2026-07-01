@@ -200,7 +200,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
            {today}{thisweek}{later}{empty}\
          </main>\
          {nav}",
-        header    = render::header_with_switcher("Home", community_id, &_community_pairs),
+        header    = render::header_with_switcher(i18n::JA_NAV_HOME, community_id, &_community_pairs),
         shortcuts = admin_shortcuts,
         today    = section(i18n::JA_HOME_TODAY, &today_cards),
         thisweek = section(i18n::JA_HOME_THIS_WEEK, &thisweek_cards),
@@ -208,5 +208,5 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
         empty    = empty_html,
         nav      = nav,
     );
-    render::page("Home", &body)
+    render::page(i18n::JA_NAV_HOME, &body)
 }

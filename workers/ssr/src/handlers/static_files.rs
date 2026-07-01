@@ -41,18 +41,18 @@ pub async fn get_app_js(_req: Request, _env: &Env) -> Result<Response> {
 
 pub async fn get_offline(_req: Request, _env: &Env) -> Result<Response> {
     let html = r#"<!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Offline — ciao.zinnias</title>
+  <title>オフライン — ciao.zinnias</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <div id="offline-banner">Offline — showing last loaded</div>
+  <div id="offline-banner">オフライン — 最後に読み込んだ情報を表示しています</div>
   <main style="padding:2rem;max-width:480px;margin:auto;font-family:system-ui,sans-serif">
-    <h1 style="font-size:1.25rem;font-weight:600">You are offline</h1>
-    <p style="color:#6e6e73">Open again when connected.</p>
+    <h1 style="font-size:1.25rem;font-weight:600">オフラインです</h1>
+    <p style="color:#6e6e73">電波がある場所で再度開いてください。</p>
   </main>
   <script src="/static/app.js" defer></script>
 </body>

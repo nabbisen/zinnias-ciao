@@ -42,8 +42,10 @@ pub async fn get_me(
 
     let admin_export_html: String = if membership.is_admin() {
         format!(
-            "<section style=\"margin-top:1.5rem\"><h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">Data</h2><a href=\"/c/{cid}/admin/export\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">Export community data</a></section>",
-            cid = render::escape_html(community_id)
+            "<section style=\"margin-top:1.5rem\"><h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{data_section}</h2><a href=\"/c/{cid}/admin/export\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{export_lbl}</a></section>",
+            cid          = render::escape_html(community_id),
+            data_section = i18n::JA_ME_SECTION_DATA,
+            export_lbl   = i18n::JA_ME_DATA_EXPORT,
         )
     } else { String::new() };
 
@@ -70,10 +72,10 @@ pub async fn get_me(
            </section>\
            <section style=\"margin-top:1.5rem\">\
              <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-               text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">Calendar</h2>\
+               text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{cal_section}</h2>\
              <a href=\"/c/{cid}/me/calendar\" \
                style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;\
-               min-height:44px;line-height:44px\">Calendar feed</a>\
+               min-height:44px;line-height:44px\">{cal_feed_lbl}</a>\
            </section>\
            {admin_export}\
            <section style=\"margin-top:1.5rem\">\
@@ -95,7 +97,9 @@ pub async fn get_me(
         name      = render::escape_html(&membership.display_name),
         community = render::escape_html(community_name),
         role      = role_label,
-        cid       = render::escape_html(community_id),
+        cid          = render::escape_html(community_id),
+        cal_section  = i18n::JA_CALENDAR_TITLE,
+        cal_feed_lbl = i18n::JA_ME_CALENDAR_LABEL,
         lbl_name      = i18n::JA_ME_SECTION_NAME,
         lbl_community = i18n::JA_ME_SECTION_COMMUNITY,
         lbl_help      = i18n::JA_ME_SECTION_HELP,

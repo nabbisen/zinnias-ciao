@@ -46,11 +46,15 @@ pub async fn get_invites(
     let flash: Option<String> = url.query_pairs()
         .find(|(k, _)| k == "flash").map(|(_, v)| v.to_string());
 
+    let _invite_code_lbl = i18n::JA_ADMIN_INVITES_TITLE;
+    let _invite_share_hint = i18n::JA_ADMIN_INVITES_NEW_CODE_HINT;
     let new_code_html = new_code.as_deref().map(|c| format!(
         "<div style=\"background:#edfaf0;border-radius:12px;padding:1rem;margin:1rem 0;border:1px solid #34C759\">\
-         <p style=\"font-size:.8125rem;color:#167A34;margin:0 0 .5rem\">Share with one person only — expires in 24 hours.</p>\
-         <div style=\"font-size:1.5rem;font-weight:700;letter-spacing:.2em;color:#1D1D1F\" aria-label=\"Invite code\">{code}</div>\
+         <p style=\"font-size:.8125rem;color:#167A34;margin:0 0 .5rem\">{hint}</p>\
+         <div style=\"font-size:1.5rem;font-weight:700;letter-spacing:.2em;color:#1D1D1F\" aria-label=\"{lbl}\">{code}</div>\
          </div>",
+        hint = _invite_share_hint,
+        lbl  = _invite_code_lbl,
         code = render::escape_html(c)
     )).unwrap_or_default();
 
@@ -67,18 +71,19 @@ pub async fn get_invites(
     for inv in &active_codes {
         let revoke_tok = form_token::issue(&db, &pp, &auth.user_id,
             token_purpose::REVOKE_INVITE, Some(&inv.id)).await.unwrap_or_default();
-        let role_label = if inv.grants_role == "admin" { " · admin invite" } else { "" };
+        let role_label = if inv.grants_role == "admin" { i18n::JA_ROLE_ADMIN } else { "" };
+        let rev = i18n::JA_ADMIN_INVITES_REVOKE;
         let exp_display = inv.expires_at.get(..16).unwrap_or(&inv.expires_at);
         code_rows.push_str(&format!(
             "<li style=\"display:flex;align-items:center;justify-content:space-between;\
              padding:.625rem 0;border-bottom:1px solid #f5f5f7;gap:.5rem\">\
-             <span style=\"font-size:.875rem;color:#1D1D1F\">Expires {exp}{role}</span>\
+             <span style=\"font-size:.875rem;color:#1D1D1F\">{exp}{role}</span>\
              <form method=\"post\" action=\"/c/{cid}/admin/invites/{iid}/revoke\" style=\"margin:0\">\
                <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
                <button type=\"submit\" \
                  style=\"font-size:.8125rem;color:#FF3B30;background:none;border:none;\
                  padding:.375rem .5rem;cursor:pointer;min-height:44px\" \
-                 aria-label=\"Revoke this invite code\">Revoke</button>\
+                 aria-label=\"{rev}\">{rev}</button>\
              </form></li>",
             exp  = render::escape_html(exp_display),
             role = role_label,
@@ -97,31 +102,35 @@ pub async fn get_invites(
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">Invite Members</h1>\
-         <p style=\"font-size:.875rem;color:#6e6e73\">Generate a one-time code for one person.</p>\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{title}</h1>\
+         <p style=\"font-size:.875rem;color:#6e6e73\">{ib}</p>\
          {flash}{new_code}\
          <form method=\"post\" action=\"/c/{cid}/admin/invites\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            <button type=\"submit\" \
              style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
              border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-             min-height:44px;cursor:pointer;margin-top:.5rem\">Generate Code</button>\
+             min-height:44px;cursor:pointer;margin-top:.5rem\">{ig}</button>\
          </form>\
          <section style=\"margin-top:1.5rem\">\
            <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">Active codes</h2>\
+             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{active_lbl}</h2>\
            {codes}\
          </section>\
          </main>{nav}",
-        header   = render::header_with_switcher(i18n::JA_ADMIN_INVITES_TITLE, community_id, &community_pairs),
-        cid      = render::escape_html(community_id),
-        tok      = render::escape_html(&gen_token),
-        new_code = new_code_html,
-        flash    = flash_html,
-        codes    = codes_html,
-        nav      = nav,
+        header      = render::header_with_switcher(i18n::JA_ADMIN_INVITES_TITLE, community_id, &community_pairs),
+        cid         = render::escape_html(community_id),
+        tok         = render::escape_html(&gen_token),
+        new_code    = new_code_html,
+        flash       = flash_html,
+        codes       = codes_html,
+        nav         = nav,
+        title       = i18n::JA_ADMIN_INVITES_TITLE,
+        ib          = i18n::JA_ADMIN_INVITES_BODY,
+        ig          = i18n::JA_ADMIN_INVITES_GENERATE,
+        active_lbl  = i18n::JA_ADMIN_INVITES_ACTIVE,
     );
-    render::page("Invite Members", &body)
+    render::page(i18n::JA_ADMIN_INVITES_TITLE, &body)
 }
 
 // ── POST /c/:cid/admin/invites ───────────────────────────────────────────
@@ -223,9 +232,10 @@ pub async fn get_members(
         } else {
             format!(
                 "<a href=\"/c/{cid}/admin/members/{mid}/remove\" \
-                 style=\"color:#FF3B30;font-size:.875rem\">Remove</a>",
+                 style=\"color:#FF3B30;font-size:.875rem\">{rc}</a>",
                 cid = render::escape_html(community_id),
                 mid = render::escape_html(&m.id),
+                rc  = i18n::JA_ADMIN_REMOVE_CONFIRM,
             )
         };
         format!(
@@ -243,7 +253,7 @@ pub async fn get_members(
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">Members</h1>\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">{members_h1}</h1>\
          <ul style=\"list-style:none;padding:0;margin:0\">{rows}</ul>\
          <a href=\"/c/{cid}/admin/invites\" \
             style=\"display:block;margin-top:1.5rem;text-align:center;\
@@ -255,8 +265,9 @@ pub async fn get_members(
         rows   = member_rows,
         cid    = render::escape_html(community_id),
         nav    = nav,
+        members_h1 = i18n::JA_ADMIN_MEMBERS_TITLE,
     );
-    render::page("Members", &body)
+    render::page(i18n::JA_ADMIN_MEMBERS_TITLE, &body)
 }
 
 // ── GET /c/:cid/admin/members/:mid/remove ────────────────────────────────
@@ -300,33 +311,36 @@ pub async fn get_remove_member(
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">Remove member?</h1>\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{rmt}</h1>\
          <p style=\"font-size:.9375rem;color:#6e6e73\">\
-           Remove <strong>{name}</strong> from this community?<br>\
-           They will no longer be able to see events or notes.\
+           <strong>{name}</strong><br>{consequence}\
          </p>\
          <div style=\"display:flex;gap:.75rem;margin-top:1.5rem\">\
            <a href=\"/c/{cid}/admin/members\" \
               style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
               text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600\">\
-              Keep Member</a>\
+              {keep}</a>\
            <form method=\"post\" \
              action=\"/c/{cid}/admin/members/{mid}/remove\" style=\"flex:1\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
              <button type=\"submit\" \
                style=\"width:100%;padding:.875rem;background:#FF3B30;color:#fff;\
                border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
-               Remove</button>\
+               {confirm}</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher("Remove Member", community_id, &_community_pairs),
-        name   = render::escape_html(target_name),
-        cid    = render::escape_html(community_id),
-        mid    = render::escape_html(target_membership_id),
-        tok    = render::escape_html(&token),
-        nav    = nav,
+        header      = render::header_with_switcher(i18n::JA_ADMIN_REMOVE_TITLE, community_id, &_community_pairs),
+        name        = render::escape_html(target_name),
+        cid         = render::escape_html(community_id),
+        mid         = render::escape_html(target_membership_id),
+        tok         = render::escape_html(&token),
+        nav         = nav,
+        rmt         = i18n::JA_ADMIN_REMOVE_TITLE,
+        consequence = i18n::JA_ADMIN_REMOVE_CONSEQUENCE,
+        keep        = i18n::JA_ADMIN_REMOVE_KEEP,
+        confirm     = i18n::JA_ADMIN_REMOVE_CONFIRM,
     );
-    render::page("Remove Member", &body)
+    render::page(i18n::JA_ADMIN_REMOVE_TITLE, &body)
 }
 
 // ── POST /c/:cid/admin/members/:mid/remove ───────────────────────────────
@@ -363,9 +377,9 @@ pub async fn post_remove_member(
     let admin_count = membership_db::count_admins(&db, community_id).await?;
     let target_role = membership_db::get_role(&db, target_membership_id, community_id).await?;
     if admin_count <= 1 && target_role.as_deref() == Some("admin") {
-        return render::page("Cannot remove",
-            "<main style=\"padding:2rem\"><p>Cannot remove the last admin. \
-             Transfer the admin role first.</p></main>");
+        return render::page(i18n::JA_GENERAL_ERROR,
+            &format!("<main style=\"padding:2rem\"><p>{}</p></main>",
+                i18n::JA_ADMIN_LAST_ADMIN));
     }
 
     membership_db::soft_remove(&db, target_membership_id, community_id).await?;

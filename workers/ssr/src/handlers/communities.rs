@@ -37,12 +37,13 @@ pub async fn get_communities(
         let is_current = s.community_id == community_id;
         let role = role_map.get(s.community_id.as_str()).copied().unwrap_or("member");
         let is_admin = role == "admin";
-        let role_label = if is_admin { "Admin" } else { "Member" };
+        let role_label = if is_admin { i18n::JA_ROLE_ADMIN } else { i18n::JA_ROLE_MEMBER };
 
         let current_badge = if is_current {
-            "<span style=\"font-size:.75rem;background:#007AFF;color:#fff;\
-             border-radius:99px;padding:.125rem .5rem;margin-left:.5rem\">Current</span>"
-        } else { "" };
+            format!("<span style=\"font-size:.75rem;background:#007AFF;color:#fff;\
+             border-radius:99px;padding:.125rem .5rem;margin-left:.5rem\">{}</span>",
+             i18n::JA_CURRENT_BADGE)
+        } else { String::new() };
 
         // Admin management links — shown only for communities where user is admin.
         let admin_links = if is_admin {

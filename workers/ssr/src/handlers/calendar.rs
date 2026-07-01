@@ -73,7 +73,7 @@ pub async fn get_me_calendar(
         // HMAC(pepper, id) itself, which is unguessable without the pepper.
         // We display the feed URL using the token ID as a stable human-readable handle;
         // the actual bearer secret in the URL will be HMAC(pepper, id).
-        let feed_url = format!(
+let feed_url = format!(
             "{origin}/c/{cid}/cal/{hmac}",
             cid  = render::escape_html(community_id),
             hmac = render::escape_html(&hmac_hex(&pp, &tok.id)),
@@ -113,18 +113,18 @@ pub async fn get_me_calendar(
         )
     } else {
         format!(
-            "<p style=\"font-size:.875rem;color:#6E6E73;margin:1rem 0\">\
-               No calendar feed is active. Generate one to subscribe from your phone calendar.\
-             </p>\
+            "<p style=\"font-size:.875rem;color:#6E6E73;margin:1rem 0\">{desc}</p>\
              <form method=\"post\" action=\"/c/{cid}/me/calendar/regenerate\">\
                <input type=\"hidden\" name=\"_token\" value=\"{gentok}\">\
                <button type=\"submit\" \
                  style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
                  border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-                 min-height:44px;cursor:pointer\">Generate feed URL</button>\
+                 min-height:44px;cursor:pointer\">{cg}</button>\
              </form>",
             cid    = render::escape_html(community_id),
             gentok = render::escape_html(&regen_token),
+            cg     = i18n::JA_CALENDAR_GENERATE,
+            desc   = i18n::JA_CALENDAR_DESCRIPTION,
         )
     };
 
@@ -137,7 +137,7 @@ pub async fn get_me_calendar(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
          {back}\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin:1rem 0 .25rem\">Calendar feed</h1>\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin:1rem 0 .25rem\">{cal_title}</h1>\
          <p style=\"font-size:.875rem;color:#6E6E73;margin-bottom:1rem\">\
            Subscribe in Apple Calendar, Google Calendar, or any app that supports \
            calendar subscriptions (.ics / webcal).\
@@ -145,7 +145,8 @@ pub async fn get_me_calendar(
          {flash}\
          {feed}\
          </main>{nav}",
-        header = render::header_with_switcher(i18n::JA_CALENDAR_TITLE, community_id, &community_pairs),
+        header    = render::header_with_switcher(i18n::JA_CALENDAR_TITLE, community_id, &community_pairs),
+        cal_title = i18n::JA_CALENDAR_TITLE,
         back   = back,
         flash  = flash_html,
         feed   = feed_section,
@@ -257,7 +258,7 @@ pub async fn get_ics_feed(
         _ => {
             // Generic not-found: don't reveal whether token exists.
             return Ok(Response::from_html(
-                "<p>Calendar feed not found or has been revoked.</p>"
+                &format!("<p>{}</p>", i18n::JA_NOT_FOUND)
             )?.with_status(404));
         }
     };
@@ -268,7 +269,7 @@ pub async fn get_ics_feed(
     ).await?.is_some();
     if !still_active {
         return Ok(Response::from_html(
-            "<p>Calendar feed not available.</p>"
+            &format!("<p>{}</p>", i18n::JA_GENERAL_ERROR)
         )?.with_status(403));
     }
 

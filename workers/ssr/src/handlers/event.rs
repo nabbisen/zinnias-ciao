@@ -118,7 +118,10 @@ pub async fn get_event_detail(
 
         let (cg, cng, cna) = (counts.going, counts.not_going, counts.no_answer);
         let counts_html = format!(
-            "<p style=\"font-size:.875rem;color:#6e6e73\">Going {cg} · No Go {cng} · No answer {cna}</p>",
+            "<p style=\"font-size:.875rem;color:#6e6e73\">{gs} {cg} · {ns} {cng} · {nas} {cna}</p>",
+            gs  = i18n::JA_STATUS_GOING,
+            ns  = i18n::JA_STATUS_NOT_GOING,
+            nas = i18n::JA_STATUS_NO_ANSWER,
         );
 
         // Participant rows for this day — from the pre-fetched batch, no N+1.
@@ -152,7 +155,7 @@ pub async fn get_event_detail(
              <h3 style=\"font-size:.9375rem;font-weight:600;margin-bottom:.5rem\">{label}</h3>\
              {status_form}{counts_html}\
              <details style=\"margin-top:.75rem\">\
-               <summary style=\"font-size:.875rem;color:#007AFF;cursor:pointer\">Who's going?</summary>\
+               <summary style=\"font-size:.875rem;color:#007AFF;cursor:pointer\">{whos_going}</summary>\
                <div style=\"margin-top:.5rem\">{plist}</div>\
              </details>\
              </div>",
@@ -160,6 +163,7 @@ pub async fn get_event_detail(
             status_form = status_form,
             counts_html = counts_html,
             plist       = plist,
+            whos_going  = i18n::JA_EVENT_WHOS_GOING,
         ));
     }
 
@@ -202,8 +206,9 @@ pub async fn get_event_detail(
     let notes_section = if !others_html.is_empty() {
         format!(
             "<section style=\"margin-top:1.5rem\">\
-             <h2 style=\"font-size:1.0625rem;font-weight:600;margin-bottom:.5rem\">Notes</h2>\
-             {others_html}</section>"
+             <h2 style=\"font-size:1.0625rem;font-weight:600;margin-bottom:.5rem\">{notes_hd}</h2>\
+             {others_html}</section>",
+        notes_hd   = i18n::JA_EVENT_NOTES_SECTION,
         )
     } else { String::new() };
 
@@ -218,7 +223,7 @@ pub async fn get_event_detail(
         render::escape_html(community_id)
     );
     let cancelled_banner = if event.status == "cancelled" {
-        "<div style=\"background:#FF3B3022;color:#FF3B30;padding:.75rem;border-radius:12px;margin-bottom:1rem\">This event was cancelled.</div>"
+        &format!("<div style=\"background:#FF3B3022;color:#FF3B30;padding:.75rem;border-radius:12px;margin-bottom:1rem\">{}</div>", i18n::JA_EVENT_CANCELLED_BADGE)
     } else { "" };
 
     let body = format!(
@@ -431,30 +436,32 @@ pub async fn get_delete_note_confirm(
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-           <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">Delete note?</h1>\
-           <p style=\"font-size:.9375rem;color:#6E6E73;margin-bottom:1.5rem\">\
-             Your note will be removed. This cannot be undone.</p>\
+           <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">{nd}</h1>\
+           <p style=\"font-size:.9375rem;color:#6E6E73;margin-bottom:1.5rem\">{body_text}</p>\
            <div style=\"display:flex;gap:.75rem\">\
              <a href=\"/c/{cid}/events/{eid}\" \
                 style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
                 text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600;min-height:44px;\
-                display:flex;align-items:center;justify-content:center\">Keep note</a>\
+                display:flex;align-items:center;justify-content:center\">{keep}</a>\
              <form method=\"post\" action=\"/c/{cid}/events/{eid}/my-note/delete\" style=\"flex:1\">\
                <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
                <button type=\"submit\" \
                  style=\"width:100%;padding:.875rem;background:#FF3B30;color:#fff;\
                  border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
-                 Delete note</button>\
+                 {nd}</button>\
              </form>\
            </div>\
          </main>{nav}",
-        header = render::header_with_switcher("Delete note", community_id, &pairs),
-        cid    = render::escape_html(community_id),
-        eid    = render::escape_html(event_id),
-        tok    = render::escape_html(&token),
-        nav    = nav,
+        header    = render::header_with_switcher(i18n::JA_NOTE_DELETE, community_id, &pairs),
+        cid       = render::escape_html(community_id),
+        eid       = render::escape_html(event_id),
+        tok       = render::escape_html(&token),
+        nav       = nav,
+        nd        = i18n::JA_NOTE_DELETE,
+        body_text = i18n::JA_NOTE_DELETE_BODY,
+        keep      = i18n::JA_ADMIN_REMOVE_KEEP,
     );
-    render::page("Delete note", &body)
+    render::page(i18n::JA_NOTE_DELETE, &body)
 }
 
 // ── POST /c/:cid/events/:eid/my-note/delete ──────────────────────────────

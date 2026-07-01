@@ -71,6 +71,18 @@ pub const EN_EMPTY_EVENTS_HINT: &str = "Ask your community admin to add one.";
 pub const EN_EMPTY_EVENTS_ADMIN: &str = "No events yet. Create the first event for this community.";
 
 pub const JA_GENERAL_ERROR: &str = "エラーが発生しました。もう一度お試しください。";
+pub const EN_NOT_FOUND: &str = "Not found.";
+pub const JA_NOT_FOUND: &str = "見つかりませんでした。";
+pub const EN_INTERNAL_ERROR: &str = "Something went wrong. Please try again.";
+pub const JA_INTERNAL_ERROR: &str = "問題が発生しました。もう一度お試しください。";
+pub const EN_ADMIN_ATTEND_CANCELLED: &str = "Attendance cannot be corrected for a cancelled event.";
+pub const JA_ADMIN_ATTEND_CANCELLED: &str = "キャンセル済みのイベントの出席は修正できません。";
+pub const EN_GENERAL_BACK: &str = "Go back";
+pub const JA_GENERAL_BACK: &str = "戻る";
+pub const EN_ADMIN_EDIT_CANCELLED: &str = "Cancelled events cannot be edited.";
+pub const JA_ADMIN_EDIT_CANCELLED: &str = "キャンセル済みのイベントは編集できません。";
+pub const EN_ADMIN_EDIT_STARTED: &str = "This event has already started and cannot be edited.";
+pub const JA_ADMIN_EDIT_STARTED: &str = "すでに開始したイベントは編集できません。";
 pub const JA_OFFLINE_BANNER: &str = "オフライン — 最後に読み込んだ情報を表示しています";
 pub const JA_EMPTY_EVENTS: &str = "イベントはまだありません。";
 pub const JA_EMPTY_EVENTS_HINT: &str = "コミュニティの管理者にイベントの追加をお願いしてください。";
@@ -85,6 +97,8 @@ pub const EN_NAV_ME: &str = "Me";
 pub const JA_NAV_HOME: &str = "ホーム";
 pub const JA_NAV_COMMUNITIES: &str = "コミュニティ";
 pub const JA_NAV_ME: &str = "マイページ";
+pub const EN_NAV_BACK: &str = "Back to event";
+pub const JA_NAV_BACK: &str = "イベントに戻る";
 
 // ── Home schedule view ────────────────────────────────────────────────────
 pub const EN_HOME_TODAY: &str = "Today";
@@ -116,6 +130,8 @@ pub const JA_NOTE_SECTION_LABEL: &str = "あなたのメモ";
 pub const JA_NOTE_PLACEHOLDER_LABEL: &str = "メモ（200文字以内）";
 pub const JA_NOTE_CHAR_HINT: &str = "200文字以内";
 pub const JA_NOTE_VISIBILITY: &str = "コミュニティのメンバーにこのメモが表示されます。";
+pub const JA_NOTE_DELETE_BODY: &str = "このメモは削除されます。元に戻すことはできません。";
+pub const EN_NOTE_DELETE_BODY: &str = "Your note will be removed. This cannot be undone.";
 
 // ── Me / profile ──────────────────────────────────────────────────────────
 pub const EN_ME_SECTION_NAME: &str = "Name";
@@ -313,6 +329,21 @@ pub const JA_EVENT_TITLE_HEADER:           &str = "イベント";
 pub const JA_EVENT_ATTENDED_UNAVAILABLE:   &str = "イベント終了後に選択できます";
 pub const JA_EVENT_ATTENDED_ADMIN_ONLY:    &str = "出席の記録は管理者のみ行えます";
 pub const JA_EVENT_MEMBER_FALLBACK:        &str = "メンバー";
+pub const EN_EVENT_CANCELLED_BADGE: &str = "This event was cancelled.";
+pub const JA_EVENT_CANCELLED_BADGE: &str = "このイベントはキャンセルされました。";
+pub const EN_EVENT_WHOS_GOING: &str = "Who's going?";
+pub const JA_EVENT_WHOS_GOING: &str = "参加予定者";
+pub const EN_EVENT_NOTES_SECTION: &str = "Notes";
+pub const JA_EVENT_NOTES_SECTION: &str = "メモ";
+pub const EN_TZ_ERROR: &str = "Community timezone is not configured correctly. Please ask the operator to set a valid timezone.";
+pub const JA_TZ_ERROR: &str = "コミュニティのタイムゾーンが正しく設定されていません。運営者にお問い合わせください。";
+pub const EN_CURRENT_BADGE: &str = "Current";
+pub const JA_CURRENT_BADGE: &str = "現在";
+pub const EN_ADMIN_MEMBERS_H1: &str = "Members";
+pub const EN_ME_CALENDAR_LABEL: &str = "Calendar feed";
+pub const JA_ME_CALENDAR_LABEL: &str = "カレンダーフィード";
+pub const EN_ME_DATA_EXPORT: &str = "Export community data";
+pub const JA_ME_DATA_EXPORT: &str = "コミュニティデータをエクスポート";
 
 // ── Join page (RFC-003) ────────────────────────────────────────────────────
 pub const EN_JOIN_PAGE_TITLE:              &str = "Join";

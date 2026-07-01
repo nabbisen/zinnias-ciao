@@ -323,7 +323,8 @@ pub fn note_form(
         format!(
             "<a href=\"/c/{cid}/events/{eid}/my-note/delete\" \
              style=\"display:inline-block;font-size:.875rem;color:{danger};padding:.25rem;\
-             min-height:44px;line-height:44px;text-decoration:none\">Delete Note</a>",
+             min-height:44px;line-height:44px;text-decoration:none\">{del}</a>",
+            del    = zinnias_ciao_contracts::i18n::JA_NOTE_DELETE,
             cid    = escape_html(community_id),
             eid    = escape_html(event_id),
             danger = CZ_COLOR_DANGER,
@@ -569,29 +570,37 @@ fn initials(name: &str) -> String {
 // ── Common pages ─────────────────────────────────────────────────────────
 
 pub fn placeholder() -> Result<Response> {
-    let body = "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
-  <h1 style=\"font-size:1.25rem;font-weight:600\">ciao.zinnias</h1>\
-  <p>Private community schedule sharing.</p>\
-  <p style=\"color:#6E6E73;font-size:.875rem\">This environment is not ready for members yet.</p>\
-</main>";
-    Response::from_html(shell(i18n::JA_JOIN_HEADING, body))
+    let body = format!("<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+  <h1 style=\"font-size:1.25rem;font-weight:600\">{}</h1>\
+  <p style=\"color:#6E6E73;font-size:.875rem\">{}</p>\
+</main>",
+        zinnias_ciao_contracts::i18n::JA_JOIN_HEADING,
+        zinnias_ciao_contracts::i18n::JA_GENERAL_ERROR,
+    );
+    Response::from_html(shell(i18n::JA_JOIN_HEADING, &body))
 }
 
 pub fn not_found() -> Result<Response> {
-    let body = "<main style=\"padding:2rem\"><p>Not found.</p></main>";
-    Ok(Response::from_html(shell("Not found", body))?.with_status(404))
+    let body = format!("<main style=\"padding:2rem\"><p>{}</p></main>",
+        zinnias_ciao_contracts::i18n::JA_NOT_FOUND);
+    Ok(Response::from_html(shell(zinnias_ciao_contracts::i18n::JA_NOT_FOUND, &body))?.with_status(404))
 }
 
 pub fn internal_error() -> Result<Response> {
-    let body = "<main style=\"padding:2rem\"><p>Something went wrong. Please try again.</p></main>";
-    Ok(Response::from_html(shell("Error", body))?.with_status(500))
+    let body = format!("<main style=\"padding:2rem\"><p>{}</p></main>",
+        zinnias_ciao_contracts::i18n::JA_INTERNAL_ERROR);
+    Ok(Response::from_html(shell(zinnias_ciao_contracts::i18n::JA_GENERAL_ERROR, &body))?.with_status(500))
 }
 
 pub fn session_expired() -> Result<Response> {
-    let body = "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
-         <p style=\"color:#FF3B30\">Your session expired. Please ask your community admin for a new invite code.</p>\
-         <a href=\"/join\" style=\"display:inline-block;margin-top:1rem;color:#007AFF\">Join</a></main>";
-    Ok(Response::from_html(shell("Session expired", body))?.with_status(401))
+    let body = format!(
+        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+         <p style=\"color:#FF3B30\">{msg}</p>\
+         <a href=\"/join\" style=\"display:inline-block;margin-top:1rem;color:#007AFF\">{join}</a></main>",
+        msg  = zinnias_ciao_contracts::i18n::JA_SESSION_EXPIRED,
+        join = zinnias_ciao_contracts::i18n::JA_JOIN_SUBMIT,
+    );
+    Ok(Response::from_html(shell(zinnias_ciao_contracts::i18n::JA_GENERAL_ERROR, &body))?.with_status(401))
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────

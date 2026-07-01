@@ -85,24 +85,26 @@ pub async fn get_templates(
                <a href=\"/c/{cid}/admin/events/new?template={tid}\" \
                   style=\"font-size:.875rem;color:#007AFF;text-decoration:none;\
                   padding:.375rem .625rem;min-height:44px;display:flex;align-items:center\">\
-                  Use</a>\
+                  {use_btn}</a>\
                <form method=\"post\" \
                  action=\"/c/{cid}/admin/templates/{tid}/delete\" style=\"margin:0\">\
                  <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
                  <button type=\"submit\" \
                    style=\"font-size:.8125rem;color:#FF3B30;background:none;border:none;\
                    cursor:pointer;padding:.375rem .5rem;min-height:44px\"\
-                   aria-label=\"Delete template\">\
-                   Delete</button>\
+                   aria-label=\"{del_btn}\">\
+                   {del_btn}</button>\
                </form>\
              </div>\
              </li>",
-            title = render::escape_html(&t.title),
-            loc   = render::escape_html(&loc_label),
-            dur   = render::escape_html(&dur_label),
-            cid   = render::escape_html(community_id),
-            tid   = render::escape_html(&t.id),
-            tok   = render::escape_html(&delete_tok),
+            title   = render::escape_html(&t.title),
+            loc     = render::escape_html(&loc_label),
+            dur     = render::escape_html(&dur_label),
+            cid     = render::escape_html(community_id),
+            tid     = render::escape_html(&t.id),
+            tok     = render::escape_html(&delete_tok),
+            use_btn = i18n::JA_TEMPLATES_USE_BTN,
+            del_btn = i18n::JA_TEMPLATES_DELETE_BTN,
         ));
     }
 

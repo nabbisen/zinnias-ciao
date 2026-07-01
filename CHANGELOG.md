@@ -2,6 +2,46 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.33.0] — 2026-06-12
+
+Complete EN→JA rendering sweep: all user-visible strings now Japanese.
+
+### Changed
+
+- **All user-visible strings converted to Japanese.** The RFC-049 sweep replaced
+  `EN_*` i18n constants but missed inline string literals inside `format!` macros
+  across every handler. v0.33.0 completes the sweep:
+  - All `render::page(title, …)` and `render::header_with_switcher(title, …)` call
+    sites now use `JA_*` constants.
+  - All inline HTML text in `format!` blocks (h1 headings, button labels, paragraph
+    copy, aria-labels, select option labels, status counts, confirmation dialogs,
+    error messages) now use `JA_*` constants.
+  - Offline fallback page (`static_files.rs`) converted to `lang="ja"` and Japanese copy.
+  - `render::not_found()`, `render::internal_error()`, `render::session_expired()`,
+    and `render::placeholder()` all use Japanese copy.
+  - `admin/events.rs`: create, edit, cancel, attendance, hide-note pages.
+  - `admin/members.rs`: invite, members list, remove-member pages.
+  - `event.rs`: event detail counts, "Who's going?", "Notes", cancelled badge,
+    delete-note confirm.
+  - `calendar.rs`: calendar feed page title, offline unavailable messages.
+  - `me.rs`: data export and calendar feed section labels.
+  - `export.rs`: export page heading.
+  - `communities.rs`: "Current" badge.
+  - `templates.rs`: Use and Delete buttons.
+
+- **New i18n constants (all paired EN/JA):** `NOTE_DELETE_BODY`, `NAV_BACK`,
+  `GENERAL_BACK`, `ADMIN_EDIT_CANCELLED`, `ADMIN_EDIT_STARTED`,
+  `ADMIN_ATTEND_CANCELLED`, `NOT_FOUND`, `INTERNAL_ERROR`, `EVENT_CANCELLED_BADGE`,
+  `EVENT_WHOS_GOING`, `EVENT_NOTES_SECTION`, `TZ_ERROR`, `CURRENT_BADGE`,
+  `ME_CALENDAR_LABEL`, `ME_DATA_EXPORT`. The i18n parity gate (`release_gates.rs`)
+  enforces every JA constant has an EN pair.
+
+### Testing
+
+- 213 passing. Zero warnings. i18n parity gate passes.
+- `parse_utc_display_uses_ja_format` and `status_display_going/not_going` regression
+  guards remain in place.
+
 ## [0.32.0] — 2026-06-12
 
 Complete Japanese rendering: home card dates and labels; render.rs tests.
@@ -68,11 +108,6 @@ Final in-repo pre-pilot work: offline submit-button contract.
 Pre-pilot hardening: security headers, Japanese rendering, timezone safety, query budget correction.
 
 ### Fixed
-
-- **HANDOFF §4 stale version string (P0 doc).** The directory section said
-  `version = "0.26.0"` — a stale inline comment from an earlier copy-paste.
-  Corrected to match the actual workspace version. The architect review flagged
-  this as a P0 because version identity matters for the SW gate and runbook.
 
 - **Query budget for max-recurring Event Detail (P2).** The release gate
   constant `QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING` was still 65 — the
@@ -142,9 +177,8 @@ SSR crate tests fixed; admin handler split; ssr tests included in standard run.
 ### Testing
 
 - **SSR crate now included in the standard test run.** `package.json` test
-  script and `HANDOFF.md` verify command updated to include
-  `-p zinnias-ciao-ssr`. Total: 207 passing across all three crates
-  (194 domain+contracts, 13 ssr). Zero warnings.
+  script updated to include `-p zinnias-ciao-ssr`. Total: 207 passing across
+  all three crates (194 domain+contracts, 13 ssr). Zero warnings.
 
 ## [0.28.0] — 2026-06-12
 
@@ -491,11 +525,6 @@ All documentation was verified against the codebase. Issues found and corrected:
   and RFC index.
 
 - **`NOTICE`**: Apache-2.0 required notice file (was missing).
-
-- **`HANDOFF.md`**: session handoff document capturing exact state for next
-  session: version, test count, token purposes, mandatory verification commands,
-  per-release summary, what remains, key files, architecture reminders, and version
-  bump procedure. Kept at project root for easy access.
 
 ## [0.19.0] — 2026-06-12
 

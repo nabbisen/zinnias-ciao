@@ -2,7 +2,7 @@
 
 ## Status
 
-**v0.32.0** — 42 of 55 RFCs implemented (13 proposed). 213 passing unit tests. Zero warnings.
+**v0.33.0** — 42 of 55 RFCs implemented (13 proposed). 213 passing unit tests. Zero warnings.
 
 **Pre-pilot hardening complete.** All in-repo code work for the pilot is done.
 RFC-055 (offline read-only contract) closed with a one-line app.js enhancement

@@ -65,7 +65,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Stabilization gates (v0.27.0 — RFC-045–047 + i18n/XSS hardening)
 
-- [x] All 11 source-verification claims from architect handoff review §8 confirmed against code (RFC-045 §5 — see HANDOFF.md §5).
+- [x] All 11 source-verification claims from architect handoff review §8 confirmed against code (RFC-045 §5).
 - [x] `SET_STATUS` token issued once per Event Detail render, bound to `event_id`; day validated via days_for_event lookup (RFC-046).
 - [x] Day labels render in Japanese convention (`6月14日（土）`); no English month abbreviation (RFC-047).
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
@@ -83,7 +83,6 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] `Referrer-Policy` changed to `same-origin` (RFC-048).
 - [x] All UI strings render in Japanese (`JA_*`); HTML `lang="ja"` (RFC-049).
 - [x] Unknown community timezone returns a hard error on write paths, not a silent UTC fallback (P1-timezone).
-- [x] HANDOFF directory section stale version string fixed (P0 doc).
 - [x] Query budget for max-recurring Event Detail updated from ≤65 to ≤13 (correct after RFC-046).
 - [~] Security header values verified in a real browser on staging. *(staging runtime)*
 

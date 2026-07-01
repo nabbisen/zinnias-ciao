@@ -65,10 +65,11 @@ pub async fn get_create_event(
         cid = render::escape_html(community_id),
     );
 
-    let body = format!(
+        let cet = i18n::JA_ADMIN_CREATE_EVENT_TITLE;
+let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">Create Event</h1>\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">{cet}</h1>\
          <form method=\"post\" action=\"/c/{cid}/admin/events\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            {fields}\
@@ -162,7 +163,7 @@ pub async fn post_create_event(
         Some(o) => o,
         None => return render::page(
             "Configuration error",
-            "<p style=\"color:#FF3B30\">Community timezone is not configured correctly. Please ask the operator to set a valid timezone.</p>"
+            &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR)
         ),
     };
     let days_utc: Vec<(String, String, String)> = expanded.iter().map(|d| {
@@ -222,30 +223,34 @@ pub async fn get_cancel_event(
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">Cancel this event?</h1>\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{cat}</h1>\
          <p style=\"font-size:.9375rem;color:#6e6e73\"><strong>{title}</strong></p>\
-         <p style=\"font-size:.875rem;color:#6e6e73\">Members will still see that it was cancelled.</p>\
+         <p style=\"font-size:.875rem;color:#6e6e73\">{body_text}</p>\
          <div style=\"display:flex;gap:.75rem;margin-top:1.5rem\">\
            <a href=\"/c/{cid}/events/{eid}\" \
               style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
               text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600\">\
-              Keep Event</a>\
+              {keep}</a>\
            <form method=\"post\" action=\"/c/{cid}/admin/events/{eid}/cancel\" style=\"flex:1\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
              <button type=\"submit\" \
                style=\"width:100%;padding:.875rem;background:#FF3B30;color:#fff;\
                border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
-               Cancel Event</button>\
+               {confirm}</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher(i18n::JA_ADMIN_CANCEL_EVENT_TITLE, community_id, &_community_pairs),
-        title  = render::escape_html(&event.title),
-        cid    = render::escape_html(community_id),
-        eid    = render::escape_html(event_id),
-        tok    = render::escape_html(&token),
-        nav    = nav,
+        header    = render::header_with_switcher(i18n::JA_ADMIN_CANCEL_EVENT_TITLE, community_id, &_community_pairs),
+        title     = render::escape_html(&event.title),
+        cid       = render::escape_html(community_id),
+        eid       = render::escape_html(event_id),
+        tok       = render::escape_html(&token),
+        nav       = nav,
+        cat       = i18n::JA_ADMIN_CANCEL_EVENT_TITLE,
+        body_text = i18n::JA_ADMIN_CANCEL_EVENT_BODY,
+        keep      = i18n::JA_ADMIN_CANCEL_EVENT_KEEP,
+        confirm   = i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM,
     );
-    render::page("Cancel Event", &body)
+    render::page(i18n::JA_ADMIN_CANCEL_EVENT_TITLE, &body)
 }
 
 // ── POST /c/:cid/admin/events/:eid/cancel ────────────────────────────────
@@ -301,9 +306,9 @@ pub async fn get_edit_event(
         None    => return render::not_found(),
     };
     if event.status == "cancelled" {
-        return render::page("Cannot edit",
-            "<main style=\"padding:2rem\"><p>Cancelled events cannot be edited.</p>\
-             <p><a href=\"javascript:history.back()\">Back</a></p></main>");
+        return render::page(i18n::JA_GENERAL_ERROR,
+            &format!("<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
+                i18n::JA_ADMIN_EDIT_CANCELLED, i18n::JA_GENERAL_BACK));
     }
     // RFC-018: editing is only allowed while the event is still upcoming (before first day starts).
     let days = event_db::days_for_event(&db, event_id).await?;
@@ -312,9 +317,9 @@ pub async fn get_edit_event(
         classify_day(&d.starts_at_utc, &d.ends_at_utc, &now_utc) != DayTimeState::Upcoming
     });
     if already_started {
-        return render::page("Cannot edit",
-            "<main style=\"padding:2rem\"><p>This event has already started and cannot be edited.</p>\
-             <p><a href=\"javascript:history.back()\">Back</a></p></main>");
+        return render::page(i18n::JA_GENERAL_ERROR,
+            &format!("<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
+                i18n::JA_ADMIN_EDIT_STARTED, i18n::JA_GENERAL_BACK));
     }
 
     let pp = crate::crypto::pepper(env);
@@ -348,10 +353,12 @@ pub async fn get_edit_event(
     let url = req.url()?;
     let err: Option<String> = url.query_pairs().find(|(k,_)| k == "err").map(|(_,v)| v.to_string());
 
-    let body = format!(
+        let eet = i18n::JA_ADMIN_EDIT_EVENT_TITLE;
+    let ees = i18n::JA_ADMIN_EDIT_EVENT_SUBMIT;
+let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">Edit Event</h1>\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{eet}</h1>\
          <p style=\"font-size:.8125rem;color:{muted};margin-bottom:1rem\">\
            Members will see the updated event details.</p>\
          <form method=\"post\" action=\"/c/{cid}/admin/events/{eid}/edit\">\
@@ -359,18 +366,19 @@ pub async fn get_edit_event(
            {fields}\
            <button type=\"submit\" style=\"width:100%;padding:.875rem;background:{going};\
            color:#fff;border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-           min-height:44px;cursor:pointer;margin-top:1rem\">Save Changes</button>\
+           min-height:44px;cursor:pointer;margin-top:1rem\">{ees}</button>\
          </form>\
          <div style=\"margin-top:1.5rem\">\
            <a href=\"/c/{cid}/events/{eid}\" \
-              style=\"color:{muted};font-size:.875rem\">Back to event</a>\
+              style=\"color:{muted};font-size:.875rem\">{back}</a>\
          </div>\
          </main>{nav}",
-        header = render::header_with_switcher("Edit Event", community_id, &community_pairs),
+        header = render::header_with_switcher(i18n::JA_ADMIN_EDIT_EVENT_TITLE, community_id, &community_pairs),
         cid    = render::escape_html(community_id),
         eid    = render::escape_html(event_id),
         tok    = render::escape_html(&token),
         muted  = "#6E6E73",
+        back   = i18n::JA_NAV_BACK,
         going  = "#007AFF",
         fields = event_form_fields(
             Some(&event.title),
@@ -384,7 +392,7 @@ pub async fn get_edit_event(
         ),
         nav = nav,
     );
-    render::page("Edit Event", &body)
+    render::page(i18n::JA_ADMIN_EDIT_EVENT_TITLE, &body)
 }
 
 // ── POST /c/:cid/admin/events/:eid/edit ──────────────────────────────────
@@ -459,7 +467,7 @@ pub async fn post_edit_event(
             Some(o) => o,
             None => return render::page(
                 "Configuration error",
-                "<p style=\"color:#FF3B30\">Community timezone is not configured correctly. Please ask the operator to set a valid timezone.</p>"
+                &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR)
             ),
         };
         let d = &validated.days[0];
@@ -511,9 +519,9 @@ pub async fn get_attendance(
     // Only allow attendance correction after the event (status=ended or any non-scheduled)
     // For MVP we allow it for any non-cancelled event (the admin controls when to correct).
     if event.status == "cancelled" {
-        return render::page("Not available",
-            "<main style=\"padding:2rem\"><p>Attendance cannot be corrected for a cancelled event.</p>\
-             <p><a href=\"javascript:history.back()\">Back</a></p></main>");
+        return render::page(i18n::JA_GENERAL_ERROR,
+            &format!("<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
+                i18n::JA_ADMIN_ATTEND_CANCELLED, i18n::JA_GENERAL_BACK));
     }
 
     let days = event_db::days_for_event(&db, event_id).await?;
@@ -553,10 +561,10 @@ pub async fn get_attendance(
                    style=\"font-size:.875rem;padding:.375rem .5rem;border:1px solid #E5E5EA;\
                    border-radius:8px;min-height:44px\" \
                    aria-label=\"Attendance for {name_raw}\">\
-                   <option value=\"\"{no_ans}>No answer</option>\
-                   <option value=\"going\"{going}>Going</option>\
-                   <option value=\"not_going\"{notgoing}>Not going</option>\
-                   <option value=\"attended\"{attended}>Attended</option>\
+                   <option value=\"\"{no_ans}>{opt_na}</option>\
+                   <option value=\"going\"{going}>{opt_go}</option>\
+                   <option value=\"not_going\"{notgoing}>{opt_ng}</option>\
+                   <option value=\"attended\"{attended}>{opt_at}</option>\
                  </select>\
                  </div>",
                 name     = render::escape_html(&m.display_name),
@@ -566,6 +574,10 @@ pub async fn get_attendance(
                 no_ans   = if current.is_none() { " selected" } else { "" },
                 going    = sel("going"),
                 notgoing = sel("not_going"),
+                opt_na   = i18n::JA_STATUS_NO_ANSWER,
+                opt_go   = i18n::JA_STATUS_GOING,
+                opt_ng   = i18n::JA_STATUS_NOT_GOING,
+                opt_at   = i18n::JA_STATUS_ATTENDED,
                 attended = sel("attended"),
             ));
         }
@@ -581,7 +593,7 @@ pub async fn get_attendance(
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.25rem\">Mark Attendance</h1>\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.25rem\">{at}</h1>\
          <p style=\"font-size:.875rem;color:#6E6E73;margin-bottom:1rem\">{title}</p>\
          {flash}\
          <form method=\"post\" action=\"/c/{cid}/admin/events/{eid}/attendance\">\
@@ -590,11 +602,11 @@ pub async fn get_attendance(
            <button type=\"submit\" \
              style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
              border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-             min-height:44px;cursor:pointer;margin-top:1.5rem\">Save Attendance</button>\
+             min-height:44px;cursor:pointer;margin-top:1.5rem\">{aas}</button>\
          </form>\
          <div style=\"margin-top:1rem\">\
            <a href=\"/c/{cid}/events/{eid}\" style=\"color:#6E6E73;font-size:.875rem\">\
-             Back to event</a>\
+             {back}</a>\
          </div>\
          </main>{nav}",
         header = render::header_with_switcher(i18n::JA_ADMIN_ATTEND_TITLE, community_id, &community_pairs),
@@ -605,8 +617,11 @@ pub async fn get_attendance(
         days   = days_html,
         flash  = flash_html,
         nav    = nav,
+        at     = i18n::JA_ADMIN_ATTEND_TITLE,
+        aas    = i18n::JA_ADMIN_ATTEND_SUBMIT,
+        back   = i18n::JA_NAV_BACK,
     );
-    render::page("Mark Attendance", &body)
+    render::page(i18n::JA_ADMIN_ATTEND_TITLE, &body)
 }
 
 // ── POST /c/:cid/admin/events/:eid/attendance ────────────────────────────
@@ -704,33 +719,36 @@ pub async fn get_admin_hide_note_confirm(
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-           <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">Remove note?</h1>\
+           <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">{nd}</h1>\
            <p style=\"font-size:.9375rem;color:#6E6E73;margin-bottom:1.5rem\">\
-             Remove the note from {name}? This cannot be undone.</p>\
+             {consequence} {name}</p>\
            <div style=\"display:flex;gap:.75rem\">\
              <a href=\"/c/{cid}/events/{eid}\" \
                 style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
                 text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600;min-height:44px;\
-                display:flex;align-items:center;justify-content:center\">Keep note</a>\
+                display:flex;align-items:center;justify-content:center\">{keep}</a>\
              <form method=\"post\" \
                    action=\"/c/{cid}/admin/events/{eid}/notes/{mid}/hide\" style=\"flex:1\">\
                <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
                <button type=\"submit\" \
                  style=\"width:100%;padding:.875rem;background:#FF3B30;color:#fff;\
                  border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
-                 Remove note</button>\
+                 {nd}</button>\
              </form>\
            </div>\
          </main>{nav}",
-        header = render::header_with_switcher("Remove note", community_id, &pairs),
-        name   = render::escape_html(target_name),
-        cid    = render::escape_html(community_id),
-        eid    = render::escape_html(event_id),
-        mid    = render::escape_html(target_membership_id),
-        tok    = render::escape_html(&token),
-        nav    = nav,
+        header      = render::header_with_switcher(i18n::JA_NOTE_DELETE, community_id, &pairs),
+        name        = render::escape_html(target_name),
+        cid         = render::escape_html(community_id),
+        eid         = render::escape_html(event_id),
+        mid         = render::escape_html(target_membership_id),
+        tok         = render::escape_html(&token),
+        nav         = nav,
+        nd          = i18n::JA_NOTE_DELETE,
+        keep        = i18n::JA_ADMIN_INVITES_REVOKE, // closest available: "無効化" — TODO RFC-054
+        consequence = i18n::JA_ADMIN_REMOVE_CONSEQUENCE,
     );
-    render::page("Remove note", &body)
+    render::page(i18n::JA_NOTE_DELETE, &body)
 }
 
 // ── POST /c/:cid/admin/events/:eid/notes/:mid/hide ───────────────────────
@@ -869,3 +887,4 @@ fn event_form_fields(
         },
     )
 }
+
