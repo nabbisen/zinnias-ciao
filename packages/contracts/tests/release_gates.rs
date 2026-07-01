@@ -1,22 +1,30 @@
 //! Release-gate checks (RFC-015).
 //! Every item here maps to a row in the MVP release-gate matrix.
 
-use zinnias_ciao_contracts::{AppError, SESSION_TTL_SECONDS, FORM_TOKEN_TTL_SECONDS};
 use zinnias_ciao_contracts::auth::token_purpose;
+use zinnias_ciao_contracts::{AppError, FORM_TOKEN_TTL_SECONDS, SESSION_TTL_SECONDS};
 
 // ── Session / auth gates ──────────────────────────────────────────────────
 
 #[test]
 fn session_ttl_positive_and_bounded() {
-    assert!(SESSION_TTL_SECONDS > 0,  "session TTL must be positive (Max-Age=0 bug)");
+    assert!(
+        SESSION_TTL_SECONDS > 0,
+        "session TTL must be positive (Max-Age=0 bug)"
+    );
     assert!(SESSION_TTL_SECONDS >= 3600, "session TTL too short");
-    assert!(SESSION_TTL_SECONDS <= 31 * 86400, "session TTL too long for invite-only MVP");
+    assert!(
+        SESSION_TTL_SECONDS <= 31 * 86400,
+        "session TTL too long for invite-only MVP"
+    );
 }
 
 #[test]
 fn form_token_ttl_shorter_than_session() {
-    assert!(FORM_TOKEN_TTL_SECONDS < SESSION_TTL_SECONDS,
-        "form token must expire before the session");
+    assert!(
+        FORM_TOKEN_TTL_SECONDS < SESSION_TTL_SECONDS,
+        "form token must expire before the session"
+    );
 }
 
 #[test]
@@ -25,9 +33,13 @@ fn session_ttl_never_derived_from_token_exp() {
     // token_exp - now and the token was at the JWT leeway edge (~55s past exp),
     // Max-Age would be <= 0 and the browser would discard the cookie immediately.
     let token_exp: i64 = 1_000_000_000;
-    let now_at_edge: i64 = 1_000_000_055;   // 55 s past exp — within 60 s leeway
+    let now_at_edge: i64 = 1_000_000_055; // 55 s past exp — within 60 s leeway
     let derived: i64 = token_exp - now_at_edge;
-    assert!(derived <= 0, "derived TTL {} <= 0 demonstrates the bug", derived);
+    assert!(
+        derived <= 0,
+        "derived TTL {} <= 0 demonstrates the bug",
+        derived
+    );
     // The correct value is always the constant:
     assert!(SESSION_TTL_SECONDS as i64 > 0);
 }
@@ -36,7 +48,10 @@ fn session_ttl_never_derived_from_token_exp() {
 
 #[test]
 fn not_found_and_forbidden_same_message() {
-    assert_eq!(AppError::not_found().user_message, AppError::forbidden().user_message);
+    assert_eq!(
+        AppError::not_found().user_message,
+        AppError::forbidden().user_message
+    );
 }
 
 #[test]
@@ -88,7 +103,10 @@ fn all_state_changing_routes_have_token_purpose() {
     ];
     for p in required {
         assert!(!p.is_empty(), "token purpose must not be empty: {p}");
-        assert!(!p.contains(' '), "token purpose must not contain spaces: {p}");
+        assert!(
+            !p.contains(' '),
+            "token purpose must not contain spaces: {p}"
+        );
     }
 }
 
@@ -155,9 +173,15 @@ fn i18n_en_ja_parity_count() {
         (EN_ADMIN_CANCEL_EVENT_BODY, JA_ADMIN_CANCEL_EVENT_BODY),
         (EN_ADMIN_CANCEL_EVENT_KEEP, JA_ADMIN_CANCEL_EVENT_KEEP),
         (EN_ADMIN_CANCEL_EVENT_CONFIRM, JA_ADMIN_CANCEL_EVENT_CONFIRM),
-        (EN_ADMIN_CANNOT_EDIT_CANCELLED, JA_ADMIN_CANNOT_EDIT_CANCELLED),
+        (
+            EN_ADMIN_CANNOT_EDIT_CANCELLED,
+            JA_ADMIN_CANNOT_EDIT_CANCELLED,
+        ),
         (EN_ADMIN_CANNOT_EDIT_STARTED, JA_ADMIN_CANNOT_EDIT_STARTED),
-        (EN_ADMIN_CANNOT_ATTEND_CANCELLED, JA_ADMIN_CANNOT_ATTEND_CANCELLED),
+        (
+            EN_ADMIN_CANNOT_ATTEND_CANCELLED,
+            JA_ADMIN_CANNOT_ATTEND_CANCELLED,
+        ),
         (EN_ADMIN_ATTEND_TITLE, JA_ADMIN_ATTEND_TITLE),
         (EN_ADMIN_ATTEND_SUBMIT, JA_ADMIN_ATTEND_SUBMIT),
         (EN_ADMIN_INVITES_TITLE, JA_ADMIN_INVITES_TITLE),
@@ -165,11 +189,17 @@ fn i18n_en_ja_parity_count() {
         (EN_ADMIN_INVITES_GENERATE, JA_ADMIN_INVITES_GENERATE),
         (EN_ADMIN_INVITES_ACTIVE, JA_ADMIN_INVITES_ACTIVE),
         (EN_ADMIN_INVITES_NONE, JA_ADMIN_INVITES_NONE),
-        (EN_ADMIN_INVITES_NEW_CODE_HINT, JA_ADMIN_INVITES_NEW_CODE_HINT),
+        (
+            EN_ADMIN_INVITES_NEW_CODE_HINT,
+            JA_ADMIN_INVITES_NEW_CODE_HINT,
+        ),
         (EN_ADMIN_INVITES_REVOKE, JA_ADMIN_INVITES_REVOKE),
         (EN_ADMIN_INVITES_REVOKED, JA_ADMIN_INVITES_REVOKED),
         (EN_ADMIN_MEMBERS_TITLE, JA_ADMIN_MEMBERS_TITLE),
-        (EN_ADMIN_MEMBERS_GENERATE_INVITE, JA_ADMIN_MEMBERS_GENERATE_INVITE),
+        (
+            EN_ADMIN_MEMBERS_GENERATE_INVITE,
+            JA_ADMIN_MEMBERS_GENERATE_INVITE,
+        ),
         (EN_ADMIN_REMOVE_TITLE, JA_ADMIN_REMOVE_TITLE),
         (EN_ADMIN_REMOVE_KEEP, JA_ADMIN_REMOVE_KEEP),
         (EN_ADMIN_REMOVE_CONFIRM, JA_ADMIN_REMOVE_CONFIRM),
@@ -301,17 +331,25 @@ fn query_budgets_are_positive_and_ordered() {
     assert!(QUERY_BUDGET_HOME > 0);
     assert!(QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY > QUERY_BUDGET_HOME);
     // After RFC-046 both single-day and max-recurring are identical (13).
-    assert_eq!(QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING, QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY,
-        "RFC-046: event-bound token makes recurring cost identical to single-day");
+    assert_eq!(
+        QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING, QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY,
+        "RFC-046: event-bound token makes recurring cost identical to single-day"
+    );
     assert!(QUERY_BUDGET_EXPORT > 0);
     // Export must be flat (well under the old per-event worst case):
-    assert!(QUERY_BUDGET_EXPORT < 20,
-        "Export budget {QUERY_BUDGET_EXPORT} exceeds expected flat upper bound");
+    assert!(
+        QUERY_BUDGET_EXPORT < 20,
+        "Export budget {QUERY_BUDGET_EXPORT} exceeds expected flat upper bound"
+    );
     // Event detail must be well under the old per-day worst case of 65:
-    assert!(QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY < 20,
-        "Event detail budget {QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY} suggests an N+1 regression");
-    assert!(QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING < 20,
-        "Event detail recurring budget suggests an N+1 regression");
+    assert!(
+        QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY < 20,
+        "Event detail budget {QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY} suggests an N+1 regression"
+    );
+    assert!(
+        QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING < 20,
+        "Event detail recurring budget suggests an N+1 regression"
+    );
 }
 
 // ── Static source query-count gates (RFC-044 §6.1) ───────────────────────
@@ -327,12 +365,9 @@ fn query_budgets_are_positive_and_ordered() {
 // refactors without constant adjustment. A count approaching the 2× ceiling
 // should trigger manual budget review.
 
-const HOME_HANDLER_SRC: &str =
-    include_str!("../../../workers/ssr/src/handlers/home.rs");
-const EVENT_HANDLER_SRC: &str =
-    include_str!("../../../workers/ssr/src/handlers/event.rs");
-const EXPORT_HANDLER_SRC: &str =
-    include_str!("../../../workers/ssr/src/handlers/export.rs");
+const HOME_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/home.rs");
+const EVENT_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/event.rs");
+const EXPORT_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/export.rs");
 
 /// Count non-comment lines containing `.await` in a source string.
 fn count_awaits(src: &str) -> usize {
@@ -414,7 +449,10 @@ fn sw_cache_version_matches_workspace_version() {
         .and_then(|l| {
             // e.g.  const CACHE_VERSION = 'v0.25.0';
             let after_eq = l.splitn(2, '=').nth(1)?;
-            let inner = after_eq.trim().trim_start_matches('\'').trim_end_matches(';')
+            let inner = after_eq
+                .trim()
+                .trim_start_matches('\'')
+                .trim_end_matches(';')
                 .trim_end_matches('\'');
             // Strip the leading 'v'
             inner.strip_prefix('v')
@@ -438,7 +476,9 @@ fn sw_cache_version_matches_workspace_version() {
                 }
                 if trimmed.starts_with("version") {
                     // version     = "0.25.0"
-                    found = trimmed.splitn(2, '=').nth(1)
+                    found = trimmed
+                        .splitn(2, '=')
+                        .nth(1)
                         .map(|v| v.trim().trim_matches('"').to_owned());
                     break;
                 }
@@ -467,10 +507,8 @@ fn sw_cache_version_matches_workspace_version() {
 // known English UI vocabulary, not arbitrary English (comments, code, ARIA
 // values, and HTTP header literals must remain unflagged).
 
-const COMMUNITIES_SRC: &str =
-    include_str!("../../../workers/ssr/src/handlers/communities.rs");
-const RENDER_SRC: &str =
-    include_str!("../../../workers/ssr/src/render.rs");
+const COMMUNITIES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/communities.rs");
+const RENDER_SRC: &str = include_str!("../../../workers/ssr/src/render.rs");
 
 #[test]
 fn no_known_english_ui_leaks_in_rendered_text() {
@@ -478,12 +516,17 @@ fn no_known_english_ui_leaks_in_rendered_text() {
     let forbidden: &[&str] = &[
         ">Invite members<",
         ">Manage members<",
-        "\u{2190} Home<",   // "← Home" — must be "← ホーム"
+        "\u{2190} Home<", // "← Home" — must be "← ホーム"
         ">Home</a>",
         ">Members</a>",
-        ">Go</button>",     // bare English fallback button (use JA)
+        ">Go</button>", // bare English fallback button (use JA)
     ];
-    for src in [EVENT_HANDLER_SRC, COMMUNITIES_SRC, RENDER_SRC, HOME_HANDLER_SRC] {
+    for src in [
+        EVENT_HANDLER_SRC,
+        COMMUNITIES_SRC,
+        RENDER_SRC,
+        HOME_HANDLER_SRC,
+    ] {
         for needle in forbidden {
             assert!(
                 !src.contains(needle),

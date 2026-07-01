@@ -3,8 +3,8 @@
 //!
 //! Status is per (event_day, membership). NULL = No answer — never fabricated.
 
-use worker::{D1Database, Result};
 use crate::db::now_utc;
+use worker::{D1Database, Result};
 
 pub struct AttendanceRow {
     pub event_day_id: String,
@@ -41,19 +41,22 @@ pub async fn find_mine(
 
     Ok(row.and_then(|v| {
         Some(AttendanceRow {
-            event_day_id:      v.get("event_day_id")?.as_str()?.to_owned(),
-            membership_id:     v.get("membership_id")?.as_str()?.to_owned(),
-            status:            v.get("status").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-            status_updated_at: v.get("status_updated_at").and_then(|x| x.as_str()).map(|s| s.to_owned()),
+            event_day_id: v.get("event_day_id")?.as_str()?.to_owned(),
+            membership_id: v.get("membership_id")?.as_str()?.to_owned(),
+            status: v
+                .get("status")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_owned()),
+            status_updated_at: v
+                .get("status_updated_at")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_owned()),
         })
     }))
 }
 
 /// All attendances for a single day (for the participant list).
-pub async fn list_for_day(
-    db: &D1Database,
-    event_day_id: &str,
-) -> Result<Vec<AttendanceRow>> {
+pub async fn list_for_day(db: &D1Database, event_day_id: &str) -> Result<Vec<AttendanceRow>> {
     let rows = db
         .prepare(
             "SELECT event_day_id, membership_id, status, status_updated_at \
@@ -65,14 +68,23 @@ pub async fn list_for_day(
         .await?
         .results::<serde_json::Value>()?;
 
-    Ok(rows.into_iter().filter_map(|v| {
-        Some(AttendanceRow {
-            event_day_id:      v.get("event_day_id")?.as_str()?.to_owned(),
-            membership_id:     v.get("membership_id")?.as_str()?.to_owned(),
-            status:            v.get("status").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-            status_updated_at: v.get("status_updated_at").and_then(|x| x.as_str()).map(|s| s.to_owned()),
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(AttendanceRow {
+                event_day_id: v.get("event_day_id")?.as_str()?.to_owned(),
+                membership_id: v.get("membership_id")?.as_str()?.to_owned(),
+                status: v
+                    .get("status")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_owned()),
+                status_updated_at: v
+                    .get("status_updated_at")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_owned()),
+            })
         })
-    }).collect())
+        .collect())
 }
 
 /// Fetch all attendance rows for multiple event days in a single `IN` query
@@ -90,11 +102,12 @@ pub async fn list_for_event_days(
         "SELECT event_day_id, membership_id, status, status_updated_at \
          FROM attendances WHERE event_day_id IN ({placeholders})"
     );
-    let binds: Vec<worker::wasm_bindgen::JsValue> =
-        day_ids.iter().map(|id| (*id).into()).collect();
-    let rows = db.prepare(&sql)
+    let binds: Vec<worker::wasm_bindgen::JsValue> = day_ids.iter().map(|id| (*id).into()).collect();
+    let rows = db
+        .prepare(&sql)
         .bind(&binds)?
-        .all().await?
+        .all()
+        .await?
         .results::<serde_json::Value>()?;
 
     let mut out: std::collections::HashMap<String, Vec<AttendanceRow>> =
@@ -102,10 +115,16 @@ pub async fn list_for_event_days(
     for v in rows {
         if let Some(row) = (|| -> Option<AttendanceRow> {
             Some(AttendanceRow {
-                event_day_id:      v.get("event_day_id")?.as_str()?.to_owned(),
-                membership_id:     v.get("membership_id")?.as_str()?.to_owned(),
-                status:            v.get("status").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-                status_updated_at: v.get("status_updated_at").and_then(|x| x.as_str()).map(|s| s.to_owned()),
+                event_day_id: v.get("event_day_id")?.as_str()?.to_owned(),
+                membership_id: v.get("membership_id")?.as_str()?.to_owned(),
+                status: v
+                    .get("status")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_owned()),
+                status_updated_at: v
+                    .get("status_updated_at")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_owned()),
             })
         })() {
             out.entry(row.event_day_id.clone()).or_default().push(row);
@@ -113,7 +132,6 @@ pub async fn list_for_event_days(
     }
     Ok(out)
 }
-
 
 /// Status counts for one day. `active_member_count` is used to derive `no_answer`.
 pub async fn counts_for_day(
@@ -137,16 +155,21 @@ pub async fn counts_for_day(
 
     let (going, not_going, attended, total_rows) = row
         .map(|v| {
-            let g  = v.get("going")     .and_then(|x| x.as_u64()).unwrap_or(0) as u32;
-            let ng = v.get("not_going") .and_then(|x| x.as_u64()).unwrap_or(0) as u32;
-            let a  = v.get("attended")  .and_then(|x| x.as_u64()).unwrap_or(0) as u32;
-            let t  = v.get("total_rows").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+            let g = v.get("going").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+            let ng = v.get("not_going").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+            let a = v.get("attended").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+            let t = v.get("total_rows").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
             (g, ng, a, t)
         })
         .unwrap_or((0, 0, 0, 0));
 
     let no_answer = active_member_count.saturating_sub(total_rows);
-    Ok(DayCountRow { going, not_going, attended, no_answer })
+    Ok(DayCountRow {
+        going,
+        not_going,
+        attended,
+        no_answer,
+    })
 }
 
 /// Upsert a status for (event_day, membership). `status` = None clears to No answer.
@@ -290,22 +313,31 @@ pub async fn counts_for_days(
             Some(id) => id.to_owned(),
             None => continue,
         };
-        let g  = v.get("going")     .and_then(|x| x.as_u64()).unwrap_or(0) as u32;
-        let ng = v.get("not_going") .and_then(|x| x.as_u64()).unwrap_or(0) as u32;
-        let a  = v.get("attended")  .and_then(|x| x.as_u64()).unwrap_or(0) as u32;
-        let t  = v.get("total_rows").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+        let g = v.get("going").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+        let ng = v.get("not_going").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+        let a = v.get("attended").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
+        let t = v.get("total_rows").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
         let no_answer = active_member_count.saturating_sub(t);
-        map.insert(day_id, DayCountRow { going: g, not_going: ng, attended: a, no_answer });
+        map.insert(
+            day_id,
+            DayCountRow {
+                going: g,
+                not_going: ng,
+                attended: a,
+                no_answer,
+            },
+        );
     }
 
     // Days with zero attendances have no row in the result — fill them in.
     for day_id in day_ids {
         map.entry(day_id.to_string()).or_insert(DayCountRow {
-            going: 0, not_going: 0, attended: 0,
+            going: 0,
+            not_going: 0,
+            attended: 0,
             no_answer: active_member_count,
         });
     }
 
     Ok(map)
 }
-

@@ -16,7 +16,6 @@ use crate::db::{self, calendar as cal_db};
 use crate::render;
 use crate::session::require_auth;
 
-
 // ── GET /c/:cid/me/calendar ───────────────────────────────────────────────
 
 pub async fn get_me_calendar(
@@ -33,32 +32,40 @@ pub async fn get_me_calendar(
     let db = env.d1("DB")?;
     let pp = crate::crypto::pepper(env);
 
-    let regen_token = crate::codlet::issue_token(
-        env, &auth.user_id,
-        token_purpose::CALENDAR_REGENERATE, None,
-    ).await;
-    let revoke_token = crate::codlet::issue_token(
-        env, &auth.user_id,
-        token_purpose::CALENDAR_REVOKE, None,
-    ).await;
+    let regen_token =
+        crate::codlet::issue_token(env, &auth.user_id, token_purpose::CALENDAR_REGENERATE, None)
+            .await;
+    let revoke_token =
+        crate::codlet::issue_token(env, &auth.user_id, token_purpose::CALENDAR_REVOKE, None).await;
 
-    let active = cal_db::find_active_for_membership(&db, &membership.membership_id, community_id).await
+    let active = cal_db::find_active_for_membership(&db, &membership.membership_id, community_id)
+        .await
         .unwrap_or(None);
 
-    let communities_for_switcher = crate::db::membership::list_communities_for_user(&db, &auth.user_id)
-        .await.unwrap_or_default();
-    let community_pairs: Vec<(String, String)> = communities_for_switcher.iter()
-        .map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    let communities_for_switcher =
+        crate::db::membership::list_communities_for_user(&db, &auth.user_id)
+            .await
+            .unwrap_or_default();
+    let community_pairs: Vec<(String, String)> = communities_for_switcher
+        .iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone()))
+        .collect();
 
     // Build the feed URL from the request URL origin.
     let origin = {
         let url = req.url()?;
-        format!("{}://{}", url.scheme(), url.host_str().unwrap_or("localhost"))
+        format!(
+            "{}://{}",
+            url.scheme(),
+            url.host_str().unwrap_or("localhost")
+        )
     };
 
     let url = req.url()?;
-    let flash: Option<String> = url.query_pairs()
-        .find(|(k, _)| k == "flash").map(|(_, v)| v.to_string());
+    let flash: Option<String> = url
+        .query_pairs()
+        .find(|(k, _)| k == "flash")
+        .map(|(_, v)| v.to_string());
     let flash_html = flash.map(|f| format!(
         "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0\">{}</p>",
         render::escape_html(&f)
@@ -72,9 +79,9 @@ pub async fn get_me_calendar(
         // HMAC(pepper, id) itself, which is unguessable without the pepper.
         // We display the feed URL using the token ID as a stable human-readable handle;
         // the actual bearer secret in the URL will be HMAC(pepper, id).
-let feed_url = format!(
+        let feed_url = format!(
             "{origin}/c/{cid}/cal/{hmac}",
-            cid  = render::escape_html(community_id),
+            cid = render::escape_html(community_id),
             hmac = render::escape_html(&hmac_hex(&pp, &tok.id)),
         );
         format!(
@@ -106,9 +113,9 @@ let feed_url = format!(
              </form>\
              </div>",
             feed_url = render::escape_html(&feed_url),
-            cid      = render::escape_html(community_id),
-            rtok     = render::escape_html(&revoke_token),
-            gentok   = render::escape_html(&regen_token),
+            cid = render::escape_html(community_id),
+            rtok = render::escape_html(&revoke_token),
+            gentok = render::escape_html(&regen_token),
         )
     } else {
         format!(
@@ -120,17 +127,18 @@ let feed_url = format!(
                  border:none;border-radius:14px;font-size:1rem;font-weight:600;\
                  min-height:44px;cursor:pointer\">{cg}</button>\
              </form>",
-            cid    = render::escape_html(community_id),
+            cid = render::escape_html(community_id),
             gentok = render::escape_html(&regen_token),
-            cg     = i18n::JA_CALENDAR_GENERATE,
-            desc   = i18n::JA_CALENDAR_DESCRIPTION,
+            cg = i18n::JA_CALENDAR_GENERATE,
+            desc = i18n::JA_CALENDAR_DESCRIPTION,
         )
     };
 
-    let nav  = render::bottom_nav(community_id, "me");
+    let nav = render::bottom_nav(community_id, "me");
     let back = format!(
         "<a href=\"/c/{}/me\" style=\"color:#007AFF;font-size:.9375rem\">\u{2190} {}</a>",
-        render::escape_html(community_id), i18n::JA_NAV_ME,
+        render::escape_html(community_id),
+        i18n::JA_NAV_ME,
     );
     let body = format!(
         "{header}\
@@ -144,12 +152,13 @@ let feed_url = format!(
          {flash}\
          {feed}\
          </main>{nav}",
-        header    = render::header_with_switcher(i18n::JA_CALENDAR_TITLE, community_id, &community_pairs),
+        header =
+            render::header_with_switcher(i18n::JA_CALENDAR_TITLE, community_id, &community_pairs),
         cal_title = i18n::JA_CALENDAR_TITLE,
-        back   = back,
-        flash  = flash_html,
-        feed   = feed_section,
-        nav    = nav,
+        back = back,
+        flash = flash_html,
+        feed = feed_section,
+        nav = nav,
     );
     render::page(i18n::JA_CALENDAR_TITLE, &body)
 }
@@ -173,9 +182,13 @@ pub async fn post_regenerate_calendar(
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let replay = crate::codlet::consume_token(
-        env, &auth.user_id,
-        token_purpose::CALENDAR_REGENERATE, &raw_token, None,
-    ).await?;
+        env,
+        &auth.user_id,
+        token_purpose::CALENDAR_REGENERATE,
+        &raw_token,
+        None,
+    )
+    .await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/me/calendar"));
     }
@@ -185,18 +198,35 @@ pub async fn post_regenerate_calendar(
     cal_db::revoke_for_membership(&db, &membership.membership_id, community_id, &now).await?;
 
     // Generate new token — the ID is stored; HMAC(pepper, id) is the bearer secret.
-    let token_id  = random_token()[..32].to_owned();
+    let token_id = random_token()[..32].to_owned();
     let token_hmac = hmac_hex(&pp, &token_id);
-    cal_db::insert(&db, &token_id, community_id, &membership.membership_id, &token_hmac, &now).await?;
+    cal_db::insert(
+        &db,
+        &token_id,
+        community_id,
+        &membership.membership_id,
+        &token_hmac,
+        &now,
+    )
+    .await?;
 
     // Audit calendar token generation (security-relevant, RFC-045 P1-5).
     // The token secret is never logged — only that a feed was (re)generated.
     let _ = crate::audit::write(
-        &db, rid, Some(community_id), Some(&membership.membership_id),
-        "calendar_feed", None, "calendar_token_generated", None,
-    ).await;
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "calendar_feed",
+        None,
+        "calendar_token_generated",
+        None,
+    )
+    .await;
 
-    redirect(&format!("/c/{community_id}/me/calendar?flash=Feed+URL+generated"))
+    redirect(&format!(
+        "/c/{community_id}/me/calendar?flash=Feed+URL+generated"
+    ))
 }
 
 // ── POST /c/:cid/me/calendar/revoke ──────────────────────────────────────
@@ -217,9 +247,13 @@ pub async fn post_revoke_calendar(
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let replay = crate::codlet::consume_token(
-        env, &auth.user_id,
-        token_purpose::CALENDAR_REVOKE, &raw_token, None,
-    ).await?;
+        env,
+        &auth.user_id,
+        token_purpose::CALENDAR_REVOKE,
+        &raw_token,
+        None,
+    )
+    .await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/me/calendar"));
     }
@@ -229,11 +263,20 @@ pub async fn post_revoke_calendar(
 
     // Audit calendar token revocation (security-relevant, RFC-045 P1-5).
     let _ = crate::audit::write(
-        &db, rid, Some(community_id), Some(&membership.membership_id),
-        "calendar_feed", None, "calendar_token_revoked", None,
-    ).await;
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "calendar_feed",
+        None,
+        "calendar_token_revoked",
+        None,
+    )
+    .await;
 
-    redirect(&format!("/c/{community_id}/me/calendar?flash=Feed+disabled"))
+    redirect(&format!(
+        "/c/{community_id}/me/calendar?flash=Feed+disabled"
+    ))
 }
 
 // ── GET /c/:cid/cal/:token ────────────────────────────────────────────────
@@ -255,20 +298,21 @@ pub async fn get_ics_feed(
         Some(c) if c.community_id == community_id => c,
         _ => {
             // Generic not-found: don't reveal whether token exists.
-            return Ok(Response::from_html(
-                &format!("<p>{}</p>", i18n::JA_NOT_FOUND)
-            )?.with_status(404));
+            return Ok(
+                Response::from_html(&format!("<p>{}</p>", i18n::JA_NOT_FOUND))?.with_status(404),
+            );
         }
     };
 
     // Verify the membership is still active in this community.
-    let still_active = crate::db::membership::find_active_by_id(
-        &db, &claims.membership_id, community_id
-    ).await?.is_some();
+    let still_active =
+        crate::db::membership::find_active_by_id(&db, &claims.membership_id, community_id)
+            .await?
+            .is_some();
     if !still_active {
-        return Ok(Response::from_html(
-            &format!("<p>{}</p>", i18n::JA_GENERAL_ERROR)
-        )?.with_status(403));
+        return Ok(
+            Response::from_html(&format!("<p>{}</p>", i18n::JA_GENERAL_ERROR))?.with_status(403),
+        );
     }
 
     // Fetch events.
@@ -276,29 +320,36 @@ pub async fn get_ics_feed(
 
     // Build ICS.
     let community = crate::db::community::find_active(&db, community_id).await?;
-    let cal_name = community.map(|c| c.name).unwrap_or_else(|| "Community".to_owned());
-    let days: Vec<zinnias_ciao_contracts::ics::IcsDay<'_>> = events.iter().map(|ev| {
-        zinnias_ciao_contracts::ics::IcsDay {
-            uid:           &ev.day_id,
-            title:         &ev.title,
-            location:      ev.location.as_deref(),
-            status:        &ev.status,
+    let cal_name = community
+        .map(|c| c.name)
+        .unwrap_or_else(|| "Community".to_owned());
+    let days: Vec<zinnias_ciao_contracts::ics::IcsDay<'_>> = events
+        .iter()
+        .map(|ev| zinnias_ciao_contracts::ics::IcsDay {
+            uid: &ev.day_id,
+            title: &ev.title,
+            location: ev.location.as_deref(),
+            status: &ev.status,
             starts_at_utc: &ev.starts_at_utc,
-            ends_at_utc:   &ev.ends_at_utc,
-        }
-    }).collect();
+            ends_at_utc: &ev.ends_at_utc,
+        })
+        .collect();
     let ics = zinnias_ciao_contracts::ics::build_vcalendar(&cal_name, &days);
 
     // Return as text/calendar.
     let mut resp = Response::ok(ics)?;
-    resp.headers_mut().set("Content-Type", "text/calendar; charset=utf-8")?;
+    resp.headers_mut()
+        .set("Content-Type", "text/calendar; charset=utf-8")?;
     resp.headers_mut().set(
         "Content-Disposition",
-        &format!("attachment; filename=\"{}.ics\"",
-            zinnias_ciao_contracts::ics::sanitize_filename(&cal_name)),
+        &format!(
+            "attachment; filename=\"{}.ics\"",
+            zinnias_ciao_contracts::ics::sanitize_filename(&cal_name)
+        ),
     )?;
     // Prevent caching of private feed data.
-    resp.headers_mut().set("Cache-Control", "no-store, private")?;
+    resp.headers_mut()
+        .set("Cache-Control", "no-store, private")?;
     Ok(resp)
 }
 
@@ -309,4 +360,3 @@ fn redirect(location: &str) -> Result<Response> {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
-

@@ -18,10 +18,10 @@ pub fn escape_html(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 16);
     for c in s.chars() {
         match c {
-            '&'  => out.push_str("&amp;"),
-            '<'  => out.push_str("&lt;"),
-            '>'  => out.push_str("&gt;"),
-            '"'  => out.push_str("&quot;"),
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
             '\'' => out.push_str("&#x27;"),
             other => out.push(other),
         }
@@ -79,15 +79,15 @@ mod tests {
         // Value injected into href="…" with a quote to break out of attribute.
         let input = r#"foo" onclick="evil()"#;
         let escaped = escape_html(input);
-        assert!(!escaped.contains('"'), "\" must be escaped in attribute context");
+        assert!(
+            !escaped.contains('"'),
+            "\" must be escaped in attribute context"
+        );
     }
 
     #[test]
     fn all_five_entities() {
-        assert_eq!(
-            escape_html("&<>\"'"),
-            "&amp;&lt;&gt;&quot;&#x27;"
-        );
+        assert_eq!(escape_html("&<>\"'"), "&amp;&lt;&gt;&quot;&#x27;");
     }
 
     #[test]
@@ -98,9 +98,6 @@ mod tests {
 
     #[test]
     fn multi_byte_and_special_mix() {
-        assert_eq!(
-            escape_html("田中さん <Admin>"),
-            "田中さん &lt;Admin&gt;"
-        );
+        assert_eq!(escape_html("田中さん <Admin>"), "田中さん &lt;Admin&gt;");
     }
 }

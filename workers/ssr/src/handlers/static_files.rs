@@ -8,15 +8,18 @@ use worker::{Env, Request, Response, Result};
 pub async fn get_manifest(_req: Request, _env: &Env) -> Result<Response> {
     let body = include_str!("../../static/manifest.webmanifest");
     let mut r = Response::from_body(worker::ResponseBody::Body(body.as_bytes().to_vec()))?;
-    r.headers_mut().set("Content-Type", "application/manifest+json")?;
-    r.headers_mut().set("Cache-Control", "public, max-age=86400")?;
+    r.headers_mut()
+        .set("Content-Type", "application/manifest+json")?;
+    r.headers_mut()
+        .set("Cache-Control", "public, max-age=86400")?;
     Ok(r)
 }
 
 pub async fn get_sw(_req: Request, _env: &Env) -> Result<Response> {
     let body = include_str!("../../static/sw.js");
     let mut r = Response::from_body(worker::ResponseBody::Body(body.as_bytes().to_vec()))?;
-    r.headers_mut().set("Content-Type", "application/javascript")?;
+    r.headers_mut()
+        .set("Content-Type", "application/javascript")?;
     // SW must not be cached aggressively — browsers re-check on every navigation
     r.headers_mut().set("Cache-Control", "no-cache")?;
     r.headers_mut().set("Service-Worker-Allowed", "/")?;
@@ -27,15 +30,18 @@ pub async fn get_css(_req: Request, _env: &Env) -> Result<Response> {
     let body = include_str!("../../static/app.css");
     let mut r = Response::from_body(worker::ResponseBody::Body(body.as_bytes().to_vec()))?;
     r.headers_mut().set("Content-Type", "text/css")?;
-    r.headers_mut().set("Cache-Control", "public, max-age=3600")?;
+    r.headers_mut()
+        .set("Cache-Control", "public, max-age=3600")?;
     Ok(r)
 }
 
 pub async fn get_app_js(_req: Request, _env: &Env) -> Result<Response> {
     let body = include_str!("../../static/app.js");
     let mut r = Response::from_body(worker::ResponseBody::Body(body.as_bytes().to_vec()))?;
-    r.headers_mut().set("Content-Type", "application/javascript")?;
-    r.headers_mut().set("Cache-Control", "public, max-age=3600")?;
+    r.headers_mut()
+        .set("Content-Type", "application/javascript")?;
+    r.headers_mut()
+        .set("Cache-Control", "public, max-age=3600")?;
     Ok(r)
 }
 

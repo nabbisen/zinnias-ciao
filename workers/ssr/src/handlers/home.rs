@@ -3,10 +3,12 @@
 use worker::{Env, Request, Response, Result};
 
 use crate::authz::require_membership;
-use zinnias_ciao_contracts::i18n;
-use crate::db::{self, event as event_db, attendance as attendance_db, membership as membership_db};
+use crate::db::{
+    self, attendance as attendance_db, event as event_db, membership as membership_db,
+};
 use crate::render;
 use crate::session::require_auth;
+use zinnias_ciao_contracts::i18n;
 
 pub async fn redirect_to_home(req: Request, env: &Env, _rid: &str) -> Result<Response> {
     let auth = match require_auth(&req, &env).await {
@@ -21,7 +23,8 @@ pub async fn redirect_to_home(req: Request, env: &Env, _rid: &str) -> Result<Res
     // Use the first community as default; M3+ will add a selected-community cookie.
     let cid = &memberships[0].community_id;
     let mut resp = Response::empty()?;
-    resp.headers_mut().set("Location", &format!("/c/{cid}/home"))?;
+    resp.headers_mut()
+        .set("Location", &format!("/c/{cid}/home"))?;
     Ok(resp.with_status(303))
 }
 
@@ -35,7 +38,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
 
     // Home window: today through 30 days ahead
     let from_utc = db::now_utc();
-    let to_utc   = db::utc_days_ahead(30);
+    let to_utc = db::utc_days_ahead(30);
     let rows = event_db::home_upcoming(&db, community_id, &from_utc, &to_utc).await?;
 
     // Active member count for no_answer calculation
@@ -45,23 +48,30 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
 
     // Fetch community (name + timezone) before the event loop (needed for time display).
     let community = db::community::find_active(&db, community_id).await?;
-    let _community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or_default();
-    let community_tz   = community.as_ref().map(|c| c.timezone.as_str()).unwrap_or("UTC");
+    let _community_name = community
+        .as_ref()
+        .map(|c| c.name.as_str())
+        .unwrap_or_default();
+    let community_tz = community
+        .as_ref()
+        .map(|c| c.timezone.as_str())
+        .unwrap_or("UTC");
 
     // Collect my attendances for the listed days in one query
     let my_attendances = attendance_db::list_mine_for_days(
         &db,
         &membership.membership_id,
         &rows.iter().map(|r| r.day_id.as_str()).collect::<Vec<_>>(),
-    ).await?;
+    )
+    .await?;
 
     // Build cards grouped by section: Today / This Week / Later
     let now_prefix = db::now_utc();
     let today_date = &now_prefix[..10]; // "2026-06-12"
 
-    let mut today_cards   = String::new();
+    let mut today_cards = String::new();
     let mut thisweek_cards = String::new();
-    let mut later_cards   = String::new();
+    let mut later_cards = String::new();
 
     // Batch-fetch all day counts in a single query (RFC-029: no N+1).
     let all_day_ids: Vec<&str> = rows.iter().map(|r| r.day_id.as_str()).collect();
@@ -71,12 +81,17 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
     let mut seen_events: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for row in &rows {
-        if seen_events.contains(&row.event_id) { continue; }
+        if seen_events.contains(&row.event_id) {
+            continue;
+        }
         seen_events.insert(row.event_id.clone());
 
         let my_status = my_attendances.get(&row.day_id).map(|s| s.as_str());
         let empty_counts = attendance_db::DayCountRow {
-            going: 0, not_going: 0, attended: 0, no_answer: member_count
+            going: 0,
+            not_going: 0,
+            attended: 0,
+            no_answer: member_count,
         };
         let counts = all_counts.get(&row.day_id).unwrap_or(&empty_counts);
 
@@ -88,12 +103,14 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
             row.event_status == "cancelled",
             &render::CardDay {
                 starts_at_utc: &row.starts_at_utc,
-                ends_at_utc:   &row.ends_at_utc,
-                day_date:      &row.day_date,
+                ends_at_utc: &row.ends_at_utc,
+                day_date: &row.day_date,
             },
             row.total_days,
             my_status,
-            counts.going, counts.not_going, counts.no_answer,
+            counts.going,
+            counts.not_going,
+            counts.no_answer,
             community_tz,
         );
 
@@ -107,7 +124,9 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
     }
 
     let section = |label: &str, cards: &str| -> String {
-        if cards.is_empty() { return String::new(); }
+        if cards.is_empty() {
+            return String::new();
+        }
         format!(
             "<section style=\"margin-bottom:1.5rem\">\
              <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
@@ -116,8 +135,13 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
         )
     };
 
-    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
-    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
+        .await
+        .unwrap_or_default();
+    let _community_pairs: Vec<(String, String)> = _communities_for_switcher
+        .iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone()))
+        .collect();
 
     let nav = render::bottom_nav(community_id, "home");
 
@@ -125,20 +149,23 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
     // When admin lands on empty Home, show an actionable setup guide
     // instead of a plain text paragraph. Detect first-run by member count.
     let is_first_run = seen_events.is_empty() && membership.is_admin() && member_count <= 1;
-    let (empty_html, admin_shortcuts): (String, String) = if seen_events.is_empty() && membership.is_admin() {
-        let intro = if is_first_run {
-            i18n::JA_HOME_FIRST_RUN_WELCOME
-        } else {
-            i18n::JA_HOME_FIRST_RUN_NO_EVENTS
-        };
-        let invite_hint = if is_first_run {
-            format!(
-                "<p style=\"font-size:.875rem;color:#6e6e73;margin:.5rem 0 0\">\
+    let (empty_html, admin_shortcuts): (String, String) =
+        if seen_events.is_empty() && membership.is_admin() {
+            let intro = if is_first_run {
+                i18n::JA_HOME_FIRST_RUN_WELCOME
+            } else {
+                i18n::JA_HOME_FIRST_RUN_NO_EVENTS
+            };
+            let invite_hint = if is_first_run {
+                format!(
+                    "<p style=\"font-size:.875rem;color:#6e6e73;margin:.5rem 0 0\">\
                  Invite members so they can see your events.</p>"
-            )
-        } else { String::new() };
-        let card = format!(
-            "<div style=\"background:#F5F5F7;border-radius:16px;padding:1.25rem;\
+                )
+            } else {
+                String::new()
+            };
+            let card = format!(
+                "<div style=\"background:#F5F5F7;border-radius:16px;padding:1.25rem;\
              margin-bottom:1.5rem\">\
              <p style=\"font-size:.9375rem;color:#6e6e73;margin:0 0 1rem\">{intro}</p>\
              <div style=\"display:flex;gap:.75rem;flex-direction:column\">\
@@ -157,23 +184,23 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
              </div>\
              {hint}\
              </div>",
-            intro = intro,
-            cid   = render::escape_html(community_id),
-            hint  = invite_hint,
-        );
-        (card, String::new())
-    } else if seen_events.is_empty() {
-        // Member empty state
-        let msg = format!(
-            "<p style=\"color:#6e6e73;padding:2rem 0\">{}</p>",
-            i18n::JA_EMPTY_EVENTS_HINT
-        );
-        (msg, String::new())
-    } else {
-        // Events exist: show persistent admin shortcuts
-        let shortcuts = if membership.is_admin() {
-            format!(
-                "<div style=\"display:flex;gap:.75rem;margin-bottom:1.25rem\">\
+                intro = intro,
+                cid = render::escape_html(community_id),
+                hint = invite_hint,
+            );
+            (card, String::new())
+        } else if seen_events.is_empty() {
+            // Member empty state
+            let msg = format!(
+                "<p style=\"color:#6e6e73;padding:2rem 0\">{}</p>",
+                i18n::JA_EMPTY_EVENTS_HINT
+            );
+            (msg, String::new())
+        } else {
+            // Events exist: show persistent admin shortcuts
+            let shortcuts = if membership.is_admin() {
+                format!(
+                    "<div style=\"display:flex;gap:.75rem;margin-bottom:1.25rem\">\
                    <a href=\"/c/{cid}/admin/events/new\" \
                       style=\"flex:1;padding:.75rem;background:#007AFF;color:#fff;\
                       border-radius:14px;font-size:.9375rem;font-weight:600;\
@@ -187,11 +214,13 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
                       display:flex;align-items:center;justify-content:center\">\
                       Invite members</a>\
                  </div>",
-                cid = render::escape_html(community_id),
-            )
-        } else { String::new() };
-        (String::new(), shortcuts)
-    };
+                    cid = render::escape_html(community_id),
+                )
+            } else {
+                String::new()
+            };
+            (String::new(), shortcuts)
+        };
 
     let body = format!(
         "{header}\
@@ -200,13 +229,13 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
            {today}{thisweek}{later}{empty}\
          </main>\
          {nav}",
-        header    = render::header_with_switcher(i18n::JA_NAV_HOME, community_id, &_community_pairs),
+        header = render::header_with_switcher(i18n::JA_NAV_HOME, community_id, &_community_pairs),
         shortcuts = admin_shortcuts,
-        today    = section(i18n::JA_HOME_TODAY, &today_cards),
+        today = section(i18n::JA_HOME_TODAY, &today_cards),
         thisweek = section(i18n::JA_HOME_THIS_WEEK, &thisweek_cards),
-        later    = section(i18n::JA_HOME_LATER, &later_cards),
-        empty    = empty_html,
-        nav      = nav,
+        later = section(i18n::JA_HOME_LATER, &later_cards),
+        empty = empty_html,
+        nav = nav,
     );
     render::page(i18n::JA_NAV_HOME, &body)
 }

@@ -41,10 +41,7 @@ mod tests {
 
     #[test]
     fn trim_whitespace() {
-        assert_eq!(
-            validate_note("  hello  "),
-            Ok("hello".to_string())
-        );
+        assert_eq!(validate_note("  hello  "), Ok("hello".to_string()));
     }
 
     #[test]

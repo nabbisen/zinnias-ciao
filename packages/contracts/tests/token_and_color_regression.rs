@@ -27,7 +27,7 @@ fn relative_luminance(r: u8, g: u8, b: u8) -> f64 {
 
 fn contrast_on_white(r: u8, g: u8, b: u8) -> f64 {
     let l_white = 1.0_f64;
-    let l_fg    = relative_luminance(r, g, b);
+    let l_fg = relative_luminance(r, g, b);
     let l1 = l_white.max(l_fg);
     let l2 = l_white.min(l_fg);
     (l1 + 0.05) / (l2 + 0.05)
@@ -89,10 +89,10 @@ fn status_no_answer_fg_passes_wcag_aa() {
 /// confirming we actually needed the fix.
 #[test]
 fn old_ios_status_colors_fail_wcag_aa_on_text() {
-    let ios_going    = parse_hex_color("#007AFF"); // was used for status text
+    let ios_going = parse_hex_color("#007AFF"); // was used for status text
     let ios_attended = parse_hex_color("#34C759");
     assert!(
-        contrast_on_white(ios_going.0,    ios_going.1,    ios_going.2)    < AA_MIN,
+        contrast_on_white(ios_going.0, ios_going.1, ios_going.2) < AA_MIN,
         "expected #007AFF to fail AA on white (it's a decorative-only color)"
     );
     assert!(
@@ -152,7 +152,8 @@ fn all_token_purposes_are_unique() {
     ];
     let set: HashSet<&str> = purposes.iter().copied().collect();
     assert_eq!(
-        set.len(), purposes.len(),
+        set.len(),
+        purposes.len(),
         "duplicate token_purpose detected — each action must have a unique string"
     );
 }

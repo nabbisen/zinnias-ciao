@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 //! Event creation, edit, and cancellation (RFC-009).
 
-use worker::{D1Database, Result};
-use crate::db::now_utc;
 use crate::crypto::random_token;
+use crate::db::now_utc;
+use worker::{D1Database, Result};
 
 /// Create an event and its day rows in one logical batch.
 /// `repeat_rule` and `repeat_count` are stored for reference; the actual
@@ -41,7 +41,8 @@ pub async fn create_event(
         rc_js,
         now.as_str().into(),
     ])?
-    .run().await?;
+    .run()
+    .await?;
 
     for (seq, (day_date, starts_utc, ends_utc)) in days.iter().enumerate() {
         let day_id = random_token()[..24].to_owned();
@@ -60,7 +61,8 @@ pub async fn create_event(
             ends_utc.as_str().into(),
             now.as_str().into(),
         ])?
-        .run().await?;
+        .run()
+        .await?;
     }
     Ok(event_id)
 }
@@ -90,7 +92,8 @@ pub async fn edit_event(
         now.as_str().into(),
         event_id.into(),
     ])?
-    .run().await?;
+    .run()
+    .await?;
 
     // Persist the single-day time edit (seq = 1). For multi-day/recurring
     // events `day` is None and only the details above are updated.
@@ -105,7 +108,8 @@ pub async fn edit_event(
             ends_utc.into(),
             event_id.into(),
         ])?
-        .run().await?;
+        .run()
+        .await?;
     }
     Ok(())
 }
@@ -126,6 +130,7 @@ pub async fn cancel_event(
         cancelled_by_membership_id.into(),
         event_id.into(),
     ])?
-    .run().await?;
+    .run()
+    .await?;
     Ok(())
 }

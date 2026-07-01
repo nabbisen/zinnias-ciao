@@ -6,10 +6,10 @@
 /// Escape special characters in ICS text property values (RFC 5545 §3.3.11).
 pub fn ics_text(s: &str) -> String {
     s.replace('\\', "\\\\")
-     .replace(';', "\\;")
-     .replace(',', "\\,")
-     .replace('\n', "\\n")
-     .replace('\r', "")
+        .replace(';', "\\;")
+        .replace(',', "\\,")
+        .replace('\n', "\\n")
+        .replace('\r', "")
 }
 
 /// Fold an ICS content line at 75 octets as per RFC 5545 §3.1.
@@ -52,31 +52,28 @@ pub fn utc_to_ics_dt(utc: &str) -> String {
         return "19700101T000000Z".to_owned();
     }
     let date = parts[0].replace('-', "");
-    let time = parts[1]
-        .get(..8)
-        .unwrap_or("00:00:00")
-        .replace(':', "");
+    let time = parts[1].get(..8).unwrap_or("00:00:00").replace(':', "");
     format!("{date}T{time}Z")
 }
 
 /// Sanitize a string for use as a filename component (alphanumeric, hyphens, underscores only).
 pub fn sanitize_filename(s: &str) -> String {
     s.chars()
-     .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
-     .collect::<String>()
-     .chars()
-     .take(40)
-     .collect()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect::<String>()
+        .chars()
+        .take(40)
+        .collect()
 }
 
 /// An event day record sufficient to render one VEVENT.
 pub struct IcsDay<'a> {
-    pub uid:           &'a str,   // unique ID for this day (stable across refreshes)
-    pub title:         &'a str,
-    pub location:      Option<&'a str>,
-    pub status:        &'a str,   // "scheduled" | "cancelled"
+    pub uid: &'a str, // unique ID for this day (stable across refreshes)
+    pub title: &'a str,
+    pub location: Option<&'a str>,
+    pub status: &'a str, // "scheduled" | "cancelled"
     pub starts_at_utc: &'a str,
-    pub ends_at_utc:   &'a str,
+    pub ends_at_utc: &'a str,
 }
 
 /// Build a complete VCALENDAR string for the given event days.
@@ -92,7 +89,7 @@ pub fn build_vcalendar(cal_name: &str, days: &[IcsDay<'_>]) -> String {
 
     for day in days {
         let dtstart = utc_to_ics_dt(day.starts_at_utc);
-        let dtend   = utc_to_ics_dt(day.ends_at_utc);
+        let dtend = utc_to_ics_dt(day.ends_at_utc);
 
         out.push_str("BEGIN:VEVENT\r\n");
         out.push_str(&fold_line(&format!("UID:{}", day.uid)));
@@ -100,7 +97,10 @@ pub fn build_vcalendar(cal_name: &str, days: &[IcsDay<'_>]) -> String {
         out.push_str(&fold_line(&format!("DTEND:{dtend}")));
 
         if day.status == "cancelled" {
-            out.push_str(&fold_line(&format!("SUMMARY:[Cancelled] {}", ics_text(day.title))));
+            out.push_str(&fold_line(&format!(
+                "SUMMARY:[Cancelled] {}",
+                ics_text(day.title)
+            )));
             out.push_str("STATUS:CANCELLED\r\n");
         } else {
             out.push_str(&fold_line(&format!("SUMMARY:{}", ics_text(day.title))));
@@ -146,7 +146,10 @@ mod tests {
 
     #[test]
     fn utc_to_ics_dt_with_millis() {
-        assert_eq!(utc_to_ics_dt("2026-06-14T09:00:00.000Z"), "20260614T090000Z");
+        assert_eq!(
+            utc_to_ics_dt("2026-06-14T09:00:00.000Z"),
+            "20260614T090000Z"
+        );
     }
 
     #[test]
@@ -186,7 +189,10 @@ mod tests {
         let line = format!("SUMMARY:{}", "A".repeat(80));
         let folded = fold_line(&line);
         let second = folded.split("\r\n").nth(1).unwrap_or("");
-        assert!(second.starts_with(' '), "continuation must start with space");
+        assert!(
+            second.starts_with(' '),
+            "continuation must start with space"
+        );
     }
 
     #[test]
@@ -204,12 +210,12 @@ mod tests {
     #[test]
     fn build_vcalendar_scheduled_event() {
         let days = vec![IcsDay {
-            uid:           "day1@ciao.zinnias",
-            title:         "Saturday Walk",
-            location:      Some("Station Gate"),
-            status:        "scheduled",
+            uid: "day1@ciao.zinnias",
+            title: "Saturday Walk",
+            location: Some("Station Gate"),
+            status: "scheduled",
             starts_at_utc: "2026-06-14T01:00:00.000Z",
-            ends_at_utc:   "2026-06-14T02:30:00.000Z",
+            ends_at_utc: "2026-06-14T02:30:00.000Z",
         }];
         let ics = build_vcalendar("Zinnia Club", &days);
         assert!(ics.contains("BEGIN:VCALENDAR"));
@@ -227,12 +233,12 @@ mod tests {
     #[test]
     fn build_vcalendar_cancelled_event() {
         let days = vec![IcsDay {
-            uid:           "day2@ciao.zinnias",
-            title:         "Sunday Walk",
-            location:      None,
-            status:        "cancelled",
+            uid: "day2@ciao.zinnias",
+            title: "Sunday Walk",
+            location: None,
+            status: "cancelled",
             starts_at_utc: "2026-06-21T01:00:00.000Z",
-            ends_at_utc:   "2026-06-21T02:00:00.000Z",
+            ends_at_utc: "2026-06-21T02:00:00.000Z",
         }];
         let ics = build_vcalendar("Zinnia Club", &days);
         assert!(ics.contains("SUMMARY:[Cancelled] Sunday Walk"));
@@ -251,12 +257,12 @@ mod tests {
     #[test]
     fn build_vcalendar_special_chars_in_title() {
         let days = vec![IcsDay {
-            uid:           "day3@ciao.zinnias",
-            title:         "Walk; Bring gear, optional",
-            location:      None,
-            status:        "scheduled",
+            uid: "day3@ciao.zinnias",
+            title: "Walk; Bring gear, optional",
+            location: None,
+            status: "scheduled",
             starts_at_utc: "2026-06-14T01:00:00Z",
-            ends_at_utc:   "2026-06-14T02:00:00Z",
+            ends_at_utc: "2026-06-14T02:00:00Z",
         }];
         let ics = build_vcalendar("Test", &days);
         assert!(ics.contains("SUMMARY:Walk\\; Bring gear\\, optional"));

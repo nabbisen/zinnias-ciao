@@ -1,6 +1,6 @@
 //! Note validation tests (RFC-007).
 
-use zinnias_ciao_domain::{validate_note, NOTE_MAX_CHARS};
+use zinnias_ciao_domain::{NOTE_MAX_CHARS, validate_note};
 
 #[test]
 fn valid_note() {
@@ -25,20 +25,29 @@ fn exactly_200_chars() {
 #[test]
 fn over_200_chars_rejected() {
     use zinnias_ciao_domain::NoteError;
-    assert_eq!(validate_note(&"A".repeat(NOTE_MAX_CHARS + 1)), Err(NoteError::TooLong));
+    assert_eq!(
+        validate_note(&"A".repeat(NOTE_MAX_CHARS + 1)),
+        Err(NoteError::TooLong)
+    );
 }
 
 #[test]
 fn unicode_length_by_char_not_bytes() {
     assert!(validate_note(&"亜".repeat(NOTE_MAX_CHARS)).is_ok());
     use zinnias_ciao_domain::NoteError;
-    assert_eq!(validate_note(&"亜".repeat(NOTE_MAX_CHARS + 1)), Err(NoteError::TooLong));
+    assert_eq!(
+        validate_note(&"亜".repeat(NOTE_MAX_CHARS + 1)),
+        Err(NoteError::TooLong)
+    );
 }
 
 #[test]
 fn control_char_rejected() {
     use zinnias_ciao_domain::NoteError;
-    assert_eq!(validate_note("hello\x01world"), Err(NoteError::InvalidChars));
+    assert_eq!(
+        validate_note("hello\x01world"),
+        Err(NoteError::InvalidChars)
+    );
 }
 
 #[test]

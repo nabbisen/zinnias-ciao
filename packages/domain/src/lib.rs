@@ -11,15 +11,15 @@ pub mod session;
 pub mod status;
 
 pub use community::Community;
-pub use display_name::{validate_display_name, DisplayNameError, DISPLAY_NAME_MAX};
+pub use display_name::{DISPLAY_NAME_MAX, DisplayNameError, validate_display_name};
 pub use event::{Event, EventDay};
 pub use event_admin::{
-    validate_event, DayInput, EventInput, EventValidationError,
-    RecurrenceFreq, expand_recurrence, RECURRENCE_MAX_COUNT,
+    DayInput, EventInput, EventValidationError, RECURRENCE_MAX_COUNT, RecurrenceFreq,
+    expand_recurrence, validate_event,
 };
-pub use invite::{validate_invite_input, InviteValidationError, INVITE_CODE_LEN};
+pub use invite::{INVITE_CODE_LEN, InviteValidationError, validate_invite_input};
 pub use membership::{Membership, Role};
-pub use note::{validate_note, NoteError, NOTE_MAX_CHARS};
+pub use note::{NOTE_MAX_CHARS, NoteError, validate_note};
 pub use session::SessionState;
 pub use status::{
     AttendanceStatus, DayTimeState, StatusTransitionError, validate_status_transition,

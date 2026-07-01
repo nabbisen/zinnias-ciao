@@ -1,7 +1,7 @@
 //! Security tests for domain-level validation (RFC-012 / RFC-015).
 //! Tests that require contracts live in packages/contracts/tests/release_gates.rs.
 
-use zinnias_ciao_domain::{validate_note, validate_display_name};
+use zinnias_ciao_domain::{validate_display_name, validate_note};
 
 #[test]
 fn xss_script_tag_passes_validation() {
@@ -38,12 +38,25 @@ fn note_escape_sequence_rejected() {
 #[test]
 fn display_name_null_byte_rejected() {
     use zinnias_ciao_domain::DisplayNameError;
-    assert_eq!(validate_display_name("Aya\x00"), Err(DisplayNameError::InvalidChars));
+    assert_eq!(
+        validate_display_name("Aya\x00"),
+        Err(DisplayNameError::InvalidChars)
+    );
 }
 
 #[test]
 fn audit_metadata_blocked_keys_documented() {
-    let blocked = ["note", "body", "secret", "token", "password",
-                   "session_hmac", "code_hmac", "pepper"];
-    for k in blocked { assert!(!k.is_empty()); }
+    let blocked = [
+        "note",
+        "body",
+        "secret",
+        "token",
+        "password",
+        "session_hmac",
+        "code_hmac",
+        "pepper",
+    ];
+    for k in blocked {
+        assert!(!k.is_empty());
+    }
 }

@@ -3,25 +3,22 @@
 //! Templates are community-scoped, admin-only, soft-deletable.
 //! They store title/location/description/duration as defaults for event creation.
 
-use worker::d1::D1Database;
-use worker::Result;
 use crate::db::now_utc;
+use worker::Result;
+use worker::d1::D1Database;
 
 pub struct EventTemplateRow {
-    pub id:               String,
-    pub community_id:     String,
-    pub title:            String,
-    pub location:         Option<String>,
-    pub description:      Option<String>,
+    pub id: String,
+    pub community_id: String,
+    pub title: String,
+    pub location: Option<String>,
+    pub description: Option<String>,
     pub duration_minutes: Option<u32>,
-    pub created_at:       String,
+    pub created_at: String,
 }
 
 /// All active templates for a community, ordered by title.
-pub async fn list_active(
-    db: &D1Database,
-    community_id: &str,
-) -> Result<Vec<EventTemplateRow>> {
+pub async fn list_active(db: &D1Database, community_id: &str) -> Result<Vec<EventTemplateRow>> {
     let rows = db
         .prepare(
             "SELECT id, community_id, title, location, description, duration_minutes, created_at \
@@ -34,17 +31,29 @@ pub async fn list_active(
         .await?
         .results::<serde_json::Value>()?;
 
-    Ok(rows.into_iter().filter_map(|v| {
-        Some(EventTemplateRow {
-            id:               v.get("id")?.as_str()?.to_owned(),
-            community_id:     v.get("community_id")?.as_str()?.to_owned(),
-            title:            v.get("title")?.as_str()?.to_owned(),
-            location:         v.get("location").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-            description:      v.get("description").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-            duration_minutes: v.get("duration_minutes").and_then(|x| x.as_u64()).map(|n| n as u32),
-            created_at:       v.get("created_at")?.as_str()?.to_owned(),
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(EventTemplateRow {
+                id: v.get("id")?.as_str()?.to_owned(),
+                community_id: v.get("community_id")?.as_str()?.to_owned(),
+                title: v.get("title")?.as_str()?.to_owned(),
+                location: v
+                    .get("location")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_owned()),
+                description: v
+                    .get("description")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_owned()),
+                duration_minutes: v
+                    .get("duration_minutes")
+                    .and_then(|x| x.as_u64())
+                    .map(|n| n as u32),
+                created_at: v.get("created_at")?.as_str()?.to_owned(),
+            })
         })
-    }).collect())
+        .collect())
 }
 
 /// Fetch a single active template by ID, scoped to community.
@@ -65,13 +74,22 @@ pub async fn find_active(
 
     Ok(row.and_then(|v| {
         Some(EventTemplateRow {
-            id:               v.get("id")?.as_str()?.to_owned(),
-            community_id:     v.get("community_id")?.as_str()?.to_owned(),
-            title:            v.get("title")?.as_str()?.to_owned(),
-            location:         v.get("location").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-            description:      v.get("description").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-            duration_minutes: v.get("duration_minutes").and_then(|x| x.as_u64()).map(|n| n as u32),
-            created_at:       v.get("created_at")?.as_str()?.to_owned(),
+            id: v.get("id")?.as_str()?.to_owned(),
+            community_id: v.get("community_id")?.as_str()?.to_owned(),
+            title: v.get("title")?.as_str()?.to_owned(),
+            location: v
+                .get("location")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_owned()),
+            description: v
+                .get("description")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_owned()),
+            duration_minutes: v
+                .get("duration_minutes")
+                .and_then(|x| x.as_u64())
+                .map(|n| n as u32),
+            created_at: v.get("created_at")?.as_str()?.to_owned(),
         })
     }))
 }
@@ -121,11 +139,7 @@ pub async fn insert(
 }
 
 /// Soft-delete (deactivate) a template, scoped to community.
-pub async fn soft_delete(
-    db: &D1Database,
-    template_id: &str,
-    community_id: &str,
-) -> Result<()> {
+pub async fn soft_delete(db: &D1Database, template_id: &str, community_id: &str) -> Result<()> {
     let now = now_utc();
     db.prepare(
         "UPDATE event_templates SET is_active = 0, updated_at = ?1 \

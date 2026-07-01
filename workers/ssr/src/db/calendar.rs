@@ -3,8 +3,8 @@
 //! One active token per (membership_id, community_id) pair.
 //! Tokens are stored as HMAC-SHA256(pepper, plaintext) — never plaintext.
 
-use worker::d1::D1Database;
 use worker::Result;
+use worker::d1::D1Database;
 
 /// Metadata returned to callers — never includes the HMAC.
 pub struct CalendarTokenRow {
@@ -37,7 +37,7 @@ pub async fn find_by_hmac(
 
     Ok(rows.into_iter().next().and_then(|v| {
         Some(CalendarTokenClaims {
-            community_id:  v.get("community_id")?.as_str()?.to_owned(),
+            community_id: v.get("community_id")?.as_str()?.to_owned(),
             membership_id: v.get("membership_id")?.as_str()?.to_owned(),
         })
     }))
@@ -65,7 +65,7 @@ pub async fn find_active_for_membership(
 
     Ok(rows.into_iter().next().and_then(|v| {
         Some(CalendarTokenRow {
-            id:         v.get("id")?.as_str()?.to_owned(),
+            id: v.get("id")?.as_str()?.to_owned(),
             created_at: v.get("created_at")?.as_str()?.to_owned(),
         })
     }))
@@ -121,21 +121,18 @@ pub async fn revoke_for_membership(
 /// Events for the ICS feed: title, times, location, status.
 /// Only events for the given community_id — enforced in query.
 pub struct IcsEventRow {
-    pub event_id:     String,
-    pub title:        String,
-    pub location:     Option<String>,
-    pub status:       String, // "scheduled" | "cancelled"
+    pub event_id: String,
+    pub title: String,
+    pub location: Option<String>,
+    pub status: String, // "scheduled" | "cancelled"
     pub starts_at_utc: String,
-    pub ends_at_utc:   String,
-    pub day_id:       String,
+    pub ends_at_utc: String,
+    pub day_id: String,
 }
 
 /// Fetch all non-deleted event days for a community, ordered by start time.
 /// The ICS feed includes past events (needed for calendar sync to work correctly).
-pub async fn events_for_feed(
-    db: &D1Database,
-    community_id: &str,
-) -> Result<Vec<IcsEventRow>> {
+pub async fn events_for_feed(db: &D1Database, community_id: &str) -> Result<Vec<IcsEventRow>> {
     let rows = db
         .prepare(
             "SELECT ed.id AS day_id, \
@@ -155,15 +152,21 @@ pub async fn events_for_feed(
         .await?
         .results::<serde_json::Value>()?;
 
-    Ok(rows.into_iter().filter_map(|v| {
-        Some(IcsEventRow {
-            day_id:        v.get("day_id")?.as_str()?.to_owned(),
-            event_id:      v.get("event_id")?.as_str()?.to_owned(),
-            title:         v.get("title")?.as_str()?.to_owned(),
-            location:      v.get("location").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-            status:        v.get("status")?.as_str()?.to_owned(),
-            starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
-            ends_at_utc:   v.get("ends_at_utc")?.as_str()?.to_owned(),
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(IcsEventRow {
+                day_id: v.get("day_id")?.as_str()?.to_owned(),
+                event_id: v.get("event_id")?.as_str()?.to_owned(),
+                title: v.get("title")?.as_str()?.to_owned(),
+                location: v
+                    .get("location")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_owned()),
+                status: v.get("status")?.as_str()?.to_owned(),
+                starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
+                ends_at_utc: v.get("ends_at_utc")?.as_str()?.to_owned(),
+            })
         })
-    }).collect())
+        .collect())
 }

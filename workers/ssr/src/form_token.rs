@@ -93,12 +93,15 @@ pub async fn consume(
         .run()
         .await?;
 
-    let changed = update.meta().ok().flatten()
+    let changed = update
+        .meta()
+        .ok()
+        .flatten()
         .and_then(|m| m.changes)
         .unwrap_or(0);
 
     // Fast path: won the atomic race.
-    use zinnias_ciao_contracts::auth::{classify_token_consume, TokenConsumeOutcome};
+    use zinnias_ciao_contracts::auth::{TokenConsumeOutcome, classify_token_consume};
     if changed == 1 {
         return Ok(None);
     }
@@ -111,34 +114,37 @@ pub async fn consume(
              WHERE token_hmac = ?1 AND user_id = ?2 AND purpose = ?3 \
              LIMIT 1",
         )
-        .bind(&[
-            token_hmac.as_str().into(),
-            user_id.into(),
-            purpose.into(),
-        ])?
+        .bind(&[token_hmac.as_str().into(), user_id.into(), purpose.into()])?
         .first::<serde_json::Value>(None)
         .await?;
 
     let found = row.is_some();
-    let already_consumed = row.as_ref()
+    let already_consumed = row
+        .as_ref()
         .and_then(|r| r.get("consumed_at").and_then(|v| v.as_str()))
         .is_some();
     let binding_ok = match (bound_resource, row.as_ref()) {
         (Some(expected), Some(r)) => {
-            r.get("bound_resource").and_then(|v| v.as_str()).unwrap_or("") == expected
+            r.get("bound_resource")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                == expected
         }
         (None, _) => true,
         (Some(_), None) => false,
     };
 
-    let invalid = || worker::Error::RustError(
-        "This action could not be completed. Please try again.".to_string(),
-    );
+    let invalid = || {
+        worker::Error::RustError(
+            "This action could not be completed. Please try again.".to_string(),
+        )
+    };
 
     match classify_token_consume(changed, found, already_consumed, binding_ok) {
         TokenConsumeOutcome::Proceed => Ok(None), // unreachable for changed==0, but safe
         TokenConsumeOutcome::Replay => {
-            let result_ref = row.as_ref()
+            let result_ref = row
+                .as_ref()
                 .and_then(|r| r.get("result_ref").and_then(|v| v.as_str()))
                 .map(|s| s.to_owned());
             Ok(result_ref)

@@ -23,56 +23,43 @@ pub fn offset_minutes(tz: &str) -> Option<i32> {
         // UTC
         "UTC" | "Etc/UTC" | "Etc/GMT" => 0,
         // Asia
-        "Asia/Tokyo" | "Japan"                          =>  9 * 60,
-        "Asia/Seoul" | "Asia/Pyongyang"                 =>  9 * 60,
-        "Asia/Shanghai" | "Asia/Hong_Kong" |
-        "Asia/Taipei" | "Asia/Singapore" |
-        "Asia/Kuala_Lumpur"                             =>  8 * 60,
-        "Asia/Bangkok" | "Asia/Jakarta" |
-        "Asia/Saigon" | "Asia/Ho_Chi_Minh"              =>  7 * 60,
-        "Asia/Dhaka"                                    =>  6 * 60,
-        "Asia/Kolkata" | "Asia/Calcutta"                =>  5 * 60 + 30,
-        "Asia/Karachi"                                  =>  5 * 60,
-        "Asia/Dubai"                                    =>  4 * 60,
-        "Asia/Tehran"                                   =>  3 * 60 + 30,
-        "Asia/Riyadh" | "Asia/Baghdad"                  =>  3 * 60,
-        "Asia/Jerusalem" | "Asia/Tel_Aviv"              =>  2 * 60,
+        "Asia/Tokyo" | "Japan" => 9 * 60,
+        "Asia/Seoul" | "Asia/Pyongyang" => 9 * 60,
+        "Asia/Shanghai" | "Asia/Hong_Kong" | "Asia/Taipei" | "Asia/Singapore"
+        | "Asia/Kuala_Lumpur" => 8 * 60,
+        "Asia/Bangkok" | "Asia/Jakarta" | "Asia/Saigon" | "Asia/Ho_Chi_Minh" => 7 * 60,
+        "Asia/Dhaka" => 6 * 60,
+        "Asia/Kolkata" | "Asia/Calcutta" => 5 * 60 + 30,
+        "Asia/Karachi" => 5 * 60,
+        "Asia/Dubai" => 4 * 60,
+        "Asia/Tehran" => 3 * 60 + 30,
+        "Asia/Riyadh" | "Asia/Baghdad" => 3 * 60,
+        "Asia/Jerusalem" | "Asia/Tel_Aviv" => 2 * 60,
         // Europe
-        "Europe/London" | "GB"                          =>  0,
-        "Europe/Paris" | "Europe/Berlin" |
-        "Europe/Rome" | "Europe/Madrid" |
-        "Europe/Amsterdam" | "Europe/Brussels" |
-        "Europe/Vienna" | "Europe/Zurich" |
-        "Europe/Stockholm" | "Europe/Oslo" |
-        "Europe/Copenhagen" | "Europe/Warsaw" |
-        "Europe/Prague" | "Europe/Budapest"             =>  1 * 60,
-        "Europe/Helsinki" | "Europe/Riga" |
-        "Europe/Tallinn" | "Europe/Vilnius" |
-        "Europe/Athens" | "Europe/Bucharest" |
-        "Europe/Kyiv"                                   =>  2 * 60,
-        "Europe/Moscow" | "Europe/Minsk"                =>  3 * 60,
+        "Europe/London" | "GB" => 0,
+        "Europe/Paris" | "Europe/Berlin" | "Europe/Rome" | "Europe/Madrid" | "Europe/Amsterdam"
+        | "Europe/Brussels" | "Europe/Vienna" | "Europe/Zurich" | "Europe/Stockholm"
+        | "Europe/Oslo" | "Europe/Copenhagen" | "Europe/Warsaw" | "Europe/Prague"
+        | "Europe/Budapest" => 1 * 60,
+        "Europe/Helsinki" | "Europe/Riga" | "Europe/Tallinn" | "Europe/Vilnius"
+        | "Europe/Athens" | "Europe/Bucharest" | "Europe/Kyiv" => 2 * 60,
+        "Europe/Moscow" | "Europe/Minsk" => 3 * 60,
         // Americas
-        "America/Sao_Paulo" |
-        "America/Argentina/Buenos_Aires"                => -3 * 60,
-        "America/Halifax"                               => -4 * 60,
-        "America/New_York" | "America/Detroit" |
-        "America/Toronto" | "America/Boston" |
-        "US/Eastern"                                    => -5 * 60,
-        "America/Chicago" | "America/Winnipeg" |
-        "US/Central"                                    => -6 * 60,
-        "America/Denver" | "America/Edmonton" |
-        "US/Mountain"                                   => -7 * 60,
-        "America/Los_Angeles" | "America/Vancouver" |
-        "US/Pacific"                                    => -8 * 60,
-        "America/Anchorage" | "US/Alaska"               => -9 * 60,
-        "Pacific/Honolulu" | "US/Hawaii"                => -10 * 60,
+        "America/Sao_Paulo" | "America/Argentina/Buenos_Aires" => -3 * 60,
+        "America/Halifax" => -4 * 60,
+        "America/New_York" | "America/Detroit" | "America/Toronto" | "America/Boston"
+        | "US/Eastern" => -5 * 60,
+        "America/Chicago" | "America/Winnipeg" | "US/Central" => -6 * 60,
+        "America/Denver" | "America/Edmonton" | "US/Mountain" => -7 * 60,
+        "America/Los_Angeles" | "America/Vancouver" | "US/Pacific" => -8 * 60,
+        "America/Anchorage" | "US/Alaska" => -9 * 60,
+        "Pacific/Honolulu" | "US/Hawaii" => -10 * 60,
         // Pacific / Oceania
-        "Australia/Sydney" | "Australia/Melbourne" |
-        "Australia/Canberra"                            =>  10 * 60,
-        "Australia/Adelaide"                            =>  9 * 60 + 30,
-        "Australia/Darwin"                              =>  9 * 60 + 30,
-        "Australia/Perth"                               =>  8 * 60,
-        "Pacific/Auckland" | "NZ"                       =>  12 * 60,
+        "Australia/Sydney" | "Australia/Melbourne" | "Australia/Canberra" => 10 * 60,
+        "Australia/Adelaide" => 9 * 60 + 30,
+        "Australia/Darwin" => 9 * 60 + 30,
+        "Australia/Perth" => 8 * 60,
+        "Pacific/Auckland" | "NZ" => 12 * 60,
         // Unknown → None (callers must reject or fall back explicitly)
         _ => return None,
     })
@@ -95,16 +82,22 @@ pub fn to_local_parts(utc: &str, offset_mins: i32) -> (String, String) {
         utc.get(11..16).unwrap_or("").to_owned(),
     );
     let parts: Vec<&str> = utc.splitn(2, 'T').collect();
-    if parts.len() < 2 { return fallback; }
+    if parts.len() < 2 {
+        return fallback;
+    }
     let date_str = parts[0];
     let time_str = parts[1].get(..5).unwrap_or("");
-    if time_str.len() < 5 { return fallback; }
+    if time_str.len() < 5 {
+        return fallback;
+    }
 
     let segs: Vec<&str> = date_str.split('-').collect();
-    if segs.len() < 3 { return fallback; }
-    let year:  i32 = segs[0].parse().unwrap_or(0);
+    if segs.len() < 3 {
+        return fallback;
+    }
+    let year: i32 = segs[0].parse().unwrap_or(0);
     let month: i32 = segs[1].parse().unwrap_or(0);
-    let day:   i32 = segs[2].parse().unwrap_or(0);
+    let day: i32 = segs[2].parse().unwrap_or(0);
     let h: i32 = time_str.get(..2).and_then(|s| s.parse().ok()).unwrap_or(0);
     let m: i32 = time_str.get(3..5).and_then(|s| s.parse().ok()).unwrap_or(0);
 
@@ -127,7 +120,10 @@ pub fn to_local_parts(utc: &str, offset_mins: i32) -> (String, String) {
         add_days(year, month, day, day_delta)
     };
 
-    (format!("{fy:04}-{fm:02}-{fd:02}"), format!("{lh:02}:{lm:02}"))
+    (
+        format!("{fy:04}-{fm:02}-{fd:02}"),
+        format!("{lh:02}:{lm:02}"),
+    )
 }
 
 /// Convert a community-local date + "HH:MM" time to a UTC ISO-8601 string
@@ -139,13 +135,32 @@ pub fn local_to_utc(date: &str, time: &str, offset_mins: i32) -> String {
     let fallback = format!("{date}T{time}:00.000Z");
 
     let segs: Vec<&str> = date.split('-').collect();
-    if segs.len() < 3 { return fallback; }
-    let year:  i32 = match segs[0].parse() { Ok(v) => v, Err(_) => return fallback };
-    let month: i32 = match segs[1].parse() { Ok(v) => v, Err(_) => return fallback };
-    let day:   i32 = match segs[2].parse() { Ok(v) => v, Err(_) => return fallback };
-    if time.len() < 5 { return fallback; }
-    let h: i32 = match time.get(..2).and_then(|s| s.parse().ok()) { Some(v) => v, None => return fallback };
-    let m: i32 = match time.get(3..5).and_then(|s| s.parse().ok()) { Some(v) => v, None => return fallback };
+    if segs.len() < 3 {
+        return fallback;
+    }
+    let year: i32 = match segs[0].parse() {
+        Ok(v) => v,
+        Err(_) => return fallback,
+    };
+    let month: i32 = match segs[1].parse() {
+        Ok(v) => v,
+        Err(_) => return fallback,
+    };
+    let day: i32 = match segs[2].parse() {
+        Ok(v) => v,
+        Err(_) => return fallback,
+    };
+    if time.len() < 5 {
+        return fallback;
+    }
+    let h: i32 = match time.get(..2).and_then(|s| s.parse().ok()) {
+        Some(v) => v,
+        None => return fallback,
+    };
+    let m: i32 = match time.get(3..5).and_then(|s| s.parse().ok()) {
+        Some(v) => v,
+        None => return fallback,
+    };
 
     // UTC = local - offset.
     let mut total_mins = h * 60 + m - offset_mins;
@@ -188,7 +203,13 @@ pub fn days_in_month(year: i32, month: i32) -> i32 {
     match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
-        2 => if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 { 29 } else { 28 },
+        2 => {
+            if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 {
+                29
+            } else {
+                28
+            }
+        }
         _ => 30,
     }
 }
@@ -203,26 +224,38 @@ mod tests {
     fn tokyo_local_to_utc_subtracts_nine_hours() {
         // Architect acceptance case: 09:00 Asia/Tokyo -> 00:00Z same day.
         let off = offset_minutes("Asia/Tokyo").unwrap();
-        assert_eq!(local_to_utc("2026-06-14", "09:00", off), "2026-06-14T00:00:00.000Z");
+        assert_eq!(
+            local_to_utc("2026-06-14", "09:00", off),
+            "2026-06-14T00:00:00.000Z"
+        );
     }
 
     #[test]
     fn tokyo_local_to_utc_wraps_to_previous_day() {
         // 06:00 JST -> 21:00Z the previous day.
         let off = offset_minutes("Asia/Tokyo").unwrap();
-        assert_eq!(local_to_utc("2026-06-14", "06:00", off), "2026-06-13T21:00:00.000Z");
+        assert_eq!(
+            local_to_utc("2026-06-14", "06:00", off),
+            "2026-06-13T21:00:00.000Z"
+        );
     }
 
     #[test]
     fn new_york_local_to_utc_adds_five_hours() {
         // -5h zone: 20:00 local -> 01:00Z next day.
         let off = offset_minutes("America/New_York").unwrap();
-        assert_eq!(local_to_utc("2026-06-14", "20:00", off), "2026-06-15T01:00:00.000Z");
+        assert_eq!(
+            local_to_utc("2026-06-14", "20:00", off),
+            "2026-06-15T01:00:00.000Z"
+        );
     }
 
     #[test]
     fn utc_local_to_utc_is_identity() {
-        assert_eq!(local_to_utc("2026-06-14", "09:00", 0), "2026-06-14T09:00:00.000Z");
+        assert_eq!(
+            local_to_utc("2026-06-14", "09:00", 0),
+            "2026-06-14T09:00:00.000Z"
+        );
     }
 
     #[test]
@@ -237,14 +270,16 @@ mod tests {
     fn local_to_utc_month_boundary_backward() {
         // 00:30 JST on the 1st -> 15:30Z on the last day of previous month.
         let off = offset_minutes("Asia/Tokyo").unwrap();
-        assert_eq!(local_to_utc("2026-07-01", "00:30", off), "2026-06-30T15:30:00.000Z");
+        assert_eq!(
+            local_to_utc("2026-07-01", "00:30", off),
+            "2026-06-30T15:30:00.000Z"
+        );
     }
 
     #[test]
     fn local_to_utc_bad_input_falls_back() {
         assert_eq!(local_to_utc("bad", "09:00", 540), "badT09:00:00.000Z");
     }
-
 
     #[test]
     fn utc_offset_is_zero() {
@@ -268,14 +303,20 @@ mod tests {
 
     #[test]
     fn unknown_tz_returns_none() {
-        assert_eq!(offset_minutes("Atlantis/Underwater"), None,
-            "unknown timezone must return None, not a silent UTC fallback");
+        assert_eq!(
+            offset_minutes("Atlantis/Underwater"),
+            None,
+            "unknown timezone must return None, not a silent UTC fallback"
+        );
     }
 
     #[test]
     fn offset_minutes_or_utc_falls_back_to_utc() {
-        assert_eq!(offset_minutes_or_utc("Atlantis/Underwater"), 0,
-            "display-path helper must fall back to UTC (0) for unknown zones");
+        assert_eq!(
+            offset_minutes_or_utc("Atlantis/Underwater"),
+            0,
+            "display-path helper must fall back to UTC (0) for unknown zones"
+        );
     }
 
     #[test]
@@ -381,7 +422,11 @@ mod tests {
 // .. 6=Saturday. Pure arithmetic, no external deps.
 pub fn weekday_index(year: i32, month: i32, day: i32) -> i32 {
     // Zeller's congruence (Gregorian). Treat Jan/Feb as months 13/14 of prior year.
-    let (m, y) = if month < 3 { (month + 12, year - 1) } else { (month, year) };
+    let (m, y) = if month < 3 {
+        (month + 12, year - 1)
+    } else {
+        (month, year)
+    };
     let k = y % 100;
     let j = y / 100;
     let h = (day + (13 * (m + 1)) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
@@ -392,17 +437,31 @@ pub fn weekday_index(year: i32, month: i32, day: i32) -> i32 {
 /// Japanese single-character weekday label for 0=Sunday..6=Saturday.
 pub fn weekday_ja(index: i32) -> &'static str {
     match index.rem_euclid(7) {
-        0 => "日", 1 => "月", 2 => "火", 3 => "水",
-        4 => "木", 5 => "金", _ => "土",
+        0 => "日",
+        1 => "月",
+        2 => "火",
+        3 => "水",
+        4 => "木",
+        5 => "金",
+        _ => "土",
     }
 }
 
 /// English 3-letter month abbreviation for 1..=12.
 pub fn month_abbr_en(month: i32) -> &'static str {
     match month {
-        1 => "Jan", 2 => "Feb", 3 => "Mar", 4 => "Apr",
-        5 => "May", 6 => "Jun", 7 => "Jul", 8 => "Aug",
-        9 => "Sep", 10 => "Oct", 11 => "Nov", 12 => "Dec",
+        1 => "Jan",
+        2 => "Feb",
+        3 => "Mar",
+        4 => "Apr",
+        5 => "May",
+        6 => "Jun",
+        7 => "Jul",
+        8 => "Aug",
+        9 => "Sep",
+        10 => "Oct",
+        11 => "Nov",
+        12 => "Dec",
         _ => "",
     }
 }
@@ -411,8 +470,14 @@ pub fn month_abbr_en(month: i32) -> &'static str {
 /// e.g. `"6月14日（土）"`. Falls back to the raw string if unparseable.
 pub fn date_label_ja(local_date: &str) -> String {
     let segs: Vec<&str> = local_date.split('-').collect();
-    if segs.len() < 3 { return local_date.to_owned(); }
-    let (y, m, d) = match (segs[0].parse::<i32>(), segs[1].parse::<i32>(), segs[2].parse::<i32>()) {
+    if segs.len() < 3 {
+        return local_date.to_owned();
+    }
+    let (y, m, d) = match (
+        segs[0].parse::<i32>(),
+        segs[1].parse::<i32>(),
+        segs[2].parse::<i32>(),
+    ) {
         (Ok(y), Ok(m), Ok(d)) => (y, m, d),
         _ => return local_date.to_owned(),
     };
@@ -424,7 +489,9 @@ pub fn date_label_ja(local_date: &str) -> String {
 /// e.g. `"14 Jun"`. Falls back to the raw string if unparseable.
 pub fn date_label_en(local_date: &str) -> String {
     let segs: Vec<&str> = local_date.split('-').collect();
-    if segs.len() < 3 { return local_date.to_owned(); }
+    if segs.len() < 3 {
+        return local_date.to_owned();
+    }
     let (m, d) = match (segs[1].parse::<i32>(), segs[2].parse::<i32>()) {
         (Ok(m), Ok(d)) => (m, d),
         _ => return local_date.to_owned(),
@@ -459,7 +526,10 @@ mod date_label_tests {
     #[test]
     fn ja_label_no_english_month() {
         let label = date_label_ja("2026-06-14");
-        assert!(!label.contains("Jun"), "JA label must not contain English month: {label}");
+        assert!(
+            !label.contains("Jun"),
+            "JA label must not contain English month: {label}"
+        );
         assert!(label.contains("月"), "JA label must use 月");
     }
 

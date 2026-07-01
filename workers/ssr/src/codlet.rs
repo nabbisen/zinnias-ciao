@@ -17,6 +17,7 @@ use std::time::Duration;
 
 #[cfg(target_arch = "wasm32")]
 use codlet_core::{
+    CodePolicy,
     audit::NoopAuditSink,
     auth::{CodeAuth, FormTokenManager, SessionManager},
     clock::SystemClock,
@@ -24,7 +25,6 @@ use codlet_core::{
     hashing::SecretHasher,
     rng::SystemRandom,
     store::ratelimit::{RateLimitPolicy, RateLimitUnavailable},
-    CodePolicy,
 };
 #[cfg(target_arch = "wasm32")]
 use codlet_worker::{
@@ -49,10 +49,12 @@ pub async fn run_migrations(env: &Env) -> Result<()> {
 /// All three codlet managers for one request lifetime.
 #[cfg(target_arch = "wasm32")]
 pub struct CodletManagers {
-    pub code_auth:   CodeAuth<D1CodeStore, KvRateLimitStore, WorkerKeyProvider, SystemClock, NoopAuditSink>,
+    pub code_auth:
+        CodeAuth<D1CodeStore, KvRateLimitStore, WorkerKeyProvider, SystemClock, NoopAuditSink>,
     pub session_mgr: SessionManager<D1SessionStore, WorkerKeyProvider, SystemClock, NoopAuditSink>,
-    pub token_mgr:   FormTokenManager<D1FormTokenStore, WorkerKeyProvider, SystemClock, NoopAuditSink>,
-    pub rng:         SystemRandom,
+    pub token_mgr:
+        FormTokenManager<D1FormTokenStore, WorkerKeyProvider, SystemClock, NoopAuditSink>,
+    pub rng: SystemRandom,
 }
 
 /// Build all three codlet managers from the Worker `Env`.
@@ -60,7 +62,7 @@ pub struct CodletManagers {
 /// Fails closed if `CODLET_HMAC_KEY_V1` is absent or empty (INV-2).
 #[cfg(target_arch = "wasm32")]
 pub async fn build(env: &Env) -> Result<CodletManagers> {
-    let db     = Rc::new(env.d1("DB")?);
+    let db = Rc::new(env.d1("DB")?);
     let tables = D1TableConfig::default();
 
     let kv_store = worker_kv::KvStore::create("CODLET_RL")
@@ -72,10 +74,8 @@ pub async fn build(env: &Env) -> Result<CodletManagers> {
     let code_policy = CodePolicy::six_symbol(Duration::from_secs(INVITE_TTL_SECS))
         .map_err(|e| worker::Error::RustError(format!("codlet policy: {e}")))?;
 
-    let cookie_policy = CookiePolicy::production_strict(
-        "ciao_sid",
-        Duration::from_secs(30 * 24 * 3600),
-    );
+    let cookie_policy =
+        CookiePolicy::production_strict("ciao_sid", Duration::from_secs(30 * 24 * 3600));
 
     let rl_policy = RateLimitPolicy {
         max_failures: 5,
@@ -85,32 +85,45 @@ pub async fn build(env: &Env) -> Result<CodletManagers> {
 
     let form_token_ttl = Duration::from_secs(3600);
 
-    // Three independent WorkerKeyProvider instances (not Clone).
-    let kp_code    = WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])?;
-    let kp_session = WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])?;
-    let kp_token   = WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])?;
+    // WorkerKeyProvider now derives Clone (v0.16.1) — one provider suffices.
+    // Fails closed if CODLET_HMAC_KEY_V1 is absent or empty (INV-2).
+    let kp = WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])?;
+    let hasher = SecretHasher::new(kp);
 
-    let code_store    = D1CodeStore::new(Rc::clone(&db), tables.clone());
+    let code_store = D1CodeStore::new(Rc::clone(&db), tables.clone());
     let session_store = D1SessionStore::new(Rc::clone(&db), tables.clone());
-    let token_store   = D1FormTokenStore::new(db, tables);
+    let token_store = D1FormTokenStore::new(db, tables);
 
     let code_auth = CodeAuth::new(
-        code_store, rl_store, SecretHasher::new(kp_code),
-        SystemClock::new(), NoopAuditSink, code_policy, rl_policy,
+        code_store,
+        rl_store,
+        hasher.clone(),
+        SystemClock::new(),
+        NoopAuditSink,
+        code_policy,
+        rl_policy,
     );
 
     let session_mgr = SessionManager::new(
-        session_store, SecretHasher::new(kp_session),
-        SystemClock::new(), NoopAuditSink, cookie_policy,
+        session_store,
+        hasher.clone(),
+        SystemClock::new(),
+        NoopAuditSink,
+        cookie_policy,
     );
 
     let token_mgr = FormTokenManager::new(
-        token_store, SecretHasher::new(kp_token),
-        SystemClock::new(), NoopAuditSink, form_token_ttl,
+        token_store,
+        hasher,
+        SystemClock::new(),
+        NoopAuditSink,
+        form_token_ttl,
     );
 
     Ok(CodletManagers {
-        code_auth, session_mgr, token_mgr,
+        code_auth,
+        session_mgr,
+        token_mgr,
         rng: SystemRandom::new(),
     })
 }
@@ -122,14 +135,16 @@ pub async fn build(env: &Env) -> Result<CodletManagers> {
 pub fn build_session_mgr(
     env: &Env,
 ) -> Result<SessionManager<D1SessionStore, WorkerKeyProvider, SystemClock, NoopAuditSink>> {
-    let db  = Rc::new(env.d1("DB")?);
-    let kp  = WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])?;
-    let cookie_policy = CookiePolicy::production_strict(
-        "ciao_sid", Duration::from_secs(30 * 24 * 3600),
-    );
+    let db = Rc::new(env.d1("DB")?);
+    let kp = WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])?;
+    let cookie_policy =
+        CookiePolicy::production_strict("ciao_sid", Duration::from_secs(30 * 24 * 3600));
     Ok(SessionManager::new(
         D1SessionStore::new(db, D1TableConfig::default()),
-        SecretHasher::new(kp), SystemClock::new(), NoopAuditSink, cookie_policy,
+        SecretHasher::new(kp),
+        SystemClock::new(),
+        NoopAuditSink,
+        cookie_policy,
     ))
 }
 
@@ -146,11 +161,13 @@ pub fn session_clear_cookie() -> String {
 fn build_token_mgr(
     env: &Env,
 ) -> Result<FormTokenManager<D1FormTokenStore, WorkerKeyProvider, SystemClock, NoopAuditSink>> {
-    let db  = Rc::new(env.d1("DB")?);
-    let kp  = WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])?;
+    let db = Rc::new(env.d1("DB")?);
+    let kp = WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])?;
     Ok(FormTokenManager::new(
         D1FormTokenStore::new(db, D1TableConfig::default()),
-        SecretHasher::new(kp), SystemClock::new(), NoopAuditSink,
+        SecretHasher::new(kp),
+        SystemClock::new(),
+        NoopAuditSink,
         Duration::from_secs(3600),
     ))
 }
@@ -174,13 +191,19 @@ pub async fn issue_token(
 ) -> String {
     #[cfg(target_arch = "wasm32")]
     {
-        use codlet_core::store::token::TokenSubject;
         use codlet_core::secret::SubjectId;
+        use codlet_core::store::token::TokenSubject;
 
         if let Ok(mgr) = build_token_mgr(env) {
             let subject = TokenSubject::Authenticated(SubjectId::new(user_id.to_owned().into()));
             let mut rng = SystemRandom::new();
-            return mgr.issue(&mut rng, subject, purpose, bound_resource.map(str::to_owned))
+            return mgr
+                .issue(
+                    &mut rng,
+                    subject,
+                    purpose,
+                    bound_resource.map(str::to_owned),
+                )
                 .await
                 .map(|s| s.expose().to_owned())
                 .unwrap_or_default();
@@ -214,12 +237,13 @@ pub async fn consume_token(
 ) -> Result<Option<String>> {
     #[cfg(target_arch = "wasm32")]
     {
-        use codlet_core::store::token::TokenSubject;
         use codlet_core::secret::SubjectId;
+        use codlet_core::store::token::TokenSubject;
 
         if let Ok(mgr) = build_token_mgr(env) {
             let subject = TokenSubject::Authenticated(SubjectId::new(user_id.to_owned().into()));
-            return mgr.consume(raw_token, &subject, purpose, bound_resource)
+            return mgr
+                .consume(raw_token, &subject, purpose, bound_resource)
                 .await
                 .map_err(|e| worker::Error::RustError(format!("form token: {e}")));
         }
@@ -227,7 +251,7 @@ pub async fn consume_token(
     }
 
     // Non-wasm path and wasm32 fallback: legacy form_tokens table.
-    let db     = env.d1("DB")?;
+    let db = env.d1("DB")?;
     let pepper = crate::crypto::pepper(env);
     crate::form_token::consume(&db, &pepper, user_id, purpose, raw_token, bound_resource).await
 }
@@ -236,9 +260,9 @@ pub async fn consume_token(
 
 /// Metadata for one active invite code — unified across codlet and legacy tables.
 pub struct InviteCodeMeta {
-    pub id:          String,
+    pub id: String,
     /// ISO-8601 prefix for display (first 16 chars).
-    pub expires_at:  String,
+    pub expires_at: String,
     /// "admin" or "member".
     pub grants_role: String,
 }
@@ -260,16 +284,15 @@ pub async fn list_active_invites(env: &Env, community_id: &str) -> Vec<InviteCod
 
         if let Ok(db) = env.d1("DB") {
             let store = D1CodeStore::new(Rc::new(db), D1TableConfig::default());
-            let now   = SystemClock::new().unix_now();
-            let filter = CodeListFilter::active_in_scope(
-                ScopeKey::new(community_id.to_string()),
-            );
+            let now = SystemClock::new().unix_now();
+            let filter = CodeListFilter::active_in_scope(ScopeKey::new(community_id.to_string()));
             if let Ok(metas) = store.list_codes(&filter, now).await {
                 for m in metas {
                     result.push(InviteCodeMeta {
-                        id:          m.id.as_str().to_owned(),
-                        expires_at:  unix_secs_to_display(m.expires_at),
-                        grants_role: m.grant
+                        id: m.id.as_str().to_owned(),
+                        expires_at: unix_secs_to_display(m.expires_at),
+                        grants_role: m
+                            .grant
                             .as_deref()
                             .and_then(|g| g.strip_prefix("role:"))
                             .unwrap_or("member")
@@ -285,8 +308,8 @@ pub async fn list_active_invites(env: &Env, community_id: &str) -> Vec<InviteCod
         if let Ok(rows) = crate::db::invite::list_active_for_community(&db, community_id).await {
             for inv in rows {
                 result.push(InviteCodeMeta {
-                    id:          inv.id,
-                    expires_at:  inv.expires_at,
+                    id: inv.id,
+                    expires_at: inv.expires_at,
                     grants_role: inv.grants_role,
                 });
             }
@@ -298,18 +321,19 @@ pub async fn list_active_invites(env: &Env, community_id: &str) -> Vec<InviteCod
 
 /// Revoke an invite code by ID, trying codlet first then the legacy table.
 /// `community_id` is passed as scope to prevent cross-community revocation.
-pub async fn revoke_invite(
-    env:          &Env,
-    invite_id:    &str,
-    community_id: &str,
-) -> worker::Result<()> {
+pub async fn revoke_invite(env: &Env, invite_id: &str, community_id: &str) -> worker::Result<()> {
     // ── Codlet path (wasm32) ────────────────────────────────────────────────
     #[cfg(target_arch = "wasm32")]
     {
         use codlet_core::secret::CodeId;
         if let Ok(mgrs) = build(env).await {
             let code_id = CodeId::new(invite_id.to_owned().into());
-            if mgrs.code_auth.revoke_code(&code_id, Some(community_id)).await.is_ok() {
+            if mgrs
+                .code_auth
+                .revoke_code(&code_id, Some(community_id))
+                .await
+                .is_ok()
+            {
                 return Ok(());
             }
             // Not found in codlet_codes — fall through to legacy.
@@ -337,15 +361,15 @@ fn unix_secs_to_display(ts: u64) -> String {
 /// Fliegel–Van Flandern proleptic Gregorian algorithm.
 #[cfg(target_arch = "wasm32")]
 fn days_since_epoch_to_ymd(days: u64) -> (u64, u64, u64) {
-    let z   = days + 719468;
+    let z = days + 719468;
     let era = z / 146097;
     let doe = z % 146097;
-    let yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
-    let y   = yoe + era * 400;
-    let doy = doe - (365*yoe + yoe/4 - yoe/100);
-    let mp  = (5*doy + 2) / 153;
-    let d   = doy - (153*mp + 2)/5 + 1;
-    let m   = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y   = if m <= 2 { y + 1 } else { y };
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
     (y, m, d)
 }

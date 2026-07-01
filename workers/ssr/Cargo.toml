@@ -1,38 +1,39 @@
 [package]
 name    = "zinnias-ciao-ssr"
-version.workspace    = true
-edition.workspace    = true
-license.workspace    = true
-authors.workspace    = true
-repository.workspace = true
+version.workspace       = true
+edition.workspace       = true
+license.workspace       = true
+authors.workspace       = true
+repository.workspace    = true
 
 # Workers target is wasm32-unknown-unknown; wrangler/worker-build drives this.
 [lib]
-crate-type = ["cdylib"]
+crate-type              = ["cdylib"]
 
 [dependencies]
-zinnias-ciao-domain     = { path = "../../packages/domain" }
-zinnias-ciao-contracts  = { path = "../../packages/contracts" }
+zinnias-ciao-domain         = { workspace = true }
+zinnias-ciao-contracts      = { workspace = true }
 
-worker     = { workspace = true }
-serde      = { workspace = true }
-serde_json = { workspace = true }
-thiserror  = { workspace = true }
-time       = { workspace = true }
-hmac       = { workspace = true }
-sha2       = { workspace = true }
-hex        = { workspace = true }
+worker                      = { workspace = true }
+
+serde                       = { workspace = true }
+serde_json                  = { workspace = true }
+thiserror                   = { workspace = true }
+time                        = { workspace = true }
+hmac                        = { workspace = true }
+sha2                        = { workspace = true }
+hex                         = { workspace = true }
 
 # codlet is wasm32-only; native tests use codlet-core types directly
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-codlet-core   = { workspace = true }
-codlet-worker = { workspace = true }
-worker-kv     = { workspace = true }
-getrandom     = { workspace = true }  # crypto.rs random_token + generate_request_id
+codlet-core                 = { workspace = true }
+codlet                      = { workspace = true }
+worker-kv                   = { workspace = true }
+getrandom                   = { workspace = true }  # crypto.rs random_token + generate_request_id
 
 # getrandom needed directly in admin/members.rs non-wasm fallback path
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-getrandom = { workspace = true }
+getrandom                   = { workspace = true }
 
 [dev-dependencies]
 # SSR worker tests run via `cargo test` in native mode for handler logic;

@@ -13,7 +13,6 @@ pub use auth::{FORM_TOKEN_TTL_SECONDS, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS}
 pub use error::{AppError, ErrorCode};
 pub use html::escape_html;
 
-
 /// Build a comma-separated list of positional D1 placeholders for IN clauses.
 /// `build_in_placeholders(3, 0)` → `"?1, ?2, ?3"`.
 /// `offset` shifts the numbering: `build_in_placeholders(2, 3)` → `"?4, ?5"`.

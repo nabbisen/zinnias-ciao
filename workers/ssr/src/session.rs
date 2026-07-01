@@ -4,9 +4,9 @@
 //! Identity derives from the session row; never from client-supplied headers.
 
 use worker::{Env, Request, Result};
-use zinnias_ciao_contracts::{AppError, SESSION_COOKIE_NAME};
 #[cfg(not(target_arch = "wasm32"))]
 use zinnias_ciao_contracts::SESSION_TTL_SECONDS;
+use zinnias_ciao_contracts::{AppError, SESSION_COOKIE_NAME};
 
 use crate::crypto::hmac_hex;
 use crate::db::session as session_db;
@@ -69,22 +69,27 @@ pub async fn require_auth(req: &Request, env: &Env) -> Result<AuthContext> {
 /// Uses `codlet::build_session_mgr()` — a single shared construction path —
 /// rather than duplicating the `SessionManager` setup here.
 #[cfg(target_arch = "wasm32")]
-async fn try_codlet_session(cookie_secret: &str, env: &worker::Env) -> worker::Result<Option<AuthContext>> {
+async fn try_codlet_session(
+    cookie_secret: &str,
+    env: &worker::Env,
+) -> worker::Result<Option<AuthContext>> {
     use codlet_core::state::SessionValidationOutcome;
 
     // build_session_mgr() returns Err if CODLET_HMAC_KEY_V1 is not yet set.
     let mgr = match crate::codlet::build_session_mgr(env) {
-        Ok(m)  => m,
+        Ok(m) => m,
         Err(_) => return Ok(None), // key not configured yet — fall through to legacy
     };
 
     match mgr.validate(cookie_secret).await {
-        Ok(SessionValidationOutcome::Authenticated { subject, session_id, .. }) => {
-            Ok(Some(AuthContext {
-                session_id: session_id.as_str().to_owned(),
-                user_id:    subject.as_str().to_owned(),
-            }))
-        }
+        Ok(SessionValidationOutcome::Authenticated {
+            subject,
+            session_id,
+            ..
+        }) => Ok(Some(AuthContext {
+            session_id: session_id.as_str().to_owned(),
+            user_id: subject.as_str().to_owned(),
+        })),
         _ => Ok(None),
     }
 }

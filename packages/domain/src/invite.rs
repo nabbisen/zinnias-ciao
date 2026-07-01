@@ -98,9 +98,12 @@ mod tests {
     #[test]
     fn rejection_sampling_ceiling_is_correct() {
         let alpha_len = INVITE_CODE_ALPHABET.len(); // 31
-        let bias_tail = 256 % alpha_len;            // 8
-        let unbiased_ceiling = 256 - bias_tail;     // 248
-        assert_eq!(alpha_len, 31, "alphabet length changed — review bias analysis");
+        let bias_tail = 256 % alpha_len; // 8
+        let unbiased_ceiling = 256 - bias_tail; // 248
+        assert_eq!(
+            alpha_len, 31,
+            "alphabet length changed — review bias analysis"
+        );
         assert_eq!(unbiased_ceiling, 248);
         // Every byte in [0, 248) maps to a unique position mod 31.
         // No byte in [248, 256) should be used.

@@ -159,10 +159,7 @@ pub struct MemberSummary {
     pub display_name: String,
 }
 
-pub async fn list_all_active(
-    db: &D1Database,
-    community_id: &str,
-) -> Result<Vec<MemberSummary>> {
+pub async fn list_all_active(db: &D1Database, community_id: &str) -> Result<Vec<MemberSummary>> {
     let rows = db
         .prepare(
             "SELECT id, display_name FROM community_memberships \
@@ -174,12 +171,15 @@ pub async fn list_all_active(
         .await?
         .results::<serde_json::Value>()?;
 
-    Ok(rows.into_iter().filter_map(|v| {
-        Some(MemberSummary {
-            id:           v.get("id")?.as_str()?.to_owned(),
-            display_name: v.get("display_name")?.as_str()?.to_owned(),
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(MemberSummary {
+                id: v.get("id")?.as_str()?.to_owned(),
+                display_name: v.get("display_name")?.as_str()?.to_owned(),
+            })
         })
-    }).collect())
+        .collect())
 }
 
 /// Count active admins in a community (for last-admin guard).
@@ -196,11 +196,16 @@ pub async fn count_admins(db: &D1Database, community_id: &str) -> Result<u32> {
 }
 
 /// Get role string for a membership_id, scoped to community_id.
-pub async fn get_role(db: &D1Database, membership_id: &str, community_id: &str) -> Result<Option<String>> {
+pub async fn get_role(
+    db: &D1Database,
+    membership_id: &str,
+    community_id: &str,
+) -> Result<Option<String>> {
     let row = db
         .prepare(
             "SELECT role FROM community_memberships \
-             WHERE id = ?1 AND community_id = ?2 AND removed_at IS NULL LIMIT 1")
+             WHERE id = ?1 AND community_id = ?2 AND removed_at IS NULL LIMIT 1",
+        )
         .bind(&[membership_id.into(), community_id.into()])?
         .first::<serde_json::Value>(None)
         .await?;
@@ -213,10 +218,15 @@ pub async fn soft_remove(db: &D1Database, membership_id: &str, community_id: &st
     let now = crate::db::now_utc();
     db.prepare(
         "UPDATE community_memberships SET removed_at = ?1 \
-         WHERE id = ?2 AND community_id = ?3 AND removed_at IS NULL")
-        .bind(&[now.as_str().into(), membership_id.into(), community_id.into()])?
-        .run()
-        .await?;
+         WHERE id = ?2 AND community_id = ?3 AND removed_at IS NULL",
+    )
+    .bind(&[
+        now.as_str().into(),
+        membership_id.into(),
+        community_id.into(),
+    ])?
+    .run()
+    .await?;
     Ok(())
 }
 
@@ -245,10 +255,13 @@ pub async fn list_communities_for_user(
         .await?
         .results::<serde_json::Value>()?;
 
-    Ok(rows.into_iter().filter_map(|v| {
-        Some(CommunitySummary {
-            community_id:   v.get("community_id")?.as_str()?.to_owned(),
-            community_name: v.get("community_name")?.as_str()?.to_owned(),
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(CommunitySummary {
+                community_id: v.get("community_id")?.as_str()?.to_owned(),
+                community_name: v.get("community_name")?.as_str()?.to_owned(),
+            })
         })
-    }).collect())
+        .collect())
 }

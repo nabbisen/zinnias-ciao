@@ -1,17 +1,19 @@
 //! Admin event handlers — event create, cancel, edit, attendance, hide-note (RFC-009).
 
-use zinnias_ciao_contracts::auth::token_purpose;
 use worker::{Env, Request, Response, Result};
+use zinnias_ciao_contracts::auth::token_purpose;
 
 use crate::audit;
 use crate::authz::require_admin;
 use crate::db::{self, event as event_db, event_write, membership as membership_db};
+use crate::handlers::event::classify_day;
 use crate::render;
 use crate::session::require_auth;
-use crate::handlers::event::classify_day;
-use zinnias_ciao_domain::{validate_event, DayInput, EventInput, RecurrenceFreq, expand_recurrence};
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::status::DayTimeState;
+use zinnias_ciao_domain::{
+    DayInput, EventInput, RecurrenceFreq, expand_recurrence, validate_event,
+};
 
 fn redirect(url: &str) -> Result<Response> {
     let mut r = Response::empty()?;
@@ -33,22 +35,34 @@ pub async fn get_create_event(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let token = crate::codlet::issue_token(
-        env, &auth.user_id,
-        token_purpose::CREATE_EVENT, None,
-    ).await;
+    let token =
+        crate::codlet::issue_token(env, &auth.user_id, token_purpose::CREATE_EVENT, None).await;
 
     let _community = db::community::find_active(&db, community_id).await?;
-    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
-    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
+        .await
+        .unwrap_or_default();
+    let _community_pairs: Vec<(String, String)> = _communities_for_switcher
+        .iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone()))
+        .collect();
     let nav = render::bottom_nav(community_id, "home");
 
     // RFC-032: pre-fill from template if ?template=TID is present.
     let url = req.url()?;
-    let template_id = url.query_pairs().find(|(k,_)| k == "template").map(|(_,v)| v.to_string());
-    let err_msg: Option<String> = url.query_pairs().find(|(k,_)| k == "err").map(|(_,v)| v.to_string());
+    let template_id = url
+        .query_pairs()
+        .find(|(k, _)| k == "template")
+        .map(|(_, v)| v.to_string());
+    let err_msg: Option<String> = url
+        .query_pairs()
+        .find(|(k, _)| k == "err")
+        .map(|(_, v)| v.to_string());
     let (prefill_title, prefill_location) = if let Some(ref tid) = template_id {
-        let tmpl = db::event_template::find_active(&db, tid, community_id).await.ok().flatten();
+        let tmpl = db::event_template::find_active(&db, tid, community_id)
+            .await
+            .ok()
+            .flatten();
         (
             tmpl.as_ref().map(|t| t.title.clone()),
             tmpl.as_ref().and_then(|t| t.location.clone()),
@@ -65,8 +79,8 @@ pub async fn get_create_event(
         cid = render::escape_html(community_id),
     );
 
-        let cet = i18n::JA_ADMIN_CREATE_EVENT_TITLE;
-let body = format!(
+    let cet = i18n::JA_ADMIN_CREATE_EVENT_TITLE;
+    let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
          <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">{cet}</h1>\
@@ -79,13 +93,26 @@ let body = format!(
          </form>\
          {tmpl_link}\
          </main>{nav}",
-        header    = render::header_with_switcher(i18n::JA_ADMIN_CREATE_EVENT_TITLE, community_id, &_community_pairs),
-        cid       = render::escape_html(community_id),
-        tok       = render::escape_html(&token),
-        fields    = event_form_fields(prefill_title.as_deref(), prefill_location.as_deref(), None, err_msg.as_deref(), None, None, None, true),
-        submit    = i18n::JA_ADMIN_CREATE_EVENT_SUBMIT,
+        header = render::header_with_switcher(
+            i18n::JA_ADMIN_CREATE_EVENT_TITLE,
+            community_id,
+            &_community_pairs
+        ),
+        cid = render::escape_html(community_id),
+        tok = render::escape_html(&token),
+        fields = event_form_fields(
+            prefill_title.as_deref(),
+            prefill_location.as_deref(),
+            None,
+            err_msg.as_deref(),
+            None,
+            None,
+            None,
+            true
+        ),
+        submit = i18n::JA_ADMIN_CREATE_EVENT_SUBMIT,
         tmpl_link = templates_link,
-        nav       = nav,
+        nav = nav,
     );
     render::page(i18n::JA_ADMIN_CREATE_EVENT_TITLE, &body)
 }
@@ -109,34 +136,39 @@ pub async fn post_create_event(
     let raw_token = body.get_field("_token").unwrap_or_default();
 
     let replay = crate::codlet::consume_token(
-        env, &auth.user_id,
-        token_purpose::CREATE_EVENT, &raw_token, None,
-    ).await?;
+        env,
+        &auth.user_id,
+        token_purpose::CREATE_EVENT,
+        &raw_token,
+        None,
+    )
+    .await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/home"));
     }
 
     let input = EventInput {
-        title:       body.get_field("title").unwrap_or_default(),
-        location:    Some(body.get_field("location").unwrap_or_default()),
+        title: body.get_field("title").unwrap_or_default(),
+        location: Some(body.get_field("location").unwrap_or_default()),
         description: Some(body.get_field("description").unwrap_or_default()),
-        days:        vec![DayInput {
-            day_date:  body.get_field("day_date").unwrap_or_default(),
+        days: vec![DayInput {
+            day_date: body.get_field("day_date").unwrap_or_default(),
             starts_at: body.get_field("starts_at").unwrap_or_default(),
-            ends_at:   body.get_field("ends_at").unwrap_or_default(),
+            ends_at: body.get_field("ends_at").unwrap_or_default(),
         }],
     };
 
     // RFC-022: recurrence
-    let freq_str  = body.get_field("repeat_rule").unwrap_or_default();
-    let freq      = RecurrenceFreq::from_str(&freq_str);
-    let rep_count = body.get_field("repeat_count")
+    let freq_str = body.get_field("repeat_rule").unwrap_or_default();
+    let freq = RecurrenceFreq::from_str(&freq_str);
+    let rep_count = body
+        .get_field("repeat_count")
         .and_then(|s| s.trim().parse::<u32>().ok())
         .unwrap_or(1)
         .max(1);
 
     let validated = match validate_event(input) {
-        Ok(v)  => v,
+        Ok(v) => v,
         Err(e) => {
             let msg = render::escape_html(&e.to_string());
             return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
@@ -146,7 +178,7 @@ pub async fn post_create_event(
     // Expand recurrence from the single validated base day.
     let base_day = validated.days[0].clone();
     let expanded = match expand_recurrence(&base_day, freq, rep_count) {
-        Ok(v)  => v,
+        Ok(v) => v,
         Err(e) => {
             let msg = render::escape_html(&e.to_string());
             return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
@@ -157,37 +189,57 @@ pub async fn post_create_event(
     // The community timezone determines the offset for local→UTC conversion.
     // Unknown timezone names are a hard configuration error — we must not
     // silently store wrong UTC times (P1-timezone, architect review v0.29.0).
-    let community_tz = db::community::find_active(&db, community_id).await?
+    let community_tz = db::community::find_active(&db, community_id)
+        .await?
         .map(|c| c.timezone)
         .unwrap_or_else(|| "UTC".to_string());
     let off = match zinnias_ciao_contracts::tz::offset_minutes(&community_tz) {
         Some(o) => o,
-        None => return render::page(
-            i18n::JA_GENERAL_ERROR,
-            &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR)
-        ),
+        None => {
+            return render::page(
+                i18n::JA_GENERAL_ERROR,
+                &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR),
+            );
+        }
     };
-    let days_utc: Vec<(String, String, String)> = expanded.iter().map(|d| {
-        let starts = zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.starts_at, off);
-        let ends   = zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.ends_at, off);
-        (d.day_date.clone(), starts, ends)
-    }).collect();
+    let days_utc: Vec<(String, String, String)> = expanded
+        .iter()
+        .map(|d| {
+            let starts = zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.starts_at, off);
+            let ends = zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.ends_at, off);
+            (d.day_date.clone(), starts, ends)
+        })
+        .collect();
 
-    let repeat_count_stored = if freq.is_recurring() { Some(expanded.len() as u32) } else { None };
+    let repeat_count_stored = if freq.is_recurring() {
+        Some(expanded.len() as u32)
+    } else {
+        None
+    };
     let event_id = event_write::create_event(
-        &db, community_id, &membership.membership_id,
+        &db,
+        community_id,
+        &membership.membership_id,
         &validated.title,
         validated.location.as_deref(),
         validated.description.as_deref(),
         &days_utc,
         freq.as_str(),
         repeat_count_stored,
-    ).await?;
+    )
+    .await?;
 
-    let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
-        "event", Some(&event_id), "created",
+    let _ = audit::write(
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "event",
+        Some(&event_id),
+        "created",
         Some(serde_json::json!({ "title": validated.title })),
-    ).await;
+    )
+    .await;
 
     redirect(&format!("/c/{community_id}/events/{event_id}"))
 }
@@ -208,18 +260,26 @@ pub async fn get_cancel_event(
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let token = crate::codlet::issue_token(
-        env, &auth.user_id,
-        token_purpose::CANCEL_EVENT, Some(event_id),
-    ).await;
+        env,
+        &auth.user_id,
+        token_purpose::CANCEL_EVENT,
+        Some(event_id),
+    )
+    .await;
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
         Some(e) => e,
-        None    => return render::not_found(),
+        None => return render::not_found(),
     };
     let community = db::community::find_active(&db, community_id).await?;
     let _community_name = community.map(|c| c.name).unwrap_or_default();
-    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
-    let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
+        .await
+        .unwrap_or_default();
+    let _community_pairs: Vec<(String, String)> = _communities_for_switcher
+        .iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone()))
+        .collect();
     let nav = render::bottom_nav(community_id, "home");
 
     let body = format!(
@@ -241,16 +301,20 @@ pub async fn get_cancel_event(
                {confirm}</button>\
            </form>\
          </div></main>{nav}",
-        header    = render::header_with_switcher(i18n::JA_ADMIN_CANCEL_EVENT_TITLE, community_id, &_community_pairs),
-        title     = render::escape_html(&event.title),
-        cid       = render::escape_html(community_id),
-        eid       = render::escape_html(event_id),
-        tok       = render::escape_html(&token),
-        nav       = nav,
-        cat       = i18n::JA_ADMIN_CANCEL_EVENT_TITLE,
+        header = render::header_with_switcher(
+            i18n::JA_ADMIN_CANCEL_EVENT_TITLE,
+            community_id,
+            &_community_pairs
+        ),
+        title = render::escape_html(&event.title),
+        cid = render::escape_html(community_id),
+        eid = render::escape_html(event_id),
+        tok = render::escape_html(&token),
+        nav = nav,
+        cat = i18n::JA_ADMIN_CANCEL_EVENT_TITLE,
         body_text = i18n::JA_ADMIN_CANCEL_EVENT_BODY,
-        keep      = i18n::JA_ADMIN_CANCEL_EVENT_KEEP,
-        confirm   = i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM,
+        keep = i18n::JA_ADMIN_CANCEL_EVENT_KEEP,
+        confirm = i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM,
     );
     render::page(i18n::JA_ADMIN_CANCEL_EVENT_TITLE, &body)
 }
@@ -274,16 +338,29 @@ pub async fn post_cancel_event(
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let replay = crate::codlet::consume_token(
-        env, &auth.user_id,
-        token_purpose::CANCEL_EVENT, &raw_token, Some(event_id),
-    ).await?;
+        env,
+        &auth.user_id,
+        token_purpose::CANCEL_EVENT,
+        &raw_token,
+        Some(event_id),
+    )
+    .await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
 
     event_write::cancel_event(&db, event_id, &membership.membership_id).await?;
-    let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
-        "event", Some(event_id), "cancelled", None).await;
+    let _ = audit::write(
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "event",
+        Some(event_id),
+        "cancelled",
+        None,
+    )
+    .await;
 
     redirect(&format!("/c/{community_id}/events/{event_id}"))
 }
@@ -306,12 +383,17 @@ pub async fn get_edit_event(
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
         Some(e) => e,
-        None    => return render::not_found(),
+        None => return render::not_found(),
     };
     if event.status == "cancelled" {
-        return render::page(i18n::JA_GENERAL_ERROR,
-            &format!("<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
-                i18n::JA_ADMIN_EDIT_CANCELLED, i18n::JA_GENERAL_BACK));
+        return render::page(
+            i18n::JA_GENERAL_ERROR,
+            &format!(
+                "<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
+                i18n::JA_ADMIN_EDIT_CANCELLED,
+                i18n::JA_GENERAL_BACK
+            ),
+        );
     }
     // RFC-018: editing is only allowed while the event is still upcoming (before first day starts).
     let days = event_db::days_for_event(&db, event_id).await?;
@@ -320,20 +402,29 @@ pub async fn get_edit_event(
         classify_day(&d.starts_at_utc, &d.ends_at_utc, &now_utc) != DayTimeState::Upcoming
     });
     if already_started {
-        return render::page(i18n::JA_GENERAL_ERROR,
-            &format!("<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
-                i18n::JA_ADMIN_EDIT_STARTED, i18n::JA_GENERAL_BACK));
+        return render::page(
+            i18n::JA_GENERAL_ERROR,
+            &format!(
+                "<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
+                i18n::JA_ADMIN_EDIT_STARTED,
+                i18n::JA_GENERAL_BACK
+            ),
+        );
     }
     let token = crate::codlet::issue_token(
-        env, &auth.user_id,
-        token_purpose::EDIT_EVENT, Some(event_id),
-    ).await;
+        env,
+        &auth.user_id,
+        token_purpose::EDIT_EVENT,
+        Some(event_id),
+    )
+    .await;
 
     // Prefill date/time from the existing day, converted UTC → community-local.
     // Only single-day events support time editing; multi-day events edit details only.
     let is_single_day = days.len() == 1;
     let (prefill_date, prefill_start, prefill_end) = if is_single_day {
-        let community_tz = db::community::find_active(&db, community_id).await?
+        let community_tz = db::community::find_active(&db, community_id)
+            .await?
             .map(|c| c.timezone)
             .unwrap_or_else(|| "UTC".to_string());
         // Display path: fall back to UTC for unknown zones (shows UTC times rather
@@ -341,24 +432,31 @@ pub async fn get_edit_event(
         let off = zinnias_ciao_contracts::tz::offset_minutes_or_utc(&community_tz);
         let d = &days[0];
         let (date, start) = zinnias_ciao_contracts::tz::to_local_parts(&d.starts_at_utc, off);
-        let (_, end)      = zinnias_ciao_contracts::tz::to_local_parts(&d.ends_at_utc, off);
+        let (_, end) = zinnias_ciao_contracts::tz::to_local_parts(&d.ends_at_utc, off);
         (Some(date), Some(start), Some(end))
     } else {
         (None, None, None)
     };
 
-    let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
-    let community_pairs: Vec<(String,String)> = communities_for_switcher.iter()
-        .map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
+        .await
+        .unwrap_or_default();
+    let community_pairs: Vec<(String, String)> = communities_for_switcher
+        .iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone()))
+        .collect();
     let nav = render::bottom_nav(community_id, "home");
 
     // Pull flash / error from query string
     let url = req.url()?;
-    let err: Option<String> = url.query_pairs().find(|(k,_)| k == "err").map(|(_,v)| v.to_string());
+    let err: Option<String> = url
+        .query_pairs()
+        .find(|(k, _)| k == "err")
+        .map(|(_, v)| v.to_string());
 
-        let eet = i18n::JA_ADMIN_EDIT_EVENT_TITLE;
+    let eet = i18n::JA_ADMIN_EDIT_EVENT_TITLE;
     let ees = i18n::JA_ADMIN_EDIT_EVENT_SUBMIT;
-let body = format!(
+    let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
          <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{eet}</h1>\
@@ -376,13 +474,17 @@ let body = format!(
               style=\"color:{muted};font-size:.875rem\">{back}</a>\
          </div>\
          </main>{nav}",
-        header = render::header_with_switcher(i18n::JA_ADMIN_EDIT_EVENT_TITLE, community_id, &community_pairs),
-        cid    = render::escape_html(community_id),
-        eid    = render::escape_html(event_id),
-        tok    = render::escape_html(&token),
-        muted  = "#6E6E73",
-        back   = i18n::JA_NAV_BACK,
-        going  = "#007AFF",
+        header = render::header_with_switcher(
+            i18n::JA_ADMIN_EDIT_EVENT_TITLE,
+            community_id,
+            &community_pairs
+        ),
+        cid = render::escape_html(community_id),
+        eid = render::escape_html(event_id),
+        tok = render::escape_html(&token),
+        muted = "#6E6E73",
+        back = i18n::JA_NAV_BACK,
+        going = "#007AFF",
         fields = event_form_fields(
             Some(&event.title),
             event.location.as_deref(),
@@ -417,9 +519,13 @@ pub async fn post_edit_event(
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let replay = crate::codlet::consume_token(
-        env, &auth.user_id,
-        token_purpose::EDIT_EVENT, &raw_token, Some(event_id),
-    ).await?;
+        env,
+        &auth.user_id,
+        token_purpose::EDIT_EVENT,
+        &raw_token,
+        Some(event_id),
+    )
+    .await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
@@ -427,34 +533,38 @@ pub async fn post_edit_event(
     // Verify event exists and belongs to community
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
         Some(e) => e,
-        None    => return render::not_found(),
+        None => return render::not_found(),
     };
     if event.status == "cancelled" {
         return render::not_found();
     }
     // RFC-018: reject POST edits if the event has already started.
     let days_check = event_db::days_for_event(&db, event_id).await?;
-    let now_check  = db::now_utc();
-    if days_check.iter().any(|d| classify_day(&d.starts_at_utc, &d.ends_at_utc, &now_check) != DayTimeState::Upcoming) {
+    let now_check = db::now_utc();
+    if days_check.iter().any(|d| {
+        classify_day(&d.starts_at_utc, &d.ends_at_utc, &now_check) != DayTimeState::Upcoming
+    }) {
         return render::not_found(); // same generic response — consistent with GET guard
     }
 
     let input = EventInput {
-        title:       body.get_field("title").unwrap_or_default(),
-        location:    Some(body.get_field("location").unwrap_or_default()),
+        title: body.get_field("title").unwrap_or_default(),
+        location: Some(body.get_field("location").unwrap_or_default()),
         description: Some(body.get_field("description").unwrap_or_default()),
-        days:        vec![zinnias_ciao_domain::DayInput {
-            day_date:  body.get_field("day_date").unwrap_or_default(),
+        days: vec![zinnias_ciao_domain::DayInput {
+            day_date: body.get_field("day_date").unwrap_or_default(),
             starts_at: body.get_field("starts_at").unwrap_or_default(),
-            ends_at:   body.get_field("ends_at").unwrap_or_default(),
+            ends_at: body.get_field("ends_at").unwrap_or_default(),
         }],
     };
 
     let validated = match validate_event(input) {
-        Ok(v)  => v,
+        Ok(v) => v,
         Err(e) => {
             let msg = render::escape_html(&e.to_string());
-            return redirect(&format!("/c/{community_id}/admin/events/{event_id}/edit?err={msg}"));
+            return redirect(&format!(
+                "/c/{community_id}/admin/events/{event_id}/edit?err={msg}"
+            ));
         }
     };
 
@@ -463,16 +573,19 @@ pub async fn post_edit_event(
     // details only (RFC-040 will define multi-day edit semantics).
     let existing_days = event_db::days_for_event(&db, event_id).await?;
     let day_utc: Option<(String, String, String)> = if existing_days.len() == 1 {
-        let community_tz = db::community::find_active(&db, community_id).await?
+        let community_tz = db::community::find_active(&db, community_id)
+            .await?
             .map(|c| c.timezone)
             .unwrap_or_else(|| "UTC".to_string());
         // Write path: unknown timezone is a hard error (P1-timezone).
         let off = match zinnias_ciao_contracts::tz::offset_minutes(&community_tz) {
             Some(o) => o,
-            None => return render::page(
-                i18n::JA_GENERAL_ERROR,
-                &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR)
-            ),
+            None => {
+                return render::page(
+                    i18n::JA_GENERAL_ERROR,
+                    &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR),
+                );
+            }
         };
         let d = &validated.days[0];
         Some((
@@ -485,17 +598,28 @@ pub async fn post_edit_event(
     };
 
     event_write::edit_event(
-        &db, event_id,
+        &db,
+        event_id,
         &validated.title,
         validated.location.as_deref(),
         validated.description.as_deref(),
-        day_utc.as_ref().map(|(d, s, e)| (d.as_str(), s.as_str(), e.as_str())),
-    ).await?;
+        day_utc
+            .as_ref()
+            .map(|(d, s, e)| (d.as_str(), s.as_str(), e.as_str())),
+    )
+    .await?;
 
-    let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
-        "event", Some(event_id), "edited",
+    let _ = audit::write(
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "event",
+        Some(event_id),
+        "edited",
         Some(serde_json::json!({ "title": validated.title })),
-    ).await;
+    )
+    .await;
 
     redirect(&format!("/c/{community_id}/events/{event_id}"))
 }
@@ -518,34 +642,47 @@ pub async fn get_attendance(
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
         Some(e) => e,
-        None    => return render::not_found(),
+        None => return render::not_found(),
     };
     // Only allow attendance correction after the event (status=ended or any non-scheduled)
     // For MVP we allow it for any non-cancelled event (the admin controls when to correct).
     if event.status == "cancelled" {
-        return render::page(i18n::JA_GENERAL_ERROR,
-            &format!("<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
-                i18n::JA_ADMIN_ATTEND_CANCELLED, i18n::JA_GENERAL_BACK));
+        return render::page(
+            i18n::JA_GENERAL_ERROR,
+            &format!(
+                "<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
+                i18n::JA_ADMIN_ATTEND_CANCELLED,
+                i18n::JA_GENERAL_BACK
+            ),
+        );
     }
 
     let days = event_db::days_for_event(&db, event_id).await?;
     let members = membership_db::list_all_active(&db, community_id).await?;
     // One token per (event, admin) covers the whole batch form.
     let token = crate::codlet::issue_token(
-        env, &auth.user_id,
-        token_purpose::ATTENDANCE_OVERRIDE, Some(event_id),
-    ).await;
+        env,
+        &auth.user_id,
+        token_purpose::ATTENDANCE_OVERRIDE,
+        Some(event_id),
+    )
+    .await;
 
-    let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
-    let community_pairs: Vec<(String,String)> = communities_for_switcher.iter()
-        .map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
+        .await
+        .unwrap_or_default();
+    let community_pairs: Vec<(String, String)> = communities_for_switcher
+        .iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone()))
+        .collect();
     let nav = render::bottom_nav(community_id, "home");
 
     // Build one table per day (MVP events are almost always single-day)
     let mut days_html = String::new();
     for day in &days {
         let attendances = crate::db::attendance::list_for_day(&db, &day.id).await?;
-        let att_map: std::collections::HashMap<&str, Option<&str>> = attendances.iter()
+        let att_map: std::collections::HashMap<&str, Option<&str>> = attendances
+            .iter()
             .map(|a| (a.membership_id.as_str(), a.status.as_deref()))
             .collect();
 
@@ -571,24 +708,27 @@ pub async fn get_attendance(
                    <option value=\"attended\"{attended}>{opt_at}</option>\
                  </select>\
                  </div>",
-                name     = render::escape_html(&m.display_name),
+                name = render::escape_html(&m.display_name),
                 name_raw = render::escape_html(&m.display_name),
-                day_id   = render::escape_html(&day.id),
-                mid      = render::escape_html(&m.id),
-                no_ans   = if current.is_none() { " selected" } else { "" },
-                going    = sel("going"),
+                day_id = render::escape_html(&day.id),
+                mid = render::escape_html(&m.id),
+                no_ans = if current.is_none() { " selected" } else { "" },
+                going = sel("going"),
                 notgoing = sel("not_going"),
-                opt_na   = i18n::JA_STATUS_NO_ANSWER,
-                opt_go   = i18n::JA_STATUS_GOING,
-                opt_ng   = i18n::JA_STATUS_NOT_GOING,
-                opt_at   = i18n::JA_STATUS_ATTENDED,
+                opt_na = i18n::JA_STATUS_NO_ANSWER,
+                opt_go = i18n::JA_STATUS_GOING,
+                opt_ng = i18n::JA_STATUS_NOT_GOING,
+                opt_at = i18n::JA_STATUS_ATTENDED,
                 attended = sel("attended"),
             ));
         }
     }
 
-    let flash: Option<String> = req.url()?.query_pairs()
-        .find(|(k,_)| k == "flash").map(|(_,v)| v.to_string());
+    let flash: Option<String> = req
+        .url()?
+        .query_pairs()
+        .find(|(k, _)| k == "flash")
+        .map(|(_, v)| v.to_string());
     let flash_html = flash.map(|f| format!(
         "<p role=\"status\" style=\"color:#167A34;font-size:.875rem;margin-bottom:1rem\">{}</p>",
         render::escape_html(&f)
@@ -613,17 +753,21 @@ pub async fn get_attendance(
              {back}</a>\
          </div>\
          </main>{nav}",
-        header = render::header_with_switcher(i18n::JA_ADMIN_ATTEND_TITLE, community_id, &community_pairs),
-        title  = render::escape_html(&event.title),
-        cid    = render::escape_html(community_id),
-        eid    = render::escape_html(event_id),
-        tok    = render::escape_html(&token),
-        days   = days_html,
-        flash  = flash_html,
-        nav    = nav,
-        at     = i18n::JA_ADMIN_ATTEND_TITLE,
-        aas    = i18n::JA_ADMIN_ATTEND_SUBMIT,
-        back   = i18n::JA_NAV_BACK,
+        header = render::header_with_switcher(
+            i18n::JA_ADMIN_ATTEND_TITLE,
+            community_id,
+            &community_pairs
+        ),
+        title = render::escape_html(&event.title),
+        cid = render::escape_html(community_id),
+        eid = render::escape_html(event_id),
+        tok = render::escape_html(&token),
+        days = days_html,
+        flash = flash_html,
+        nav = nav,
+        at = i18n::JA_ADMIN_ATTEND_TITLE,
+        aas = i18n::JA_ADMIN_ATTEND_SUBMIT,
+        back = i18n::JA_NAV_BACK,
     );
     render::page(i18n::JA_ADMIN_ATTEND_TITLE, &body)
 }
@@ -647,15 +791,22 @@ pub async fn post_attendance(
     let form = req.form_data().await?;
     let raw_token = form.get_field("_token").unwrap_or_default();
     let replay = crate::codlet::consume_token(
-        env, &auth.user_id,
-        token_purpose::ATTENDANCE_OVERRIDE, &raw_token, Some(event_id),
-    ).await?;
+        env,
+        &auth.user_id,
+        token_purpose::ATTENDANCE_OVERRIDE,
+        &raw_token,
+        Some(event_id),
+    )
+    .await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
 
     // Verify event is in scope
-    if event_db::find_for_community(&db, event_id, community_id).await?.is_none() {
+    if event_db::find_for_community(&db, event_id, community_id)
+        .await?
+        .is_none()
+    {
         return render::not_found();
     }
 
@@ -668,22 +819,31 @@ pub async fn post_attendance(
             let field_name = format!("att_{}_{}", day.id, m.id);
             let value = form.get_field(&field_name).unwrap_or_default();
             let status: Option<&str> = match value.as_str() {
-                "going"     => Some("going"),
+                "going" => Some("going"),
                 "not_going" => Some("not_going"),
-                "attended"  => Some("attended"),
-                _           => None, // "" → clear to No answer
+                "attended" => Some("attended"),
+                _ => None, // "" → clear to No answer
             };
             crate::db::attendance::upsert(&db, &day.id, &m.id, status).await?;
             changes += 1;
         }
     }
 
-    let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
-        "attendance", Some(event_id), "admin_override",
+    let _ = audit::write(
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "attendance",
+        Some(event_id),
+        "admin_override",
         Some(serde_json::json!({ "changes": changes })),
-    ).await;
+    )
+    .await;
 
-    redirect(&format!("/c/{community_id}/admin/events/{event_id}/attendance?flash=Saved"))
+    redirect(&format!(
+        "/c/{community_id}/admin/events/{event_id}/attendance?flash=Saved"
+    ))
 }
 
 // ── GET /c/:cid/admin/events/:eid/notes/:mid/hide ────────────────────────
@@ -705,20 +865,28 @@ pub async fn get_admin_hide_note_confirm(
     let db = env.d1("DB")?;
 
     let token = crate::codlet::issue_token(
-        env, &auth.user_id,
-        token_purpose::ADMIN_HIDE_NOTE, Some(event_id),
-    ).await;
+        env,
+        &auth.user_id,
+        token_purpose::ADMIN_HIDE_NOTE,
+        Some(event_id),
+    )
+    .await;
 
     // Resolve the target member's display name for the confirmation copy.
     let all = membership_db::list_all_active(&db, community_id).await?;
-    let target_name = all.iter()
+    let target_name = all
+        .iter()
         .find(|m| m.id == target_membership_id)
         .map(|m| m.display_name.as_str())
         .unwrap_or("this member");
 
-    let communities = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
-    let pairs: Vec<(String, String)> = communities.iter()
-        .map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+    let communities = membership_db::list_communities_for_user(&db, &auth.user_id)
+        .await
+        .unwrap_or_default();
+    let pairs: Vec<(String, String)> = communities
+        .iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone()))
+        .collect();
     let nav = render::bottom_nav(community_id, "home");
 
     let body = format!(
@@ -742,15 +910,15 @@ pub async fn get_admin_hide_note_confirm(
              </form>\
            </div>\
          </main>{nav}",
-        header      = render::header_with_switcher(i18n::JA_NOTE_DELETE, community_id, &pairs),
-        name        = render::escape_html(target_name),
-        cid         = render::escape_html(community_id),
-        eid         = render::escape_html(event_id),
-        mid         = render::escape_html(target_membership_id),
-        tok         = render::escape_html(&token),
-        nav         = nav,
-        nd          = i18n::JA_NOTE_DELETE,
-        keep        = i18n::JA_NOTE_KEEP_ACTION,
+        header = render::header_with_switcher(i18n::JA_NOTE_DELETE, community_id, &pairs),
+        name = render::escape_html(target_name),
+        cid = render::escape_html(community_id),
+        eid = render::escape_html(event_id),
+        mid = render::escape_html(target_membership_id),
+        tok = render::escape_html(&token),
+        nav = nav,
+        nd = i18n::JA_NOTE_DELETE,
+        keep = i18n::JA_NOTE_KEEP_ACTION,
         consequence = i18n::JA_ADMIN_REMOVE_CONSEQUENCE,
     );
     render::page(i18n::JA_NOTE_DELETE, &body)
@@ -776,27 +944,43 @@ pub async fn post_admin_hide_note(
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let replay = crate::codlet::consume_token(
-        env, &auth.user_id,
-        token_purpose::ADMIN_HIDE_NOTE, &raw_token, Some(event_id),
-    ).await?;
+        env,
+        &auth.user_id,
+        token_purpose::ADMIN_HIDE_NOTE,
+        &raw_token,
+        Some(event_id),
+    )
+    .await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
 
     // Verify event belongs to this community
-    if event_db::find_for_community(&db, event_id, community_id).await?.is_none() {
+    if event_db::find_for_community(&db, event_id, community_id)
+        .await?
+        .is_none()
+    {
         return render::not_found();
     }
 
     crate::db::event_note::admin_hide(&db, event_id, target_membership_id).await?;
 
     // Audit without note body content (RFC-014)
-    let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
-        "event_note", Some(event_id), "admin_hidden",
+    let _ = audit::write(
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "event_note",
+        Some(event_id),
+        "admin_hidden",
         Some(serde_json::json!({ "target_membership_id": target_membership_id })),
-    ).await;
+    )
+    .await;
 
-    redirect(&format!("/c/{community_id}/events/{event_id}?flash=Note+removed"))
+    redirect(&format!(
+        "/c/{community_id}/events/{event_id}?flash=Note+removed"
+    ))
 }
 
 fn event_form_fields(
@@ -809,10 +993,14 @@ fn event_form_fields(
     ends_at: Option<&str>,
     show_recurrence: bool,
 ) -> String {
-    let err_html = error.map(|e| format!(
-        "<p role=\"alert\" style=\"color:#FF3B30;font-size:.875rem\">{}</p>",
-        render::escape_html(e)
-    )).unwrap_or_default();
+    let err_html = error
+        .map(|e| {
+            format!(
+                "<p role=\"alert\" style=\"color:#FF3B30;font-size:.875rem\">{}</p>",
+                render::escape_html(e)
+            )
+        })
+        .unwrap_or_default();
 
     let field = |label: &str, name: &str, ftype: &str, val: &str, required: bool| {
         let req_attr = if required { " required" } else { "" };
@@ -825,15 +1013,15 @@ fn event_form_fields(
              </label>",
             label = label,
             ftype = ftype,
-            name  = name,
-            val   = render::escape_html(val),
+            name = name,
+            val = render::escape_html(val),
         )
     };
 
     // RFC-022: repeat fields (create only — edit hides recurrence).
     let repeat_html = if show_recurrence {
         format!(
-        "<div style=\"margin-bottom:1rem\">\
+            "<div style=\"margin-bottom:1rem\">\
          <label style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{repeat_lbl}</label>\
          <div style=\"display:flex;gap:.75rem;align-items:center\">\
            <select name=\"repeat_rule\" style=\"padding:.625rem;border:1px solid #e5e5ea;\
@@ -850,13 +1038,13 @@ fn event_form_fields(
          </div>\
          <p style=\"font-size:.75rem;color:#6e6e73;margin:.25rem 0 0\">{hint}</p>\
          </div>",
-        repeat_lbl = i18n::JA_REPEAT_LABEL,
-        opt_none   = i18n::JA_REPEAT_NONE,
-        opt_weekly = i18n::JA_REPEAT_WEEKLY,
-        opt_biweekly = i18n::JA_REPEAT_BIWEEKLY,
-        opt_monthly  = i18n::JA_REPEAT_MONTHLY,
-        unit       = i18n::JA_REPEAT_COUNT_UNIT,
-        hint       = i18n::JA_REPEAT_COUNT_HINT,
+            repeat_lbl = i18n::JA_REPEAT_LABEL,
+            opt_none = i18n::JA_REPEAT_NONE,
+            opt_weekly = i18n::JA_REPEAT_WEEKLY,
+            opt_biweekly = i18n::JA_REPEAT_BIWEEKLY,
+            opt_monthly = i18n::JA_REPEAT_MONTHLY,
+            unit = i18n::JA_REPEAT_COUNT_UNIT,
+            hint = i18n::JA_REPEAT_COUNT_HINT,
         )
     } else {
         String::new()
@@ -871,15 +1059,44 @@ fn event_form_fields(
          {loc}\
          {repeat}\
          {desc}",
-        err    = err_html,
-        title  = field(i18n::JA_FORM_FIELD_TITLE, "title", "text", title.unwrap_or(""), true),
-        date   = field(i18n::JA_FORM_FIELD_DATE, "day_date", "date", day_date.unwrap_or(""), true),
-        start  = field(i18n::JA_FORM_FIELD_START, "starts_at", "time", starts_at.unwrap_or(""), true),
-        end    = field(i18n::JA_FORM_FIELD_END, "ends_at", "time", ends_at.unwrap_or(""), true),
+        err = err_html,
+        title = field(
+            i18n::JA_FORM_FIELD_TITLE,
+            "title",
+            "text",
+            title.unwrap_or(""),
+            true
+        ),
+        date = field(
+            i18n::JA_FORM_FIELD_DATE,
+            "day_date",
+            "date",
+            day_date.unwrap_or(""),
+            true
+        ),
+        start = field(
+            i18n::JA_FORM_FIELD_START,
+            "starts_at",
+            "time",
+            starts_at.unwrap_or(""),
+            true
+        ),
+        end = field(
+            i18n::JA_FORM_FIELD_END,
+            "ends_at",
+            "time",
+            ends_at.unwrap_or(""),
+            true
+        ),
         repeat = repeat_html,
-        loc    = field(i18n::JA_FORM_FIELD_LOCATION, "location", "text",
-                      location.unwrap_or(""), false),
-        desc  = {
+        loc = field(
+            i18n::JA_FORM_FIELD_LOCATION,
+            "location",
+            "text",
+            location.unwrap_or(""),
+            false
+        ),
+        desc = {
             let dval = render::escape_html(description.unwrap_or(""));
             format!(
                 "<label style=\"display:block;margin-bottom:1rem\">\
@@ -894,4 +1111,3 @@ fn event_form_fields(
         },
     )
 }
-

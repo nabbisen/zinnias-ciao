@@ -40,21 +40,24 @@ pub async fn find_for_community(
 
     Ok(row.and_then(|v| {
         Some(EventRow {
-            id:          v.get("id")?.as_str()?.to_owned(),
+            id: v.get("id")?.as_str()?.to_owned(),
             community_id: v.get("community_id")?.as_str()?.to_owned(),
-            title:       v.get("title")?.as_str()?.to_owned(),
-            description: v.get("description").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-            location:    v.get("location").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-            status:      v.get("status")?.as_str()?.to_owned(),
+            title: v.get("title")?.as_str()?.to_owned(),
+            description: v
+                .get("description")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_owned()),
+            location: v
+                .get("location")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_owned()),
+            status: v.get("status")?.as_str()?.to_owned(),
         })
     }))
 }
 
 /// All days for one event, ordered by seq.
-pub async fn days_for_event(
-    db: &D1Database,
-    event_id: &str,
-) -> Result<Vec<EventDayRow>> {
+pub async fn days_for_event(db: &D1Database, event_id: &str) -> Result<Vec<EventDayRow>> {
     let rows = db
         .prepare(
             "SELECT id, event_id, seq, day_date, starts_at_utc, ends_at_utc \
@@ -67,16 +70,19 @@ pub async fn days_for_event(
         .await?
         .results::<serde_json::Value>()?;
 
-    Ok(rows.into_iter().filter_map(|v| {
-        Some(EventDayRow {
-            id:           v.get("id")?.as_str()?.to_owned(),
-            event_id:     v.get("event_id")?.as_str()?.to_owned(),
-            seq:          v.get("seq")?.as_u64()? as u32,
-            day_date:     v.get("day_date")?.as_str()?.to_owned(),
-            starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
-            ends_at_utc:  v.get("ends_at_utc")?.as_str()?.to_owned(),
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(EventDayRow {
+                id: v.get("id")?.as_str()?.to_owned(),
+                event_id: v.get("event_id")?.as_str()?.to_owned(),
+                seq: v.get("seq")?.as_u64()? as u32,
+                day_date: v.get("day_date")?.as_str()?.to_owned(),
+                starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
+                ends_at_utc: v.get("ends_at_utc")?.as_str()?.to_owned(),
+            })
         })
-    }).collect())
+        .collect())
 }
 
 /// Home list query: upcoming event_days for one community within a date window.
@@ -120,18 +126,24 @@ pub async fn home_upcoming(
         .await?
         .results::<serde_json::Value>()?;
 
-    Ok(rows.into_iter().filter_map(|v| {
-        Some(HomeEventRow {
-            event_id:       v.get("event_id")?.as_str()?.to_owned(),
-            event_title:    v.get("event_title")?.as_str()?.to_owned(),
-            event_location: v.get("event_location").and_then(|x| x.as_str()).map(|s| s.to_owned()),
-            event_status:   v.get("event_status")?.as_str()?.to_owned(),
-            day_id:         v.get("day_id")?.as_str()?.to_owned(),
-            day_date:       v.get("day_date")?.as_str()?.to_owned(),
-            starts_at_utc:  v.get("starts_at_utc")?.as_str()?.to_owned(),
-            ends_at_utc:    v.get("ends_at_utc")?.as_str()?.to_owned(),
-            seq:            v.get("seq")?.as_u64()? as u32,
-            total_days:     v.get("total_days")?.as_u64()? as u32,
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(HomeEventRow {
+                event_id: v.get("event_id")?.as_str()?.to_owned(),
+                event_title: v.get("event_title")?.as_str()?.to_owned(),
+                event_location: v
+                    .get("event_location")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_owned()),
+                event_status: v.get("event_status")?.as_str()?.to_owned(),
+                day_id: v.get("day_id")?.as_str()?.to_owned(),
+                day_date: v.get("day_date")?.as_str()?.to_owned(),
+                starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
+                ends_at_utc: v.get("ends_at_utc")?.as_str()?.to_owned(),
+                seq: v.get("seq")?.as_u64()? as u32,
+                total_days: v.get("total_days")?.as_u64()? as u32,
+            })
         })
-    }).collect())
+        .collect())
 }

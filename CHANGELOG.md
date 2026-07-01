@@ -2,6 +2,38 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.38.5] — 2026-06-15
+
+Upgrade codlet to v0.17.1; simplify key provider construction.
+
+### Changed
+
+- **codlet upgraded to v0.17.1** (from v0.16.0).
+  Change in v0.17.1: Housekeeping.
+  Change in v0.17.0: codlet-core crate renamed to codlet.
+  Change in v0.16.2-0.16.3: Documentation housekeeping and examples update.
+  Change in v0.16.1: `WorkerKeyProvider` now derives `Clone`.
+
+- **`codlet.rs::build()` simplified from three key providers to one.**
+  Previously, `WorkerKeyProvider` was not `Clone`, so `build()` called
+  `WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])` three
+  times — once per manager — reading the same Wrangler secret binding
+  three times per request.
+
+  Now that `WorkerKeyProvider: Clone`, a single call suffices:
+  ```rust
+  let kp     = WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])?;
+  let hasher = SecretHasher::new(kp);
+  // managers receive hasher.clone() / hasher
+  ```
+
+  `build_session_mgr()` and `build_token_mgr()` each build one manager and
+  already had one `from_env` call — no change needed there.
+
+### Testing
+
+- 223 passing. Zero warnings (native). wasm32: zero errors, zero warnings.
+
 ## [0.38.4] — 2026-06-15
 
 Upgrade codlet dependency from v0.15.1 to v0.16.0.

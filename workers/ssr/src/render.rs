@@ -12,52 +12,47 @@ use zinnias_ciao_contracts::i18n;
 //
 // Status foregrounds use the AA-passing triplet values (≥4.5:1 on white).
 // Use CZ_COLOR_* only for decorative fills (avatar rings, tints).
-const CZ_COLOR_BG:             &str = "#FFFFFF";
-const CZ_COLOR_SURFACE:        &str = "#F5F5F7";
+const CZ_COLOR_BG: &str = "#FFFFFF";
+const CZ_COLOR_SURFACE: &str = "#F5F5F7";
 const CZ_COLOR_SURFACE_STRONG: &str = "#E5E5EA";
-const CZ_COLOR_TEXT_PRIMARY:   &str = "#1D1D1F";
+const CZ_COLOR_TEXT_PRIMARY: &str = "#1D1D1F";
 const CZ_COLOR_TEXT_SECONDARY: &str = "#6E6E73";
-const CZ_COLOR_DANGER:         &str = "#FF3B30";
-const CZ_BORDER:               &str = "#E5E5EA"; // --cz-color-surface-strong
-const CZ_BORDER_LIGHT:         &str = "#F5F5F7"; // --cz-color-surface
+const CZ_COLOR_DANGER: &str = "#FF3B30";
+const CZ_BORDER: &str = "#E5E5EA"; // --cz-color-surface-strong
+const CZ_BORDER_LIGHT: &str = "#F5F5F7"; // --cz-color-surface
 
 // Status triplets — fg passes WCAG AA (≥4.5:1) on white and on its own bg.
-const CZ_STATUS_GOING_FG:        &str = "#005BBB"; // 5.0:1 on white
-const CZ_STATUS_GOING_BG:        &str = "#EAF3FF";
-const CZ_STATUS_GOING_BORDER:    &str = "#007AFF";
-const CZ_STATUS_NOT_GOING_FG:    &str = "#B42318"; // 5.9:1 on white
-const CZ_STATUS_NOT_GOING_BG:    &str = "#FFF0EF";
-const CZ_STATUS_NOT_GOING_BORDER:&str = "#FF3B30";
-const CZ_STATUS_ATTENDED_FG:     &str = "#167A34"; // 4.7:1 on white
-const CZ_STATUS_ATTENDED_BG:     &str = "#EDFAF0";
+const CZ_STATUS_GOING_FG: &str = "#005BBB"; // 5.0:1 on white
+const CZ_STATUS_GOING_BG: &str = "#EAF3FF";
+const CZ_STATUS_GOING_BORDER: &str = "#007AFF";
+const CZ_STATUS_NOT_GOING_FG: &str = "#B42318"; // 5.9:1 on white
+const CZ_STATUS_NOT_GOING_BG: &str = "#FFF0EF";
+const CZ_STATUS_NOT_GOING_BORDER: &str = "#FF3B30";
+const CZ_STATUS_ATTENDED_FG: &str = "#167A34"; // 4.7:1 on white
+const CZ_STATUS_ATTENDED_BG: &str = "#EDFAF0";
 const CZ_STATUS_ATTENDED_BORDER: &str = "#34C759";
-const CZ_STATUS_NO_ANSWER_FG:    &str = "#6E6E73"; // 4.5:1 on white
-const CZ_STATUS_NO_ANSWER_BG:    &str = "#F5F5F7";
-const CZ_STATUS_NO_ANSWER_BORDER:&str = "#D1D1D6";
+const CZ_STATUS_NO_ANSWER_FG: &str = "#6E6E73"; // 4.5:1 on white
+const CZ_STATUS_NO_ANSWER_BG: &str = "#F5F5F7";
+const CZ_STATUS_NO_ANSWER_BORDER: &str = "#D1D1D6";
 
 // Raw status colors — decorative use only (avatar rings, tints).
-const CZ_COLOR_GOING:     &str = "#007AFF";
+const CZ_COLOR_GOING: &str = "#007AFF";
 const CZ_COLOR_NOT_GOING: &str = "#FF3B30";
-const CZ_COLOR_ATTENDED:  &str = "#34C759";
+const CZ_COLOR_ATTENDED: &str = "#34C759";
 const CZ_COLOR_NO_ANSWER: &str = "#8E8E93";
 
 // ── Status icons (RFC-011 §4) ─────────────────────────────────────────────
 // Inline SVG — each icon is 1em × 1em, aria-hidden (label carries meaning).
-const ICON_GOING: &str =
-    "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28              a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z'/></svg>";
-const ICON_NOT_GOING: &str =
-    "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06              L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1              -1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z'/></svg>";
-const ICON_ATTENDED: &str =
-    "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm3.78 5.22a.75.75 0 0 0-1.06 0L7 8.94              5.28 7.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.06 0l4.25-4.25              a.75.75 0 0 0 0-1.06z'/></svg>";
-const ICON_NO_ANSWER: &str =
-    "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0              0-13zM7.25 10.5h1.5v1.5h-1.5zm0-7h1.5v5.5h-1.5z'/></svg>";
-
+const ICON_GOING: &str = "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28              a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z'/></svg>";
+const ICON_NOT_GOING: &str = "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06              L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1              -1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z'/></svg>";
+const ICON_ATTENDED: &str = "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm3.78 5.22a.75.75 0 0 0-1.06 0L7 8.94              5.28 7.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.06 0l4.25-4.25              a.75.75 0 0 0 0-1.06z'/></svg>";
+const ICON_NO_ANSWER: &str = "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0              0-13zM7.25 10.5h1.5v1.5h-1.5zm0-7h1.5v5.5h-1.5z'/></svg>";
 
 // ── Static asset paths ────────────────────────────────────────────────────
 const MANIFEST: &str = "/manifest.webmanifest";
-const CSS: &str      = "/static/app.css";
-const JS: &str       = "/static/app.js";
-const THEME: &str    = "#007AFF";
+const CSS: &str = "/static/app.css";
+const JS: &str = "/static/app.js";
+const THEME: &str = "#007AFF";
 
 // ── Shell ─────────────────────────────────────────────────────────────────
 
@@ -79,7 +74,7 @@ fn shell(title: &str, body: &str) -> String {
 <script src=\"{JS}\" defer></script>\n\
 </body>\n\
 </html>",
-        t    = escape_html(title),
+        t = escape_html(title),
         body = body,
     )
 }
@@ -106,7 +101,11 @@ pub fn escape_html(s: &str) -> String {
 /// Bottom tab navigation (Home | Communities | Me).
 pub fn bottom_nav(community_id: &str, active: &str) -> String {
     let tab = |label: &str, href: &str, id: &str| -> String {
-        let aria = if id == active { " aria-current=\"page\"" } else { "" };
+        let aria = if id == active {
+            " aria-current=\"page\""
+        } else {
+            ""
+        };
         let style = if id == active {
             "color:#007AFF;font-weight:600"
         } else {
@@ -125,9 +124,17 @@ pub fn bottom_nav(community_id: &str, active: &str) -> String {
          padding-bottom:env(safe-area-inset-bottom)\">\
          {home}{communities}{me}\
          </nav>",
-        home        = tab(i18n::JA_NAV_HOME, &format!("/c/{community_id}/home"), "home"),
-        communities = tab(i18n::JA_NAV_COMMUNITIES, &format!("/c/{community_id}/communities"), "communities"),
-        me          = tab(i18n::JA_NAV_ME, &format!("/c/{community_id}/me"), "me"),
+        home = tab(
+            i18n::JA_NAV_HOME,
+            &format!("/c/{community_id}/home"),
+            "home"
+        ),
+        communities = tab(
+            i18n::JA_NAV_COMMUNITIES,
+            &format!("/c/{community_id}/communities"),
+            "communities"
+        ),
+        me = tab(i18n::JA_NAV_ME, &format!("/c/{community_id}/me"), "me"),
     )
 }
 
@@ -140,7 +147,7 @@ pub fn header(title: &str, community_name: &str) -> String {
          <span style=\"font-size:1.25rem;font-weight:600\">{title}</span>\
          <span style=\"font-size:.8125rem;color:#6E6E73\">{community}</span>\
          </header>",
-        title     = escape_html(title),
+        title = escape_html(title),
         community = escape_html(community_name),
     )
 }
@@ -160,12 +167,19 @@ pub fn header_with_switcher(
     let title_s = escape_html(title);
 
     // <option> elements — use single-quoted HTML attributes to avoid \" in Rust strings.
-    let options: String = communities.iter().map(|(id, name)| {
-        let id_s   = escape_html(id.as_ref());
-        let name_s = escape_html(name.as_ref());
-        let sel    = if id.as_ref() == current_community_id { " selected" } else { "" };
-        format!("<option value='{id_s}'{sel}>{name_s}</option>")
-    }).collect();
+    let options: String = communities
+        .iter()
+        .map(|(id, name)| {
+            let id_s = escape_html(id.as_ref());
+            let name_s = escape_html(name.as_ref());
+            let sel = if id.as_ref() == current_community_id {
+                " selected"
+            } else {
+                ""
+            };
+            format!("<option value='{id_s}'{sel}>{name_s}</option>")
+        })
+        .collect();
 
     // onchange navigates immediately with JS.
     // Without JS the select still shows the current community visually.
@@ -194,26 +208,54 @@ pub fn header_with_switcher(
     h.push_str("</form>");
     h.push_str("</header>");
     h
-}// ── Status chip / buttons ─────────────────────────────────────────────────
+} // ── Status chip / buttons ─────────────────────────────────────────────────
 
 /// Colour, icon, and label for a status value — text/icon use (AA-passing fg).
 pub fn status_display(status: Option<&str>) -> (&'static str, &'static str, &'static str) {
     // returns (fg_color, icon, label)
     match status {
-        Some("going")     => (CZ_STATUS_GOING_FG,    ICON_GOING,     i18n::JA_STATUS_GOING),
-        Some("not_going") => (CZ_STATUS_NOT_GOING_FG, ICON_NOT_GOING, i18n::JA_STATUS_NOT_GOING),
-        Some("attended")  => (CZ_STATUS_ATTENDED_FG,  ICON_ATTENDED,  i18n::JA_STATUS_ATTENDED),
-        _                 => (CZ_STATUS_NO_ANSWER_FG, ICON_NO_ANSWER, i18n::JA_STATUS_NO_ANSWER),
+        Some("going") => (CZ_STATUS_GOING_FG, ICON_GOING, i18n::JA_STATUS_GOING),
+        Some("not_going") => (
+            CZ_STATUS_NOT_GOING_FG,
+            ICON_NOT_GOING,
+            i18n::JA_STATUS_NOT_GOING,
+        ),
+        Some("attended") => (
+            CZ_STATUS_ATTENDED_FG,
+            ICON_ATTENDED,
+            i18n::JA_STATUS_ATTENDED,
+        ),
+        _ => (
+            CZ_STATUS_NO_ANSWER_FG,
+            ICON_NO_ANSWER,
+            i18n::JA_STATUS_NO_ANSWER,
+        ),
     }
 }
 
 /// Full triplet (fg, bg, border) for a status — used by buttons and surface fills.
 pub fn status_triplet(status: Option<&str>) -> (&'static str, &'static str, &'static str) {
     match status {
-        Some("going")     => (CZ_STATUS_GOING_FG,    CZ_STATUS_GOING_BG,    CZ_STATUS_GOING_BORDER),
-        Some("not_going") => (CZ_STATUS_NOT_GOING_FG, CZ_STATUS_NOT_GOING_BG, CZ_STATUS_NOT_GOING_BORDER),
-        Some("attended")  => (CZ_STATUS_ATTENDED_FG,  CZ_STATUS_ATTENDED_BG,  CZ_STATUS_ATTENDED_BORDER),
-        _                 => (CZ_STATUS_NO_ANSWER_FG, CZ_STATUS_NO_ANSWER_BG, CZ_STATUS_NO_ANSWER_BORDER),
+        Some("going") => (
+            CZ_STATUS_GOING_FG,
+            CZ_STATUS_GOING_BG,
+            CZ_STATUS_GOING_BORDER,
+        ),
+        Some("not_going") => (
+            CZ_STATUS_NOT_GOING_FG,
+            CZ_STATUS_NOT_GOING_BG,
+            CZ_STATUS_NOT_GOING_BORDER,
+        ),
+        Some("attended") => (
+            CZ_STATUS_ATTENDED_FG,
+            CZ_STATUS_ATTENDED_BG,
+            CZ_STATUS_ATTENDED_BORDER,
+        ),
+        _ => (
+            CZ_STATUS_NO_ANSWER_FG,
+            CZ_STATUS_NO_ANSWER_BG,
+            CZ_STATUS_NO_ANSWER_BORDER,
+        ),
     }
 }
 
@@ -244,12 +286,14 @@ pub fn status_form(
     let btn = |value: Option<&str>, label: &str, icon: &str, disabled: bool, reason: &str| {
         let is_current = current == value;
         let (fg, bg_sel, border) = status_triplet(value);
-        let bg    = if is_current { bg_sel } else { CZ_COLOR_SURFACE };
+        let bg = if is_current { bg_sel } else { CZ_COLOR_SURFACE };
         let val_str = value.unwrap_or("clear");
         let disabled_attr = if disabled { " disabled" } else { "" };
         let title_attr = if disabled && !reason.is_empty() {
             format!(" title=\"{}\"", escape_html(reason))
-        } else { String::new() };
+        } else {
+            String::new()
+        };
         format!(
             "<button type=\"submit\" name=\"status\" value=\"{val}\" \
              style=\"flex:1;padding:.75rem .5rem;border:2px solid {border};\
@@ -262,11 +306,20 @@ pub fn status_form(
         )
     };
 
-    let going_btn    = btn(Some("going"),     i18n::JA_STATUS_GOING,     ICON_GOING,     false, "");
-    let notgoing_btn = btn(Some("not_going"), i18n::JA_STATUS_NOT_GOING, ICON_NOT_GOING, false, "");
+    let going_btn = btn(Some("going"), i18n::JA_STATUS_GOING, ICON_GOING, false, "");
+    let notgoing_btn = btn(
+        Some("not_going"),
+        i18n::JA_STATUS_NOT_GOING,
+        ICON_NOT_GOING,
+        false,
+        "",
+    );
     let attended_btn = btn(
-        Some("attended"), i18n::JA_STATUS_ATTENDED, ICON_ATTENDED,
-        !can_set_attended, attended_disabled_reason,
+        Some("attended"),
+        i18n::JA_STATUS_ATTENDED,
+        ICON_ATTENDED,
+        !can_set_attended,
+        attended_disabled_reason,
     );
 
     // Show a "Clear" link only when the member has an explicit status
@@ -275,8 +328,8 @@ pub fn status_form(
             "<button type=\"submit\" name=\"status\" value=\"clear\" \
              style=\"font-size:.75rem;color:#6E6E73;background:none;border:none;\
              padding:.25rem;cursor:pointer\" aria-label=\"{clear_label}\">{clear}</button>",
-                clear_label = i18n::JA_STATUS_CLEAR_LABEL,
-                clear       = i18n::JA_STATUS_CLEAR,
+            clear_label = i18n::JA_STATUS_CLEAR_LABEL,
+            clear = i18n::JA_STATUS_CLEAR,
         )
     } else {
         String::new()
@@ -290,14 +343,14 @@ pub fn status_form(
          <div style=\"display:flex;gap:.5rem\">{going}{notgoing}{attended}</div>\
          {clear}\
          </form>",
-        cid  = escape_html(community_id),
-        eid  = escape_html(event_id),
-        did  = escape_html(day_id),
-        tok  = escape_html(token),
-        going    = going_btn,
+        cid = escape_html(community_id),
+        eid = escape_html(event_id),
+        did = escape_html(day_id),
+        tok = escape_html(token),
+        going = going_btn,
         notgoing = notgoing_btn,
         attended = attended_btn,
-        clear    = clear_btn,
+        clear = clear_btn,
     )
 }
 
@@ -312,11 +365,13 @@ pub fn note_form(
     flash: Option<&str>,
 ) -> String {
     let flash_html = flash
-        .map(|f| format!(
-            "<p role=\"status\" style=\"font-size:.875rem;color:{};margin:.5rem 0\">{}</p>",
-            CZ_STATUS_ATTENDED_FG, // AA-passing green for success text
-            escape_html(f)
-        ))
+        .map(|f| {
+            format!(
+                "<p role=\"status\" style=\"font-size:.875rem;color:{};margin:.5rem 0\">{}</p>",
+                CZ_STATUS_ATTENDED_FG, // AA-passing green for success text
+                escape_html(f)
+            )
+        })
         .unwrap_or_default();
 
     // The delete button navigates to a route-backed confirmation page (RFC-043).
@@ -326,9 +381,9 @@ pub fn note_form(
             "<a href=\"/c/{cid}/events/{eid}/my-note/delete\" \
              style=\"display:inline-block;font-size:.875rem;color:{danger};padding:.25rem;\
              min-height:44px;line-height:44px;text-decoration:none\">{del}</a>",
-            del    = zinnias_ciao_contracts::i18n::JA_NOTE_DELETE,
-            cid    = escape_html(community_id),
-            eid    = escape_html(event_id),
+            del = zinnias_ciao_contracts::i18n::JA_NOTE_DELETE,
+            cid = escape_html(community_id),
+            eid = escape_html(event_id),
             danger = CZ_COLOR_DANGER,
         )
     } else {
@@ -357,20 +412,20 @@ pub fn note_form(
          </form>\
          {delete}\
          </section>",
-        cid          = escape_html(community_id),
-        eid          = escape_html(event_id),
-        tok          = escape_html(save_token),
-        existing     = escape_html(existing_note.unwrap_or("")),
-        flash        = flash_html,
-        delete       = delete_btn,
-        muted             = CZ_COLOR_TEXT_SECONDARY,
-        border            = CZ_BORDER,
-        going_border      = CZ_STATUS_GOING_BORDER,
-        note_section_label    = i18n::JA_NOTE_SECTION_LABEL,
+        cid = escape_html(community_id),
+        eid = escape_html(event_id),
+        tok = escape_html(save_token),
+        existing = escape_html(existing_note.unwrap_or("")),
+        flash = flash_html,
+        delete = delete_btn,
+        muted = CZ_COLOR_TEXT_SECONDARY,
+        border = CZ_BORDER,
+        going_border = CZ_STATUS_GOING_BORDER,
+        note_section_label = i18n::JA_NOTE_SECTION_LABEL,
         note_placeholder_label = i18n::JA_NOTE_PLACEHOLDER_LABEL,
-        note_char_hint        = i18n::JA_NOTE_CHAR_HINT,
-        note_visibility       = i18n::JA_NOTE_VISIBILITY,
-        note_save             = i18n::JA_NOTE_SAVE,
+        note_char_hint = i18n::JA_NOTE_CHAR_HINT,
+        note_visibility = i18n::JA_NOTE_VISIBILITY,
+        note_save = i18n::JA_NOTE_SAVE,
     )
 }
 
@@ -389,11 +444,11 @@ pub fn admin_note_hide_form(
          style=\"font-size:.75rem;color:{danger};padding:.25rem .375rem;\
          min-height:44px;line-height:44px;display:inline-block;text-decoration:none\" \
          aria-label=\"{lbl}\">{lbl}</a>",
-        cid    = escape_html(community_id),
-        eid    = escape_html(event_id),
-        mid    = escape_html(target_membership_id),
+        cid = escape_html(community_id),
+        eid = escape_html(event_id),
+        mid = escape_html(target_membership_id),
         danger = CZ_COLOR_DANGER,
-        lbl    = label,
+        lbl = label,
     )
 }
 
@@ -415,28 +470,43 @@ pub fn event_card(
     nearest_day: &CardDay<'_>,
     total_days: u32,
     my_status: Option<&str>,
-    going: u32, not_going: u32, no_answer: u32,
+    going: u32,
+    not_going: u32,
+    no_answer: u32,
     tz: &str,
 ) -> String {
     let (_, icon, label) = status_display(my_status);
     let (sc, _, _) = status_display(my_status);
     let cancelled_badge = if is_cancelled {
-        format!("<span style=\"font-size:.75rem;background:#FF3B30;color:#FFFFFF;\
+        format!(
+            "<span style=\"font-size:.75rem;background:#FF3B30;color:#FFFFFF;\
          border-radius:99px;padding:.125rem .5rem;margin-left:.5rem\">{}</span>",
-         zinnias_ciao_contracts::i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM)
-    } else { String::new() };
+            zinnias_ciao_contracts::i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM
+        )
+    } else {
+        String::new()
+    };
     let multi_badge = if total_days > 1 {
         format!("<span style=\"font-size:.75rem;color:#6E6E73\"> · {total_days} 日間</span>")
-    } else { String::new() };
-    let loc_html = location.map(|l| format!(
-        "<span style=\"color:#6E6E73;font-size:.875rem\"> · {}</span>",
-        escape_html(l)
-    )).unwrap_or_default();
+    } else {
+        String::new()
+    };
+    let loc_html = location
+        .map(|l| {
+            format!(
+                "<span style=\"color:#6E6E73;font-size:.875rem\"> · {}</span>",
+                escape_html(l)
+            )
+        })
+        .unwrap_or_default();
     let counts_line = format!(
         "{} {} · {} {} · {} {}",
-        zinnias_ciao_contracts::i18n::JA_STATUS_GOING, going,
-        zinnias_ciao_contracts::i18n::JA_STATUS_NOT_GOING, not_going,
-        zinnias_ciao_contracts::i18n::JA_STATUS_NO_ANSWER, no_answer,
+        zinnias_ciao_contracts::i18n::JA_STATUS_GOING,
+        going,
+        zinnias_ciao_contracts::i18n::JA_STATUS_NOT_GOING,
+        not_going,
+        zinnias_ciao_contracts::i18n::JA_STATUS_NO_ANSWER,
+        no_answer,
     );
     let muted = if is_cancelled { "opacity:.5;" } else { "" };
 
@@ -456,14 +526,14 @@ pub fn event_card(
              {counts}\
            </div>\
          </article></a>",
-        cid       = escape_html(community_id),
-        eid       = escape_html(event_id),
-        title     = escape_html(title),
+        cid = escape_html(community_id),
+        eid = escape_html(event_id),
+        title = escape_html(title),
         cancelled = cancelled_badge,
-        multi     = multi_badge,
-        time      = format_day_time_tz(nearest_day, tz),
-        loc       = loc_html,
-        counts    = counts_line,
+        multi = multi_badge,
+        time = format_day_time_tz(nearest_day, tz),
+        loc = loc_html,
+        counts = counts_line,
     )
 }
 
@@ -472,14 +542,14 @@ pub fn event_card(
 pub fn format_day_time_tz(day: &CardDay<'_>, tz: &str) -> String {
     let offset_mins = tz_offset_minutes(tz);
     let starts = apply_offset_display(day.starts_at_utc, offset_mins);
-    let ends   = apply_offset_time(day.ends_at_utc,   offset_mins);
+    let ends = apply_offset_time(day.ends_at_utc, offset_mins);
     format!("{starts}–{ends}")
 }
 
 /// Format a day's time range for display (UTC — used when timezone is unknown).
 fn format_day_time(day: &CardDay<'_>) -> String {
     let starts = parse_utc_display(day.starts_at_utc);
-    let ends   = parse_utc_time(day.ends_at_utc);
+    let ends = parse_utc_time(day.ends_at_utc);
     format!("{starts}–{ends}")
 }
 
@@ -496,7 +566,9 @@ fn utc_to_local_parts(utc: &str, offset_mins: i32) -> (String, String) {
 /// Apply a UTC offset and return "Mon D, HH:MM" in local time.
 fn apply_offset_display(utc: &str, offset_mins: i32) -> String {
     let (local_date, time_hm) = utc_to_local_parts(utc, offset_mins);
-    if local_date.is_empty() { return parse_utc_display(utc); }
+    if local_date.is_empty() {
+        return parse_utc_display(utc);
+    }
     // Japan-first pilot: use JA date label (e.g. "6月14日 09:00")
     let date_label = zinnias_ciao_contracts::tz::date_label_ja(&local_date);
     format!("{date_label} {time_hm}")
@@ -510,7 +582,9 @@ fn apply_offset_time(utc: &str, offset_mins: i32) -> String {
 fn parse_utc_display(utc: &str) -> String {
     // Japan-first pilot: "2026-06-14T09:00:00.000Z" -> "6月14日（日） 09:00"
     let parts: Vec<&str> = utc.splitn(2, 'T').collect();
-    if parts.len() < 2 { return utc.to_owned(); }
+    if parts.len() < 2 {
+        return utc.to_owned();
+    }
     let date = parts[0];
     let time = parts[1].get(..5).unwrap_or("");
     let date_label = zinnias_ciao_contracts::tz::date_label_ja(date);
@@ -526,9 +600,15 @@ fn parse_utc_time(utc: &str) -> String {
 }
 
 /// Public re-export for handlers that need offset arithmetic (e.g. event.rs).
-pub fn tz_offset_minutes_pub(tz: &str) -> i32 { tz_offset_minutes(tz) }
-pub fn utc_to_local_parts_pub(utc: &str, offset: i32) -> (String, String) { utc_to_local_parts(utc, offset) }
-pub fn apply_offset_time_pub(utc: &str, offset: i32) -> String { apply_offset_time(utc, offset) }
+pub fn tz_offset_minutes_pub(tz: &str) -> i32 {
+    tz_offset_minutes(tz)
+}
+pub fn utc_to_local_parts_pub(utc: &str, offset: i32) -> (String, String) {
+    utc_to_local_parts(utc, offset)
+}
+pub fn apply_offset_time_pub(utc: &str, offset: i32) -> String {
+    apply_offset_time(utc, offset)
+}
 
 // ── Participant list ──────────────────────────────────────────────────────
 
@@ -539,13 +619,18 @@ pub struct ParticipantEntry<'a> {
 
 pub fn participant_list(participants: &[ParticipantEntry<'_>]) -> String {
     if participants.is_empty() {
-        return format!("<p style=\"color:#6E6E73;font-size:.875rem\">{}</p>", zinnias_ciao_contracts::i18n::JA_EVENT_MEMBER_FALLBACK);
+        return format!(
+            "<p style=\"color:#6E6E73;font-size:.875rem\">{}</p>",
+            zinnias_ciao_contracts::i18n::JA_EVENT_MEMBER_FALLBACK
+        );
     }
-    let rows: String = participants.iter().map(|p| {
-        let initials = initials(p.display_name);
-        let (color, icon, label) = status_display(p.status);
-        format!(
-            "<li style=\"display:flex;align-items:center;gap:.75rem;padding:.5rem 0;\
+    let rows: String = participants
+        .iter()
+        .map(|p| {
+            let initials = initials(p.display_name);
+            let (color, icon, label) = status_display(p.status);
+            format!(
+                "<li style=\"display:flex;align-items:center;gap:.75rem;padding:.5rem 0;\
              border-bottom:1px solid #F5F5F7\">\
              <span style=\"width:2rem;height:2rem;border-radius:50%;background:{color}22;\
              color:{color};display:flex;align-items:center;justify-content:center;\
@@ -553,10 +638,11 @@ pub fn participant_list(participants: &[ParticipantEntry<'_>]) -> String {
              <span style=\"flex:1;font-size:.9375rem\">{name}</span>\
              <span style=\"font-size:.8125rem;color:{color}\">{icon} {label}</span>\
              </li>",
-            initials = escape_html(&initials),
-            name     = escape_html(p.display_name),
-        )
-    }).collect();
+                initials = escape_html(&initials),
+                name = escape_html(p.display_name),
+            )
+        })
+        .collect();
     format!("<ul style=\"list-style:none;padding:0;margin:0\">{rows}</ul>")
 }
 
@@ -572,7 +658,8 @@ fn initials(name: &str) -> String {
 // ── Common pages ─────────────────────────────────────────────────────────
 
 pub fn placeholder() -> Result<Response> {
-    let body = format!("<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+    let body = format!(
+        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
   <h1 style=\"font-size:1.25rem;font-weight:600\">{}</h1>\
   <p style=\"color:#6E6E73;font-size:.875rem\">{}</p>\
 </main>",
@@ -583,15 +670,25 @@ pub fn placeholder() -> Result<Response> {
 }
 
 pub fn not_found() -> Result<Response> {
-    let body = format!("<main style=\"padding:2rem\"><p>{}</p></main>",
-        zinnias_ciao_contracts::i18n::JA_NOT_FOUND);
-    Ok(Response::from_html(shell(zinnias_ciao_contracts::i18n::JA_NOT_FOUND, &body))?.with_status(404))
+    let body = format!(
+        "<main style=\"padding:2rem\"><p>{}</p></main>",
+        zinnias_ciao_contracts::i18n::JA_NOT_FOUND
+    );
+    Ok(
+        Response::from_html(shell(zinnias_ciao_contracts::i18n::JA_NOT_FOUND, &body))?
+            .with_status(404),
+    )
 }
 
 pub fn internal_error() -> Result<Response> {
-    let body = format!("<main style=\"padding:2rem\"><p>{}</p></main>",
-        zinnias_ciao_contracts::i18n::JA_INTERNAL_ERROR);
-    Ok(Response::from_html(shell(zinnias_ciao_contracts::i18n::JA_GENERAL_ERROR, &body))?.with_status(500))
+    let body = format!(
+        "<main style=\"padding:2rem\"><p>{}</p></main>",
+        zinnias_ciao_contracts::i18n::JA_INTERNAL_ERROR
+    );
+    Ok(
+        Response::from_html(shell(zinnias_ciao_contracts::i18n::JA_GENERAL_ERROR, &body))?
+            .with_status(500),
+    )
 }
 
 pub fn session_expired() -> Result<Response> {
@@ -599,10 +696,13 @@ pub fn session_expired() -> Result<Response> {
         "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
          <p style=\"color:#FF3B30\">{msg}</p>\
          <a href=\"/join\" style=\"display:inline-block;margin-top:1rem;color:#007AFF\">{join}</a></main>",
-        msg  = zinnias_ciao_contracts::i18n::JA_SESSION_EXPIRED,
+        msg = zinnias_ciao_contracts::i18n::JA_SESSION_EXPIRED,
         join = zinnias_ciao_contracts::i18n::JA_JOIN_SUBMIT,
     );
-    Ok(Response::from_html(shell(zinnias_ciao_contracts::i18n::JA_GENERAL_ERROR, &body))?.with_status(401))
+    Ok(
+        Response::from_html(shell(zinnias_ciao_contracts::i18n::JA_GENERAL_ERROR, &body))?
+            .with_status(401),
+    )
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
@@ -665,31 +765,43 @@ mod tests {
     fn parse_utc_display_uses_ja_format() {
         // Home card date display must use Japanese convention, not "Jun 14".
         let out = parse_utc_display("2026-06-14T09:00:00.000Z");
-        assert!(!out.contains("Jun"),   "must not contain English month: {out}");
-        assert!(out.contains("月"),     "must contain 月: {out}");
-        assert!(out.contains("日"),     "must contain 日: {out}");
-        assert!(out.contains("09:00"),  "must contain time: {out}");
+        assert!(
+            !out.contains("Jun"),
+            "must not contain English month: {out}"
+        );
+        assert!(out.contains("月"), "must contain 月: {out}");
+        assert!(out.contains("日"), "must contain 日: {out}");
+        assert!(out.contains("09:00"), "must contain time: {out}");
     }
 
     #[test]
     fn status_display_going() {
         let (_, _, label) = status_display(Some("going"));
         assert!(!label.is_empty());
-        assert!(!label.contains("Going"), "label must be Japanese, got: {label}");
+        assert!(
+            !label.contains("Going"),
+            "label must be Japanese, got: {label}"
+        );
     }
 
     #[test]
     fn status_display_not_going() {
         let (_, _, label) = status_display(Some("not_going"));
         assert!(!label.is_empty());
-        assert!(!label.contains("No Go"), "label must be Japanese, got: {label}");
+        assert!(
+            !label.contains("No Go"),
+            "label must be Japanese, got: {label}"
+        );
     }
 
     #[test]
     fn status_display_no_answer_is_default() {
         let (_, _, label_none) = status_display(None);
         let (_, _, label_unknown) = status_display(Some("unknown_value"));
-        assert_eq!(label_none, label_unknown, "unknown status must use same label as None");
+        assert_eq!(
+            label_none, label_unknown,
+            "unknown status must use same label as None"
+        );
         assert!(!label_none.is_empty());
     }
 }

@@ -5,15 +5,13 @@
 //!   - `admin/members.rs`: invite codes and member management
 
 pub use events::{
-    get_create_event, post_create_event,
-    get_cancel_event, post_cancel_event,
-    get_edit_event, post_edit_event,
-    get_attendance, post_attendance,
-    get_admin_hide_note_confirm, post_admin_hide_note,
+    get_admin_hide_note_confirm, get_attendance, get_cancel_event, get_create_event,
+    get_edit_event, post_admin_hide_note, post_attendance, post_cancel_event, post_create_event,
+    post_edit_event,
 };
 pub use members::{
-    get_invites, post_generate_invite, post_revoke_invite,
-    get_members, get_remove_member, post_remove_member,
+    get_invites, get_members, get_remove_member, post_generate_invite, post_remove_member,
+    post_revoke_invite,
 };
 
 #[path = "admin/events.rs"]

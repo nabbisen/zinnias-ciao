@@ -12,10 +12,9 @@ use crate::audit;
 use crate::authz::require_admin;
 use crate::crypto::random_token;
 use crate::db::{event_template as tmpl_db, membership as membership_db};
-use zinnias_ciao_contracts::i18n;
 use crate::render;
 use crate::session::require_auth;
-
+use zinnias_ciao_contracts::i18n;
 
 fn redirect(location: &str) -> Result<Response> {
     let mut resp = Response::from_html("")?;
@@ -39,19 +38,29 @@ pub async fn get_templates(
     let db = env.d1("DB")?;
 
     let create_token = crate::codlet::issue_token(
-        env, &auth.user_id,
-        token_purpose::CREATE_TEMPLATE, Some(community_id),
-    ).await;
+        env,
+        &auth.user_id,
+        token_purpose::CREATE_TEMPLATE,
+        Some(community_id),
+    )
+    .await;
 
-    let templates = tmpl_db::list_active(&db, community_id).await.unwrap_or_default();
+    let templates = tmpl_db::list_active(&db, community_id)
+        .await
+        .unwrap_or_default();
     let communities = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await.unwrap_or_default();
-    let community_pairs: Vec<(String, String)> = communities.iter()
-        .map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
+        .await
+        .unwrap_or_default();
+    let community_pairs: Vec<(String, String)> = communities
+        .iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone()))
+        .collect();
 
     let url = req.url()?;
-    let flash: Option<String> = url.query_pairs()
-        .find(|(k, _)| k == "flash").map(|(_, v)| v.to_string());
+    let flash: Option<String> = url
+        .query_pairs()
+        .find(|(k, _)| k == "flash")
+        .map(|(_, v)| v.to_string());
     let flash_html = flash.map(|f| format!(
         "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0\">{}</p>",
         render::escape_html(&f)
@@ -61,14 +70,20 @@ pub async fn get_templates(
     let mut list_html = String::new();
     for t in &templates {
         let delete_tok = crate::codlet::issue_token(
-        env, &auth.user_id,
-        token_purpose::DELETE_TEMPLATE, Some(&t.id),
-    ).await;
+            env,
+            &auth.user_id,
+            token_purpose::DELETE_TEMPLATE,
+            Some(&t.id),
+        )
+        .await;
 
-        let dur_label = t.duration_minutes
+        let dur_label = t
+            .duration_minutes
             .map(|d| format!(" · {}min", d))
             .unwrap_or_default();
-        let loc_label = t.location.as_deref()
+        let loc_label = t
+            .location
+            .as_deref()
             .map(|l| format!(" · {}", l))
             .unwrap_or_default();
 
@@ -95,22 +110,27 @@ pub async fn get_templates(
                </form>\
              </div>\
              </li>",
-            title   = render::escape_html(&t.title),
-            loc     = render::escape_html(&loc_label),
-            dur     = render::escape_html(&dur_label),
-            cid     = render::escape_html(community_id),
-            tid     = render::escape_html(&t.id),
-            tok     = render::escape_html(&delete_tok),
+            title = render::escape_html(&t.title),
+            loc = render::escape_html(&loc_label),
+            dur = render::escape_html(&dur_label),
+            cid = render::escape_html(community_id),
+            tid = render::escape_html(&t.id),
+            tok = render::escape_html(&delete_tok),
             use_btn = i18n::JA_TEMPLATES_USE_BTN,
             del_btn = i18n::JA_TEMPLATES_DELETE_BTN,
         ));
     }
 
     let empty_msg = if templates.is_empty() {
-        &format!("<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>", i18n::JA_TEMPLATES_EMPTY)
-    } else { "" };
+        &format!(
+            "<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>",
+            i18n::JA_TEMPLATES_EMPTY
+        )
+    } else {
+        ""
+    };
 
-    let nav  = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav(community_id, "home");
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
@@ -151,21 +171,25 @@ pub async fn get_templates(
            </form>\
          </section>\
          </main>{nav}",
-        title_h1     = i18n::JA_TEMPLATES_TITLE,
-        desc         = i18n::JA_TEMPLATES_DESCRIPTION,
+        title_h1 = i18n::JA_TEMPLATES_TITLE,
+        desc = i18n::JA_TEMPLATES_DESCRIPTION,
         save_section_h2 = i18n::JA_TEMPLATES_SAVE_SECTION,
-        lbl_title    = i18n::JA_TEMPLATES_TITLE_LABEL,
-        lbl_loc      = i18n::JA_TEMPLATES_LOC_LABEL,
-        lbl_dur      = i18n::JA_TEMPLATES_DUR_LABEL,
-        btn_save     = i18n::JA_TEMPLATES_SAVE_BTN,
-        header       = render::header_with_switcher(i18n::JA_TEMPLATES_TITLE, community_id, &community_pairs),
-        flash  = flash_html,
-        empty  = empty_msg,
-        list   = if list_html.is_empty() { String::new() }
-                 else { format!("<ul style=\"list-style:none;padding:0;margin:0\">{list_html}</ul>") },
-        cid    = render::escape_html(community_id),
-        tok    = render::escape_html(&create_token),
-        nav    = nav,
+        lbl_title = i18n::JA_TEMPLATES_TITLE_LABEL,
+        lbl_loc = i18n::JA_TEMPLATES_LOC_LABEL,
+        lbl_dur = i18n::JA_TEMPLATES_DUR_LABEL,
+        btn_save = i18n::JA_TEMPLATES_SAVE_BTN,
+        header =
+            render::header_with_switcher(i18n::JA_TEMPLATES_TITLE, community_id, &community_pairs),
+        flash = flash_html,
+        empty = empty_msg,
+        list = if list_html.is_empty() {
+            String::new()
+        } else {
+            format!("<ul style=\"list-style:none;padding:0;margin:0\">{list_html}</ul>")
+        },
+        cid = render::escape_html(community_id),
+        tok = render::escape_html(&create_token),
+        nav = nav,
     );
     render::page(i18n::JA_TEMPLATES_TITLE, &body)
 }
@@ -188,9 +212,13 @@ pub async fn post_create_template(
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let replay = crate::codlet::consume_token(
-        env, &auth.user_id,
-        token_purpose::CREATE_TEMPLATE, &raw_token, Some(community_id),
-    ).await?;
+        env,
+        &auth.user_id,
+        token_purpose::CREATE_TEMPLATE,
+        &raw_token,
+        Some(community_id),
+    )
+    .await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/admin/templates"));
     }
@@ -198,29 +226,52 @@ pub async fn post_create_template(
     let title = body.get_field("title").unwrap_or_default();
     let title = title.trim();
     if title.is_empty() || title.len() > 80 {
-        return redirect(&format!("/c/{community_id}/admin/templates?flash=Title+required"));
+        return redirect(&format!(
+            "/c/{community_id}/admin/templates?flash=Title+required"
+        ));
     }
 
     let location = body.get_field("location").unwrap_or_default();
     let location = location.trim();
-    let location = if location.is_empty() { None } else { Some(location) };
+    let location = if location.is_empty() {
+        None
+    } else {
+        Some(location)
+    };
 
-    let duration_minutes: Option<u32> = body.get_field("duration_minutes")
+    let duration_minutes: Option<u32> = body
+        .get_field("duration_minutes")
         .and_then(|s| s.trim().parse::<u32>().ok())
         .filter(|&d| d > 0 && d <= 1440);
 
     let template_id = random_token()[..24].to_owned();
     tmpl_db::insert(
-        &db, &template_id, community_id, &membership.membership_id,
-        title, location, None, duration_minutes,
-    ).await?;
+        &db,
+        &template_id,
+        community_id,
+        &membership.membership_id,
+        title,
+        location,
+        None,
+        duration_minutes,
+    )
+    .await?;
 
     let _ = audit::write(
-        &db, rid, Some(community_id), Some(&membership.membership_id),
-        "event_template", Some(&template_id), "created", None,
-    ).await;
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "event_template",
+        Some(&template_id),
+        "created",
+        None,
+    )
+    .await;
 
-    redirect(&format!("/c/{community_id}/admin/templates?flash=Template+saved"))
+    redirect(&format!(
+        "/c/{community_id}/admin/templates?flash=Template+saved"
+    ))
 }
 
 // ── POST /c/:cid/admin/templates/:tid/delete ─────────────────────────────
@@ -242,9 +293,13 @@ pub async fn post_delete_template(
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let replay = crate::codlet::consume_token(
-        env, &auth.user_id,
-        token_purpose::DELETE_TEMPLATE, &raw_token, Some(template_id),
-    ).await?;
+        env,
+        &auth.user_id,
+        token_purpose::DELETE_TEMPLATE,
+        &raw_token,
+        Some(template_id),
+    )
+    .await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/admin/templates"));
     }
@@ -252,9 +307,18 @@ pub async fn post_delete_template(
     tmpl_db::soft_delete(&db, template_id, community_id).await?;
 
     let _ = audit::write(
-        &db, rid, Some(community_id), Some(&membership.membership_id),
-        "event_template", Some(template_id), "deleted", None,
-    ).await;
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "event_template",
+        Some(template_id),
+        "deleted",
+        None,
+    )
+    .await;
 
-    redirect(&format!("/c/{community_id}/admin/templates?flash=Template+deleted"))
+    redirect(&format!(
+        "/c/{community_id}/admin/templates?flash=Template+deleted"
+    ))
 }

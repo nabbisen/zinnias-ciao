@@ -35,12 +35,13 @@ pub async fn find_valid(db: &D1Database, code_hmac: &str) -> Result<Option<Invit
 
     Ok(row.and_then(|v| {
         Some(InviteRow {
-            id:           v.get("id")?.as_str()?.to_owned(),
+            id: v.get("id")?.as_str()?.to_owned(),
             community_id: v.get("community_id")?.as_str()?.to_owned(),
-            grants_role:  v.get("grants_role")
-                           .and_then(|x| x.as_str())
-                           .unwrap_or("member")
-                           .to_owned(),
+            grants_role: v
+                .get("grants_role")
+                .and_then(|x| x.as_str())
+                .unwrap_or("member")
+                .to_owned(),
             is_valid: true,
         })
     }))
@@ -65,12 +66,13 @@ pub async fn find_by_id(db: &D1Database, invite_id: &str) -> Result<Option<Invit
 
     Ok(row.and_then(|v| {
         Some(InviteRow {
-            id:           v.get("id")?.as_str()?.to_owned(),
+            id: v.get("id")?.as_str()?.to_owned(),
             community_id: v.get("community_id")?.as_str()?.to_owned(),
-            grants_role:  v.get("grants_role")
-                           .and_then(|x| x.as_str())
-                           .unwrap_or("member")
-                           .to_owned(),
+            grants_role: v
+                .get("grants_role")
+                .and_then(|x| x.as_str())
+                .unwrap_or("member")
+                .to_owned(),
             is_valid: true,
         })
     }))
@@ -83,18 +85,24 @@ pub async fn find_by_id(db: &D1Database, invite_id: &str) -> Result<Option<Invit
 /// expired. Callers must check the boolean to enforce one-time use under races.
 pub async fn mark_used(db: &D1Database, invite_id: &str, membership_id: &str) -> Result<bool> {
     let now = now_utc();
-    let res = db.prepare(
-        "UPDATE invite_codes \
+    let res = db
+        .prepare(
+            "UPDATE invite_codes \
          SET used_at = ?1, used_by_membership_id = ?2 \
          WHERE id = ?3 \
            AND used_at IS NULL \
            AND revoked_at IS NULL \
            AND expires_at > ?1",
-    )
-    .bind(&[now.as_str().into(), membership_id.into(), invite_id.into()])?
-    .run()
-    .await?;
-    let changed = res.meta().ok().flatten().and_then(|m| m.changes).unwrap_or(0);
+        )
+        .bind(&[now.as_str().into(), membership_id.into(), invite_id.into()])?
+        .run()
+        .await?;
+    let changed = res
+        .meta()
+        .ok()
+        .flatten()
+        .and_then(|m| m.changes)
+        .unwrap_or(0);
     Ok(changed == 1)
 }
 
@@ -144,16 +152,20 @@ pub async fn list_active_for_community(
         .await?
         .results::<serde_json::Value>()?;
 
-    Ok(rows.into_iter().filter_map(|v| {
-        Some(InviteMetaRow {
-            id:          v.get("id")?.as_str()?.to_owned(),
-            expires_at:  v.get("expires_at")?.as_str()?.to_owned(),
-            grants_role: v.get("grants_role")
-                          .and_then(|x| x.as_str())
-                          .unwrap_or("member")
-                          .to_owned(),
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(InviteMetaRow {
+                id: v.get("id")?.as_str()?.to_owned(),
+                expires_at: v.get("expires_at")?.as_str()?.to_owned(),
+                grants_role: v
+                    .get("grants_role")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("member")
+                    .to_owned(),
+            })
         })
-    }).collect())
+        .collect())
 }
 
 /// Insert a new invite code (admin action).
