@@ -33,6 +33,22 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Script tag in note/title/name renders as text (not executed). *(render.rs escape_html used at every user-content insertion; test: escape_script_tag)*
 - [x] Private page cache cleared on logout. *(RFC-042: authenticated HTML is never cached; only static shell assets are stored. No private cache exists to clear — the property holds trivially. PURGE_PRIVATE is retained for defence-in-depth.)*
 
+## Codlet integration gates (v0.37.0+)
+
+- [ ] `CODLET_HMAC_KEY_V1` secret is set in the target environment (`wrangler secret put CODLET_HMAC_KEY_V1`).
+- [ ] `CODLET_RL` KV namespace is created and bound in `wrangler.toml` for the target environment.
+- [ ] New invite code generation writes to `codlet_codes` (verify: `SELECT COUNT(*) FROM codlet_codes` increases after admin generates a code).
+- [ ] New session issuance writes to `codlet_sessions` (verify: `SELECT COUNT(*) FROM codlet_sessions` increases after a join).
+- [ ] Form tokens write to `codlet_form_tokens` (verify: `SELECT COUNT(*) FROM codlet_form_tokens` increases after any form submit).
+- [ ] Invite revocation works for codlet-issued codes (generate a code, revoke it, verify `codlet_codes.revoked_at` is set).
+- [ ] Invite listing shows both codlet and legacy codes on the admin invite page.
+- [ ] Session cookie name unchanged (`ciao_sid`) — existing browser sessions are not invalidated.
+
+**Grace-period gate (30 days post first codlet deploy):**
+- [ ] `SELECT COUNT(*) FROM sessions WHERE revoked_at IS NULL AND expires_at > unixepoch()` = 0.
+- [ ] When above is 0: remove the legacy session fallback block from `session.rs::require_auth`.
+
+
 ## Offline gates
 
 - [x] Previously visited Home/Event Detail opens offline with banner. *(RFC-042: authenticated routes are network-only; offline navigation returns the pre-cached static `/offline` page. No stale private page is served.)*

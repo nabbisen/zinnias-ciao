@@ -2,13 +2,20 @@
 
 ## Status
 
-**v0.37.0** — 43 of 55 RFCs implemented (12 proposed). 223 passing unit tests. Zero warnings.
+**v0.38.1** — 43 of 55 RFCs implemented (12 proposed). 223 passing unit tests. Zero warnings.
 
-**codlet integration (Phase 1) complete.** The join flow, admin invite issuance, and
-session validation now use codlet v0.15.1. Legacy paths remain for native tests and
-the 30-day session grace period. Operator must set `CODLET_HMAC_KEY_V1` secret before
-deploying. All other handlers (event status, notes, admin forms) continue to use the
-existing form_token / session infrastructure; Phase 2 will migrate those.
+**codlet integration complete (Phase 1 + 2).** All auth primitives now route through
+codlet v0.15.1 on wasm32 (production Workers):
+- Invite code issuance, listing, and revocation
+- Session issuance, validation, and logout (parallel legacy lookup for 30-day grace period)
+- Form tokens (all handlers: join, event, notes, admin, calendar, export, templates)
+
+Native tests use legacy fallback paths throughout. Operator must set `CODLET_HMAC_KEY_V1`
+and create `CODLET_RL` KV namespace before deploying (see `docs/src/launch-runbook.md`).
+
+**One time-gated task remains:** remove the legacy session lookup from `session.rs`
+once `SELECT COUNT(*) FROM sessions WHERE revoked_at IS NULL AND expires_at > unixepoch()`
+returns 0 (approximately 30 days after first codlet deploy).
 
 **Pre-pilot hardening complete.** All in-repo code work for the pilot is done:
 - All user-visible strings are Japanese (RFC-049, v0.30.0–v0.33.1).

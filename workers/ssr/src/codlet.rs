@@ -323,6 +323,7 @@ pub async fn revoke_invite(
 
 /// Format a Unix timestamp (seconds since epoch) as an ISO-8601 display prefix.
 /// Returns "YYYY-MM-DDTHH:MM" — the first 16 characters of ISO-8601.
+#[cfg(target_arch = "wasm32")]
 fn unix_secs_to_display(ts: u64) -> String {
     let s = ts % 60;
     let m = (ts / 60) % 60;
@@ -334,6 +335,7 @@ fn unix_secs_to_display(ts: u64) -> String {
 
 /// Convert days since Unix epoch to (year, month, day) via the
 /// Fliegel–Van Flandern proleptic Gregorian algorithm.
+#[cfg(target_arch = "wasm32")]
 fn days_since_epoch_to_ymd(days: u64) -> (u64, u64, u64) {
     let z   = days + 719468;
     let era = z / 146097;

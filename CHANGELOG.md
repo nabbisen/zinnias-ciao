@@ -2,6 +2,57 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.38.2] — 2026-06-15
+
+Housekeeping: remove stale allow(dead_code), fix cfg gating on helpers,
+complete operator docs for codlet deployment.
+
+### Removed
+
+- **`#![allow(dead_code)]` from `db/invite.rs`.**
+  The suppression was added before the module's functions were properly
+  cfg-gated. After the codlet migration, all functions either have callers
+  on wasm32 (`list_active_for_community`, called via `codlet::list_active_invites`)
+  or live exclusively in `#[cfg(not(target_arch = "wasm32"))]` blocks
+  (`find_valid`, `find_by_id`, `mark_used`, `insert`). The compiler emits no
+  dead-code warnings without the allow; it was masking a class of future regressions.
+
+### Fixed
+
+- **`unix_secs_to_display` and `days_since_epoch_to_ymd` in `codlet.rs`**
+  were unconditionally compiled and warned as unused on non-wasm.
+  Both are gated `#[cfg(target_arch = "wasm32")]` — they are only called from
+  the wasm32 branch of `list_active_invites`.
+
+### Changed
+
+- **`wrangler.toml`** — `CODLET_RL` KV namespace binding added to all three
+  env sections: `dev` (id `"local"`), `staging`
+  (`REPLACE_WITH_STAGING_CODLET_RL_ID`), `production`
+  (`REPLACE_WITH_PRODUCTION_CODLET_RL_ID`). Previously it was only in the
+  top-level default section; a deploy to a named environment would fail to
+  resolve the binding.
+
+- **`docs/src/launch-runbook.md`** updated for codlet:
+  - §1.5: create production `CODLET_RL` KV namespace
+  - §1.6: create staging `CODLET_RL` KV namespace
+  - §2.4: set `CODLET_HMAC_KEY_V1` for staging with key-rotation guidance
+  - §2.5: set `CODLET_HMAC_KEY_V1` for production
+  - Grace-period note before Phase 4: when and how to remove the legacy
+    session lookup from `session.rs::require_auth`
+
+- **`docs/src/release-checklist.md`** — new "Codlet integration gates"
+  section: 8 deploy-time verification steps and the 30-day grace-period
+  removal gate with the trigger query.
+
+- **`ROADMAP.md`** — status section updated to v0.38.1 (was v0.37.0);
+  codlet integration described as fully complete (Phase 1 + 2) with the
+  single remaining time-gated task (legacy session removal) documented.
+
+### Testing
+
+- 223 passing. Zero warnings (native). wasm32: zero errors, zero warnings.
+
 ## [0.38.1] — 2026-06-15
 
 Fix functional bug: admin invite listing and revocation now cover both codlet and legacy tables.

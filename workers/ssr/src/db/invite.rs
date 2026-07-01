@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Invite-code table access — RFC-003 / RFC-002.
 //!
 //! Codes are stored as HMAC-SHA256(pepper, normalize(code)).

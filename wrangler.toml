@@ -51,6 +51,10 @@ database_id   = "local"
 binding = "RATE_LIMIT"
 id      = "local"
 
+[[env.dev.kv_namespaces]]
+binding = "CODLET_RL"
+id      = "local"
+
 [env.staging]
 name = "zinnias-ciao-ssr-stg"
 [env.staging.vars]
@@ -66,6 +70,10 @@ database_id   = "REPLACE_WITH_STAGING_D1_ID"   # create with: wrangler d1 create
 binding = "RATE_LIMIT"
 id      = "REPLACE_WITH_STAGING_KV_ID"         # create with: wrangler kv:namespace create RATE_LIMIT --env staging
 
+[[env.staging.kv_namespaces]]
+binding = "CODLET_RL"
+id      = "REPLACE_WITH_STAGING_CODLET_RL_ID"  # create with: wrangler kv:namespace create CODLET_RL --env staging
+
 [env.production]
 name = "zinnias-ciao-ssr-prd"
 [env.production.vars]
@@ -80,3 +88,7 @@ database_id   = "REPLACE_WITH_PRODUCTION_D1_ID"   # create with: wrangler d1 cre
 [[env.production.kv_namespaces]]
 binding = "RATE_LIMIT"
 id      = "REPLACE_WITH_PRODUCTION_KV_ID"         # create with: wrangler kv:namespace create RATE_LIMIT --env production
+
+[[env.production.kv_namespaces]]
+binding = "CODLET_RL"
+id      = "REPLACE_WITH_PRODUCTION_CODLET_RL_ID"  # create with: wrangler kv:namespace create CODLET_RL --env production
