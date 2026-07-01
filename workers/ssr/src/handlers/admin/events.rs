@@ -162,7 +162,7 @@ pub async fn post_create_event(
     let off = match zinnias_ciao_contracts::tz::offset_minutes(&community_tz) {
         Some(o) => o,
         None => return render::page(
-            "Configuration error",
+            i18n::JA_GENERAL_ERROR,
             &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR)
         ),
     };
@@ -466,7 +466,7 @@ pub async fn post_edit_event(
         let off = match zinnias_ciao_contracts::tz::offset_minutes(&community_tz) {
             Some(o) => o,
             None => return render::page(
-                "Configuration error",
+                i18n::JA_GENERAL_ERROR,
                 &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR)
             ),
         };
@@ -866,23 +866,24 @@ fn event_form_fields(
          {repeat}\
          {desc}",
         err    = err_html,
-        title  = field("Title", "title", "text", title.unwrap_or(""), true),
-        date   = field("Date", "day_date", "date", day_date.unwrap_or(""), true),
-        start  = field("Start time", "starts_at", "time", starts_at.unwrap_or(""), true),
-        end    = field("End time", "ends_at", "time", ends_at.unwrap_or(""), true),
+        title  = field(i18n::JA_FORM_FIELD_TITLE, "title", "text", title.unwrap_or(""), true),
+        date   = field(i18n::JA_FORM_FIELD_DATE, "day_date", "date", day_date.unwrap_or(""), true),
+        start  = field(i18n::JA_FORM_FIELD_START, "starts_at", "time", starts_at.unwrap_or(""), true),
+        end    = field(i18n::JA_FORM_FIELD_END, "ends_at", "time", ends_at.unwrap_or(""), true),
         repeat = repeat_html,
-        loc    = field("Location (optional)", "location", "text",
+        loc    = field(i18n::JA_FORM_FIELD_LOCATION, "location", "text",
                       location.unwrap_or(""), false),
         desc  = {
             let dval = render::escape_html(description.unwrap_or(""));
             format!(
                 "<label style=\"display:block;margin-bottom:1rem\">\
                  <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">\
-                 Description (optional)</span>\
+                 {desc_lbl}</span>\
                  <textarea name=\"description\" rows=\"3\" \
                    style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
                    border-radius:12px;font-size:1rem\">{dval}</textarea>\
-                 </label>"
+                 </label>",
+                desc_lbl = i18n::JA_FORM_FIELD_DESC,
             )
         },
     )

@@ -2,6 +2,26 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.33.1] — 2026-06-12
+
+Complete EN→JA sweep: event form field labels and remaining error page titles.
+
+### Changed
+
+- **Event form field labels fully Japanese.** The `event_form_fields` helper
+  passed EN strings (`"Title"`, `"Date"`, `"Start time"`, `"End time"`,
+  `"Location (optional)"`, `"Description (optional)"`) directly to the `field()`
+  closure. These are now `JA_FORM_FIELD_*` constants.
+- **Remaining page titles fixed.** Two `render::page("Configuration error", …)` calls
+  replaced with `i18n::JA_GENERAL_ERROR`.
+- **New i18n constant pairs:** `FORM_FIELD_TITLE`, `FORM_FIELD_DATE`, `FORM_FIELD_START`,
+  `FORM_FIELD_END`, `FORM_FIELD_LOCATION`, `FORM_FIELD_DESC`. All paired EN/JA.
+
+### Testing
+
+- 213 passing. Zero warnings. i18n parity gate passes.
+- Final HTML-content scan confirms no bare EN words remain in user-facing HTML output.
+
 ## [0.33.0] — 2026-06-12
 
 Complete EN→JA rendering sweep: all user-visible strings now Japanese.

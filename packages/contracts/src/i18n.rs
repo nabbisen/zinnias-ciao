@@ -251,6 +251,18 @@ pub const JA_REPEAT_BIWEEKLY:       &str = "2週間ごと";
 pub const JA_REPEAT_MONTHLY:        &str = "毎月";
 pub const JA_REPEAT_COUNT_UNIT:     &str = "回";
 pub const JA_REPEAT_COUNT_HINT:     &str = "「繰り返さない」を選択した場合、回数は無視されます。";
+pub const EN_FORM_FIELD_TITLE:      &str = "Title";
+pub const JA_FORM_FIELD_TITLE:      &str = "タイトル";
+pub const EN_FORM_FIELD_DATE:       &str = "Date";
+pub const JA_FORM_FIELD_DATE:       &str = "日付";
+pub const EN_FORM_FIELD_START:      &str = "Start time";
+pub const JA_FORM_FIELD_START:      &str = "開始時刻";
+pub const EN_FORM_FIELD_END:        &str = "End time";
+pub const JA_FORM_FIELD_END:        &str = "終了時刻";
+pub const EN_FORM_FIELD_LOCATION:   &str = "Location (optional)";
+pub const JA_FORM_FIELD_LOCATION:   &str = "場所（任意）";
+pub const EN_FORM_FIELD_DESC:       &str = "Description (optional)";
+pub const JA_FORM_FIELD_DESC:       &str = "説明（任意）";
 
 // ── Event templates (RFC-032) ─────────────────────────────────────────────
 pub const EN_TEMPLATES_TITLE:        &str = "Event Templates";
