@@ -194,6 +194,7 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
             key_version: KeyVersion::new(key_version_str),
             grant:       None, // not needed here; extracted from redeem.grant below
             scope:       Some(community_id.to_owned()),
+            purpose:     None, // invite codes are not purpose-labelled (RFC-C)
             expires_at:  u64::MAX,
         };
 

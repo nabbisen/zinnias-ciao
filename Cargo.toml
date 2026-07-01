@@ -7,7 +7,7 @@ members = [
 ]
 
 [workspace.package]
-version     = "0.38.3"
+version     = "0.38.4"
 edition     = "2024"
 license     = "Apache-2.0"
 authors     = ["nabbisen"]
@@ -27,8 +27,8 @@ hex         = { version = "0.4" }
 getrandom   = { version = "0.4",     features = ["wasm_js"] }  # wasm_js feature required for wasm32 target
 
 # codlet auth library (wasm32-only; target-gated in workers/ssr/Cargo.toml)
-codlet-core   = { git = "https://github.com/nabbisen/codlet", tag = "v0.15.1" }
-codlet-worker = { git = "https://github.com/nabbisen/codlet", tag = "v0.15.1" }
+codlet-core   = { git = "https://github.com/nabbisen/codlet", tag = "v0.16.0" }
+codlet-worker = { git = "https://github.com/nabbisen/codlet", tag = "v0.16.0" }
 
 [profile.release]
 opt-level = "s"   # minimise WASM bundle size

@@ -2,6 +2,82 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.38.4] — 2026-06-15
+
+Upgrade codlet dependency from v0.15.1 to v0.16.0.
+
+### Changed
+
+- **codlet upgraded to v0.16.0** (`Cargo.toml`: tag `v0.15.1` → `v0.16.0`).
+
+### Fixed
+
+- **§2f — `RedeemableCode` now has a `purpose` field.**
+  `RedeemableCode` gained `purpose: Option<String>` in v0.16.0 (RFC-C:
+  purpose/scope enforced in the claim UPDATE to prevent cross-flow redemption).
+  We construct `RedeemableCode` directly in `join.rs::post_profile` to pass to
+  `code_auth.claim()`; the struct literal was missing the new field, which
+  would have been a compile error.
+  Fix: added `purpose: None` — invite codes in this service are not purpose-labelled;
+  scope (`community_id`) is the only claim-time discriminator.
+
+### Security improvements (automatic — no code changes required)
+
+Inherited from codlet v0.16.0:
+
+- **RFC-A — Key rotation now works.** `SecretHasher::lookup_key_candidates`
+  derives one lookup key per held key (active + all previous). Records written
+  under a previous key remain reachable during the rotation grace period. The
+  `previous_keys` parameter to `WorkerKeyProvider::from_env` (currently `&[]`)
+  can now be populated when a key rotation is performed — existing sessions and
+  invite codes will not be invalidated.
+
+- **RFC-B — Rate limiting counts all failed guesses.** Previously, only a lost
+  concurrent claim incremented the failure counter. Invalid-format and not-found
+  codes did not count. Now `record_failure()` is called for every public failure
+  from `find()`. Also: `RateLimitUnavailable::FailClosed` is now correctly
+  honoured when the KV store returns an error (previously it fell open regardless
+  of policy).
+
+- **RFC-C — Purpose/scope enforced in the claim UPDATE.** The D1 `claim_code`
+  conditional UPDATE now adds `AND purpose = ?` and `AND scope = ?` when those
+  fields are present on the found record. Cross-flow redemption is blocked at
+  the database level. Our invite codes use `scope = community_id` and
+  `purpose = None`; both are enforced correctly.
+
+- **RFC-E — Form token `bound_resource` semantics unified.** Previously the
+  in-memory store treated `None` as wildcard, but the D1 adapter required an
+  exact match. Both now use exact-match semantics: `(None, None)` proceeds;
+  any mismatch (including `Some(stored) + None(caller)`) is invalid. Tests
+  relying on the old wildcard behaviour now correctly reflect production
+  behaviour.
+
+### Breaking changes handled
+
+All six breaking changes in the v0.14.3 → v0.16.0 handoff were assessed:
+
+| # | Change | Status |
+|---|---|---|
+| §2a | `Rc<D1Database>` constructors | ✅ Already correct since v0.37.0 |
+| §2b | `with_existing_table_names()` rename | ✅ Not applicable (we use `default()`) |
+| §2c | `six_symbol()` + `#[allow(deprecated)]` | ✅ Already correct since v0.37.1 |
+| §2d | `SoftDenyAfterThreshold` removed | ✅ Never used |
+| §2e | `redeem_with_callback()` deprecated | ✅ Never used (two-step flow) |
+| §2f | `RedeemableCode.purpose` field | ✅ Fixed in this release |
+
+### Notes on §5 reference wiring
+
+The handoff §5 reference example shows `hasher.clone()` and a 4-arg
+`FormTokenManager::new`. Both are incorrect for the Workers target:
+- `WorkerKeyProvider` does not implement `Clone` in v0.16.0. Our three
+  independent `WorkerKeyProvider` instances remain correct.
+- `FormTokenManager::new` still takes 5 arguments including `ttl: Duration`.
+  Our 5-arg call is correct.
+
+### Testing
+
+- 223 passing. Zero warnings (native). wasm32: zero errors, zero warnings.
+
 ## [0.38.3] — 2026-06-15
 
 Documentation: update all operator and verification docs to reflect codlet
