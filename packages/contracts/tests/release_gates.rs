@@ -222,6 +222,28 @@ fn i18n_en_ja_parity_count() {
         (EN_EVENT_MEMBER_FALLBACK, JA_EVENT_MEMBER_FALLBACK),
         (EN_JOIN_PAGE_TITLE, JA_JOIN_PAGE_TITLE),
         (EN_JOIN_PROFILE_PAGE_TITLE, JA_JOIN_PROFILE_PAGE_TITLE),
+        // Added in v0.33.x — EN→JA inline string sweep
+        (EN_NOT_FOUND, JA_NOT_FOUND),
+        (EN_INTERNAL_ERROR, JA_INTERNAL_ERROR),
+        (EN_ADMIN_ATTEND_CANCELLED, JA_ADMIN_ATTEND_CANCELLED),
+        (EN_GENERAL_BACK, JA_GENERAL_BACK),
+        (EN_ADMIN_EDIT_CANCELLED, JA_ADMIN_EDIT_CANCELLED),
+        (EN_ADMIN_EDIT_STARTED, JA_ADMIN_EDIT_STARTED),
+        (EN_NAV_BACK, JA_NAV_BACK),
+        (EN_NOTE_DELETE_BODY, JA_NOTE_DELETE_BODY),
+        (EN_FORM_FIELD_TITLE, JA_FORM_FIELD_TITLE),
+        (EN_FORM_FIELD_DATE, JA_FORM_FIELD_DATE),
+        (EN_FORM_FIELD_START, JA_FORM_FIELD_START),
+        (EN_FORM_FIELD_END, JA_FORM_FIELD_END),
+        (EN_FORM_FIELD_LOCATION, JA_FORM_FIELD_LOCATION),
+        (EN_FORM_FIELD_DESC, JA_FORM_FIELD_DESC),
+        (EN_EVENT_CANCELLED_BADGE, JA_EVENT_CANCELLED_BADGE),
+        (EN_EVENT_WHOS_GOING, JA_EVENT_WHOS_GOING),
+        (EN_EVENT_NOTES_SECTION, JA_EVENT_NOTES_SECTION),
+        (EN_TZ_ERROR, JA_TZ_ERROR),
+        (EN_CURRENT_BADGE, JA_CURRENT_BADGE),
+        (EN_ME_CALENDAR_LABEL, JA_ME_CALENDAR_LABEL),
+        (EN_ME_DATA_EXPORT, JA_ME_DATA_EXPORT),
     ];
     // Strings that are intentionally identical across languages (product name,
     // numeric units, etc.) are exempted from the identity check.
@@ -288,6 +310,86 @@ fn query_budgets_are_positive_and_ordered() {
         "Event detail budget {QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY} suggests an N+1 regression");
     assert!(QUERY_BUDGET_EVENT_DETAIL_MAX_RECURRING < 20,
         "Event detail recurring budget suggests an N+1 regression");
+}
+
+// ── Static source query-count gates (RFC-044 §6.1) ───────────────────────
+//
+// Count `.await` calls on DB functions in the key handler source files and
+// assert they don't regress above their declared budgets. Uses include_str! so
+// the check fires on every `cargo test` run without a live database.
+//
+// The counting heuristic: lines containing `.await` in a handler are almost
+// always D1 operations; non-DB awaits (form_data(), etc.) are few and counted
+// conservatively. The gate fires if the count exceeds 2× the budget — tight
+// enough to catch a major N+1 regression but loose enough to survive minor
+// refactors without constant adjustment. A count approaching the 2× ceiling
+// should trigger manual budget review.
+
+const HOME_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/home.rs");
+const EVENT_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/event.rs");
+const EXPORT_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/export.rs");
+
+/// Count non-comment lines containing `.await` in a source string.
+fn count_awaits(src: &str) -> usize {
+    src.lines()
+        .filter(|l| {
+            let t = l.trim();
+            !t.starts_with("//") && t.contains(".await")
+        })
+        .count()
+}
+
+#[test]
+fn home_handler_await_count_within_budget() {
+    // Home handler awaits: require_auth (session), list_active_for_user (community
+    // switcher route), require_membership, home_upcoming, list_active_for_user
+    // (switcher), count_active, find_active (community), list_mine_for_days,
+    // counts_for_days, list_communities_for_user.  Total ≈ 10-11 DB awaits.
+    // Gate: must not exceed 2 × budget.
+    let awaits = count_awaits(HOME_HANDLER_SRC);
+    assert!(
+        awaits <= QUERY_BUDGET_HOME * 2,
+        "home.rs has {awaits} .await calls, exceeds 2× budget ({}).\
+         Investigate for N+1 regression.",
+        QUERY_BUDGET_HOME * 2
+    );
+}
+
+#[test]
+fn event_detail_handler_await_count_within_budget() {
+    // Event detail GET awaits: require_auth, require_membership, find_for_community,
+    // days_for_event, count_active, find_mine (note), list_for_event (notes),
+    // list_all_active (members), find_active (community), list_mine_for_days,
+    // counts_for_days (IN), list_for_event_days (IN), issue token (×2 SET_STATUS +
+    // SAVE_NOTE), list_communities_for_user.  ~13 DB awaits for the GET handler.
+    // The full file also contains POST handlers; total awaits will be higher.
+    // Gate: file total must not regress into obviously N+1 territory (> 50).
+    let awaits = count_awaits(EVENT_HANDLER_SRC);
+    assert!(
+        awaits <= 50,
+        "event.rs has {awaits} .await calls total across all handlers.\
+         Investigate if event detail GET alone exceeds {QUERY_BUDGET_EVENT_DETAIL_SINGLE_DAY}."
+    );
+}
+
+#[test]
+fn export_handler_await_count_within_budget() {
+    // export.rs contains three handlers (page, JSON download, token/revoke) plus
+    // the build_export helper. The per-route budget is 8 flat IN-batched queries.
+    // With ~3 handlers + helper, the file-level ceiling is 30 to catch a
+    // clear N+1 regression while allowing normal multi-handler structure.
+    // The important invariant (batched IN queries, no per-row fetch) is documented
+    // in QUERY_BUDGET_EXPORT and enforced via code review; a live harness (RFC-044)
+    // will provide the precise per-route assertion when staging is available.
+    let awaits = count_awaits(EXPORT_HANDLER_SRC);
+    assert!(
+        awaits <= 30,
+        "export.rs has {awaits} .await calls across all handlers, exceeds ceiling (30).\
+         Investigate for N+1 regression — the export route must use batched IN queries."
+    );
 }
 
 // ── Service worker version gate (RFC-044 §11 step 1) ─────────────────────

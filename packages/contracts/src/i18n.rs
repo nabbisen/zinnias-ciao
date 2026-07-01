@@ -351,7 +351,6 @@ pub const EN_TZ_ERROR: &str = "Community timezone is not configured correctly. P
 pub const JA_TZ_ERROR: &str = "コミュニティのタイムゾーンが正しく設定されていません。運営者にお問い合わせください。";
 pub const EN_CURRENT_BADGE: &str = "Current";
 pub const JA_CURRENT_BADGE: &str = "現在";
-pub const EN_ADMIN_MEMBERS_H1: &str = "Members";
 pub const EN_ME_CALENDAR_LABEL: &str = "Calendar feed";
 pub const JA_ME_CALENDAR_LABEL: &str = "カレンダーフィード";
 pub const EN_ME_DATA_EXPORT: &str = "Export community data";

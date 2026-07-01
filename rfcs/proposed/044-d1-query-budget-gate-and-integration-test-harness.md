@@ -7,9 +7,12 @@
 **Relationship:** Stabilization RFC. Closes deep-review finding P1-4 (D1/subrequest pressure) and provides the live-D1 integration harness that RFC-037, RFC-040, and RFC-041 defer their end-to-end tests to. Refines RFC-029 (query performance discipline) and RFC-015 (testing and release gates).
 
 > **Proposed (partial).** The compile-level query-budget constants shipped in
-> v0.25.0 (§6.1 option a) and the SW version gate shipped in v0.26.0 (§11 step 1).
-> The integration harness (§6.2) and the race-regression tests (§11 steps 3–5)
-> remain unimplemented. They gate beta, not the first pilot.
+> v0.25.0 (§6.1 option a), the SW version gate in v0.26.0 (§11 step 1), and
+> the static source query-count gates in v0.34.0 (§6.1 — home, event detail,
+> export await-count assertions via `include_str!`). The i18n parity gate now
+> covers all 141 EN/JA constant pairs. The integration harness (§6.2) and the
+> race-regression tests (§11 steps 3–5) remain unimplemented. They gate beta,
+> not the first pilot.
 
 ---
 

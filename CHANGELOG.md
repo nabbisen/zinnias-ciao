@@ -2,6 +2,37 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.34.0] — 2026-06-12
+
+Release gate hardening: i18n parity gap closed, static query-count guards added.
+
+### Changed
+
+- **i18n parity gate now covers all 141 EN/JA constant pairs.** The parity test
+  in `release_gates.rs` was checking 120 pairs while 21 new constants added in
+  v0.33.x went unregistered. All 21 pairs are now enumerated in the test, so a
+  missing or empty JA string causes `cargo test` to fail immediately.
+
+- **Duplicate EN_ADMIN_MEMBERS_TITLE removed.** A duplicate constant was
+  introduced in v0.33.0 causing EN count (142) to exceed JA count (141). Removed
+  the duplicate; counts are now 141/141.
+
+- **Static query-count gate tests added (RFC-044 §6.1).** Three new tests in
+  `release_gates.rs` read the handler source files via `include_str!` and assert
+  that `.await` call counts stay within expected ceilings:
+  - `home_handler_await_count_within_budget` — home.rs ≤ 2× `QUERY_BUDGET_HOME`
+  - `event_detail_handler_await_count_within_budget` — event.rs ≤ 50 total
+  - `export_handler_await_count_within_budget` — export.rs ≤ 30 total
+
+  These fire on every `cargo test` run without a live database. They catch
+  major N+1 regressions; the precise per-route live assertions remain in RFC-044
+  pending staging infrastructure.
+
+### Testing
+
+- 216 passing (was 213). Zero warnings.
+- i18n parity: 141 EN/JA pairs, all verified non-empty and non-identical.
+
 ## [0.33.1] — 2026-06-12
 
 Complete EN→JA sweep: event form field labels and remaining error page titles.
