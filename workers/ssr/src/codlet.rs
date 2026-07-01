@@ -59,10 +59,33 @@ pub async fn build(env: &Env) -> Result<CodletManagers> {
     let rl_store = KvRateLimitStore::new(kv_store);
 
     // ── Policies ────────────────────────────────────────────────────────────
-    // 6-symbol codes to match existing admin-generated invite codes.
-    // Switch to default_human (8 symbols) once all 6-char codes have expired.
+    // Code policy: 6-symbol codes.
+    //
+    // `CodePolicy::six_symbol` is deprecated because 6-symbol codes carry only
+    // ~29.7 bits of entropy, below the library's 8-symbol secure minimum
+    // (~39.6 bits). The `#[allow(deprecated)]` below is an explicit,
+    // reviewable acknowledgment that the following three conditions are met for
+    // this deployment — as codlet's deprecation note requires:
+    //
+    //   1. SHORT EXPIRY: codes expire in 24 hours (`INVITE_TTL_SECS`).
+    //      This tightly bounds the online-guessing window.
+    //
+    //   2. SINGLE-USE: codlet's atomic `claim_code` conditional UPDATE
+    //      guarantees one-time use even under concurrent submissions (INV-5).
+    //
+    //   3. RATE LIMITING: `KvRateLimitStore` with 5 failures / 15-minute
+    //      window is active. The handoff document (§8f) names this the minimum
+    //      policy for 6-symbol codes. `FailOpen` is intentional: a KV outage
+    //      should not lock out legitimate users of a small community.
+    //
+    // Migration path: once all outstanding 6-char codes have expired (i.e.,
+    // no admin-generated invites predate this deploy by more than 24 hours),
+    // switch to `CodePolicy::default_human(Duration::from_secs(INVITE_TTL_SECS))`
+    // and remove this `#[allow(deprecated)]`. Admin-issued codes will then be
+    // 8 symbols; users entering old codes will simply see an expired error.
+    const INVITE_TTL_SECS: u64 = 86_400; // 24 hours — matches legacy invite_codes.expires_at
     #[allow(deprecated)]
-    let code_policy = CodePolicy::six_symbol(Duration::from_secs(4 * 3600))
+    let code_policy = CodePolicy::six_symbol(Duration::from_secs(INVITE_TTL_SECS))
         .map_err(|e| worker::Error::RustError(format!("codlet policy: {e}")))?;
 
     let cookie_policy = CookiePolicy::production_strict(

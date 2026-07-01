@@ -2,6 +2,61 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.37.1] — 2026-06-15
+
+Codlet `six_symbol` deprecation review: accepted with documented rationale;
+TTL bug fixed.
+
+### Fixed
+
+- **Invite code TTL bug in `codlet.rs`.**  
+  `CodePolicy::six_symbol(Duration::from_secs(4 * 3600))` used a 4-hour TTL,
+  but admin-generated invites are displayed to users as "24時間で失効します"
+  (expires in 24 hours) and the legacy `invite_db::insert` path used
+  `db::add_seconds_to_now(86_400)` (24 hours). The codlet path now uses the
+  same constant: `INVITE_TTL_SECS = 86_400`.
+
+### Changed
+
+- **`codlet.rs` — `#[allow(deprecated)]` comment expanded.**  
+  The `six_symbol` deprecation suppression is an explicit, reviewable
+  acknowledgment that three conditions required by codlet's deprecation note
+  are all met for this deployment:
+  1. Short expiry: 24-hour invite TTL (`INVITE_TTL_SECS = 86_400`).
+  2. Single-use: codlet's atomic `claim_code` conditional UPDATE (INV-5).
+  3. Rate limiting: `KvRateLimitStore`, 5 failures / 15-minute window.
+  The comment also documents the migration path: switch to
+  `CodePolicy::default_human(INVITE_TTL_SECS)` once all outstanding 6-char
+  codes have expired.
+
+### Context: was `six_symbol()` the right choice?
+
+`CodePolicy::six_symbol` is the correct API for this service during the
+transition, for two reasons:
+
+**Backward compatibility.** The existing `invite_codes` table (legacy path)
+issues 6-symbol codes. Admin-generated codes written before v0.37.0 are stored
+as 6-symbol values. `validate_invite_input` in `zinnias-ciao-domain` accepts
+exactly 6 characters. Switching to 8-symbol codes mid-deploy would silently
+reject any outstanding 6-symbol codes that users receive between the deploy and
+their redemption. `six_symbol()` ensures codlet validates the same length as
+the legacy path.
+
+**User-facing consistency.** The invite code UX — the 6-character input field,
+the `maxlength="16"` hint, the normalization pipeline, the admin display — is
+built for 6-symbol codes. Changing the length requires a coordinated UI update.
+
+The deprecation is an appropriate mechanism: it makes the security tradeoff
+visible at every call site in code review, requires deliberate suppression
+(`#[allow(deprecated)]`), and documents what the caller must verify. All three
+conditions are verifiably met. The switch to 8-symbol codes (`default_human`)
+can happen after the transition window closes with no data migration, just a
+TTL wait.
+
+### Testing
+
+- 223 passing. Zero warnings (native). wasm32: zero errors, zero warnings.
+
 ## [0.37.0] — 2026-06-15
 
 Codlet integration (Phase 1): join flow, admin invite issuance, session validation.
