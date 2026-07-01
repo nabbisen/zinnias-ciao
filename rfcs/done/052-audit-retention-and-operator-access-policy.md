@@ -1,6 +1,6 @@
 # RFC 052 — Audit Retention and Operator Access Policy
 
-**Status.** Proposed
+**Status.** Implemented (v0.36.0) — policy document at `docs/src/audit-policy.md`
 **Phase:** F8 / Pre-pilot hardening
 **Project:** ciao.zinnias
 **Date:** June 12, 2026

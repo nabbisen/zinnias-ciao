@@ -10,7 +10,7 @@
 
 // Keep in sync with the release version. A release gate verifies this matches
 // the package version (see docs/src/release-checklist.md).
-const CACHE_VERSION = 'v0.35.1';
+const CACHE_VERSION = 'v0.36.0';
 const SHELL_CACHE   = 'shell-' + CACHE_VERSION;
 const OFFLINE_URL   = '/offline';
 

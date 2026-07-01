@@ -6,5 +6,6 @@
 - [Launch Runbook](./launch-runbook.md)
 - [Operations](./operations.md)
 - [Backup and Recovery](./backup-recovery.md)
+- [Audit Policy](./audit-policy.md)
 - [Architecture](./architecture.md)
 - [Release Checklist](./release-checklist.md)

@@ -2,6 +2,43 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.36.0] — 2026-06-13
+
+RFC-052 closed; RFC-054 and RFC-045 updated for reviewer handoff.
+
+### Added
+
+- **`docs/src/audit-policy.md`** — operator-facing policy document for RFC-052.
+  Covers access policy (operator-only, no UI), retention (indefinite for pilot),
+  metadata allowlist (entity type, ID, action, timestamp; no note bodies, no
+  tokens), full audit event inventory (16 `target_kind.action` pairs with their
+  triggers), complete D1 query reference, and incident response procedures for
+  invite abuse, member removal, and note moderation.
+
+- **Audit policy added to mdbook SUMMARY.md** (`docs/src/SUMMARY.md`).
+
+### Changed
+
+- **RFC-052 moved to `rfcs/done/`** — marked Implemented (v0.36.0). The policy
+  document satisfies the RFC's stated deliverable: "Document first."
+
+- **RFC-054 updated** — corrects the stale string count (120 → 143), adds a
+  complete grouped inventory of all 143 `JA_*` strings with per-string
+  reviewer notes flagging technical jargon (`セッション`, `JSON`, `エクスポート`,
+  `タイムゾーン`, `オフライン`) and the UX-architect's suggested alternatives for
+  key strings (`カレンダーフィード`, `エクスポート`, `出席済み`). The inventory is
+  organized by screen context to match the reviewer's workflow.
+
+- **RFC-045 source-verification count updated** to 218 (v0.35.1).
+
+- **`rfcs/README.md`** — RFC-052 moved from proposed to done; proposed count
+  updated to 12.
+
+### Testing
+
+- 218 passing. Zero warnings.
+- RFC counts: 43 done, 12 proposed.
+
 ## [0.35.1] — 2026-06-13
 
 UX-architect review remediation: three English-text leaks fixed; memo counter wired.

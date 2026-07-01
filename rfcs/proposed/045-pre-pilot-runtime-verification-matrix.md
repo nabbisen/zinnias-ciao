@@ -57,7 +57,7 @@ review's §8 "Source/code verification" checklist.
 | 11 | Display paths use `tz::to_local_parts` | `render.rs:487–537`, `admin.rs:685` | ✅ |
 
 **Conclusion of source verification:** every source-checkable claim in the
-handoff is confirmed true against the code. 184 tests pass; zero warnings.
+handoff is confirmed true against the code. 218 tests pass; zero warnings. (v0.35.1)
 
 ## 6. Staging-Runtime Verification — PENDING (requires deployed environment)
 

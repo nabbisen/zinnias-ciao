@@ -53,6 +53,7 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 048 | [Pilot Security Headers and Cache-Control Gate](./done/048-pilot-security-headers.md) | v0.30.0 |
 | 049 | [Japanese-Language Pilot Rendering](./done/049-japanese-language-pilot-rendering.md) | v0.30.0 |
 | 055 | [Offline Read-Only Contract](./done/055-offline-read-only-contract.md) | v0.31.0 |
+| 052 | [Audit Retention and Operator Access Policy](./done/052-audit-retention-and-operator-access-policy.md) | v0.36.0 |
 
 ## Also Done
 
@@ -84,7 +85,6 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 045 | Pre-Pilot Runtime Verification Matrix | [./proposed/045-pre-pilot-runtime-verification-matrix.md](./proposed/045-pre-pilot-runtime-verification-matrix.md) | Source verification discharged; staging-runtime matrix pending environment |
 | 050 | [Staging Runtime Verification Evidence Pack](./proposed/050-staging-runtime-verification-evidence-pack.md) | Needs Cloudflare staging |
 | 051 | [Multi-Day and Recurring Event Edit Semantics](./proposed/051-multi-day-and-recurring-event-edit-semantics.md) | Product decision needed |
-| 052 | [Audit Retention and Operator Access Policy](./proposed/052-audit-retention-and-operator-access-policy.md) | Document first |
 | 053 | [ICS Feed Privacy and Revocation UX](./proposed/053-ics-feed-privacy-and-revocation-ux.md) | Copy review (RFC-054) |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
 
