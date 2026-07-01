@@ -2,6 +2,54 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.36.1] — 2026-06-13
+
+Security: two invite-code generation defects fixed (identified in codlet extraction review).
+
+### Fixed
+
+- **§7.1 — Fail-closed randomness.** `generate_invite_code()` previously called
+  `getrandom::getrandom(&mut bytes).unwrap_or_default()`. On an RNG failure the
+  buffer stayed zeroed, producing the deterministic code `"AAAAAA"`. The function
+  now returns `worker::Result<String>` and propagates the error with `?`, matching
+  the discipline of `crypto::random_token()` which already used `.expect()`.
+  The call site in `post_generate_invite` propagates via `?`, returning HTTP 500
+  rather than issuing a weak code.
+
+- **§7.2 — Rejection sampling replaces modulo bias.** The alphabet has 31
+  characters. `256 % 31 = 8`, so the previous `b % 31` map made the first eight
+  characters (`A B C D E F G H`) appear with probability `9/256` vs `8/256` for
+  the remaining 23. The new generator discards bytes `>= 248` (the biased tail)
+  and resamples. Expected extra draws per character ≈ 0.03 — negligible overhead.
+
+### Added
+
+- **3 property tests in `packages/domain/src/invite.rs`:**
+  - `rejection_sampling_ceiling_is_correct` — verifies `248 = 256 - (256 % 31)`.
+  - `all_accepted_bytes_map_to_alphabet` — every byte `< 248` produces a valid
+    alphabet character.
+  - `alphabet_excludes_ambiguous_characters` — `0`, `1`, `O`, `I`, `L` are absent.
+
+- **2 release gates in `packages/contracts/tests/release_gates.rs`:**
+  - `invite_code_generator_does_not_use_unwrap_or_default_on_getrandom` — prevents
+    regression to the fail-open pattern.
+  - `invite_code_generator_uses_rejection_sampling` — asserts the ceiling constant
+    is still present and the old biased pattern is absent.
+
+### Context
+
+Both defects were identified by a Rust and security architect reviewing the
+codebase for a potential `codlet` crate extraction (the one-time code auth
+mechanism). §7.1 is a real security defect — a compromised or unavailable OS RNG
+silently issues a predictable invite code. §7.2 is a quality defect — the bias is
+minor in practice (0.4% over-representation behind expiry + throttling) but
+unacceptable in a reusable security library. Both are worth fixing in the app
+regardless of extraction status.
+
+### Testing
+
+- 223 passing (was 218). Zero warnings.
+
 ## [0.36.0] — 2026-06-13
 
 RFC-052 closed; RFC-054 and RFC-045 updated for reviewer handoff.

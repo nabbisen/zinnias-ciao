@@ -2,7 +2,7 @@
 
 ## Status
 
-**v0.36.0** — 43 of 55 RFCs implemented (12 proposed). 218 passing unit tests. Zero warnings.
+**v0.36.1** — 43 of 55 RFCs implemented (12 proposed). 223 passing unit tests. Zero warnings.
 
 **Pre-pilot hardening complete.** All in-repo code work for the pilot is done:
 - All user-visible strings are Japanese (RFC-049, v0.30.0–v0.33.1).

@@ -157,7 +157,7 @@ pub async fn post_generate_invite(
         return redirect(&format!("/c/{community_id}/admin/invites"));
     }
 
-    let code = generate_invite_code();
+    let code = generate_invite_code()?;
     let normalized = normalize_invite_code(&code);
     let code_hmac = hmac_hex(&pp, &normalized);
     let invite_id = random_token()[..24].to_owned();
@@ -392,11 +392,34 @@ pub async fn post_remove_member(
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 /// Generate a 6-char invite code from the safe alphabet (no ambiguous chars).
-fn generate_invite_code() -> String {
-    use zinnias_ciao_domain::invite::INVITE_CODE_ALPHABET;
-    let mut bytes = [0u8; 6];
-    getrandom::getrandom(&mut bytes).unwrap_or_default();
-    bytes.iter()
-        .map(|&b| INVITE_CODE_ALPHABET[b as usize % INVITE_CODE_ALPHABET.len()] as char)
-        .collect()
+///
+/// # Fail-closed (security fix §7.1)
+/// Returns `Err` if the OS RNG is unavailable rather than silently producing a
+/// deterministic code. Matches `crypto::random_token`'s `.expect()` discipline.
+///
+/// # Rejection sampling (security fix §7.2)
+/// The alphabet has 31 characters. `256 % 31 = 8`, so naive `b % 31` makes the
+/// first 8 characters ~0.4% more likely than the rest (modulo bias). Bytes in the
+/// biased tail (>= 248) are discarded and resampled. Expected extra draws per
+/// character ≈ 0.03 — negligible overhead.
+fn generate_invite_code() -> worker::Result<String> {
+    use zinnias_ciao_domain::invite::{INVITE_CODE_ALPHABET, INVITE_CODE_LEN};
+    let alpha_len = INVITE_CODE_ALPHABET.len(); // 31
+    // Largest multiple of 31 that fits in a u8: 248 = 31 × 8.
+    // Bytes >= 248 are discarded (rejection sampling).
+    let unbiased_ceiling: usize = 256 - (256 % alpha_len); // 248
+
+    let mut code = String::with_capacity(INVITE_CODE_LEN);
+    while code.len() < INVITE_CODE_LEN {
+        let mut buf = [0u8; 1];
+        getrandom::getrandom(&mut buf)
+            .map_err(|e| worker::Error::RustError(
+                format!("invite code generation: RNG unavailable: {e}")))?;
+        let b = buf[0] as usize;
+        if b < unbiased_ceiling {
+            code.push(INVITE_CODE_ALPHABET[b % alpha_len] as char);
+        }
+        // else: discard and redraw
+    }
+    Ok(code)
 }

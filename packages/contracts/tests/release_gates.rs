@@ -506,3 +506,56 @@ fn note_form_has_counter_element_for_js() {
          app.js character counter has a target. Without it the live count is dead."
     );
 }
+
+// ── Invite code generation security gates ────────────────────────────────
+//
+// §7.1: fail-closed randomness. The generator must not silently fall back to
+// deterministic output if the OS RNG is unavailable. The previous implementation
+// used `.unwrap_or_default()` on `getrandom`, which on failure left the byte
+// buffer zeroed, producing the code "AAAAAA". The fix uses `?` propagation.
+//
+// §7.2: rejection sampling. The alphabet has 31 characters; 256 % 31 = 8.
+// The previous implementation used `b % 31`, which over-represents the first
+// 8 characters by one count out of every 256 draws. The fix discards bytes
+// >= 248 and redraws.
+
+const MEMBERS_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/admin/members.rs");
+
+#[test]
+fn invite_code_generator_does_not_use_unwrap_or_default_on_getrandom() {
+    // If this fails, the generator has regressed to fail-open: randomness
+    // failure would silently produce a deterministic invite code.
+    //
+    // The source must use `?` (or `.expect()`) after `getrandom::getrandom`,
+    // not `.unwrap_or_default()` or `.ok()`.
+    let lines: Vec<&str> = MEMBERS_HANDLER_SRC
+        .lines()
+        .filter(|l| l.contains("getrandom"))
+        .collect();
+    assert!(!lines.is_empty(), "generate_invite_code no longer calls getrandom — review it");
+    for l in &lines {
+        assert!(
+            !l.contains("unwrap_or_default") && !l.contains(".ok()"),
+            "getrandom call uses fail-open error handling: {l:?}\n\
+             Must use `?` or `.expect()` — silence on RNG failure produces \
+             a deterministic invite code."
+        );
+    }
+}
+
+#[test]
+fn invite_code_generator_uses_rejection_sampling() {
+    // The unbiased ceiling must appear in the source to confirm rejection
+    // sampling is in use. 248 = 256 - (256 % 31) is the exact value.
+    assert!(
+        MEMBERS_HANDLER_SRC.contains("248") || MEMBERS_HANDLER_SRC.contains("unbiased_ceiling"),
+        "generate_invite_code no longer references the rejection-sampling ceiling (248 or \
+         unbiased_ceiling). Verify the modulo-bias fix is still in place."
+    );
+    // The old biased pattern must not be present.
+    assert!(
+        !MEMBERS_HANDLER_SRC.contains("unwrap_or_default();\n    bytes.iter()"),
+        "generate_invite_code appears to have reverted to the biased modulo pattern."
+    );
+}
