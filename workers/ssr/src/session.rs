@@ -65,35 +65,24 @@ pub async fn require_auth(req: &Request, env: &Env) -> Result<AuthContext> {
 
 /// Try to validate a session against codlet_sessions (wasm32 only).
 /// Returns `Ok(None)` for any miss or error so the legacy path runs.
+///
+/// Uses `codlet::build_session_mgr()` — a single shared construction path —
+/// rather than duplicating the `SessionManager` setup here.
 #[cfg(target_arch = "wasm32")]
 async fn try_codlet_session(cookie_secret: &str, env: &worker::Env) -> worker::Result<Option<AuthContext>> {
     use codlet_core::state::SessionValidationOutcome;
-    use codlet_worker::{D1SessionStore, D1TableConfig, WorkerKeyProvider};
-    use codlet_core::{auth::SessionManager, clock::SystemClock, audit::NoopAuditSink,
-                      cookie::CookiePolicy, hashing::SecretHasher};
-    use std::rc::Rc;
-    use std::time::Duration;
 
-    // Build a minimal session manager — just key provider + session store.
-    let key_provider = match WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[]) {
-        Ok(k) => k,
-        Err(_) => return Ok(None), // CODLET_HMAC_KEY_V1 not configured yet
+    // build_session_mgr() returns Err if CODLET_HMAC_KEY_V1 is not yet set.
+    let mgr = match crate::codlet::build_session_mgr(env) {
+        Ok(m)  => m,
+        Err(_) => return Ok(None), // key not configured yet — fall through to legacy
     };
-    let db = Rc::new(env.d1("DB")?);
-    let session_store = D1SessionStore::new(db, D1TableConfig::default());
-    let cookie_policy = CookiePolicy::production_strict(
-        "ciao_sid", Duration::from_secs(30 * 24 * 3600),
-    );
-    let mgr = SessionManager::new(
-        session_store, SecretHasher::new(key_provider),
-        SystemClock::new(), NoopAuditSink, cookie_policy,
-    );
 
     match mgr.validate(cookie_secret).await {
         Ok(SessionValidationOutcome::Authenticated { subject, session_id, .. }) => {
             Ok(Some(AuthContext {
                 session_id: session_id.as_str().to_owned(),
-                user_id: subject.as_str().to_owned(),
+                user_id:    subject.as_str().to_owned(),
             }))
         }
         _ => Ok(None),

@@ -17,6 +17,16 @@ mod handlers;
 #[event(fetch)]
 pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     let request_id = generate_request_id();
+
+    // Run codlet D1 migrations once per request (idempotent: IF NOT EXISTS).
+    // Done here rather than inside codlet::build() so it runs exactly once
+    // regardless of how many codlet::build() calls a handler makes.
+    #[cfg(target_arch = "wasm32")]
+    if let Err(e) = codlet::run_migrations(&env).await {
+        console_error!("[{}] codlet migration error: {:?}", request_id, e);
+        // Non-fatal during grace period: legacy tables still serve all handlers.
+    }
+
     let url = req.url()?;
     let path = url.path();
     let method = req.method();

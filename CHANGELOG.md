@@ -2,6 +2,47 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.37.2] — 2026-06-15
+
+Codlet migration: fix two per-request overhead issues identified in post-integration audit.
+
+### Fixed
+
+- **Task 2 — `run_d1_migrations` called once per request, not once per `codlet::build()` call.**
+
+  `codlet::build()` was calling `run_d1_migrations(&db)` unconditionally. On the
+  join flow this meant DDL statements ran on every `build()` invocation:
+  `get_join`, `post_join`, and `post_profile` each call `build()` independently,
+  so a single join attempt ran `CREATE TABLE IF NOT EXISTS` three times per
+  request. Logout had the same problem via `build()` in `auth.rs`.
+
+  Fix: `run_d1_migrations` is removed from `build()` and called once in
+  `lib.rs::main()` via a new `codlet::run_migrations(env)` helper, before the
+  routing match. The call is non-fatal during the grace period — a migration
+  failure only means the codlet tables may not yet exist, which is handled
+  gracefully by the parallel lookup fallback.
+
+- **Task 3 — duplicate `SessionManager` construction on every authenticated request.**
+
+  `session::try_codlet_session` (called from `require_auth` on every request)
+  was manually constructing a `SessionManager` by repeating the same
+  `WorkerKeyProvider` + `D1SessionStore` + `CookiePolicy` setup already in
+  `codlet::build()`. This produced a second independent set of Wrangler secret
+  reads and D1 handle acquisitions per authenticated request, independent of
+  any `build()` call in the handler.
+
+  Fix: a new `codlet::build_session_mgr(env)` function constructs only the
+  session manager (no `CodeAuth`, no `FormTokenManager`) and is shared by both
+  `session::try_codlet_session` and `handlers/auth.rs::post_logout`. A companion
+  `codlet::session_clear_cookie()` helper returns the clearing `Set-Cookie` value
+  from the single source of truth for the cookie name and attributes, eliminating
+  the duplicate `CookiePolicy::production_strict("ciao_sid", …)` construction
+  that appeared in `auth.rs`.
+
+### Testing
+
+- 223 passing. Zero warnings (native). wasm32: zero errors, zero warnings.
+
 ## [0.37.1] — 2026-06-15
 
 Codlet `six_symbol` deprecation review: accepted with documented rationale;

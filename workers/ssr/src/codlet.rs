@@ -25,6 +25,16 @@ use codlet_worker::{
 };
 use worker::{Env, Result};
 
+/// Run codlet's D1 schema migrations idempotently.
+///
+/// Must be called **once per request** at the top of the fetch handler, before
+/// any `build()` calls. Separated from `build()` so migrations are not re-run
+/// on every `build()` invocation within a single request.
+pub async fn run_migrations(env: &Env) -> Result<()> {
+    let db = env.d1("DB")?;
+    run_d1_migrations(&db).await
+}
+
 /// All three codlet managers built for one request lifetime.
 ///
 /// `WorkerKeyProvider` does not implement `Clone`, so each manager gets its
@@ -37,14 +47,43 @@ pub struct CodletManagers {
     pub rng:         SystemRandom,
 }
 
-/// Build all codlet managers from the Worker `Env`.
+/// Build only the `SessionManager` component, without constructing the full
+/// `CodletManagers`. Used by `session::require_auth` so every authenticated
+/// request doesn't pay the cost of building `CodeAuth` and `FormTokenManager`.
+pub fn build_session_mgr(
+    env: &Env,
+) -> Result<SessionManager<D1SessionStore, WorkerKeyProvider, SystemClock, NoopAuditSink>> {
+    let db = Rc::new(env.d1("DB")?);
+    let kp = WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])?;
+    let cookie_policy = CookiePolicy::production_strict(
+        "ciao_sid",
+        Duration::from_secs(30 * 24 * 3600),
+    );
+    Ok(SessionManager::new(
+        D1SessionStore::new(db, D1TableConfig::default()),
+        SecretHasher::new(kp),
+        SystemClock::new(),
+        NoopAuditSink,
+        cookie_policy,
+    ))
+}
+
+/// Return the `Set-Cookie` header value that clears the codlet session cookie.
+///
+/// Kept here alongside the cookie policy constants so there is one source of
+/// truth for the cookie name and attributes used at both login and logout.
+pub fn session_clear_cookie() -> String {
+    CookiePolicy::production_strict("ciao_sid", Duration::from_secs(30 * 24 * 3600))
+        .build_clear_cookie()
+}
 ///
 /// Fails closed if `CODLET_HMAC_KEY_V1` is absent or empty (INV-2).
-/// `run_d1_migrations` is idempotent (`IF NOT EXISTS`) — safe to call every request.
+/// `run_d1_migrations` is **not** called here; call it once at the top of the
+/// fetch handler before routing so it runs exactly once per request, not once
+/// per `build()` invocation.
 pub async fn build(env: &Env) -> Result<CodletManagers> {
     // ── Shared D1 handle ────────────────────────────────────────────────────
     let db = Rc::new(env.d1("DB")?);
-    run_d1_migrations(&db).await?;
 
     // ── Tables ──────────────────────────────────────────────────────────────
     // Option A: use codlet's own table names (codlet_codes / codlet_sessions /

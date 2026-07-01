@@ -36,11 +36,10 @@ pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Respo
     {
         use codlet_core::secret::SessionId;
 
-        if let Ok(mgrs) = crate::codlet::build(env).await {
+        if let Ok(mgr) = crate::codlet::build_session_mgr(&env) {
             let session_id = SessionId::new(auth.session_id.clone().into());
-            let _ = mgrs.session_mgr.revoke(&session_id).await;
-            // Also attempt legacy revocation (session may be in either table
-            // during the grace period).
+            let _ = mgr.revoke(&session_id).await;
+            // Also revoke in legacy table during the grace period.
             let _ = session_db::revoke(&db, &auth.session_id).await;
 
             let _ = crate::audit::write(
@@ -48,19 +47,12 @@ pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Respo
                 "session", Some(&auth.session_id), "logout", None,
             ).await;
 
-            // Build the clearing cookie via codlet's CookiePolicy so the
-            // name/path/domain attributes match exactly what was set at login.
-            use codlet_core::cookie::CookiePolicy;
-            use std::time::Duration;
-            let cookie_policy = CookiePolicy::production_strict(
-                "ciao_sid", Duration::from_secs(30 * 24 * 3600),
-            );
-            let clear = cookie_policy.build_clear_cookie();
+            let clear = crate::codlet::session_clear_cookie();
             let mut resp = redirect("/join")?;
             resp.headers_mut().set("Set-Cookie", &clear)?;
             return Ok(resp);
         }
-        // If codlet managers cannot be built, fall through to legacy path.
+        // CODLET_HMAC_KEY_V1 not yet set — fall through to legacy path.
     }
 
     // ── Legacy path (non-wasm tests or pre-CODLET_HMAC_KEY_V1 deploy) ────
