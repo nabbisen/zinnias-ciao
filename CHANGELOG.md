@@ -2,6 +2,35 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.38.7] — 2026-07-01
+
+Patch hardening for the v0.38.6 join-flow fix.
+
+### Changed
+
+- **Release version bumped to v0.38.7.**
+  `Cargo.toml`, `package.json`, and `workers/ssr/static/sw.js` are aligned.
+
+- **Release gates now cover the join invite FK ordering.**
+  `release_gates.rs` checks that `/join/profile` wins the one-use invite claim,
+  inserts the membership row, and only then backfills
+  `invite_codes.used_by_membership_id`.
+
+### Fixed
+
+- **Guarded against regression of the `/join/profile` FK failure.**
+  `invite::mark_used` is now covered by a source gate that fails if it writes
+  `used_by_membership_id` before the referenced `community_memberships` row
+  exists.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+
 ## [0.38.6] — 2026-07-01
 
 Release stabilization after the v0.38.5 codlet rename review.

@@ -565,6 +565,8 @@ fn note_form_has_counter_element_for_js() {
 
 const MEMBERS_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/admin/members.rs");
+const JOIN_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/join.rs");
+const INVITE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/invite.rs");
 
 #[test]
 fn invite_code_generator_does_not_use_unwrap_or_default_on_getrandom() {
@@ -605,5 +607,56 @@ fn invite_code_generator_uses_rejection_sampling() {
     assert!(
         !MEMBERS_HANDLER_SRC.contains("unwrap_or_default();\n    bytes.iter()"),
         "generate_invite_code appears to have reverted to the biased modulo pattern."
+    );
+}
+
+#[test]
+fn join_profile_backfills_invite_membership_after_membership_exists() {
+    let mark_used = JOIN_HANDLER_SRC
+        .find("crate::db::invite::mark_used(&db, &invite_id)")
+        .expect("join profile must atomically mark invite used");
+    let insert_user = JOIN_HANDLER_SRC
+        .find("membership_db::insert_user(&db, &user_id)")
+        .expect("join profile must insert user");
+    let insert_membership = JOIN_HANDLER_SRC
+        .find("membership_db::insert_membership(")
+        .expect("join profile must insert membership");
+    let assign_used_membership = JOIN_HANDLER_SRC
+        .find("crate::db::invite::assign_used_membership(&db, &invite_id, &membership_id)")
+        .expect("join profile must backfill invite used_by_membership_id");
+
+    assert!(
+        mark_used < insert_user && mark_used < insert_membership,
+        "invite must be claimed before user/session side effects so races create one winner"
+    );
+    assert!(
+        insert_membership < assign_used_membership,
+        "used_by_membership_id references community_memberships(id); backfill it only after \
+         insert_membership succeeds"
+    );
+}
+
+#[test]
+fn invite_mark_used_does_not_write_membership_fk() {
+    let mark_start = INVITE_DB_SRC
+        .find("pub async fn mark_used(")
+        .expect("invite::mark_used must exist");
+    let assign_start = INVITE_DB_SRC
+        .find("pub async fn assign_used_membership(")
+        .expect("invite::assign_used_membership must exist");
+    let mark_body = &INVITE_DB_SRC[mark_start..assign_start];
+    let assign_body = &INVITE_DB_SRC[assign_start..];
+
+    assert!(
+        mark_body.contains("SET used_at = ?1"),
+        "mark_used should perform the atomic one-winner claim"
+    );
+    assert!(
+        !mark_body.contains("used_by_membership_id"),
+        "mark_used must not write used_by_membership_id before the membership FK target exists"
+    );
+    assert!(
+        assign_body.contains("SET used_by_membership_id = ?1"),
+        "assign_used_membership should perform the post-membership FK backfill"
     );
 }

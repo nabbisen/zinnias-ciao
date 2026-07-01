@@ -1,6 +1,6 @@
 {
   "name": "zinnias-ciao",
-  "version": "0.38.6",
+  "version": "0.38.7",
   "private": true,
   "scripts": {
     "setup": "node scripts/setup.mjs",
