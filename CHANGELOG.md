@@ -2,6 +2,53 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.35.1] — 2026-06-13
+
+UX-architect review remediation: three English-text leaks fixed; memo counter wired.
+
+### Fixed
+
+- **Three English strings leaked into Japanese-only UI (RFC-049 violations).** These
+  were inline string literals, not i18n constants, so the i18n parity gate did not
+  catch them. All now use `JA_*` constants:
+  - Event detail back-link rendered `← Home` → now `← ホーム` (`JA_NAV_HOME`).
+  - Communities admin links rendered `Invite members` / `Manage members` → now
+    `メンバーを招待` / `メンバー` (`JA_ADMIN_INVITES_TITLE` / `JA_ADMIN_MEMBERS_TITLE`).
+  - Community switcher no-JS fallback button rendered `Go` → now `切り替え`
+    (new `JA_NAV_SWITCH_GO`).
+
+- **Memo character counter was dead.** `app.js` updates an element with class
+  `.note-counter`, but `note_form` rendered the hint `<span>` without that class,
+  so the live `N/200` counter never displayed (button-disable on overflow still
+  worked). Added the `note-counter` class to the rendered span. The counter now
+  updates as the user types, per the handoff specification.
+
+### Added
+
+- **Two regression gates in `release_gates.rs`:**
+  - `no_known_english_ui_leaks_in_rendered_text` — scans handler/render sources
+    for the specific English-text regressions and a small English UI vocabulary
+    in `>Word</a>` / `>Word</button>` shapes. The i18n parity gate only covers
+    constants; this catches inline literals.
+  - `note_form_has_counter_element_for_js` — asserts the `.note-counter` class is
+    rendered so the JS counter has a target.
+
+- **New i18n pair:** `EN/JA_NAV_SWITCH_GO`.
+
+### Context
+
+These issues surfaced during the UX-architect review of the handoff document. The
+reviewer's plain-language emphasis (no technical or English words in member-facing
+copy) was directly validated: the audit found three concrete English leaks the
+reviewer's principles would flag. The reviewer's other recommendations
+(`カレンダーフィード` → `予定をカレンダーに入れる`, `エクスポート`/`JSON` softening)
+are copy-tone refinements deferred to RFC-054 (native-speaker copy review), since
+they are judgment calls best made by a Japanese reviewer, not unilateral string edits.
+
+### Testing
+
+- 218 passing (was 216). Zero warnings. i18n parity 143/143 pairs.
+
 ## [0.35.0] — 2026-06-13
 
 Comprehensive audit: RFC-to-code verification, ad hoc code review, doc accuracy.

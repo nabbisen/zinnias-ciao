@@ -51,12 +51,14 @@ pub async fn get_communities(
                 "<div style=\"display:flex;gap:1rem;margin-top:.5rem\">\
                    <a href=\"/c/{cid}/admin/invites\" \
                       style=\"font-size:.8125rem;color:#007AFF;text-decoration:none\">\
-                      Invite members</a>\
+                      {invite}</a>\
                    <a href=\"/c/{cid}/admin/members\" \
                       style=\"font-size:.8125rem;color:#007AFF;text-decoration:none\">\
-                      Manage members</a>\
+                      {manage}</a>\
                  </div>",
                 cid = render::escape_html(&s.community_id),
+                invite = i18n::JA_ADMIN_INVITES_TITLE,
+                manage = i18n::JA_ADMIN_MEMBERS_TITLE,
             )
         } else {
             String::new()

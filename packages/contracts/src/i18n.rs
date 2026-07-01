@@ -99,6 +99,8 @@ pub const JA_NAV_COMMUNITIES: &str = "コミュニティ";
 pub const JA_NAV_ME: &str = "マイページ";
 pub const EN_NAV_BACK: &str = "Back to event";
 pub const JA_NAV_BACK: &str = "イベントに戻る";
+pub const EN_NAV_SWITCH_GO: &str = "Switch";
+pub const JA_NAV_SWITCH_GO: &str = "切り替え";
 
 // ── Home schedule view ────────────────────────────────────────────────────
 pub const EN_HOME_TODAY: &str = "Today";

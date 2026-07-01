@@ -230,6 +230,7 @@ fn i18n_en_ja_parity_count() {
         (EN_ADMIN_EDIT_CANCELLED, JA_ADMIN_EDIT_CANCELLED),
         (EN_ADMIN_EDIT_STARTED, JA_ADMIN_EDIT_STARTED),
         (EN_NAV_BACK, JA_NAV_BACK),
+        (EN_NAV_SWITCH_GO, JA_NAV_SWITCH_GO),
         (EN_NOTE_DELETE_BODY, JA_NOTE_DELETE_BODY),
         (EN_NOTE_KEEP_ACTION, JA_NOTE_KEEP_ACTION),
         (EN_FORM_FIELD_TITLE, JA_FORM_FIELD_TITLE),
@@ -450,5 +451,58 @@ fn sw_cache_version_matches_workspace_version() {
         cache_ver, workspace_ver,
         "sw.js CACHE_VERSION 'v{cache_ver}' does not match workspace version '{workspace_ver}'. \
          Update sw.js CACHE_VERSION when bumping the version."
+    );
+}
+
+// ── Japanese-only rendered-text gate (RFC-049) ───────────────────────────
+//
+// The pilot ships Japanese UI only. English words leaked into rendered link
+// and button text twice in v0.35.x (event-detail "← Home", communities
+// "Invite members" / "Manage members"). These were inline literals, not i18n
+// constants, so the i18n parity gate did not catch them.
+//
+// This gate scans the handler/render sources for the specific regressions that
+// occurred and a few obvious English UI words appearing as element text. It is
+// deliberately narrow: it matches ">Word</a>" or ">Word</button>" shapes with a
+// known English UI vocabulary, not arbitrary English (comments, code, ARIA
+// values, and HTTP header literals must remain unflagged).
+
+const COMMUNITIES_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/communities.rs");
+const RENDER_SRC: &str =
+    include_str!("../../../workers/ssr/src/render.rs");
+
+#[test]
+fn no_known_english_ui_leaks_in_rendered_text() {
+    // Exact regressions that previously shipped — keep them from returning.
+    let forbidden: &[&str] = &[
+        ">Invite members<",
+        ">Manage members<",
+        "\u{2190} Home<",   // "← Home" — must be "← ホーム"
+        ">Home</a>",
+        ">Members</a>",
+        ">Go</button>",     // bare English fallback button (use JA)
+    ];
+    for src in [EVENT_HANDLER_SRC, COMMUNITIES_SRC, RENDER_SRC, HOME_HANDLER_SRC] {
+        for needle in forbidden {
+            assert!(
+                !src.contains(needle),
+                "English UI text leaked into rendered output: {needle:?}. \
+                 Pilot is Japanese-only (RFC-049) — use a JA_* i18n constant."
+            );
+        }
+    }
+}
+
+#[test]
+fn note_form_has_counter_element_for_js() {
+    // The app.js memo counter targets `.note-counter`. If the rendered form
+    // omits that class, the live N/200 counter silently never updates (the
+    // button-disable still works, but the visible count does not). This
+    // regression shipped in v0.35.x.
+    assert!(
+        RENDER_SRC.contains("note-counter"),
+        "note_form must render an element with class \"note-counter\" so the \
+         app.js character counter has a target. Without it the live count is dead."
     );
 }

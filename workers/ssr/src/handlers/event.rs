@@ -219,8 +219,9 @@ pub async fn get_event_detail(
     let _community_pairs: Vec<(String,String)> = _communities_for_switcher.iter().map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav  = render::bottom_nav(community_id, "home");
     let back = format!(
-        "<a href=\"/c/{}/home\" style=\"color:#007AFF;font-size:.9375rem\">\u{2190} Home</a>",
-        render::escape_html(community_id)
+        "<a href=\"/c/{}/home\" style=\"color:#007AFF;font-size:.9375rem\">\u{2190} {home}</a>",
+        render::escape_html(community_id),
+        home = i18n::JA_NAV_HOME,
     );
     let cancelled_banner = if event.status == "cancelled" {
         &format!("<div style=\"background:#FF3B3022;color:#FF3B30;padding:.75rem;border-radius:12px;margin-bottom:1rem\">{}</div>", i18n::JA_EVENT_CANCELLED_BADGE)

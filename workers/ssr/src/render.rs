@@ -188,7 +188,9 @@ pub fn header_with_switcher(
     h.push_str(&options);
     h.push_str("</select>");
     h.push_str("<noscript><button type='submit' style='font-size:.8125rem;");
-    h.push_str("margin-left:.25rem;min-height:44px;cursor:pointer'>Go</button></noscript>");
+    h.push_str("margin-left:.25rem;min-height:44px;cursor:pointer'>");
+    h.push_str(i18n::JA_NAV_SWITCH_GO);
+    h.push_str("</button></noscript>");
     h.push_str("</form>");
     h.push_str("</header>");
     h
@@ -346,7 +348,7 @@ pub fn note_form(
              border-radius:12px;font-size:1rem;resize:vertical;box-sizing:border-box\" \
              aria-label=\"{note_placeholder_label}\">{existing}</textarea>\
            <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:.5rem\">\
-             <span style=\"font-size:.75rem;color:{muted}\">{note_char_hint}</span>\
+             <span class=\"note-counter\" style=\"font-size:.75rem;color:{muted}\" aria-live=\"polite\">{note_char_hint}</span>\
              <button type=\"submit\" \
                style=\"padding:.625rem 1.25rem;background:{going_border};color:#FFFFFF;\
                border:none;border-radius:14px;font-size:.9375rem;font-weight:600;\
