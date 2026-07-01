@@ -7,6 +7,7 @@ use crate::crypto::random_token;
 use crate::db::now_utc;
 use worker::{D1Database, Result, console_log};
 
+#[allow(clippy::too_many_arguments)]
 pub async fn write(
     db: &D1Database,
     request_id: &str,

@@ -7,7 +7,7 @@ members     = [
 ]
 
 [workspace.package]
-version     = "0.38.5"
+version     = "0.38.6"
 edition     = "2024"
 license     = "Apache-2.0"
 authors     = ["nabbisen"]
@@ -18,11 +18,8 @@ zinnias-ciao-domain         = { version = "0", path = "packages/domain" }
 zinnias-ciao-contracts      = { version = "0", path = "packages/contracts" }
 
 worker                      = { version = "0.8", features = ["d1", "http"] }
-# direct dep for codlet-worker KvRateLimitStore
-worker-kv                   = "0.9"
 
-# codlet auth library (wasm32-only; target-gated in workers/ssr/Cargo.toml)
-codlet-core                 = "0.17"
+# codlet auth library core types. Runtime integration stays service-owned.
 codlet                      = "0.17"
 
 serde                       = { version = "1", features = ["derive"] }

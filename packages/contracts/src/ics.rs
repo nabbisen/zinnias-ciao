@@ -107,10 +107,10 @@ pub fn build_vcalendar(cal_name: &str, days: &[IcsDay<'_>]) -> String {
             out.push_str("STATUS:CONFIRMED\r\n");
         }
 
-        if let Some(loc) = day.location {
-            if !loc.is_empty() {
-                out.push_str(&fold_line(&format!("LOCATION:{}", ics_text(loc))));
-            }
+        if let Some(loc) = day.location
+            && !loc.is_empty()
+        {
+            out.push_str(&fold_line(&format!("LOCATION:{}", ics_text(loc))));
         }
 
         out.push_str("END:VEVENT\r\n");

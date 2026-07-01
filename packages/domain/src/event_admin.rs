@@ -20,7 +20,7 @@ pub enum RecurrenceFreq {
 
 impl RecurrenceFreq {
     /// Parse the value from a form `<select>` option.
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse_form_value(s: &str) -> Self {
         match s.trim() {
             "weekly" => Self::Weekly,
             "biweekly" => Self::Biweekly,
@@ -431,10 +431,19 @@ mod tests {
 
     #[test]
     fn freq_round_trip() {
-        assert_eq!(RecurrenceFreq::from_str("weekly").as_str(), "weekly");
-        assert_eq!(RecurrenceFreq::from_str("biweekly").as_str(), "biweekly");
-        assert_eq!(RecurrenceFreq::from_str("monthly").as_str(), "monthly");
-        assert_eq!(RecurrenceFreq::from_str("none").as_str(), "none");
-        assert_eq!(RecurrenceFreq::from_str("unknown").as_str(), "none");
+        assert_eq!(
+            RecurrenceFreq::parse_form_value("weekly").as_str(),
+            "weekly"
+        );
+        assert_eq!(
+            RecurrenceFreq::parse_form_value("biweekly").as_str(),
+            "biweekly"
+        );
+        assert_eq!(
+            RecurrenceFreq::parse_form_value("monthly").as_str(),
+            "monthly"
+        );
+        assert_eq!(RecurrenceFreq::parse_form_value("none").as_str(), "none");
+        assert_eq!(RecurrenceFreq::parse_form_value("unknown").as_str(), "none");
     }
 }

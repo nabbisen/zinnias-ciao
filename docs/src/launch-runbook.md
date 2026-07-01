@@ -4,7 +4,7 @@ This document is the step-by-step operator guide for taking ciao.zinnias from a
 clean tarball to a running production deployment. It is intended to be followed
 exactly, in order, by one operator. Tick each step as you complete it.
 
-**Version this runbook was written for:** v0.34.0  
+**Version this runbook was written for:** v0.38.6  
 **Estimated time:** 60–90 minutes for a first deployment.
 
 ---
@@ -18,7 +18,7 @@ Before starting, confirm you have:
 - [ ] Rust stable + `wasm32-unknown-unknown` target + `worker-build` installed
   (see `docs/src/quick-start.md`).
 - [ ] `bun` installed.
-- [ ] The v0.34.0 source tarball extracted to a working directory.
+- [ ] The v0.38.6 source tarball extracted to a working directory.
 - [ ] A domain or workers.dev subdomain decided for the production deployment.
 
 ---
@@ -81,26 +81,6 @@ Replace `REPLACE_WITH_STAGING_KV_ID` in `wrangler.toml`.
 
 - [ ] Done.
 
-### 1.5 Create production KV namespace for codlet rate limiting
-
-```sh
-bunx wrangler kv:namespace create CODLET_RL --env production
-```
-
-Replace `REPLACE_WITH_PRODUCTION_CODLET_RL_ID` in `wrangler.toml` with the real ID.
-
-- [ ] Done.
-
-### 1.6 Create staging KV namespace for codlet rate limiting
-
-```sh
-bunx wrangler kv:namespace create CODLET_RL --env staging
-```
-
-Replace `REPLACE_WITH_STAGING_CODLET_RL_ID` in `wrangler.toml` with the real ID.
-
-- [ ] Done.
-
 ---
 
 ## Phase 2 — Set secrets
@@ -138,36 +118,6 @@ exact deployment host. Only set it if you need cross-subdomain cookie sharing.
 
 - [ ] Done.
 
-### 2.4 Set codlet HMAC key for staging
-
-The codlet HMAC key secures all invite codes, sessions, and form tokens issued
-by the codlet auth library. It must be a different value from `HMAC_PEPPER`.
-
-```sh
-openssl rand -hex 32   # generate — different from HMAC_PEPPER
-bunx wrangler secret put CODLET_HMAC_KEY_V1 --env staging
-# paste the key when prompted
-```
-
-**Key versioning:** `CODLET_HMAC_KEY_V1` is version `v1`. If you need to rotate
-the key, generate a new 32-byte secret, add it as `CODLET_HMAC_KEY_V2`, update
-`codlet.rs` to list `v1` in `previous_keys`, and change the primary key to `v2`.
-Old sessions and invite codes hashed under `v1` will remain valid until they
-expire naturally (30-day sessions, 24-hour invite codes).
-
-- [ ] Done.
-
-### 2.5 Set codlet HMAC key for production
-
-Use a **different** value from both `HMAC_PEPPER` and the staging codlet key.
-
-```sh
-openssl rand -hex 32
-bunx wrangler secret put CODLET_HMAC_KEY_V1 --env production
-```
-
-- [ ] Done.
-
 ### 2.3 Set secrets for production
 
 Use a **different** pepper value from staging.
@@ -201,7 +151,7 @@ Or leave unset for a host-only cookie.
 bun run migrate:staging
 ```
 
-Confirm output shows all six migrations applied (`0001` through `0006`).
+Confirm output shows all migrations applied (`0001` through `0007`).
 
 - [ ] Done.
 
@@ -211,24 +161,11 @@ Confirm output shows all six migrations applied (`0001` through `0006`).
 bun run migrate:prod
 ```
 
-Confirm all six migrations applied.
+Confirm all migrations applied (`0001` through `0007`).
 
 - [ ] Done.
 
 ---
-
-
-> **Grace-period note (codlet migration):** after the first production deploy with
-> `CODLET_HMAC_KEY_V1` set, new sessions are stored in `codlet_sessions`. The
-> legacy `sessions` table is still checked as a fallback for 30 days (the maximum
-> session TTL). Once all pre-migration sessions have expired, remove the fallback
-> path in `session.rs::require_auth`. Trigger query:
->
-> ```sql
-> SELECT COUNT(*) FROM sessions WHERE revoked_at IS NULL AND expires_at > unixepoch();
-> ```
->
-> When this returns 0, the parallel lookup can be removed.
 
 ## Phase 4 — Build and deploy
 

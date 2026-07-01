@@ -11,7 +11,7 @@ use crate::session::require_auth;
 use zinnias_ciao_contracts::i18n;
 
 pub async fn redirect_to_home(req: Request, env: &Env, _rid: &str) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return crate::render::session_expired(),
     };
@@ -29,11 +29,11 @@ pub async fn redirect_to_home(req: Request, env: &Env, _rid: &str) -> Result<Res
 }
 
 pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_membership(&env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     // Home window: today through 30 days ahead
@@ -116,7 +116,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
 
         if row.day_date == today_date {
             today_cards.push_str(&card);
-        } else if &row.day_date[..10] <= &db::utc_days_ahead(7)[..10] {
+        } else if row.day_date[..10] <= db::utc_days_ahead(7)[..10] {
             thisweek_cards.push_str(&card);
         } else {
             later_cards.push_str(&card);
@@ -157,10 +157,9 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
                 i18n::JA_HOME_FIRST_RUN_NO_EVENTS
             };
             let invite_hint = if is_first_run {
-                format!(
-                    "<p style=\"font-size:.875rem;color:#6e6e73;margin:.5rem 0 0\">\
+                "<p style=\"font-size:.875rem;color:#6e6e73;margin:.5rem 0 0\">\
                  Invite members so they can see your events.</p>"
-                )
+                    .to_string()
             } else {
                 String::new()
             };

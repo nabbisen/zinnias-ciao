@@ -30,11 +30,11 @@ pub async fn get_templates(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let _membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let create_token = crate::codlet::issue_token(
@@ -202,11 +202,11 @@ pub async fn post_create_template(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -283,11 +283,11 @@ pub async fn post_delete_template(
     community_id: &str,
     template_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;

@@ -44,12 +44,12 @@ review's §8 "Source/code verification" checklist.
 
 | # | Claim | Evidence (file:symbol) | Result |
 |---|-------|------------------------|--------|
-| 1 | All token issues/consumes use `auth.user_id` as subject | On wasm32: `codlet::issue_token(env, &auth.user_id, …)` and `codlet::consume_token(env, &auth.user_id, …)` — `TokenSubject::Authenticated(SubjectId::new(user_id))` at every call site in `handlers/*.rs`. On non-wasm: `form_token::issue/consume` with `&auth.user_id`. Pre-auth join tokens use `TokenSubject::Anonymous`; flow tokens use `TokenSubject::Flow(flow_id)`. `membership_id` appears only as `bound_resource`. | ✅ (updated v0.38.2) |
-| 2 | `consume` is conditional UPDATE + checks affected rows | `codlet-worker/d1/token.rs`: `UPDATE codlet_form_tokens SET consumed_at=? WHERE lookup_key=? AND subject_kind=? AND purpose=? AND bound_resource=? AND expires_at>? AND consumed_at IS NULL`; checks `meta().changes`; classified by `classify_token_consume`. Non-wasm fallback: `form_token.rs` same logic on `form_tokens`. | ✅ (updated v0.38.2) |
-| 3 | Invite claimed before user/membership/session | On wasm32: `join.rs::post_profile` calls `codlet::code_auth.claim(redeemable, subject=user_id)` → `ClaimOutcome::Won` required before `membership_db::insert_user`, `insert_membership`, or `session_mgr.issue`. Codlet's `D1CodeStore::claim_code` uses conditional UPDATE on `codlet_codes`. On non-wasm: `mark_used → won` precedes `insert_user`, `insert_membership`, `session_db::insert`; aborts if `!won`. | ✅ (updated v0.38.2) |
-| 4 | No plaintext invite code stored or logged | On wasm32: `codlet::code_auth.issue_code()` stores `lookup_key = HMAC(key, domain-separated-value)` in `codlet_codes`; plaintext returned as `CodeSecret` exposed only to the admin redirect. On non-wasm: `code_hmac = hmac_hex(pp, normalized)` stored in `invite_codes`. `codlet.rs` and `codlet-worker` pass the `no-plaintext-store` xtask release gate. | ✅ (updated v0.38.2) |
-| 5 | Key material held by a single provider | On wasm32: `WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[])` is the sole HMAC key source for all codlet managers. Fails closed on missing/empty secret (INV-2). On non-wasm: `crypto::pepper(env)` reads `HMAC_PEPPER`. No `secret("HMAC_PEPPER")` or `var("HMAC_PEPPER")` call outside `crypto.rs`. | ✅ (updated v0.38.2) |
-| 6 | `SESSION_COOKIE_DOMAIN` optional, host-only default | On wasm32: `codlet::build_session_mgr` uses `CookiePolicy::production_strict("ciao_sid", …)` which emits `Domain` only if explicitly set. On non-wasm: `session.rs::build_session_cookie(Option<&str>)` emits `Domain` only when non-empty. | ✅ (updated v0.38.2) |
+| 1 | All authenticated token issues/consumes use `auth.user_id` as subject | `codlet::issue_token(env, &auth.user_id, ...)` and `codlet::consume_token(env, &auth.user_id, ...)` are handler-facing compatibility helpers that delegate to `form_token::issue/consume`; every authenticated call site passes `auth.user_id`. Pre-auth join tokens use an empty anonymous subject, and profile tokens bind to the join ticket HMAC. `membership_id` appears only as `bound_resource` or audit metadata. | ✅ (updated v0.38.6) |
+| 2 | `consume` is conditional UPDATE + checks affected rows | `form_token.rs::consume`: `UPDATE form_tokens SET consumed_at=? WHERE token_hmac=? AND user_id=? AND purpose=? AND ... AND consumed_at IS NULL`; checks `meta().changes`, then classifies replay vs invalid through follow-up lookup. | ✅ (updated v0.38.6) |
+| 3 | Invite claimed before session; one winner only | `join.rs::post_profile` calls `invite::mark_used` before user/membership/session creation. `mark_used` is a conditional `UPDATE invite_codes SET used_at=? WHERE used_at IS NULL ...`; the handler aborts if `!won`. After the membership row exists, `assign_used_membership` fills `used_by_membership_id`, satisfying the FK. | ✅ (updated v0.38.6) |
+| 4 | No plaintext invite code stored or logged | `admin/members.rs::post_generate_invite` uses rejection sampling, normalizes the plaintext only long enough to compute `hmac_hex(pepper, normalized)`, and stores only `invite_codes.code_hmac`. The plaintext appears only in the admin redirect response. | ✅ (updated v0.38.6) |
+| 5 | Key material held by a single provider | `crypto::pepper(env)` reads `HMAC_PEPPER`; invite codes, sessions, and form tokens all use that provider for service-owned HMACs. No direct `env.secret("HMAC_PEPPER")` or `env.var("HMAC_PEPPER")` calls outside `crypto.rs`. | ✅ (updated v0.38.6) |
+| 6 | `SESSION_COOKIE_DOMAIN` optional, host-only default | `session.rs::build_session_cookie(Option<&str>)` and `clear_session_cookie(Option<&str>)` emit `Domain` only when the configured var is non-empty. | ✅ (updated v0.38.6) |
 | 7 | SW does not cache authenticated HTML | `sw.js`: no `cache.put` for any route; `/c/*`, `/`, `/join` are network-only; static assets pre-cached at install | ✅ |
 | 8 | SW cache version matches package version | `sw.js CACHE_VERSION` == `Cargo.toml [workspace.package].version`; enforced by `release_gates.rs::sw_cache_version_matches_workspace_version` | ✅ |
 | 9 | Export uses flat batched `IN` queries | `export.rs::build_export`: 5 prepares (members, events, 3 `IN` batches for days/attendances/notes); `for` loops are in-memory grouping | ✅ |
@@ -57,9 +57,9 @@ review's §8 "Source/code verification" checklist.
 | 11 | Display paths use `tz::to_local_parts` | `render.rs:487–537`, `admin.rs:685` | ✅ |
 
 **Conclusion of source verification:** every source-checkable claim confirmed against the code.
-223 tests pass; zero warnings (native); zero errors/warnings (wasm32). Updated at v0.38.2
-to reflect codlet integration (v0.37.0–v0.38.2): items 1–6 revised with codlet evidence.
-Items 7–11 unchanged.
+223 tests pass; zero warnings (native); zero errors/warnings (wasm32). Updated at v0.38.6
+to reflect the service-owned auth storage path: items 1–6 revised after removing
+the unpublished/deprecated codlet-worker integration. Items 7–11 unchanged.
 
 ## 6. Staging-Runtime Verification — PENDING (requires deployed environment)
 
@@ -69,12 +69,12 @@ Each maps to a review P0.
 
 | # | Test (review ref) | Expected result | Blocks |
 |---|-------------------|-----------------|--------|
-| S1 | Deploy to Cloudflare staging | Worker boots; `/healthz` 200; `/version` reports current version; `codlet_codes`, `codlet_sessions`, `codlet_form_tokens` tables created by `run_d1_migrations` | P0-1 |
+| S1 | Deploy to Cloudflare staging | Worker boots; `/healthz` 200; `/version` reports current version; migrations are applied; `invite_codes`, `sessions`, and `form_tokens` are available | P0-1 |
 | S2 | `Asia/Tokyo` community, create 09:00–10:30 event, view detail (P0-2) | Detail shows `09:00–10:30` JST; stored `starts_at_utc` = `…T00:00:00.000Z` | P0-2 |
 | S3 | Edit event time 09:00→13:00, re-view (P0-2) | Detail shows `13:00`; `event_days` row updated, not duplicated | P0-2 |
 | S4 | Download ICS, inspect (P0-2) | DTSTART/DTEND correct for JST | P0-2 |
-| S5 | Two concurrent redemptions of one invite (P0-3) | Exactly one membership + session created (`codlet_sessions`); the other gets generic invalid-or-expired. `codlet_codes.used_at` set exactly once (verify via D1 query). | P0-3 |
-| S6 | Two concurrent POSTs with one `SET_STATUS` token (P0-4) | Exactly one mutation; replay is a deterministic redirect; no duplicate attendance. `codlet_form_tokens.consumed_at` set exactly once (verify via D1 query). | P0-4 |
+| S5 | Two concurrent redemptions of one invite (P0-3) | Exactly one membership + session created; the other gets generic invalid-or-expired. `invite_codes.used_at` is set once and `used_by_membership_id` points to the winning membership. | P0-3 |
+| S6 | Two concurrent POSTs with one `SET_STATUS` token (P0-4) | Exactly one mutation; replay is a deterministic redirect; no duplicate attendance. `form_tokens.consumed_at` set exactly once (verify via D1 query). | P0-4 |
 | S7 | Same for `SAVE_NOTE`, `DELETE_NOTE`, `REMOVE_MEMBER` (P0-4) | Exactly one mutation each; audit log has no duplicate admin actions | P0-4 |
 | S8 | Logout, then probe SW cache for private HTML (P0-1) | No authenticated HTML served from cache after logout | P0-1 |
 | S9 | Browser with JavaScript disabled (P1-4) | Join, mark attendance, switch community, all destructive confirmations work | P1-4 |

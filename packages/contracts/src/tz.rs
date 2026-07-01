@@ -40,7 +40,7 @@ pub fn offset_minutes(tz: &str) -> Option<i32> {
         "Europe/Paris" | "Europe/Berlin" | "Europe/Rome" | "Europe/Madrid" | "Europe/Amsterdam"
         | "Europe/Brussels" | "Europe/Vienna" | "Europe/Zurich" | "Europe/Stockholm"
         | "Europe/Oslo" | "Europe/Copenhagen" | "Europe/Warsaw" | "Europe/Prague"
-        | "Europe/Budapest" => 1 * 60,
+        | "Europe/Budapest" => 60,
         "Europe/Helsinki" | "Europe/Riga" | "Europe/Tallinn" | "Europe/Vilnius"
         | "Europe/Athens" | "Europe/Bucharest" | "Europe/Kyiv" => 2 * 60,
         "Europe/Moscow" | "Europe/Minsk" => 3 * 60,

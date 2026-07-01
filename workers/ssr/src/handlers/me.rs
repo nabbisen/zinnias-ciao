@@ -10,11 +10,11 @@ use crate::session::require_auth;
 use zinnias_ciao_contracts::i18n;
 
 pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_membership(&env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let logout_token =

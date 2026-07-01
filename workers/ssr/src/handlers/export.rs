@@ -24,11 +24,11 @@ pub async fn get_export_page(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let _membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     // Issue a one-time download token bound to this admin.
@@ -107,11 +107,11 @@ pub async fn get_export_json(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     // Validate the one-time download token from the query string.
@@ -251,7 +251,7 @@ async fn build_export(
     let ev_binds: Vec<worker::wasm_bindgen::JsValue> =
         event_ids.iter().map(|id| (*id).into()).collect();
     let all_days_raw = db
-        .prepare(&format!(
+        .prepare(format!(
             "SELECT id, event_id, seq, day_date, starts_at_utc, ends_at_utc \
              FROM event_days WHERE event_id IN ({ev_placeholders}) ORDER BY event_id, seq ASC"
         ))
@@ -275,7 +275,7 @@ async fn build_export(
         let day_binds: Vec<worker::wasm_bindgen::JsValue> =
             day_id_refs.iter().map(|id| (*id).into()).collect();
         let att_raw = db
-            .prepare(&format!(
+            .prepare(format!(
                 "SELECT event_day_id, membership_id, status, status_updated_at \
                  FROM attendances WHERE event_day_id IN ({day_placeholders})"
             ))

@@ -13,9 +13,16 @@
 | Secret | Purpose |
 |--------|---------|
 | `HMAC_PEPPER` | Server pepper for invite-code and session HMAC (AD-3) |
-| `SESSION_COOKIE_DOMAIN` | Cookie `Domain` attribute for the session cookie |
 
 Never commit secrets. Never use production secrets in dev/staging.
+
+## Vars
+
+| Var | Purpose |
+|-----|---------|
+| `SESSION_COOKIE_DOMAIN` | Optional cookie `Domain` attribute for the session cookie. Leave unset/empty for host-only cookies. |
+| `BUILD_VERSION` | Value returned by `/version`. |
+| `LOG_LEVEL` | Runtime log verbosity. |
 
 ## Migrations
 

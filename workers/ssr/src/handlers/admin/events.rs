@@ -29,11 +29,11 @@ pub async fn get_create_event(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let _membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let token =
         crate::codlet::issue_token(env, &auth.user_id, token_purpose::CREATE_EVENT, None).await;
@@ -125,11 +125,11 @@ pub async fn post_create_event(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -160,7 +160,7 @@ pub async fn post_create_event(
 
     // RFC-022: recurrence
     let freq_str = body.get_field("repeat_rule").unwrap_or_default();
-    let freq = RecurrenceFreq::from_str(&freq_str);
+    let freq = RecurrenceFreq::parse_form_value(&freq_str);
     let rep_count = body
         .get_field("repeat_count")
         .and_then(|s| s.trim().parse::<u32>().ok())
@@ -253,11 +253,11 @@ pub async fn get_cancel_event(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let _membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let token = crate::codlet::issue_token(
         env,
@@ -328,11 +328,11 @@ pub async fn post_cancel_event(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -374,11 +374,11 @@ pub async fn get_edit_event(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let _membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -509,11 +509,11 @@ pub async fn post_edit_event(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -633,11 +633,11 @@ pub async fn get_attendance(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let _membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -781,11 +781,11 @@ pub async fn post_attendance(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let form = req.form_data().await?;
@@ -857,11 +857,11 @@ pub async fn get_admin_hide_note_confirm(
     event_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let _membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let token = crate::codlet::issue_token(
@@ -934,11 +934,11 @@ pub async fn post_admin_hide_note(
     event_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -983,6 +983,7 @@ pub async fn post_admin_hide_note(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn event_form_fields(
     title: Option<&str>,
     location: Option<&str>,

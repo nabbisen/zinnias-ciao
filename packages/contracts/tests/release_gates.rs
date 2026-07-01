@@ -1,6 +1,8 @@
 //! Release-gate checks (RFC-015).
 //! Every item here maps to a row in the MVP release-gate matrix.
 
+#![allow(clippy::assertions_on_constants)]
+
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::{AppError, FORM_TOKEN_TTL_SECONDS, SESSION_TTL_SECONDS};
 
@@ -448,7 +450,7 @@ fn sw_cache_version_matches_workspace_version() {
         .find(|l| l.trim_start().starts_with("const CACHE_VERSION"))
         .and_then(|l| {
             // e.g.  const CACHE_VERSION = 'v0.25.0';
-            let after_eq = l.splitn(2, '=').nth(1)?;
+            let after_eq = l.split_once('=')?.1;
             let inner = after_eq
                 .trim()
                 .trim_start_matches('\'')
@@ -477,9 +479,8 @@ fn sw_cache_version_matches_workspace_version() {
                 if trimmed.starts_with("version") {
                     // version     = "0.25.0"
                     found = trimmed
-                        .splitn(2, '=')
-                        .nth(1)
-                        .map(|v| v.trim().trim_matches('"').to_owned());
+                        .split_once('=')
+                        .map(|(_, v)| v.trim().trim_matches('"').to_owned());
                     break;
                 }
             }
@@ -573,15 +574,12 @@ fn invite_code_generator_does_not_use_unwrap_or_default_on_getrandom() {
     // getrandom 0.4 renamed the entry point from `getrandom::getrandom` to
     // `getrandom::fill`. The source must use `?` or `.expect()` after the
     // call, not `.unwrap_or_default()` or `.ok()`.
-    // On wasm32, codlet owns invite code generation; the members.rs fallback
-    // path for non-wasm tests still calls getrandom::fill.
+    // Invite generation must propagate getrandom errors instead of silently
+    // falling back to deterministic bytes.
     let lines: Vec<&str> = MEMBERS_HANDLER_SRC
         .lines()
         .filter(|l| l.contains("getrandom::fill") || l.contains("getrandom::getrandom"))
         .collect();
-    // On wasm32, codlet CodeAuth::issue_code() handles generation; the members.rs
-    // getrandom call lives in a #[cfg(not(target_arch = "wasm32"))] block.
-    // The gate still fires if any non-cfg-gated getrandom call uses fail-open error handling.
     for l in &lines {
         assert!(
             !l.contains("unwrap_or_default") && !l.contains(".ok()"),

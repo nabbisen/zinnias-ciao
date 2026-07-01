@@ -13,7 +13,7 @@ pub async fn get_communities(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };

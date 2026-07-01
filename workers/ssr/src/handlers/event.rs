@@ -34,11 +34,11 @@ pub async fn get_event_detail(
     flash: Option<&str>,
     err: Option<&str>,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_membership(&env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -325,11 +325,11 @@ pub async fn post_my_status(
     event_id: &str,
     day_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_membership(&env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -434,11 +434,11 @@ pub async fn post_my_note(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_membership(&env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -552,11 +552,11 @@ pub async fn delete_my_note(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_membership(&env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;

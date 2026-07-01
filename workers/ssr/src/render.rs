@@ -461,6 +461,7 @@ pub struct CardDay<'a> {
 }
 
 /// One event card for the Home list.
+#[allow(clippy::too_many_arguments)]
 pub fn event_card(
     community_id: &str,
     event_id: &str,
@@ -592,8 +593,8 @@ fn parse_utc_display(utc: &str) -> String {
 }
 
 fn parse_utc_time(utc: &str) -> String {
-    utc.splitn(2, 'T')
-        .nth(1)
+    utc.split_once('T')
+        .map(|(_, time)| time)
         .and_then(|t| t.get(..5))
         .unwrap_or("")
         .to_owned()

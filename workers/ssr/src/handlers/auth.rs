@@ -1,7 +1,6 @@
 //! Logout handler — RFC-003.
 //!
-//! On wasm32: uses codlet `SessionManager::revoke` + `CookiePolicy::build_clear_cookie`.
-//! On non-wasm (native tests): uses legacy session DB + clear_session_cookie.
+//! Revokes the server-side session row and clears the session cookie.
 
 use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
@@ -25,40 +24,6 @@ pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Respo
         crate::codlet::consume_token(env, &auth.user_id, token_purpose::LOGOUT, &raw_token, None)
             .await?;
 
-    // ── Revoke session ────────────────────────────────────────────────────
-    // Try the codlet session store first (for sessions issued after the
-    // migration); fall back to the legacy sessions table.
-    #[cfg(target_arch = "wasm32")]
-    {
-        use codlet_core::secret::SessionId;
-
-        if let Ok(mgr) = crate::codlet::build_session_mgr(&env) {
-            let session_id = SessionId::new(auth.session_id.clone().into());
-            let _ = mgr.revoke(&session_id).await;
-            // Also revoke in legacy table during the grace period.
-            let _ = session_db::revoke(&db, &auth.session_id).await;
-
-            let _ = crate::audit::write(
-                &db,
-                rid,
-                None,
-                None,
-                "session",
-                Some(&auth.session_id),
-                "logout",
-                None,
-            )
-            .await;
-
-            let clear = crate::codlet::session_clear_cookie();
-            let mut resp = redirect("/join")?;
-            resp.headers_mut().set("Set-Cookie", &clear)?;
-            return Ok(resp);
-        }
-        // CODLET_HMAC_KEY_V1 not yet set — fall through to legacy path.
-    }
-
-    // ── Legacy path (non-wasm tests or pre-CODLET_HMAC_KEY_V1 deploy) ────
     let _ = session_db::revoke(&db, &auth.session_id).await;
     let _ = crate::audit::write(
         &db,
@@ -78,17 +43,7 @@ pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Respo
         .map(|s| s.to_string())
         .filter(|s| !s.is_empty());
 
-    #[cfg(not(target_arch = "wasm32"))]
     let clear = crate::session::clear_session_cookie(domain.as_deref());
-
-    #[cfg(target_arch = "wasm32")]
-    let clear = {
-        let domain_part = domain
-            .filter(|d| !d.is_empty())
-            .map(|d| format!("; Domain={d}"))
-            .unwrap_or_default();
-        format!("ciao_sid=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict{domain_part}")
-    };
 
     let mut resp = redirect("/join")?;
     resp.headers_mut().set("Set-Cookie", &clear)?;

@@ -8,6 +8,7 @@ use worker::{D1Database, Result};
 /// Create an event and its day rows in one logical batch.
 /// `repeat_rule` and `repeat_count` are stored for reference; the actual
 /// day rows in `days` are already the fully-expanded occurrences.
+#[allow(clippy::too_many_arguments)]
 pub async fn create_event(
     db: &D1Database,
     community_id: &str,

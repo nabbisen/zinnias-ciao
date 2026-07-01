@@ -1,5 +1,7 @@
 //! Regression tests for the session-TTL-decoupling rule (RFC-003 §8).
 
+#![allow(clippy::assertions_on_constants)]
+
 use zinnias_ciao_contracts::{FORM_TOKEN_TTL_SECONDS, SESSION_TTL_SECONDS};
 
 #[test]

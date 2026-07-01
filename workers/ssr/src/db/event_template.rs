@@ -95,6 +95,7 @@ pub async fn find_active(
 }
 
 /// Insert a new template.
+#[allow(clippy::too_many_arguments)]
 pub async fn insert(
     db: &D1Database,
     id: &str,
@@ -108,10 +109,10 @@ pub async fn insert(
     let now = now_utc();
     // Build nullable bind values using JsValue directly.
     let loc_js: worker::wasm_bindgen::JsValue = location
-        .map(|s| worker::wasm_bindgen::JsValue::from_str(s))
+        .map(worker::wasm_bindgen::JsValue::from_str)
         .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
     let desc_js: worker::wasm_bindgen::JsValue = description
-        .map(|s| worker::wasm_bindgen::JsValue::from_str(s))
+        .map(worker::wasm_bindgen::JsValue::from_str)
         .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
     let dur_js: worker::wasm_bindgen::JsValue = duration_minutes
         .map(|d| worker::wasm_bindgen::JsValue::from_f64(d as f64))

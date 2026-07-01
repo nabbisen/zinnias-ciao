@@ -2,6 +2,52 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.38.6] — 2026-07-01
+
+Release stabilization after the v0.38.5 codlet rename review.
+
+### Changed
+
+- **Operator docs now match the service-owned auth path.**
+  `CODLET_RL` and `CODLET_HMAC_KEY_V1` provisioning steps were removed from
+  active release/deploy docs. Operators need `HMAC_PEPPER`, `RATE_LIMIT`, D1,
+  and the standard Worker vars.
+
+- **Release version bumped to v0.38.6.**
+  `Cargo.toml`, `package.json`, and `workers/ssr/static/sw.js` are aligned.
+
+### Fixed
+
+- **Removed the deprecated `codlet-core` dependency.**
+  `codlet-core` was deprecated after being renamed to `codlet` at v0.17.0.
+  The workspace now resolves the runtime-neutral `codlet` crate at v0.17.1
+  and no longer contains `codlet-core` in `Cargo.lock`.
+
+- **Removed the unpublished/missing `codlet-worker` integration path.**
+  The active Worker runtime now uses service-owned D1/HMAC storage for invite
+  codes, sessions, and form tokens on all targets. The local `codlet` module is
+  a compatibility wrapper for handlers and delegates to `form_token`, `session`,
+  and `invite` database helpers.
+
+- **Fixed `/join/profile` foreign-key failure.**
+  `invite_codes.used_by_membership_id` references `community_memberships(id)`.
+  The join flow now first wins the atomic invite claim by setting `used_at`,
+  then inserts the user and membership, then backfills `used_by_membership_id`.
+
+- **Fixed the clippy blocker in recurrence parsing.**
+  `RecurrenceFreq::from_str` was renamed to `parse_form_value` to avoid the
+  `should_implement_trait` lint while preserving form parsing behavior.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- Wrangler local join smoke was reported successful by the project owner after
+  the `/join/profile` FK fix.
+
 ## [0.38.5] — 2026-06-15
 
 Upgrade codlet to v0.17.1; simplify key provider construction.

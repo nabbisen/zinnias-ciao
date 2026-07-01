@@ -24,11 +24,11 @@ pub async fn get_me_calendar(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_membership(&env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let pp = crate::crypto::pepper(env);
 
@@ -171,11 +171,11 @@ pub async fn post_regenerate_calendar(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_membership(&env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let pp = crate::crypto::pepper(env);
 
@@ -237,11 +237,11 @@ pub async fn post_revoke_calendar(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_membership(&env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -299,7 +299,7 @@ pub async fn get_ics_feed(
         _ => {
             // Generic not-found: don't reveal whether token exists.
             return Ok(
-                Response::from_html(&format!("<p>{}</p>", i18n::JA_NOT_FOUND))?.with_status(404),
+                Response::from_html(format!("<p>{}</p>", i18n::JA_NOT_FOUND))?.with_status(404),
             );
         }
     };
@@ -311,7 +311,7 @@ pub async fn get_ics_feed(
             .is_some();
     if !still_active {
         return Ok(
-            Response::from_html(&format!("<p>{}</p>", i18n::JA_GENERAL_ERROR))?.with_status(403),
+            Response::from_html(format!("<p>{}</p>", i18n::JA_GENERAL_ERROR))?.with_status(403),
         );
     }
 

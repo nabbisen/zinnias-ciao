@@ -86,19 +86,22 @@ mod tests {
     /// updated to verify the decoupling explicitly (RFC-003 §8).
     #[test]
     fn session_ttl_is_positive_and_reasonable() {
+        let session_ttl_seconds = std::hint::black_box(SESSION_TTL_SECONDS);
         assert!(
-            SESSION_TTL_SECONDS >= 3_600,
+            session_ttl_seconds >= 3_600,
             "SESSION_TTL_SECONDS too short"
         );
         assert!(
-            SESSION_TTL_SECONDS <= 31 * 86_400,
+            session_ttl_seconds <= 31 * 86_400,
             "SESSION_TTL_SECONDS too long for invite-only MVP"
         );
     }
 
     #[test]
     fn form_token_ttl_shorter_than_session() {
-        assert!(FORM_TOKEN_TTL_SECONDS < SESSION_TTL_SECONDS);
+        let form_token_ttl_seconds = std::hint::black_box(FORM_TOKEN_TTL_SECONDS);
+        let session_ttl_seconds = std::hint::black_box(SESSION_TTL_SECONDS);
+        assert!(form_token_ttl_seconds < session_ttl_seconds);
     }
 
     // ── Token consume classification (P0-7 race/idempotency contract) ──────

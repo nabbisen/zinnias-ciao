@@ -6,9 +6,7 @@ use zinnias_ciao_contracts::auth::token_purpose;
 use crate::audit;
 use crate::authz::require_admin;
 use crate::crypto::random_token;
-#[cfg(not(target_arch = "wasm32"))]
 use crate::crypto::{hmac_hex, normalize_invite_code};
-#[cfg(not(target_arch = "wasm32"))]
 use crate::db::invite as invite_db;
 use crate::db::{self, membership as membership_db};
 use crate::render;
@@ -29,11 +27,11 @@ pub async fn get_invites(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let _membership = require_admin(&env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let gen_token =
         crate::codlet::issue_token(env, &auth.user_id, token_purpose::GENERATE_INVITE, None).await;
@@ -73,7 +71,7 @@ pub async fn get_invites(
         render::escape_html(&f)
     )).unwrap_or_default();
 
-    // List active invite codes from both codlet_codes (new) and invite_codes (legacy).
+    // List active invite codes from the service-owned invite table.
     let active_codes = crate::codlet::list_active_invites(env, community_id).await;
 
     let mut code_rows = String::new();
@@ -166,13 +164,12 @@ pub async fn post_generate_invite(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    #[cfg(not(target_arch = "wasm32"))]
     let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
@@ -189,93 +186,45 @@ pub async fn post_generate_invite(
         return redirect(&format!("/c/{community_id}/admin/invites"));
     }
 
-    // ── codlet path (wasm32) ───────────────────────────────────────────────
-    #[cfg(target_arch = "wasm32")]
-    {
-        use codlet_core::secret::CodeId;
+    use zinnias_ciao_domain::invite::{INVITE_CODE_ALPHABET, INVITE_CODE_LEN};
 
-        let mut mgrs = crate::codlet::build(env)
-            .await
-            .map_err(|e| worker::Error::RustError(format!("codlet: {e}")))?;
-
-        // Generate a random CodeId; codlet generates the code internally.
-        let invite_id = &random_token()[..24];
-        let code_id = CodeId::new(invite_id.to_owned().into());
-
-        // issue_code: generates code, hashes it, inserts into codlet_codes.
-        // scope = community_id; grant = "role:member" (admin invites are member by default).
-        let (_record, plain_code) = mgrs
-            .code_auth
-            .issue_code(
-                &mut mgrs.rng,
-                code_id,
-                Some("invite".to_owned()),
-                Some(community_id.to_owned()),  // scope
-                Some("role:member".to_owned()), // grant_payload
-            )
-            .await
-            .map_err(|e| worker::Error::RustError(format!("issue_code: {e}")))?;
-
-        let _ = audit::write(
-            &db,
-            rid,
-            Some(community_id),
-            Some(&membership.membership_id),
-            "invite_code",
-            Some(invite_id),
-            "generated",
-            None,
-        )
-        .await;
-
-        let code = plain_code.expose().to_owned();
-        return redirect(&format!("/c/{community_id}/admin/invites?code={code}"));
-    }
-
-    // ── legacy fallback (non-wasm / native tests) ──────────────────────────
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        use zinnias_ciao_domain::invite::{INVITE_CODE_ALPHABET, INVITE_CODE_LEN};
-
-        // Inline rejection-sampling generator for the non-wasm path (tests).
-        let alpha_len = INVITE_CODE_ALPHABET.len();
-        let ceiling = 256 - (256 % alpha_len);
-        let mut code = String::with_capacity(INVITE_CODE_LEN);
-        while code.len() < INVITE_CODE_LEN {
-            let mut buf = [0u8; 1];
-            getrandom::fill(&mut buf).map_err(|e| worker::Error::RustError(format!("rng: {e}")))?;
-            let b = buf[0] as usize;
-            if b < ceiling {
-                code.push(INVITE_CODE_ALPHABET[b % alpha_len] as char);
-            }
+    let alpha_len = INVITE_CODE_ALPHABET.len();
+    let ceiling = 256 - (256 % alpha_len);
+    let mut code = String::with_capacity(INVITE_CODE_LEN);
+    while code.len() < INVITE_CODE_LEN {
+        let mut buf = [0u8; 1];
+        getrandom::fill(&mut buf).map_err(|e| worker::Error::RustError(format!("rng: {e}")))?;
+        let b = buf[0] as usize;
+        if b < ceiling {
+            code.push(INVITE_CODE_ALPHABET[b % alpha_len] as char);
         }
-        let normalized = normalize_invite_code(&code);
-        let code_hmac = hmac_hex(&pp, &normalized);
-        let invite_id = random_token()[..24].to_owned();
-        let expires_at = db::add_seconds_to_now(86_400);
-        invite_db::insert(
-            &db,
-            &invite_id,
-            community_id,
-            &code_hmac,
-            &membership.membership_id,
-            &expires_at,
-            "member",
-        )
-        .await?;
-        let _ = audit::write(
-            &db,
-            rid,
-            Some(community_id),
-            Some(&membership.membership_id),
-            "invite_code",
-            Some(&invite_id),
-            "generated",
-            None,
-        )
-        .await;
-        redirect(&format!("/c/{community_id}/admin/invites?code={code}"))
     }
+    let normalized = normalize_invite_code(&code);
+    let code_hmac = hmac_hex(&pp, &normalized);
+    let invite_id = random_token()[..24].to_owned();
+    let expires_at = db::add_seconds_to_now(86_400);
+    invite_db::insert(
+        &db,
+        &invite_id,
+        community_id,
+        &code_hmac,
+        &membership.membership_id,
+        &expires_at,
+        "member",
+    )
+    .await?;
+    let _ = audit::write(
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "invite_code",
+        Some(&invite_id),
+        "generated",
+        None,
+    )
+    .await;
+    redirect(&format!("/c/{community_id}/admin/invites?code={code}"))
 }
 
 // ── POST /c/:cid/admin/invites/:iid/revoke ───────────────────────────────
@@ -287,11 +236,11 @@ pub async fn post_revoke_invite(
     community_id: &str,
     invite_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -335,11 +284,11 @@ pub async fn get_members(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let community = db::community::find_active(&db, community_id).await?;
     let _community_name = community.map(|c| c.name).unwrap_or_default();
@@ -413,11 +362,11 @@ pub async fn get_remove_member(
     community_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
 
     // Cannot remove yourself
     if target_membership_id == membership.membership_id {
@@ -500,11 +449,11 @@ pub async fn post_remove_member(
     community_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, &env).await {
+    let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
     };
-    let membership = require_admin(&env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id).await?;
 
     if target_membership_id == membership.membership_id {
         return render::not_found();
@@ -556,7 +505,3 @@ pub async fn post_remove_member(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-
-// generate_invite_code() removed — codlet CodeAuth::issue_code() handles
-// generation with fail-closed RNG and rejection sampling (INV-3, RFC-003 §4).
-// Called via crate::codlet::build(env) in post_generate_invite.
