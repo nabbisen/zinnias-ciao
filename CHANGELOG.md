@@ -2,6 +2,33 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.34.2] — 2026-06-12
+
+Code quality: wrong keep-note string fixed; set_result documented; parity updated.
+
+### Fixed
+
+- **Wrong string for "Keep note" button.** The admin hide-note confirm page and
+  the member delete-note confirm page were using `JA_ADMIN_INVITES_REVOKE`
+  ("無効化" — revoke/invalidate) as the "keep" button label. This is semantically
+  wrong. A new paired constant `JA_NOTE_KEEP_ACTION = "メモを保持"` /
+  `EN_NOTE_KEEP_ACTION = "Keep note"` was added and both pages updated.
+
+### Changed
+
+- **`form_token::set_result` `#[allow(dead_code)]` documented.** The function was
+  written as deferred infrastructure for RFC-037 §4 (idempotency replay) but is
+  not called by any current handler. The allow is correct; the comment now explains
+  the reason, expected use in RFC-044 integration harness, and why the function is
+  retained rather than deleted.
+
+- **i18n parity gate updated.** `EN/JA_NOTE_KEEP_ACTION` added to the parity test
+  (142 pairs, balanced).
+
+### Testing
+
+- 216 passing. Zero warnings. Parity: 142/142 EN/JA pairs, no duplicates.
+
 ## [0.34.1] — 2026-06-12
 
 Documentation housekeeping: release checklist, launch runbook, ROADMAP.

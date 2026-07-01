@@ -459,7 +459,7 @@ pub async fn get_delete_note_confirm(
         nav       = nav,
         nd        = i18n::JA_NOTE_DELETE,
         body_text = i18n::JA_NOTE_DELETE_BODY,
-        keep      = i18n::JA_ADMIN_REMOVE_KEEP,
+        keep      = i18n::JA_NOTE_KEEP_ACTION,
     );
     render::page(i18n::JA_NOTE_DELETE, &body)
 }

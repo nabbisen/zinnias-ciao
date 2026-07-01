@@ -745,7 +745,7 @@ pub async fn get_admin_hide_note_confirm(
         tok         = render::escape_html(&token),
         nav         = nav,
         nd          = i18n::JA_NOTE_DELETE,
-        keep        = i18n::JA_ADMIN_INVITES_REVOKE, // closest available: "無効化" — TODO RFC-054
+        keep        = i18n::JA_NOTE_KEEP_ACTION,
         consequence = i18n::JA_ADMIN_REMOVE_CONSEQUENCE,
     );
     render::page(i18n::JA_NOTE_DELETE, &body)

@@ -131,6 +131,8 @@ pub const JA_NOTE_PLACEHOLDER_LABEL: &str = "メモ（200文字以内）";
 pub const JA_NOTE_CHAR_HINT: &str = "200文字以内";
 pub const JA_NOTE_VISIBILITY: &str = "コミュニティのメンバーにこのメモが表示されます。";
 pub const JA_NOTE_DELETE_BODY: &str = "このメモは削除されます。元に戻すことはできません。";
+pub const EN_NOTE_KEEP_ACTION: &str = "Keep note";
+pub const JA_NOTE_KEEP_ACTION: &str = "メモを保持";
 pub const EN_NOTE_DELETE_BODY: &str = "Your note will be removed. This cannot be undone.";
 
 // ── Me / profile ──────────────────────────────────────────────────────────

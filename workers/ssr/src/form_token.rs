@@ -148,6 +148,11 @@ pub async fn consume(
 }
 
 /// Store the result ref on a consumed token (for idempotency replay).
+///
+/// Written as infrastructure for RFC-037 §4 (full idempotency replay: a retry
+/// returns the stored result without re-executing the mutation). Not called in
+/// the pilot — current handlers redirect on token replay rather than replaying
+/// the result. Retained for the integration harness (RFC-044) and future use.
 #[allow(dead_code)]
 pub async fn set_result(
     db: &D1Database,
