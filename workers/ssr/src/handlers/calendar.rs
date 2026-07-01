@@ -87,8 +87,7 @@ pub async fn get_me_calendar(
         format!(
             "<div style=\"background:#f5f5f7;border-radius:12px;padding:1rem;margin:1rem 0\">\
              <p style=\"font-size:.8125rem;color:#6E6E73;margin:0 0 .5rem\">\
-               Your personal calendar feed URL. Keep this private — \
-               anyone with the URL can read your community events.\
+               {privacy_note}\
              </p>\
              <div style=\"font-size:.75rem;font-family:monospace;word-break:break-all;\
                background:#fff;border:1px solid #E5E5EA;border-radius:8px;\
@@ -99,7 +98,7 @@ pub async fn get_me_calendar(
                <button type=\"submit\" \
                  style=\"font-size:.875rem;color:#FF3B30;background:none;border:none;\
                  cursor:pointer;padding:.25rem 0;min-height:44px\">\
-                 Disable feed\
+                 {disable}\
                </button>\
              </form>\
              <form method=\"post\" action=\"/c/{cid}/me/calendar/regenerate\" \
@@ -108,7 +107,7 @@ pub async fn get_me_calendar(
                <button type=\"submit\" \
                  style=\"font-size:.875rem;color:#007AFF;background:none;border:none;\
                  cursor:pointer;padding:.25rem 0;min-height:44px\">\
-                 Regenerate URL\
+                 {regenerate}\
                </button>\
              </form>\
              </div>",
@@ -116,6 +115,9 @@ pub async fn get_me_calendar(
             cid = render::escape_html(community_id),
             rtok = render::escape_html(&revoke_token),
             gentok = render::escape_html(&regen_token),
+            privacy_note = i18n::JA_CALENDAR_PRIVACY_NOTE,
+            disable = i18n::JA_CALENDAR_DISABLE,
+            regenerate = i18n::JA_CALENDAR_REGENERATE,
         )
     } else {
         format!(
@@ -146,8 +148,7 @@ pub async fn get_me_calendar(
          {back}\
          <h1 style=\"font-size:1.25rem;font-weight:600;margin:1rem 0 .25rem\">{cal_title}</h1>\
          <p style=\"font-size:.875rem;color:#6E6E73;margin-bottom:1rem\">\
-           Subscribe in Apple Calendar, Google Calendar, or any app that supports \
-           calendar subscriptions (.ics / webcal).\
+           {cal_desc}\
          </p>\
          {flash}\
          {feed}\
@@ -155,6 +156,7 @@ pub async fn get_me_calendar(
         header =
             render::header_with_switcher(i18n::JA_CALENDAR_TITLE, community_id, &community_pairs),
         cal_title = i18n::JA_CALENDAR_TITLE,
+        cal_desc = i18n::JA_CALENDAR_DESCRIPTION,
         back = back,
         flash = flash_html,
         feed = feed_section,

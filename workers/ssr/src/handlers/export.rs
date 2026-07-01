@@ -63,9 +63,7 @@ pub async fn get_export_page(
          <main style=\"padding:1rem 1rem 5rem\">\
          <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{exp_title}</h1>\
          <p style=\"font-size:.875rem;color:#6E6E73;margin-bottom:1.5rem\">\
-           Download a JSON file of your community's events, attendance, and notes.\
-           Member names and notes are included. Session tokens and security credentials\
-           are not included.\
+           {exp_desc} {privacy_note}\
          </p>\
          <div style=\"background:#F5F5F7;border-radius:12px;padding:1rem;margin-bottom:1.5rem\">\
            <p style=\"font-size:.875rem;margin:0 0 .25rem\"><strong>{name}</strong></p>\
@@ -76,16 +74,20 @@ pub async fn get_export_page(
          <a href=\"/c/{cid}/admin/export/json?token={token}\" \
             download=\"{slug}-export.json\" \
             style=\"display:flex;align-items:center;justify-content:center;\
-            padding:.875rem;background:#007AFF;color:#fff;\
-            border-radius:14px;font-size:1rem;font-weight:600;\
-            text-decoration:none;min-height:44px;margin-bottom:1rem\">\
-            Download JSON\
+           padding:.875rem;background:#007AFF;color:#fff;\
+           border-radius:14px;font-size:1rem;font-weight:600;\
+           text-decoration:none;min-height:44px;margin-bottom:1rem\">\
+            {download_btn}\
          </a>\
          <p style=\"font-size:.75rem;color:#6E6E73;text-align:center\">\
-           This link is single-use and expires in 5 minutes.\
+           {single_use}\
          </p>\
          </main>{nav}",
         exp_title = i18n::JA_EXPORT_TITLE,
+        exp_desc = i18n::JA_EXPORT_DESCRIPTION,
+        privacy_note = i18n::JA_EXPORT_PRIVACY_NOTE,
+        download_btn = i18n::JA_EXPORT_DOWNLOAD_BTN,
+        single_use = i18n::JA_EXPORT_SINGLE_USE,
         header =
             render::header_with_switcher(i18n::JA_EXPORT_TITLE, community_id, &community_pairs),
         name = render::escape_html(&community_name),

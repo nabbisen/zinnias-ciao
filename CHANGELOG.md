@@ -2,6 +2,39 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.39.0] — 2026-07-01
+
+RFC-054/RFC-053 Japanese copy hardening before runtime verification.
+
+### Changed
+
+- **Member-facing Japanese copy avoids technical jargon called out by RFC-054.**
+  Session recovery, status clear/attended labels, calendar link wording, and
+  export/download wording were revised to use plainer language.
+
+- **Calendar and export pages now render Japanese constants instead of hardcoded
+  English copy.**
+  The calendar privacy warning now uses the RFC-053 wording: anyone with the
+  link can see community events, so it should not be made public.
+
+- **Release version bumped to v0.39.0.**
+  `Cargo.toml`, `package.json`, and `workers/ssr/static/sw.js` are aligned.
+
+### Fixed
+
+- **Added a release gate for RFC-054-sensitive copy.**
+  The gate fails if reviewed member-facing Japanese strings reintroduce
+  `セッション`, `トークン`, `HMAC`, `ICS`, `iCS`, `webcal`, `JSON`, or
+  `エクスポート`.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+
 ## [0.38.7] — 2026-07-01
 
 Patch hardening for the v0.38.6 join-flow fix.

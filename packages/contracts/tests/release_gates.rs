@@ -292,6 +292,53 @@ fn i18n_en_ja_parity_count() {
     }
 }
 
+#[test]
+fn rfc054_member_facing_japanese_copy_avoids_technical_jargon() {
+    use zinnias_ciao_contracts::i18n::*;
+
+    let reviewed = [
+        JA_SESSION_EXPIRED,
+        JA_STATUS_GOING,
+        JA_STATUS_NOT_GOING,
+        JA_STATUS_ATTENDED,
+        JA_STATUS_NO_ANSWER,
+        JA_STATUS_CLEAR,
+        JA_STATUS_CLEAR_LABEL,
+        JA_CALENDAR_TITLE,
+        JA_CALENDAR_DESCRIPTION,
+        JA_CALENDAR_GENERATE,
+        JA_CALENDAR_DISABLE,
+        JA_CALENDAR_REGENERATE,
+        JA_CALENDAR_PRIVACY_NOTE,
+        JA_ME_CALENDAR_LABEL,
+        JA_EXPORT_TITLE,
+        JA_EXPORT_DESCRIPTION,
+        JA_EXPORT_PRIVACY_NOTE,
+        JA_EXPORT_DOWNLOAD_BTN,
+        JA_ME_EXPORT_LINK,
+        JA_ME_DATA_EXPORT,
+    ];
+    let forbidden = [
+        "セッション",
+        "トークン",
+        "HMAC",
+        "ICS",
+        "iCS",
+        "webcal",
+        "JSON",
+        "エクスポート",
+    ];
+
+    for text in reviewed {
+        for term in forbidden {
+            assert!(
+                !text.contains(term),
+                "RFC-054 Japanese member-facing copy contains technical jargon {term:?}: {text}"
+            );
+        }
+    }
+}
+
 // ── D1 query budget documentation (RFC-029 / RFC-044) ────────────────────
 //
 // These constants document the approved D1 operation budget per route.

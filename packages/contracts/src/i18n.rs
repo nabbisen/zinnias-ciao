@@ -37,7 +37,7 @@ pub const EN_STATUS_ATTENDED_DISABLED: &str = "Available after the event";
 
 pub const JA_STATUS_GOING: &str = "参加";
 pub const JA_STATUS_NOT_GOING: &str = "不参加";
-pub const JA_STATUS_ATTENDED: &str = "出席済み";
+pub const JA_STATUS_ATTENDED: &str = "参加済み";
 pub const JA_STATUS_NO_ANSWER: &str = "未回答";
 pub const JA_STATUS_ATTENDED_DISABLED: &str = "イベント終了後に利用可能";
 
@@ -58,8 +58,7 @@ pub const EN_SESSION_EXPIRED: &str =
 pub const EN_LOGOUT: &str = "Log out";
 pub const EN_LOGOUT_CONFIRM: &str = "Log out?";
 
-pub const JA_SESSION_EXPIRED: &str =
-    "セッションが切れました。新しい招待コードをコミュニティ管理者にお問い合わせください。";
+pub const JA_SESSION_EXPIRED: &str = "もう一度、招待コードを入力してください。招待コードがない場合は、コミュニティの管理者にお問い合わせください。";
 pub const JA_LOGOUT: &str = "ログアウト";
 pub const JA_LOGOUT_CONFIRM: &str = "ログアウトしますか？";
 
@@ -119,8 +118,8 @@ pub const JA_HOME_INVITE_MEMBERS: &str = "メンバーを招待";
 pub const EN_STATUS_CLEAR: &str = "Clear";
 pub const EN_STATUS_CLEAR_LABEL: &str = "Clear answer";
 
-pub const JA_STATUS_CLEAR: &str = "クリア";
-pub const JA_STATUS_CLEAR_LABEL: &str = "回答をクリア";
+pub const JA_STATUS_CLEAR: &str = "未回答に戻す";
+pub const JA_STATUS_CLEAR_LABEL: &str = "回答を未回答に戻す";
 
 // ── Note editor (additional) ──────────────────────────────────────────────
 pub const EN_NOTE_SECTION_LABEL: &str = "Your note";
@@ -319,12 +318,12 @@ pub const EN_EXPORT_PRIVACY_NOTE: &str = "Member names and notes are included. S
 pub const EN_EXPORT_DOWNLOAD_BTN: &str = "Download JSON";
 pub const EN_EXPORT_SINGLE_USE: &str = "This link is single-use and expires in 5 minutes.";
 
-pub const JA_EXPORT_TITLE: &str = "コミュニティデータのエクスポート";
+pub const JA_EXPORT_TITLE: &str = "コミュニティの記録をダウンロード";
 pub const JA_EXPORT_DESCRIPTION: &str =
-    "コミュニティのイベント・出欠・メモをJSONファイルでダウンロードします。";
+    "イベント・出欠・メモの記録をファイルでダウンロードします。";
 pub const JA_EXPORT_PRIVACY_NOTE: &str =
-    "メンバー名とメモが含まれます。セッショントークンやセキュリティ情報は含まれません。";
-pub const JA_EXPORT_DOWNLOAD_BTN: &str = "JSONをダウンロード";
+    "メンバー名とメモが含まれます。ログイン情報や招待コードは含まれません。";
+pub const JA_EXPORT_DOWNLOAD_BTN: &str = "ファイルをダウンロード";
 pub const JA_EXPORT_SINGLE_USE: &str = "このリンクは1回限りで、5分後に無効になります。";
 
 // ── Support / about (RFC-035) ─────────────────────────────────────────────
@@ -338,7 +337,7 @@ pub const JA_ME_SECTION_ABOUT: &str = "このアプリについて";
 pub const JA_ME_VERSION_LABEL: &str = "バージョン";
 pub const JA_ME_REF_LABEL: &str = "参照コード";
 pub const JA_ME_SECTION_DATA: &str = "データ";
-pub const JA_ME_EXPORT_LINK: &str = "コミュニティデータをエクスポート";
+pub const JA_ME_EXPORT_LINK: &str = "記録をダウンロード";
 
 // ── Calendar feed (RFC-023) ───────────────────────────────────────────────
 pub const EN_CALENDAR_TITLE: &str = "Calendar feed";
@@ -348,13 +347,13 @@ pub const EN_CALENDAR_DISABLE: &str = "Disable feed";
 pub const EN_CALENDAR_REGENERATE: &str = "Regenerate URL";
 pub const EN_CALENDAR_PRIVACY_NOTE: &str = "Your personal calendar feed URL. Keep this private — anyone with the URL can read your community events.";
 
-pub const JA_CALENDAR_TITLE: &str = "カレンダーフィード";
+pub const JA_CALENDAR_TITLE: &str = "予定をカレンダーに入れる";
 pub const JA_CALENDAR_DESCRIPTION: &str =
-    "Appleカレンダー、Googleカレンダー、またはiCS/webcalに対応したアプリでご利用いただけます。";
-pub const JA_CALENDAR_GENERATE: &str = "フィードURLを生成";
-pub const JA_CALENDAR_DISABLE: &str = "フィードを無効化";
-pub const JA_CALENDAR_REGENERATE: &str = "URLを再生成";
-pub const JA_CALENDAR_PRIVACY_NOTE: &str = "個人のカレンダーフィードURLです。このURLを知っている人はコミュニティのイベントを閲覧できます。公開しないでください。";
+    "AppleカレンダーやGoogleカレンダーなど、予定を取り込めるアプリで利用できます。";
+pub const JA_CALENDAR_GENERATE: &str = "リンクを作成";
+pub const JA_CALENDAR_DISABLE: &str = "リンクを無効化";
+pub const JA_CALENDAR_REGENERATE: &str = "リンクを再作成";
+pub const JA_CALENDAR_PRIVACY_NOTE: &str = "このカレンダーリンクは、持っている人なら誰でもあなたのコミュニティの予定を見られます。公開しないでください。こちらで再発行または無効化できます。";
 
 // ── Event detail page (RFC-006 / RFC-025) ─────────────────────────────────
 pub const EN_EVENT_TITLE_HEADER: &str = "Event";
@@ -378,9 +377,9 @@ pub const JA_TZ_ERROR: &str =
 pub const EN_CURRENT_BADGE: &str = "Current";
 pub const JA_CURRENT_BADGE: &str = "現在";
 pub const EN_ME_CALENDAR_LABEL: &str = "Calendar feed";
-pub const JA_ME_CALENDAR_LABEL: &str = "カレンダーフィード";
+pub const JA_ME_CALENDAR_LABEL: &str = "予定をカレンダーに入れる";
 pub const EN_ME_DATA_EXPORT: &str = "Export community data";
-pub const JA_ME_DATA_EXPORT: &str = "コミュニティデータをエクスポート";
+pub const JA_ME_DATA_EXPORT: &str = "記録をダウンロード";
 
 // ── Join page (RFC-003) ────────────────────────────────────────────────────
 pub const EN_JOIN_PAGE_TITLE: &str = "Join";
