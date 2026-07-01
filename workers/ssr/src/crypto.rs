@@ -62,7 +62,7 @@ pub fn hmac_hex_eq(a: &str, b: &str) -> bool {
 /// Generate a cryptographically random URL-safe token (32 bytes → 64 hex chars).
 pub fn random_token() -> String {
     let mut bytes = [0u8; 32];
-    getrandom::getrandom(&mut bytes).expect("getrandom failed");
+    getrandom::fill(&mut bytes).expect("getrandom failed");
     hex::encode(bytes)
 }
 

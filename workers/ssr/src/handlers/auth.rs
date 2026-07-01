@@ -1,53 +1,91 @@
 //! Logout handler — RFC-003.
+//!
+//! On wasm32: uses codlet `SessionManager::revoke` + `CookiePolicy::build_clear_cookie`.
+//! On non-wasm (native tests): uses legacy session DB + clear_session_cookie.
 
 use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 
 use crate::db::session as session_db;
 use crate::form_token;
-use crate::session::{clear_session_cookie, require_auth};
+use crate::session::require_auth;
 
 pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
-    // Require a valid session first.
     let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
+        Ok(a)  => a,
         Err(_) => return redirect("/join"),
     };
 
-    let body = req.form_data().await?;
+    let body      = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
 
     let pepper = crate::crypto::pepper(env);
-    let db = env.d1("DB")?;
+    let db     = env.d1("DB")?;
 
-    // Validate logout form token.
+    // Validate the logout CSRF form token (legacy path — covers both wasm32
+    // and non-wasm since all form tokens still go through the service table).
     let _ = form_token::consume(
-        &db,
-        &pepper,
-        &auth.user_id,
-        token_purpose::LOGOUT,
-        &raw_token,
-        None,
-    )
-    .await?;
+        &db, &pepper, &auth.user_id,
+        token_purpose::LOGOUT, &raw_token, None,
+    ).await?;
 
-    // Revoke session.
+    // ── Revoke session ────────────────────────────────────────────────────
+    // Try the codlet session store first (for sessions issued after the
+    // migration); fall back to the legacy sessions table.
+    #[cfg(target_arch = "wasm32")]
+    {
+        use codlet_core::secret::SessionId;
+
+        if let Ok(mgrs) = crate::codlet::build(env).await {
+            let session_id = SessionId::new(auth.session_id.clone().into());
+            let _ = mgrs.session_mgr.revoke(&session_id).await;
+            // Also attempt legacy revocation (session may be in either table
+            // during the grace period).
+            let _ = session_db::revoke(&db, &auth.session_id).await;
+
+            let _ = crate::audit::write(
+                &db, rid, None, None,
+                "session", Some(&auth.session_id), "logout", None,
+            ).await;
+
+            // Build the clearing cookie via codlet's CookiePolicy so the
+            // name/path/domain attributes match exactly what was set at login.
+            use codlet_core::cookie::CookiePolicy;
+            use std::time::Duration;
+            let cookie_policy = CookiePolicy::production_strict(
+                "ciao_sid", Duration::from_secs(30 * 24 * 3600),
+            );
+            let clear = cookie_policy.build_clear_cookie();
+            let mut resp = redirect("/join")?;
+            resp.headers_mut().set("Set-Cookie", &clear)?;
+            return Ok(resp);
+        }
+        // If codlet managers cannot be built, fall through to legacy path.
+    }
+
+    // ── Legacy path (non-wasm tests or pre-CODLET_HMAC_KEY_V1 deploy) ────
     let _ = session_db::revoke(&db, &auth.session_id).await;
-
-    // Audit the logout (security-relevant non-admin event, RFC-045 P1-5).
-    // Not community-scoped; no content logged beyond the session subject.
     let _ = crate::audit::write(
         &db, rid, None, None,
         "session", Some(&auth.session_id), "logout", None,
     ).await;
 
-    // Clear cookie and redirect.
-    let domain = env
-        .var("SESSION_COOKIE_DOMAIN")
-        .ok()
-        .map(|s| s.to_string())
-        .filter(|s| !s.is_empty());
-    let clear = clear_session_cookie(domain.as_deref());
+    let domain = env.var("SESSION_COOKIE_DOMAIN").ok()
+        .map(|s| s.to_string()).filter(|s| !s.is_empty());
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let clear = crate::session::clear_session_cookie(domain.as_deref());
+
+    #[cfg(target_arch = "wasm32")]
+    let clear = {
+        let domain_part = domain
+            .filter(|d| !d.is_empty())
+            .map(|d| format!("; Domain={d}"))
+            .unwrap_or_default();
+        format!(
+            "ciao_sid=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict{domain_part}"
+        )
+    };
 
     let mut resp = redirect("/join")?;
     resp.headers_mut().set("Set-Cookie", &clear)?;

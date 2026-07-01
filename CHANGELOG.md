@@ -2,6 +2,86 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.37.0] — 2026-06-15
+
+Codlet integration (Phase 1): join flow, admin invite issuance, session validation.
+
+### Added
+
+- **codlet v0.15.1 integrated for auth primitives.**
+  `codlet-core` and `codlet-worker` added as wasm32-only workspace dependencies.
+  `worker-kv = "0.9"` added as a direct dependency to satisfy `KvRateLimitStore`'s
+  concrete type requirement.
+
+- **`migrations/0007_codlet_tables.sql`** — Option A migration: creates
+  `codlet_codes`, `codlet_sessions`, `codlet_form_tokens` tables alongside the
+  existing service tables. Existing tables are not renamed or altered.
+
+- **`workers/ssr/src/codlet.rs`** — per-request manager builder. Constructs
+  `CodeAuth`, `SessionManager`, and `FormTokenManager` from three independent
+  `WorkerKeyProvider` instances (one per manager — `WorkerKeyProvider` does not
+  implement `Clone`). Uses `worker_kv::KvStore::create("CODLET_RL")` directly
+  for the rate-limit store. Runs `run_d1_migrations` idempotently on every
+  request startup.
+
+- **`wrangler.toml`**: `CODLET_RL` KV namespace binding added. Secret binding
+  `CODLET_HMAC_KEY_V1` documented in a comment (set via `wrangler secret put`).
+
+### Changed
+
+- **`handlers/join.rs` — codlet path (wasm32):**
+  - `POST /join`: `CodeAuth::find()` handles rate-limit check, normalization,
+    and HMAC lookup. `FormTokenManager::issue(TokenSubject::Anonymous, …)` issues
+    the join-form CSRF token. `TokenSubject::Flow(flow_id)` issues the profile
+    CSRF token bound to the community scope.
+  - `POST /join/profile`: `FormTokenManager::consume(TokenSubject::Flow(…), …)`
+    validates the profile step. `CodeAuth::claim(RedeemableCode, subject=user_id, …)`
+    atomically claims the invite. `SessionManager::issue(RedeemSuccess, …)` issues
+    the codlet session. Membership creation remains in the service.
+  - Ticket cookie format extended to four fields:
+    `flow_id|code_record_id|key_version|community_id` so `RedeemableCode` can be
+    reconstructed in `post_profile` without a second HMAC lookup.
+  - Legacy (non-wasm) path preserved unchanged for native tests.
+
+- **`handlers/admin/members.rs` — codlet path (wasm32):**
+  - `CodeAuth::issue_code()` replaces the bespoke `generate_invite_code()` +
+    `invite_db::insert()` call. Grant payload `"role:member"` is stored in
+    `codlet_codes.grant_payload`; `post_profile` reads it after a won claim.
+  - Non-wasm fallback retains the inline rejection-sampling generator.
+
+- **`handlers/auth.rs` — codlet path (wasm32):**
+  - `SessionManager::revoke()` revokes the codlet session. Legacy
+    `session_db::revoke()` also runs during the 30-day grace period (both
+    tables may hold the session).
+  - `CookiePolicy::build_clear_cookie()` builds the clearing `Set-Cookie` header.
+
+- **`session.rs` — parallel session lookup:**
+  - `require_auth()` tries `SessionManager::validate()` (codlet sessions) first,
+    then falls back to the legacy HMAC lookup in the `sessions` table.
+  - Remove the legacy lookup after 30 days or once
+    `SELECT COUNT(*) FROM sessions WHERE revoked_at IS NULL AND expires_at > unixepoch()`
+    returns 0.
+
+- **`getrandom` upgraded from 0.2 to 0.4.** The 0.4 API renamed the entry
+  point from `getrandom::getrandom()` to `getrandom::fill()`. Updated in
+  `crypto.rs`, `lib.rs`, and `admin/members.rs`.
+
+### Migration operator checklist (before first codlet deploy)
+
+- [ ] `ALTER TABLE` migrations not required (Option A: fresh codlet tables).
+- [ ] Generate 32-byte HMAC key: `openssl rand -hex 32`
+- [ ] Store as wrangler secret: `wrangler secret put CODLET_HMAC_KEY_V1`
+- [ ] Add `CODLET_RL` KV namespace and bind in `wrangler.toml`.
+- [ ] Deploy. Verify new invite codes write to `codlet_codes`.
+- [ ] Verify new sessions write to `codlet_sessions`.
+- [ ] After 30 days: remove parallel legacy session lookup from `session.rs`.
+
+### Testing
+
+- 223 passing. Zero warnings (native). wasm32: zero errors, zero warnings.
+- Native tests run the legacy (non-wasm) code path; wasm32 integration tests
+  require Miniflare (see `codlet-worker/tests/`).
+
 ## [0.36.1] — 2026-06-13
 
 Security: two invite-code generation defects fixed (identified in codlet extraction review).

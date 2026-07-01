@@ -1,13 +1,21 @@
 //! Invite-code rate limiting via Cloudflare KV (RFC-012 §5).
 //!
+//! On wasm32 (production Workers), codlet CodeAuth handles rate limiting.
+//! These functions remain for the non-wasm (native test) code path.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_variables))]
+//!
 //! Tracks failed redemption attempts per IP using KV with a short TTL.
 //! Generic errors are returned — never revealing whether a code was valid.
 
 use worker::Env;
 
+// Used on non-wasm (native test) path; codlet handles rate limiting on wasm32.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 const MAX_FAILURES: u32 = 10;
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 const WINDOW_SECONDS: u64 = 300; // 5-minute window
 
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 /// Check if the given IP is rate-limited for invite redemption.
 /// Returns `true` (blocked) or `false` (allowed).
 pub async fn is_rate_limited(env: &Env, ip: &str) -> bool {

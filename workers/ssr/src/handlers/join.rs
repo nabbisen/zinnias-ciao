@@ -2,259 +2,349 @@
 //!
 //! Flow:
 //!   GET  /join              → render invite-code form
-//!   POST /join              → validate + find invite; 303 → /join/profile
+//!   POST /join              → codlet find(); 303 → /join/profile
 //!   GET  /join/profile      → render display-name form
-//!   POST /join/profile      → create user + membership + session; 303 → /
+//!   POST /join/profile      → codlet claim() → session issue; 303 → /
 //!
-//! All writes are behind the form token (AD-4 / RFC-012).
-//! Invite codes are looked up by HMAC — never stored or logged in plaintext.
+//! codlet v0.15.x manages code lookup, CSRF tokens, and session issuance.
+//! Membership creation remains in zinnias-ciao service code.
+//!
+//! ## Ticket cookie (`__join_ticket`) — format
+//!
+//! Four pipe-separated fields:
+//!   `{flow_id}|{code_record_id}|{key_version}|{community_id}`
+//!
+//! `flow_id`        — random bearer; binds the profile form token (TokenSubject::Flow)
+//! `code_record_id` — codlet CodeId; used to reconstruct RedeemableCode for claim()
+//! `key_version`    — codlet key version written at issue time; needed by claim()
+//! `community_id`   — scope stored in the code record; verified at profile step
+//!
+//! ## Subject ordering
+//!
+//! codlet session subject = `user_id` (generated in post_profile).
+//! The session is issued via `code_auth.claim(subject=user_id)` → RedeemSuccess
+//! → `session_mgr.issue(RedeemSuccess)`.  `membership_id` is a separate
+//! service-layer identifier stored only in `community_memberships`.
 
 use worker::{Env, Request, Response, Result};
-use zinnias_ciao_contracts::{auth::token_purpose, i18n};
+use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::{validate_display_name, validate_invite_input};
 
 use crate::audit;
-use crate::crypto::{hmac_hex, normalize_invite_code, random_token};
-use crate::rate_limit;
-use crate::db::{invite as invite_db, membership as membership_db, session as session_db};
-use crate::form_token;
+use crate::db::membership as membership_db;
 use crate::render::{self, escape_html};
-use crate::session::build_session_cookie;
 
-// ── GET /join ────────────────────────────────────────────────────────────
+// ── GET /join ─────────────────────────────────────────────────────────────
 
 pub async fn get_join(req: Request, env: &Env, _rid: &str) -> Result<Response> {
-    // If the user already has a valid session, redirect to home.
-    if crate::session::require_auth(&req, &env).await.is_ok() {
+    if crate::session::require_auth(&req, env).await.is_ok() {
         return redirect("/");
     }
-
-    // Issue a form token for the join POST (CSRF, AD-4).
-    // We use a placeholder user_id for pre-auth tokens; the token is
-    // bound to the purpose so it cannot be replayed for another action.
-    let pepper = crate::crypto::pepper(&env);
-    let db = env.d1("DB")?;
-    let anon_token =
-        form_token::issue(&db, &pepper, "", token_purpose::REDEEM_INVITE, None).await?;
-
-    render_join_form(&anon_token, None)
+    let token = anon_token(env).await?;
+    render_join_form(&token, None)
 }
 
-// ── POST /join ───────────────────────────────────────────────────────────
+// ── POST /join ────────────────────────────────────────────────────────────
 
 pub async fn post_join(mut req: Request, env: &Env, _rid: &str) -> Result<Response> {
-    let body = req.form_data().await?;
-
-    let raw_code = body.get_field("code").unwrap_or_default();
+    let body      = req.form_data().await?;
+    let raw_code  = body.get_field("code").unwrap_or_default();
     let raw_token = body.get_field("_token").unwrap_or_default();
 
-    // Rate-limit check (RFC-012) — before any DB work.
-    let client_ip = rate_limit::client_ip(&req);
-    if rate_limit::is_rate_limited(&env, &client_ip).await {
-        return render_join_form(
-            &refresh_anon_token(&env).await?,
-            Some(zinnias_ciao_contracts::i18n::JA_JOIN_CODE_HINT),
-        );
+    if validate_invite_input(&raw_code).is_err() {
+        return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
     }
 
-    // Validate the invite code format (domain rule — before DB lookup).
-    if let Err(_) = validate_invite_input(&raw_code) {
-        return render_join_form(
-            &refresh_anon_token(&env).await?,
-            Some(i18n::JA_JOIN_CODE_HINT), // re-use hint as generic error position
+    // ── codlet path (wasm32 production) ────────────────────────────────────
+    #[cfg(target_arch = "wasm32")]
+    {
+        use codlet_core::{secret::CodeId, store::token::TokenSubject};
+        use codlet_worker::http::extract_rate_limit_key;
+
+        let mut mgrs = match crate::codlet::build(env).await {
+            Ok(m)  => m,
+            Err(_) => return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await,
+        };
+
+        // Consume the anonymous CSRF form token.
+        if mgrs.token_mgr.consume(
+            &raw_token, &TokenSubject::Anonymous, "redeem_invite", None,
+        ).await.is_err() {
+            return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
+        }
+
+        let rl_key = extract_rate_limit_key(&req, None);
+
+        // find() = rate-limit + normalize + HMAC lookup. Returns RedeemableCode.
+        let found = match mgrs.code_auth.find(&raw_code, rl_key.as_ref()).await {
+            Ok(f)  => f,
+            Err(_) => return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await,
+        };
+
+        // Build the join ticket:  flow_id|code_id|key_version|community_id
+        let flow_id_raw = crate::crypto::random_token();
+        let community_id = found.scope.clone().unwrap_or_default();
+        let ticket = format!(
+            "{}|{}|{}|{}",
+            flow_id_raw,
+            found.id.as_str(),
+            found.key_version.as_str(),
+            community_id,
         );
+
+        // Issue a profile form token bound to this flow + community.
+        let flow_id = CodeId::new(flow_id_raw.clone().into());
+        let profile_token = mgrs.token_mgr.issue(
+            &mut mgrs.rng,
+            TokenSubject::Flow(flow_id),
+            "join_profile",
+            Some(community_id.clone()),
+        ).await.map_err(|e| worker::Error::RustError(format!("token issue: {e}")))?;
+
+        let join_cookie = format!(
+            "__join_ticket={ticket}; Max-Age=900; Path=/join; HttpOnly; Secure; SameSite=Strict"
+        );
+        let token_cookie = format!(
+            "__join_ptoken={}; Max-Age=900; Path=/join; HttpOnly; Secure; SameSite=Strict",
+            profile_token.expose()
+        );
+        let mut resp = redirect("/join/profile")?;
+        resp.headers_mut().set("Set-Cookie", &join_cookie)?;
+        resp.headers_mut().append("Set-Cookie", &token_cookie)?;
+        return Ok(resp);
     }
 
-    // Validate the form token (CSRF).
-    let pepper = crate::crypto::pepper(&env);
+    // ── legacy fallback (non-wasm / native tests) ─────────────────────────
+    #[cfg(not(target_arch = "wasm32"))]
+    legacy_post_join(req, env, raw_code, raw_token).await
+}
+
+// ── GET /join/profile ──────────────────────────────────────────────────────
+
+pub async fn get_profile(req: Request, _env: &Env, _rid: &str) -> Result<Response> {
+    let pt = extract_cookie(&req, "__join_ptoken").unwrap_or_default();
+    render_profile_form(&pt, None)
+}
+
+// ── POST /join/profile ─────────────────────────────────────────────────────
+
+pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
+    let body             = req.form_data().await?;
+    let display_name_raw = body.get_field("display_name").unwrap_or_default();
+    let raw_token        = body.get_field("_token").unwrap_or_default();
+
+    let display_name = match validate_display_name(&display_name_raw) {
+        Ok(n)  => n,
+        Err(e) => {
+            let pt = extract_cookie(&req, "__join_ptoken").unwrap_or_default();
+            return render_profile_form(&pt, Some(e.to_string().leak()));
+        }
+    };
+
+    let ticket_raw = extract_cookie(&req, "__join_ticket").unwrap_or_default();
+
+    // ── codlet path (wasm32 production) ────────────────────────────────────
+    #[cfg(target_arch = "wasm32")]
+    {
+        use codlet_core::{
+            hashing::KeyVersion,
+            secret::{CodeId, SessionId, SubjectId},
+            store::{code::RedeemableCode, token::TokenSubject},
+        };
+        use codlet_worker::http::extract_rate_limit_key;
+
+        // Parse ticket: flow_id|code_record_id|key_version|community_id
+        let parts: Vec<&str> = ticket_raw.splitn(4, '|').collect();
+        if parts.len() != 4 { return redirect("/join"); }
+        let (flow_id_raw, code_record_id, key_version_str, community_id) =
+            (parts[0], parts[1], parts[2], parts[3]);
+        if flow_id_raw.is_empty() || code_record_id.is_empty() {
+            return redirect("/join");
+        }
+
+        let mut mgrs = match crate::codlet::build(env).await {
+            Ok(m)  => m,
+            Err(_) => return redirect("/join"),
+        };
+
+        // Consume the profile form token (bound to this flow + community).
+        let flow_id = CodeId::new(flow_id_raw.to_owned().into());
+        match mgrs.token_mgr.consume(
+            &raw_token,
+            &TokenSubject::Flow(flow_id),
+            "join_profile",
+            Some(community_id),
+        ).await {
+            Ok(None)    => { /* first submission — proceed */ }
+            Ok(Some(_)) => return redirect("/"),     // replay → already joined
+            Err(_)      => return redirect("/join"),  // expired or invalid
+        }
+
+        // Generate service-layer identifiers.
+        // user_id is the codlet session subject — must equal the claim subject.
+        let user_id       = crate::crypto::random_token();
+        let membership_id = crate::crypto::random_token();
+
+        // Reconstruct RedeemableCode from the ticket data so we can call claim().
+        // expires_at is u64::MAX here; the store's conditional UPDATE enforces
+        // the real expiry in the WHERE clause — if expired, changes == 0 and
+        // we get ClaimLost.
+        let redeemable = RedeemableCode {
+            id:          CodeId::new(code_record_id.to_owned().into()),
+            key_version: KeyVersion::new(key_version_str),
+            grant:       None, // not needed here; extracted from redeem.grant below
+            scope:       Some(community_id.to_owned()),
+            expires_at:  u64::MAX,
+        };
+
+        // Atomically claim. subject = user_id so session.subject = user_id,
+        // matching what require_auth returns.
+        let subject   = SubjectId::new(user_id.clone().into());
+        let rl_key    = extract_rate_limit_key(&req, None);
+        let redeem = match mgrs.code_auth.claim(&redeemable, subject, rl_key.as_ref()).await {
+            Ok(r)  => r,
+            Err(_) => return redirect("/join"), // ClaimLost or already used
+        };
+
+        // Extract the role from the grant payload ("role:member" / "role:admin").
+        let grants_role = redeem.grant.as_deref()
+            .and_then(|g| g.strip_prefix("role:"))
+            .unwrap_or("member")
+            .to_owned();
+
+        // Write to service tables.
+        let db = env.d1("DB")?;
+        membership_db::insert_user(&db, &user_id).await?;
+        membership_db::insert_membership(
+            &db, &membership_id, community_id,
+            &user_id, &grants_role, &display_name,
+        ).await?;
+
+        // Issue a codlet session. Requires the RedeemSuccess proof from claim().
+        let session_id = SessionId::new(crate::crypto::random_token().into());
+        let issued = mgrs.session_mgr.issue(&redeem, session_id, &mut mgrs.rng)
+            .await
+            .map_err(|e| worker::Error::RustError(format!("session issue: {e}")))?;
+
+        // Audit.
+        let _ = audit::write(
+            &db, rid, Some(community_id), Some(&membership_id),
+            "invite_code", Some(code_record_id), "redeemed",
+            Some(serde_json::json!({ "membership_id": membership_id })),
+        ).await;
+
+        let clear_join   = "__join_ticket=; Max-Age=0; Path=/join; HttpOnly; Secure; SameSite=Strict";
+        let clear_ptoken = "__join_ptoken=; Max-Age=0; Path=/join; HttpOnly; Secure; SameSite=Strict";
+        let mut resp = redirect("/")?;
+        resp.headers_mut().set("Set-Cookie", &issued.set_cookie)?;
+        resp.headers_mut().append("Set-Cookie", clear_join)?;
+        resp.headers_mut().append("Set-Cookie", clear_ptoken)?;
+        return Ok(resp);
+    }
+
+    // ── legacy fallback (non-wasm / native tests) ─────────────────────────
+    #[cfg(not(target_arch = "wasm32"))]
+    legacy_post_profile(req, env, rid, ticket_raw, raw_token, display_name).await
+}
+
+// ── Legacy helpers (non-wasm) ──────────────────────────────────────────────
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn legacy_post_join(
+    req: Request,
+    env: &Env,
+    raw_code: String,
+    raw_token: String,
+) -> Result<Response> {
+    use zinnias_ciao_contracts::auth::token_purpose;
+    let client_ip = crate::rate_limit::client_ip(&req);
+    if crate::rate_limit::is_rate_limited(env, &client_ip).await {
+        return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
+    }
+    let pepper = crate::crypto::pepper(env);
     let db = env.d1("DB")?;
-    // For anon tokens we used user_id = ""
-    let _ = form_token::consume(
-        &db,
-        &pepper,
-        "",
-        token_purpose::REDEEM_INVITE,
-        &raw_token,
-        None,
-    )
-    .await?;
-
-    // Look up the invite by HMAC (never by plaintext).
-    let normalized = normalize_invite_code(&raw_code);
-    let code_hmac = hmac_hex(&pepper, &normalized);
-
-    let invite = invite_db::find_valid(&db, &code_hmac).await?;
-
+    let _ = crate::form_token::consume(
+        &db, &pepper, "", token_purpose::REDEEM_INVITE, &raw_token, None,
+    ).await?;
+    let normalized = crate::crypto::normalize_invite_code(&raw_code);
+    let code_hmac  = crate::crypto::hmac_hex(&pepper, &normalized);
+    let invite = crate::db::invite::find_valid(&db, &code_hmac).await?;
     if invite.is_none() {
-        // Generic error: do not reveal whether the code existed (RFC-003 §7).
-        rate_limit::record_failure(&env, &client_ip).await;
-        return render_join_form(
-            &refresh_anon_token(&env).await?,
-            Some(i18n::JA_JOIN_CODE_HINT),
-        );
+        crate::rate_limit::record_failure(env, &client_ip).await;
+        return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
     }
-    let invite = invite.expect("invite is Some: None case returned early above");
-    // Valid code — clear the failure counter so a legitimate user isn't
-    // locked out by their own earlier mistakes.
-    rate_limit::clear_failures(&env, &client_ip).await;
-
-    // Stash invite_id + community_id in a short-lived join-ticket cookie
-    // so the profile step can complete the redemption atomically.
-    let ticket = random_token();
+    let invite = invite.unwrap();
+    crate::rate_limit::clear_failures(env, &client_ip).await;
+    let ticket       = crate::crypto::random_token();
     let ticket_value = format!("{}:{}", invite.id, invite.community_id);
-    let ticket_hmac = hmac_hex(&pepper, &ticket_value);
-
-    // Issue a profile form token bound to this ticket.
-    let profile_token = form_token::issue(
-        &db,
-        &pepper,
-        &ticket, // ticket is the ephemeral "user_id" for this step
-        token_purpose::JOIN_PROFILE,
-        Some(&ticket_hmac),
-    )
-    .await?;
-
-    // 303 → /join/profile, carrying ticket + profile_token in a short-lived cookie.
+    let ticket_hmac  = crate::crypto::hmac_hex(&pepper, &ticket_value);
+    let profile_token = crate::form_token::issue(
+        &db, &pepper, &ticket, token_purpose::JOIN_PROFILE, Some(&ticket_hmac),
+    ).await?;
     let join_cookie = format!(
         "__join_ticket={ticket}|{ticket_value}; Max-Age=600; Path=/join; HttpOnly; Secure; SameSite=Strict"
     );
-    let mut resp = redirect("/join/profile")?;
-    resp.headers_mut().set("Set-Cookie", &join_cookie)?;
-    // Store the profile token in another cookie so the GET can pre-fill the form.
     let token_cookie = format!(
         "__join_ptoken={profile_token}; Max-Age=600; Path=/join; HttpOnly; Secure; SameSite=Strict"
     );
+    let mut resp = redirect("/join/profile")?;
+    resp.headers_mut().set("Set-Cookie", &join_cookie)?;
     resp.headers_mut().append("Set-Cookie", &token_cookie)?;
     Ok(resp)
 }
 
-// ── GET /join/profile ────────────────────────────────────────────────────
-
-pub async fn get_profile(req: Request, _env: &Env, _rid: &str) -> Result<Response> {
-    let profile_token = extract_cookie(&req, "__join_ptoken").unwrap_or_default();
-    let community_name = ""; // M1: community name looked up in POST; omit for GET
-    render_profile_form(community_name, &profile_token, None)
-}
-
-// ── POST /join/profile ───────────────────────────────────────────────────
-
-pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
-    let body = req.form_data().await?;
-    let display_name_raw = body.get_field("display_name").unwrap_or_default();
-    let raw_token = body.get_field("_token").unwrap_or_default();
-
-    // Validate display name (domain rule).
-    let display_name = match validate_display_name(&display_name_raw) {
-        Ok(n) => n,
-        Err(e) => {
-            let profile_token = extract_cookie(&req, "__join_ptoken").unwrap_or_default();
-            return render_profile_form("", &profile_token, Some(e.to_string().leak()));
-        }
-    };
-
-    // Recover join ticket from cookie.
-    let ticket_raw = extract_cookie(&req, "__join_ticket").unwrap_or_default();
-    let mut parts = ticket_raw.splitn(2, '|');
-    let ticket = parts.next().unwrap_or_default();
-    let ticket_value = parts.next().unwrap_or_default();
-    if ticket.is_empty() || ticket_value.is_empty() {
-        return redirect("/join");
-    }
-
-    let pepper = crate::crypto::pepper(&env);
-    let ticket_hmac = hmac_hex(&pepper, ticket_value);
-
-    // Validate profile form token.
-    let db = env.d1("DB")?;
-    let replay = form_token::consume(
-        &db,
-        &pepper,
-        ticket,
-        token_purpose::JOIN_PROFILE,
-        &raw_token,
-        Some(&ticket_hmac),
-    )
-    .await?;
-
-    // If this token was already consumed (replay), redirect to home.
-    if replay.is_some() {
-        return redirect("/");
-    }
-
-    // Parse ticket_value: "invite_id:community_id"
-    let mut tv = ticket_value.splitn(2, ':');
-    let invite_id = tv.next().unwrap_or_default().to_owned();
+#[cfg(not(target_arch = "wasm32"))]
+async fn legacy_post_profile(
+    req: Request,
+    env: &Env,
+    rid: &str,
+    ticket_raw: String,
+    raw_token: String,
+    display_name: String,
+) -> Result<Response> {
+    use zinnias_ciao_contracts::auth::token_purpose;
+    let mut parts    = ticket_raw.splitn(2, '|');
+    let ticket       = parts.next().unwrap_or_default().to_owned();
+    let ticket_value = parts.next().unwrap_or_default().to_owned();
+    if ticket.is_empty() || ticket_value.is_empty() { return redirect("/join"); }
+    let pepper       = crate::crypto::pepper(env);
+    let ticket_hmac  = crate::crypto::hmac_hex(&pepper, &ticket_value);
+    let db           = env.d1("DB")?;
+    let replay = crate::form_token::consume(
+        &db, &pepper, &ticket,
+        token_purpose::JOIN_PROFILE, &raw_token, Some(&ticket_hmac),
+    ).await?;
+    if replay.is_some() { return redirect("/"); }
+    let mut tv       = ticket_value.splitn(2, ':');
+    let invite_id    = tv.next().unwrap_or_default().to_owned();
     let community_id = tv.next().unwrap_or_default().to_owned();
-    if invite_id.is_empty() || community_id.is_empty() {
-        return redirect("/join");
-    }
-
-    // ── Redemption sequence ───────────────────────────────────────────────
-    // D1 via worker-rs does not support multi-statement transactions, so we
-    // make the invite the single point of serialization: claim it FIRST with
-    // a conditional UPDATE (used_at IS NULL AND not revoked AND not expired).
-    // Only the caller that wins that atomic transition proceeds to create the
-    // user/membership/session. Concurrent submissions of the same invite lose
-    // the race and are redirected without creating a second member.
-    //
-    // We need a membership_id for used_by_membership_id, so we generate IDs up
-    // front but only persist them after winning the claim.
-    let grants_role = invite_db::find_by_id(&db, &invite_id)
-        .await?
-        .map(|inv| inv.grants_role)
-        .unwrap_or_else(|| "member".to_owned());
-
-    let user_id = random_token();
-    let membership_id = random_token();
-
-    // 1. Claim the invite atomically. If we don't win, someone already redeemed
-    //    it (or it expired/was revoked) — redirect without creating records.
-    let won = invite_db::mark_used(&db, &invite_id, &membership_id).await?;
-    if !won {
-        return redirect("/join");
-    }
-
-    // 2. Create user.
+    if invite_id.is_empty() || community_id.is_empty() { return redirect("/join"); }
+    let grants_role = crate::db::invite::find_by_id(&db, &invite_id).await?
+        .map(|inv| inv.grants_role).unwrap_or_else(|| "member".to_owned());
+    let user_id       = crate::crypto::random_token();
+    let membership_id = crate::crypto::random_token();
+    let won = crate::db::invite::mark_used(&db, &invite_id, &membership_id).await?;
+    if !won { return redirect("/join"); }
     membership_db::insert_user(&db, &user_id).await?;
-
-    // 3. Create membership — role comes from the invite code, not hardcoded.
-    //    setup.mjs seeds the bootstrap invite with grants_role='admin'.
-    //    Admin-generated invites for new members use grants_role='member' (default).
     membership_db::insert_membership(
-        &db,
-        &membership_id,
-        &community_id,
-        &user_id,
-        &grants_role,
-        &display_name,
-    )
-    .await?;
-
-    // 4. Create session
-    let session_secret = random_token();
-    let session_hmac = hmac_hex(&pepper, &session_secret);
-    let session_id = random_token();
-    session_db::insert(&db, &session_id, &user_id, &session_hmac).await?;
-
-    // 5. Audit
+        &db, &membership_id, &community_id, &user_id, &grants_role, &display_name,
+    ).await?;
+    let session_secret = crate::crypto::random_token();
+    let session_hmac   = crate::crypto::hmac_hex(&pepper, &session_secret);
+    let session_id     = crate::crypto::random_token();
+    crate::db::session::insert(&db, &session_id, &user_id, &session_hmac).await?;
     let _ = audit::write(
-        &db,
-        rid,
-        Some(&community_id),
-        Some(&membership_id),
-        "invite_code",
-        Some(&invite_id),
-        "redeemed",
+        &db, rid, Some(&community_id), Some(&membership_id),
+        "invite_code", Some(&invite_id), "redeemed",
         Some(serde_json::json!({ "membership_id": membership_id })),
-    )
-    .await;
-
-    // 6. Set session cookie and redirect to home.
-    let cookie_domain = get_domain(&env);
-    let session_cookie = build_session_cookie(&session_secret, cookie_domain.as_deref());
-    let clear_join = "__join_ticket=; Max-Age=0; Path=/join; HttpOnly; Secure; SameSite=Strict";
+    ).await;
+    let cookie_domain = env.var("SESSION_COOKIE_DOMAIN").ok()
+        .map(|s| s.to_string()).filter(|s| !s.is_empty());
+    let session_cookie = crate::session::build_session_cookie(
+        &session_secret, cookie_domain.as_deref(),
+    );
+    let clear_join   = "__join_ticket=; Max-Age=0; Path=/join; HttpOnly; Secure; SameSite=Strict";
     let clear_ptoken = "__join_ptoken=; Max-Age=0; Path=/join; HttpOnly; Secure; SameSite=Strict";
-
     let mut resp = redirect("/")?;
     resp.headers_mut().set("Set-Cookie", &session_cookie)?;
     resp.headers_mut().append("Set-Cookie", clear_join)?;
@@ -262,17 +352,27 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
     Ok(resp)
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ── Shared helpers ─────────────────────────────────────────────────────────
 
+async fn anon_token(env: &Env) -> Result<String> {
+    #[cfg(target_arch = "wasm32")]
+    if let Ok(mut mgrs) = crate::codlet::build(env).await {
+        use codlet_core::store::token::TokenSubject;
+        return mgrs.token_mgr
+            .issue(&mut mgrs.rng, TokenSubject::Anonymous, "redeem_invite", None)
+            .await
+            .map(|s| s.expose().to_owned())
+            .map_err(|e| worker::Error::RustError(format!("token: {e}")));
+    }
+    use zinnias_ciao_contracts::auth::token_purpose;
+    let pepper = crate::crypto::pepper(env);
+    let db = env.d1("DB")?;
+    crate::form_token::issue(&db, &pepper, "", token_purpose::REDEEM_INVITE, None).await
+}
 
-/// The cookie Domain attribute. Read from the `SESSION_COOKIE_DOMAIN` var
-/// (a normal `[vars]` binding — the domain is not secret material).
-/// Returns `None` when unset/empty so the cookie becomes host-only.
-fn get_domain(env: &Env) -> Option<String> {
-    env.var("SESSION_COOKIE_DOMAIN")
-        .ok()
-        .map(|s| s.to_string())
-        .filter(|s| !s.is_empty())
+async fn refresh_join_form(env: &Env, error: Option<&'static str>) -> Result<Response> {
+    let token = anon_token(env).await?;
+    render_join_form(&token, error)
 }
 
 fn extract_cookie(req: &Request, name: &str) -> Option<String> {
@@ -286,12 +386,6 @@ fn extract_cookie(req: &Request, name: &str) -> Option<String> {
     None
 }
 
-async fn refresh_anon_token(env: &Env) -> Result<String> {
-    let pepper = crate::crypto::pepper(env);
-    let db = env.d1("DB")?;
-    form_token::issue(&db, &pepper, "", token_purpose::REDEEM_INVITE, None).await
-}
-
 fn redirect(url: &str) -> Result<Response> {
     let mut resp = Response::empty()?.with_status(303);
     resp.headers_mut().set("Location", url)?;
@@ -300,14 +394,8 @@ fn redirect(url: &str) -> Result<Response> {
 
 fn render_join_form(token: &str, error: Option<&str>) -> Result<Response> {
     let error_html = error
-        .map(|e| {
-            format!(
-                "<p role=\"alert\" style=\"color:#FF3B30\">{}</p>",
-                escape_html(e)
-            )
-        })
+        .map(|e| format!("<p role=\"alert\" style=\"color:#FF3B30\">{}</p>", escape_html(e)))
         .unwrap_or_default();
-
     let body = format!(
         "<main style=\"padding:2rem;max-width:480px;margin:auto;font-family:system-ui,sans-serif\">\
          <h1 style=\"font-size:1.25rem;font-weight:600\">{heading}</h1>\
@@ -326,41 +414,22 @@ fn render_join_form(token: &str, error: Option<&str>) -> Result<Response> {
          <p style=\"margin-top:1.5rem;color:#6e6e73;font-size:.8125rem\">{hint}</p>\
          </main>",
         heading = i18n::JA_JOIN_HEADING,
-        sub = i18n::JA_JOIN_SUBHEADING,
-        label = i18n::JA_JOIN_CODE_LABEL,
-        token = escape_html(token),
-        submit = i18n::JA_JOIN_SUBMIT,
-        hint = i18n::JA_JOIN_CODE_HINT,
+        sub     = i18n::JA_JOIN_SUBHEADING,
+        label   = i18n::JA_JOIN_CODE_LABEL,
+        token   = escape_html(token),
+        submit  = i18n::JA_JOIN_SUBMIT,
+        hint    = i18n::JA_JOIN_CODE_HINT,
     );
     render::page(i18n::JA_JOIN_PAGE_TITLE, &body)
 }
 
-fn render_profile_form(
-    community_name: &str,
-    token: &str,
-    error: Option<&'static str>,
-) -> Result<Response> {
+fn render_profile_form(token: &str, error: Option<&'static str>) -> Result<Response> {
     let error_html = error
-        .map(|e| {
-            format!(
-                "<p role=\"alert\" style=\"color:#FF3B30\">{}</p>",
-                escape_html(e)
-            )
-        })
+        .map(|e| format!("<p role=\"alert\" style=\"color:#FF3B30\">{}</p>", escape_html(e)))
         .unwrap_or_default();
-    let community_html = if community_name.is_empty() {
-        String::new()
-    } else {
-        format!(
-            "<p style=\"color:#6e6e73\">{}</p>",
-            escape_html(community_name)
-        )
-    };
-
     let body = format!(
         "<main style=\"padding:2rem;max-width:480px;margin:auto;font-family:system-ui,sans-serif\">\
          <h1 style=\"font-size:1.25rem;font-weight:600\">{heading}</h1>\
-         {community_html}\
          <p style=\"color:#6e6e73;font-size:.875rem\">{hint}</p>\
          {error_html}\
          <form method=\"post\" action=\"/join/profile\" style=\"margin-top:1.5rem\">\
@@ -375,10 +444,10 @@ fn render_profile_form(
          </form>\
          </main>",
         heading = i18n::JA_JOIN_PROFILE_HEADING,
-        hint = i18n::JA_JOIN_PROFILE_HINT,
-        label = i18n::JA_JOIN_PROFILE_LABEL,
-        token = escape_html(token),
-        submit = i18n::JA_JOIN_PROFILE_SUBMIT,
+        hint    = i18n::JA_JOIN_PROFILE_HINT,
+        label   = i18n::JA_JOIN_PROFILE_LABEL,
+        token   = escape_html(token),
+        submit  = i18n::JA_JOIN_PROFILE_SUBMIT,
     );
     render::page(i18n::JA_JOIN_PROFILE_PAGE_TITLE, &body)
 }

@@ -18,9 +18,15 @@ database_id   = "local"          # replaced by real ID on deploy
 binding = "RATE_LIMIT"
 id      = "local"
 
+# codlet KV namespace for rate-limiting (RFC-033)
+[[kv_namespaces]]
+binding = "CODLET_RL"
+id      = "local"
+
 # Secret bindings — set via `wrangler secret put` in each environment.
 # Never hard-coded here.
-#   HMAC_PEPPER     — server pepper for invite-code and session HMAC (AD-3)
+#   HMAC_PEPPER           — legacy server pepper (pre-codlet sessions, AD-3)
+#   CODLET_HMAC_KEY_V1    — codlet HMAC key (generate: openssl rand -hex 32)
 #
 # SESSION_COOKIE_DOMAIN is a normal [vars] binding (not secret — the domain is
 # not sensitive). Set it per-environment below. Leave unset/empty for a

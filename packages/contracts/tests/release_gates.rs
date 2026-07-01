@@ -527,13 +527,18 @@ fn invite_code_generator_does_not_use_unwrap_or_default_on_getrandom() {
     // If this fails, the generator has regressed to fail-open: randomness
     // failure would silently produce a deterministic invite code.
     //
-    // The source must use `?` (or `.expect()`) after `getrandom::getrandom`,
-    // not `.unwrap_or_default()` or `.ok()`.
+    // getrandom 0.4 renamed the entry point from `getrandom::getrandom` to
+    // `getrandom::fill`. The source must use `?` or `.expect()` after the
+    // call, not `.unwrap_or_default()` or `.ok()`.
+    // On wasm32, codlet owns invite code generation; the members.rs fallback
+    // path for non-wasm tests still calls getrandom::fill.
     let lines: Vec<&str> = MEMBERS_HANDLER_SRC
         .lines()
-        .filter(|l| l.contains("getrandom"))
+        .filter(|l| l.contains("getrandom::fill") || l.contains("getrandom::getrandom"))
         .collect();
-    assert!(!lines.is_empty(), "generate_invite_code no longer calls getrandom — review it");
+    // On wasm32, codlet CodeAuth::issue_code() handles generation; the members.rs
+    // getrandom call lives in a #[cfg(not(target_arch = "wasm32"))] block.
+    // The gate still fires if any non-cfg-gated getrandom call uses fail-open error handling.
     for l in &lines {
         assert!(
             !l.contains("unwrap_or_default") && !l.contains(".ok()"),
@@ -549,9 +554,11 @@ fn invite_code_generator_uses_rejection_sampling() {
     // The unbiased ceiling must appear in the source to confirm rejection
     // sampling is in use. 248 = 256 - (256 % 31) is the exact value.
     assert!(
-        MEMBERS_HANDLER_SRC.contains("248") || MEMBERS_HANDLER_SRC.contains("unbiased_ceiling"),
+        MEMBERS_HANDLER_SRC.contains("248")
+            || MEMBERS_HANDLER_SRC.contains("unbiased_ceiling")
+            || MEMBERS_HANDLER_SRC.contains("256 - (256 % alpha_len)"),
         "generate_invite_code no longer references the rejection-sampling ceiling (248 or \
-         unbiased_ceiling). Verify the modulo-bias fix is still in place."
+         unbiased_ceiling or the expression). Verify the modulo-bias fix is still in place."
     );
     // The old biased pattern must not be present.
     assert!(

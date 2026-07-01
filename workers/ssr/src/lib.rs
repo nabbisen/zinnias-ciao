@@ -2,6 +2,8 @@ use worker::*;
 
 mod audit;
 mod authz;
+#[cfg(target_arch = "wasm32")]
+mod codlet;
 mod crypto;
 mod db;
 mod errors;
@@ -76,7 +78,7 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 fn generate_request_id() -> String {
     use std::fmt::Write;
     let mut bytes = [0u8; 8];
-    getrandom::getrandom(&mut bytes).unwrap_or_default();
+    getrandom::fill(&mut bytes).unwrap_or_default();
     let mut s = String::with_capacity(16);
     for b in bytes { let _ = write!(s, "{:02x}", b); }
     s

@@ -2,7 +2,13 @@
 
 ## Status
 
-**v0.36.1** — 43 of 55 RFCs implemented (12 proposed). 223 passing unit tests. Zero warnings.
+**v0.37.0** — 43 of 55 RFCs implemented (12 proposed). 223 passing unit tests. Zero warnings.
+
+**codlet integration (Phase 1) complete.** The join flow, admin invite issuance, and
+session validation now use codlet v0.15.1. Legacy paths remain for native tests and
+the 30-day session grace period. Operator must set `CODLET_HMAC_KEY_V1` secret before
+deploying. All other handlers (event status, notes, admin forms) continue to use the
+existing form_token / session infrastructure; Phase 2 will migrate those.
 
 **Pre-pilot hardening complete.** All in-repo code work for the pilot is done:
 - All user-visible strings are Japanese (RFC-049, v0.30.0–v0.33.1).

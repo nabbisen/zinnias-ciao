@@ -4,7 +4,9 @@
 //! Identity derives from the session row; never from client-supplied headers.
 
 use worker::{Env, Request, Result};
-use zinnias_ciao_contracts::{AppError, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS};
+use zinnias_ciao_contracts::{AppError, SESSION_COOKIE_NAME};
+#[cfg(not(target_arch = "wasm32"))]
+use zinnias_ciao_contracts::SESSION_TTL_SECONDS;
 
 use crate::crypto::hmac_hex;
 use crate::db::session as session_db;
@@ -19,8 +21,17 @@ pub struct AuthContext {
 /// Extract the session cookie, hash it, look it up in D1.
 /// Returns `Ok(AuthContext)` on success, `Err(AppError)` otherwise.
 ///
-/// Error variant tells the handler whether to redirect to /join (expired)
-/// or return 400 (missing cookie on a POST that should have had one).
+/// ## Parallel lookup — 30-day grace period (codlet Option A migration)
+///
+/// New sessions issued after codlet integration are stored in `codlet_sessions`
+/// under codlet's domain-separated HMAC (`codlet/v1/lookup\0session\0value`).
+/// Existing sessions (issued before the migration, up to 30 days old) live in
+/// `sessions` under the legacy HMAC (`hmac_hex(pepper, value)`).
+///
+/// We try the codlet table first (fast path for all new sessions), then fall
+/// back to the legacy table. Once `SELECT COUNT(*) FROM sessions WHERE
+/// revoked_at IS NULL AND expires_at > unixepoch()` returns 0 (or after 30
+/// days from the first codlet deploy), remove the fallback path.
 pub async fn require_auth(req: &Request, env: &Env) -> Result<AuthContext> {
     let pepper = crate::crypto::pepper(env);
 
@@ -28,9 +39,20 @@ pub async fn require_auth(req: &Request, env: &Env) -> Result<AuthContext> {
         worker::Error::RustError(AppError::session_expired().user_message.to_string())
     })?;
 
-    let hmac = hmac_hex(&pepper, &cookie_secret);
-
     let db = env.d1("DB")?;
+
+    // ── Codlet path (new sessions) ────────────────────────────────────────
+    // Try codlet_sessions first; this is the fast path for all sessions
+    // issued after the migration. Fails gracefully if the table doesn't exist
+    // yet (e.g. before migration 0007 runs) so existing sessions still work.
+    #[cfg(target_arch = "wasm32")]
+    if let Ok(Some(ctx)) = try_codlet_session(&cookie_secret, env).await {
+        return Ok(ctx);
+    }
+
+    // ── Legacy path (pre-migration sessions) ──────────────────────────────
+    // Falls back to the original sessions table. Remove after 30 days.
+    let hmac = hmac_hex(&pepper, &cookie_secret);
     let session = session_db::find_active(&db, &hmac).await?.ok_or_else(|| {
         worker::Error::RustError(AppError::session_expired().user_message.to_string())
     })?;
@@ -39,6 +61,43 @@ pub async fn require_auth(req: &Request, env: &Env) -> Result<AuthContext> {
         session_id: session.id,
         user_id: session.user_id,
     })
+}
+
+/// Try to validate a session against codlet_sessions (wasm32 only).
+/// Returns `Ok(None)` for any miss or error so the legacy path runs.
+#[cfg(target_arch = "wasm32")]
+async fn try_codlet_session(cookie_secret: &str, env: &worker::Env) -> worker::Result<Option<AuthContext>> {
+    use codlet_core::state::SessionValidationOutcome;
+    use codlet_worker::{D1SessionStore, D1TableConfig, WorkerKeyProvider};
+    use codlet_core::{auth::SessionManager, clock::SystemClock, audit::NoopAuditSink,
+                      cookie::CookiePolicy, hashing::SecretHasher};
+    use std::rc::Rc;
+    use std::time::Duration;
+
+    // Build a minimal session manager — just key provider + session store.
+    let key_provider = match WorkerKeyProvider::from_env(env, "v1", "CODLET_HMAC_KEY_V1", &[]) {
+        Ok(k) => k,
+        Err(_) => return Ok(None), // CODLET_HMAC_KEY_V1 not configured yet
+    };
+    let db = Rc::new(env.d1("DB")?);
+    let session_store = D1SessionStore::new(db, D1TableConfig::default());
+    let cookie_policy = CookiePolicy::production_strict(
+        "ciao_sid", Duration::from_secs(30 * 24 * 3600),
+    );
+    let mgr = SessionManager::new(
+        session_store, SecretHasher::new(key_provider),
+        SystemClock::new(), NoopAuditSink, cookie_policy,
+    );
+
+    match mgr.validate(cookie_secret).await {
+        Ok(SessionValidationOutcome::Authenticated { subject, session_id, .. }) => {
+            Ok(Some(AuthContext {
+                session_id: session_id.as_str().to_owned(),
+                user_id: subject.as_str().to_owned(),
+            }))
+        }
+        _ => Ok(None),
+    }
 }
 
 /// Parse a named cookie from the `Cookie` request header.
@@ -57,11 +116,9 @@ fn extract_cookie(req: &Request, name: &str) -> Option<String> {
 
 /// Build a `Set-Cookie` header value for the session cookie (RFC-003).
 ///
-/// Max-Age is set from `SESSION_TTL_SECONDS` **only** — never from an
-/// upstream token exp (regression rule, RFC-003 §8).
-/// Build the session cookie. When `domain` is `None` or empty, a host-only
-/// cookie is produced (no `Domain` attribute) — correct for single-host
-/// deployments. A `Domain` is only emitted for explicit cross-subdomain sharing.
+/// Used by the legacy (non-wasm) code path. On wasm32, codlet's
+/// `CookiePolicy::build_set_cookie` handles session cookie construction.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn build_session_cookie(secret: &str, domain: Option<&str>) -> String {
     let domain_part = domain
         .filter(|d| !d.is_empty())
@@ -77,6 +134,9 @@ pub fn build_session_cookie(secret: &str, domain: Option<&str>) -> String {
 }
 
 /// Build a `Set-Cookie` header that clears the session cookie (logout).
+/// Used by the legacy (non-wasm) path; codlet's `CookiePolicy::build_clear_cookie`
+/// handles this on wasm32.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn clear_session_cookie(domain: Option<&str>) -> String {
     let domain_part = domain
         .filter(|d| !d.is_empty())

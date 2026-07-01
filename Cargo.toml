@@ -7,7 +7,7 @@ members = [
 ]
 
 [workspace.package]
-version     = "0.36.1"
+version     = "0.37.0"
 edition     = "2024"
 license     = "Apache-2.0"
 authors     = ["nabbisen"]
@@ -15,6 +15,7 @@ repository  = "https://github.com/nabbisen/zinnias-ciao"
 
 [workspace.dependencies]
 worker      = { version = "0.8", features = ["d1", "http"] }
+worker-kv   = { version = "0.9" }                              # direct dep for codlet-worker KvRateLimitStore
 serde       = { version = "1",       features = ["derive"] }
 serde_json  = { version = "1" }
 thiserror   = { version = "2" }
@@ -23,7 +24,11 @@ uuid        = { version = "1",       features = ["v4"] }
 hmac        = { version = "0.12" }
 sha2        = { version = "0.10" }
 hex         = { version = "0.4" }
-getrandom   = { version = "0.2",     features = ["js"] }  # js feature required for wasm32 target
+getrandom   = { version = "0.4",     features = ["wasm_js"] }  # wasm_js feature required for wasm32 target
+
+# codlet auth library (wasm32-only; target-gated in workers/ssr/Cargo.toml)
+codlet-core   = { git = "https://github.com/nabbisen/codlet", tag = "v0.15.1" }
+codlet-worker = { git = "https://github.com/nabbisen/codlet", tag = "v0.15.1" }
 
 [profile.release]
 opt-level = "s"   # minimise WASM bundle size

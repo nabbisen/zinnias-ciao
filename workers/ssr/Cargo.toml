@@ -22,7 +22,17 @@ time       = { workspace = true }
 hmac       = { workspace = true }
 sha2       = { workspace = true }
 hex        = { workspace = true }
-getrandom  = { workspace = true }
+
+# codlet is wasm32-only; native tests use codlet-core types directly
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+codlet-core   = { workspace = true }
+codlet-worker = { workspace = true }
+worker-kv     = { workspace = true }
+getrandom     = { workspace = true }  # crypto.rs random_token + generate_request_id
+
+# getrandom needed directly in admin/members.rs non-wasm fallback path
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+getrandom = { workspace = true }
 
 [dev-dependencies]
 # SSR worker tests run via `cargo test` in native mode for handler logic;

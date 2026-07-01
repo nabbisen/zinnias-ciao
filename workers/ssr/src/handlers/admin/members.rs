@@ -5,7 +5,9 @@ use worker::{Env, Request, Response, Result};
 
 use crate::audit;
 use crate::authz::require_admin;
-use crate::crypto::{hmac_hex, normalize_invite_code, random_token};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::crypto::{hmac_hex, normalize_invite_code};
+use crate::crypto::random_token;
 use crate::db::{self, invite as invite_db, membership as membership_db};
 use crate::form_token;
 use crate::render;
@@ -157,19 +159,64 @@ pub async fn post_generate_invite(
         return redirect(&format!("/c/{community_id}/admin/invites"));
     }
 
-    let code = generate_invite_code()?;
-    let normalized = normalize_invite_code(&code);
-    let code_hmac = hmac_hex(&pp, &normalized);
-    let invite_id = random_token()[..24].to_owned();
-    let expires_at = db::add_seconds_to_now(86_400);
+    // ── codlet path (wasm32) ───────────────────────────────────────────────
+    #[cfg(target_arch = "wasm32")]
+    {
+        use codlet_core::secret::CodeId;
 
-    invite_db::insert(&db, &invite_id, community_id, &code_hmac,
-        &membership.membership_id, &expires_at, "member").await?;
+        let mut mgrs = crate::codlet::build(env)
+            .await
+            .map_err(|e| worker::Error::RustError(format!("codlet: {e}")))?;
 
-    let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
-        "invite_code", Some(&invite_id), "generated", None).await;
+        // Generate a random CodeId; codlet generates the code internally.
+        let invite_id = &random_token()[..24];
+        let code_id   = CodeId::new(invite_id.to_owned().into());
 
-    redirect(&format!("/c/{community_id}/admin/invites?code={code}"))
+        // issue_code: generates code, hashes it, inserts into codlet_codes.
+        // scope = community_id; grant = "role:member" (admin invites are member by default).
+        let (_record, plain_code) = mgrs.code_auth.issue_code(
+            &mut mgrs.rng,
+            code_id,
+            Some("invite".to_owned()),
+            Some(community_id.to_owned()),            // scope
+            Some("role:member".to_owned()),           // grant_payload
+        ).await.map_err(|e| worker::Error::RustError(format!("issue_code: {e}")))?;
+
+        let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
+            "invite_code", Some(invite_id), "generated", None).await;
+
+        let code = plain_code.expose().to_owned();
+        return redirect(&format!("/c/{community_id}/admin/invites?code={code}"));
+    }
+
+    // ── legacy fallback (non-wasm / native tests) ──────────────────────────
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use zinnias_ciao_domain::invite::{INVITE_CODE_ALPHABET, INVITE_CODE_LEN};
+
+        // Inline rejection-sampling generator for the non-wasm path (tests).
+        let alpha_len = INVITE_CODE_ALPHABET.len();
+        let ceiling   = 256 - (256 % alpha_len);
+        let mut code  = String::with_capacity(INVITE_CODE_LEN);
+        while code.len() < INVITE_CODE_LEN {
+            let mut buf = [0u8; 1];
+            getrandom::fill(&mut buf)
+                .map_err(|e| worker::Error::RustError(format!("rng: {e}")))?;
+            let b = buf[0] as usize;
+            if b < ceiling {
+                code.push(INVITE_CODE_ALPHABET[b % alpha_len] as char);
+            }
+        }
+        let normalized = normalize_invite_code(&code);
+        let code_hmac  = hmac_hex(&pp, &normalized);
+        let invite_id  = random_token()[..24].to_owned();
+        let expires_at = db::add_seconds_to_now(86_400);
+        invite_db::insert(&db, &invite_id, community_id, &code_hmac,
+            &membership.membership_id, &expires_at, "member").await?;
+        let _ = audit::write(&db, rid, Some(community_id), Some(&membership.membership_id),
+            "invite_code", Some(&invite_id), "generated", None).await;
+        redirect(&format!("/c/{community_id}/admin/invites?code={code}"))
+    }
 }
 
 // ── POST /c/:cid/admin/invites/:iid/revoke ───────────────────────────────
@@ -391,35 +438,6 @@ pub async fn post_remove_member(
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-/// Generate a 6-char invite code from the safe alphabet (no ambiguous chars).
-///
-/// # Fail-closed (security fix §7.1)
-/// Returns `Err` if the OS RNG is unavailable rather than silently producing a
-/// deterministic code. Matches `crypto::random_token`'s `.expect()` discipline.
-///
-/// # Rejection sampling (security fix §7.2)
-/// The alphabet has 31 characters. `256 % 31 = 8`, so naive `b % 31` makes the
-/// first 8 characters ~0.4% more likely than the rest (modulo bias). Bytes in the
-/// biased tail (>= 248) are discarded and resampled. Expected extra draws per
-/// character ≈ 0.03 — negligible overhead.
-fn generate_invite_code() -> worker::Result<String> {
-    use zinnias_ciao_domain::invite::{INVITE_CODE_ALPHABET, INVITE_CODE_LEN};
-    let alpha_len = INVITE_CODE_ALPHABET.len(); // 31
-    // Largest multiple of 31 that fits in a u8: 248 = 31 × 8.
-    // Bytes >= 248 are discarded (rejection sampling).
-    let unbiased_ceiling: usize = 256 - (256 % alpha_len); // 248
-
-    let mut code = String::with_capacity(INVITE_CODE_LEN);
-    while code.len() < INVITE_CODE_LEN {
-        let mut buf = [0u8; 1];
-        getrandom::getrandom(&mut buf)
-            .map_err(|e| worker::Error::RustError(
-                format!("invite code generation: RNG unavailable: {e}")))?;
-        let b = buf[0] as usize;
-        if b < unbiased_ceiling {
-            code.push(INVITE_CODE_ALPHABET[b % alpha_len] as char);
-        }
-        // else: discard and redraw
-    }
-    Ok(code)
-}
+// generate_invite_code() removed — codlet CodeAuth::issue_code() handles
+// generation with fail-closed RNG and rejection sampling (INV-3, RFC-003 §4).
+// Called via crate::codlet::build(env) in post_generate_invite.
