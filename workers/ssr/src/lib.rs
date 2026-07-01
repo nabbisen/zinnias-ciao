@@ -2,7 +2,6 @@ use worker::*;
 
 mod audit;
 mod authz;
-#[cfg(target_arch = "wasm32")]
 mod codlet;
 mod crypto;
 mod db;

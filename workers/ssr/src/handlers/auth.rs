@@ -7,7 +7,6 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 
 use crate::db::session as session_db;
-use crate::form_token;
 use crate::session::require_auth;
 
 pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
@@ -19,13 +18,11 @@ pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Respo
     let body      = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
 
-    let pepper = crate::crypto::pepper(env);
     let db     = env.d1("DB")?;
 
-    // Validate the logout CSRF form token (legacy path — covers both wasm32
-    // and non-wasm since all form tokens still go through the service table).
-    let _ = form_token::consume(
-        &db, &pepper, &auth.user_id,
+    // Validate the logout CSRF form token.
+    let _ = crate::codlet::consume_token(
+        env, &auth.user_id,
         token_purpose::LOGOUT, &raw_token, None,
     ).await?;
 

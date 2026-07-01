@@ -13,7 +13,6 @@ use crate::authz::require_admin;
 use crate::crypto::random_token;
 use crate::db::{event_template as tmpl_db, membership as membership_db};
 use zinnias_ciao_contracts::i18n;
-use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
 
@@ -38,12 +37,11 @@ pub async fn get_templates(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
-    let create_token = form_token::issue(
-        &db, &pp, &auth.user_id,
+    let create_token = crate::codlet::issue_token(
+        env, &auth.user_id,
         token_purpose::CREATE_TEMPLATE, Some(community_id),
-    ).await.unwrap_or_default();
+    ).await;
 
     let templates = tmpl_db::list_active(&db, community_id).await.unwrap_or_default();
     let communities = membership_db::list_communities_for_user(&db, &auth.user_id)
@@ -62,10 +60,10 @@ pub async fn get_templates(
     // Build template list rows
     let mut list_html = String::new();
     for t in &templates {
-        let delete_tok = form_token::issue(
-            &db, &pp, &auth.user_id,
-            token_purpose::DELETE_TEMPLATE, Some(&t.id),
-        ).await.unwrap_or_default();
+        let delete_tok = crate::codlet::issue_token(
+        env, &auth.user_id,
+        token_purpose::DELETE_TEMPLATE, Some(&t.id),
+    ).await;
 
         let dur_label = t.duration_minutes
             .map(|d| format!(" · {}min", d))
@@ -186,12 +184,11 @@ pub async fn post_create_template(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(
-        &db, &pp, &auth.user_id,
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
         token_purpose::CREATE_TEMPLATE, &raw_token, Some(community_id),
     ).await?;
     if replay.is_some() {
@@ -241,12 +238,11 @@ pub async fn post_delete_template(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(
-        &db, &pp, &auth.user_id,
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
         token_purpose::DELETE_TEMPLATE, &raw_token, Some(template_id),
     ).await?;
     if replay.is_some() {

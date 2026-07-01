@@ -13,7 +13,6 @@ use zinnias_ciao_contracts::auth::token_purpose;
 use crate::authz::require_admin;
 use crate::db::{self, community as community_db, membership as membership_db};
 use zinnias_ciao_contracts::i18n;
-use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
 
@@ -32,13 +31,12 @@ pub async fn get_export_page(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     // Issue a one-time download token bound to this admin.
-    let dl_token = form_token::issue(
-        &db, &pp, &auth.user_id,
+    let dl_token = crate::codlet::issue_token(
+        env, &auth.user_id,
         token_purpose::COMMUNITY_EXPORT, Some(community_id),
-    ).await.unwrap_or_default();
+    ).await;
 
     let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
         .await.unwrap_or_default();
@@ -107,7 +105,6 @@ pub async fn get_export_json(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     // Validate the one-time download token from the query string.
     let url = req.url()?;
@@ -116,8 +113,8 @@ pub async fn get_export_json(
         .map(|(_, v)| v.to_string())
         .unwrap_or_default();
 
-    let replay = form_token::consume(
-        &db, &pp, &auth.user_id,
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
         token_purpose::COMMUNITY_EXPORT, &raw_token, Some(community_id),
     ).await?;
     if replay.is_some() {

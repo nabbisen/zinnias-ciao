@@ -6,7 +6,6 @@ use worker::{Env, Request, Response, Result};
 use crate::audit;
 use crate::authz::require_admin;
 use crate::db::{self, event as event_db, event_write, membership as membership_db};
-use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
 use crate::handlers::event::classify_day;
@@ -34,9 +33,10 @@ pub async fn get_create_event(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
-    let token = form_token::issue(&db, &pp, &auth.user_id,
-        token_purpose::CREATE_EVENT, None).await.unwrap_or_default();
+    let token = crate::codlet::issue_token(
+        env, &auth.user_id,
+        token_purpose::CREATE_EVENT, None,
+    ).await;
 
     let _community = db::community::find_active(&db, community_id).await?;
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
@@ -104,13 +104,14 @@ pub async fn post_create_event(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
 
-    let replay = form_token::consume(&db, &pp, &auth.user_id,
-        token_purpose::CREATE_EVENT, &raw_token, None).await?;
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
+        token_purpose::CREATE_EVENT, &raw_token, None,
+    ).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/home"));
     }
@@ -206,9 +207,10 @@ pub async fn get_cancel_event(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
-    let token = form_token::issue(&db, &pp, &auth.user_id,
-        token_purpose::CANCEL_EVENT, Some(event_id)).await.unwrap_or_default();
+    let token = crate::codlet::issue_token(
+        env, &auth.user_id,
+        token_purpose::CANCEL_EVENT, Some(event_id),
+    ).await;
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
         Some(e) => e,
@@ -268,12 +270,13 @@ pub async fn post_cancel_event(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(&db, &pp, &auth.user_id,
-        token_purpose::CANCEL_EVENT, &raw_token, Some(event_id)).await?;
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
+        token_purpose::CANCEL_EVENT, &raw_token, Some(event_id),
+    ).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
@@ -321,10 +324,10 @@ pub async fn get_edit_event(
             &format!("<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
                 i18n::JA_ADMIN_EDIT_STARTED, i18n::JA_GENERAL_BACK));
     }
-
-    let pp = crate::crypto::pepper(env);
-    let token = form_token::issue(&db, &pp, &auth.user_id,
-        token_purpose::EDIT_EVENT, Some(event_id)).await.unwrap_or_default();
+    let token = crate::codlet::issue_token(
+        env, &auth.user_id,
+        token_purpose::EDIT_EVENT, Some(event_id),
+    ).await;
 
     // Prefill date/time from the existing day, converted UTC → community-local.
     // Only single-day events support time editing; multi-day events edit details only.
@@ -410,12 +413,13 @@ pub async fn post_edit_event(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(&db, &pp, &auth.user_id,
-        token_purpose::EDIT_EVENT, &raw_token, Some(event_id)).await?;
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
+        token_purpose::EDIT_EVENT, &raw_token, Some(event_id),
+    ).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
@@ -526,11 +530,11 @@ pub async fn get_attendance(
 
     let days = event_db::days_for_event(&db, event_id).await?;
     let members = membership_db::list_all_active(&db, community_id).await?;
-
-    let pp = crate::crypto::pepper(env);
     // One token per (event, admin) covers the whole batch form.
-    let token = form_token::issue(&db, &pp, &auth.user_id,
-        token_purpose::ATTENDANCE_OVERRIDE, Some(event_id)).await.unwrap_or_default();
+    let token = crate::codlet::issue_token(
+        env, &auth.user_id,
+        token_purpose::ATTENDANCE_OVERRIDE, Some(event_id),
+    ).await;
 
     let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let community_pairs: Vec<(String,String)> = communities_for_switcher.iter()
@@ -639,12 +643,13 @@ pub async fn post_attendance(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let form = req.form_data().await?;
     let raw_token = form.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(&db, &pp, &auth.user_id,
-        token_purpose::ATTENDANCE_OVERRIDE, &raw_token, Some(event_id)).await?;
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
+        token_purpose::ATTENDANCE_OVERRIDE, &raw_token, Some(event_id),
+    ).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
@@ -698,10 +703,11 @@ pub async fn get_admin_hide_note_confirm(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
-    let token = form_token::issue(&db, &pp, &auth.user_id,
-        token_purpose::ADMIN_HIDE_NOTE, Some(event_id)).await.unwrap_or_default();
+    let token = crate::codlet::issue_token(
+        env, &auth.user_id,
+        token_purpose::ADMIN_HIDE_NOTE, Some(event_id),
+    ).await;
 
     // Resolve the target member's display name for the confirmation copy.
     let all = membership_db::list_all_active(&db, community_id).await?;
@@ -710,8 +716,7 @@ pub async fn get_admin_hide_note_confirm(
         .map(|m| m.display_name.as_str())
         .unwrap_or("this member");
 
-    let communities = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await.unwrap_or_default();
+    let communities = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let pairs: Vec<(String, String)> = communities.iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone())).collect();
     let nav = render::bottom_nav(community_id, "home");
@@ -767,12 +772,13 @@ pub async fn post_admin_hide_note(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(&db, &pp, &auth.user_id,
-        token_purpose::ADMIN_HIDE_NOTE, &raw_token, Some(event_id)).await?;
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
+        token_purpose::ADMIN_HIDE_NOTE, &raw_token, Some(event_id),
+    ).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }

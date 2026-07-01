@@ -13,7 +13,6 @@ use crate::db::{
     event_note as note_db,
     membership as membership_db,
 };
-use crate::form_token;
 use crate::render::{self, ParticipantEntry};
 use crate::session::require_auth;
 use zinnias_ciao_domain::{
@@ -45,7 +44,6 @@ pub async fn get_event_detail(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
         Some(e) => e,
@@ -85,10 +83,10 @@ pub async fn get_event_detail(
     // event (and community) before mutating, so a single event-bound token is
     // safe and removes the per-day D1 write that previously scaled with the
     // number of recurring occurrences.
-    let status_token = form_token::issue(
-        &db, &pp, &auth.user_id,
+    let status_token = crate::codlet::issue_token(
+        env, &auth.user_id,
         token_purpose::SET_STATUS, Some(event_id),
-    ).await.unwrap_or_default();
+    ).await;
 
     // ── Days section ─────────────────────────────────────────────────────
     let mut days_html = String::new();
@@ -168,10 +166,10 @@ pub async fn get_event_detail(
     }
 
     // ── Note section ─────────────────────────────────────────────────────
-    let save_token = form_token::issue(
-        &db, &pp, &auth.user_id,
+    let save_token = crate::codlet::issue_token(
+        env, &auth.user_id,
         token_purpose::SAVE_NOTE, Some(event_id),
-    ).await.unwrap_or_default();
+    ).await;
 
     let note_html = render::note_form(
         community_id, event_id,
@@ -279,7 +277,6 @@ pub async fn post_my_status(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token  = body.get_field("_token").unwrap_or_default();
@@ -288,8 +285,8 @@ pub async fn post_my_status(
     // Validate and consume form token (CSRF + idempotency, AD-4).
     // The token is bound to the EVENT (RFC-046); the day is identified by the
     // URL path and validated for event/community ownership below.
-    let replay = form_token::consume(
-        &db, &pp, &auth.user_id,
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
         token_purpose::SET_STATUS, &raw_token, Some(event_id),
     ).await?;
 
@@ -374,14 +371,13 @@ pub async fn post_my_note(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let raw_note  = body.get_field("note").unwrap_or_default();
 
-    let replay = form_token::consume(
-        &db, &pp, &auth.user_id,
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
         token_purpose::SAVE_NOTE, &raw_token, Some(event_id),
     ).await?;
     if replay.is_some() {
@@ -417,14 +413,13 @@ pub async fn get_delete_note_confirm(
     };
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     // Issue a fresh DELETE_NOTE token (the Event Detail page's token is not
     // carried here — this is a new page with its own server-issued token).
-    let token = form_token::issue(
-        &db, &pp, &auth.user_id,
+    let token = crate::codlet::issue_token(
+        env, &auth.user_id,
         token_purpose::DELETE_NOTE, Some(event_id),
-    ).await.unwrap_or_default();
+    ).await;
 
     // Only show the confirmation if the member actually has a note.
     let my_note = note_db::find_mine(&db, event_id, &membership.membership_id).await?;
@@ -484,13 +479,12 @@ pub async fn delete_my_note(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
 
-    let replay = form_token::consume(
-        &db, &pp, &auth.user_id,
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
         token_purpose::DELETE_NOTE, &raw_token, Some(event_id),
     ).await?;
     if replay.is_some() {

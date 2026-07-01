@@ -9,7 +9,6 @@ use crate::authz::require_admin;
 use crate::crypto::{hmac_hex, normalize_invite_code};
 use crate::crypto::random_token;
 use crate::db::{self, invite as invite_db, membership as membership_db};
-use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
 use zinnias_ciao_contracts::i18n;
@@ -34,9 +33,10 @@ pub async fn get_invites(
     };
     let _membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
-    let gen_token = form_token::issue(&db, &pp, &auth.user_id,
-        token_purpose::GENERATE_INVITE, None).await.unwrap_or_default();
+    let gen_token = crate::codlet::issue_token(
+        env, &auth.user_id,
+        token_purpose::GENERATE_INVITE, None,
+    ).await;
 
     let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id).await.unwrap_or_default();
     let community_pairs: Vec<(String,String)> = communities_for_switcher.iter()
@@ -71,8 +71,10 @@ pub async fn get_invites(
 
     let mut code_rows = String::new();
     for inv in &active_codes {
-        let revoke_tok = form_token::issue(&db, &pp, &auth.user_id,
-            token_purpose::REVOKE_INVITE, Some(&inv.id)).await.unwrap_or_default();
+        let revoke_tok = crate::codlet::issue_token(
+        env, &auth.user_id,
+        token_purpose::REVOKE_INVITE, Some(&inv.id),
+    ).await;
         let role_label = if inv.grants_role == "admin" { i18n::JA_ROLE_ADMIN } else { "" };
         let rev = i18n::JA_ADMIN_INVITES_REVOKE;
         let exp_display = inv.expires_at.get(..16).unwrap_or(&inv.expires_at);
@@ -149,12 +151,15 @@ pub async fn post_generate_invite(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
+    #[cfg(not(target_arch = "wasm32"))]
     let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(&db, &pp, &auth.user_id,
-        token_purpose::GENERATE_INVITE, &raw_token, None).await?;
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
+        token_purpose::GENERATE_INVITE, &raw_token, None,
+    ).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/admin/invites"));
     }
@@ -234,12 +239,13 @@ pub async fn post_revoke_invite(
     };
     let membership = require_admin(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(&db, &pp, &auth.user_id,
-        token_purpose::REVOKE_INVITE, &raw_token, Some(invite_id)).await?;
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
+        token_purpose::REVOKE_INVITE, &raw_token, Some(invite_id),
+    ).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/admin/invites"));
     }
@@ -338,9 +344,10 @@ pub async fn get_remove_member(
     }
 
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
-    let token = form_token::issue(&db, &pp, &auth.user_id,
-        token_purpose::REMOVE_MEMBER, Some(target_membership_id)).await.unwrap_or_default();
+    let token = crate::codlet::issue_token(
+        env, &auth.user_id,
+        token_purpose::REMOVE_MEMBER, Some(target_membership_id),
+    ).await;
 
     // Find the target member name
     let all = membership_db::list_all_active(&db, community_id).await?;
@@ -410,12 +417,13 @@ pub async fn post_remove_member(
     }
 
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(&db, &pp, &auth.user_id,
-        token_purpose::REMOVE_MEMBER, &raw_token, Some(target_membership_id)).await?;
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
+        token_purpose::REMOVE_MEMBER, &raw_token, Some(target_membership_id),
+    ).await?;
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/admin/members"));
     }

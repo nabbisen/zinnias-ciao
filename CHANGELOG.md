@@ -2,6 +2,59 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.38.0] — 2026-06-15
+
+Codlet integration Phase 2: all remaining form tokens migrated to `codlet_form_tokens`.
+
+### Changed
+
+- **All handler form tokens now use `codlet::issue_token` / `codlet::consume_token`.**
+  Every `form_token::issue` and `form_token::consume` call in the following files has
+  been replaced with the codlet-backed equivalents:
+  `handlers/me.rs`, `handlers/auth.rs`, `handlers/event.rs`,
+  `handlers/admin/events.rs`, `handlers/admin/members.rs`,
+  `handlers/calendar.rs`, `handlers/export.rs`, `handlers/templates.rs`.
+
+  On wasm32 (production): tokens are written to and read from `codlet_form_tokens`
+  via codlet's `FormTokenManager`. On non-wasm (native tests): the functions fall
+  through to the legacy `form_token::issue/consume` functions via the same D1
+  `form_tokens` table, so all 223 tests continue to pass unchanged.
+
+  The fallback on wasm32 (when `CODLET_HMAC_KEY_V1` is not configured) also routes
+  to the legacy table, ensuring a safe zero-downtime deployment: tokens issued
+  before `CODLET_HMAC_KEY_V1` is set are still accepted.
+
+- **`codlet::consume_token` signature simplified.**
+  The `db` and `pepper` parameters were removed — they are now obtained from `env`
+  inside the fallback branch. Every call site dropped `env, &db, &pp,` → `env,`,
+  eliminating 12 redundant `let pp = crate::crypto::pepper(env)` declarations
+  across handlers. The single remaining `let pp` in `admin/members.rs` is gated
+  `#[cfg(not(target_arch = "wasm32"))]` (used only by the legacy invite issuance
+  code path).
+
+- **`mod codlet` made unconditionally available.**
+  The `#[cfg(target_arch = "wasm32")]` gate was removed from the `mod codlet`
+  declaration in `lib.rs`. The wasm32-only internals (`build`, `build_session_mgr`,
+  `build_token_mgr`, `CodletManagers`, etc.) retain their per-item `#[cfg]` gates.
+  `issue_token` and `consume_token` are available on all targets, each dispatching
+  to codlet on wasm32 or to the legacy module on native, with no cfg at the call
+  site.
+
+### Migration status after v0.38.0
+
+| Component | Status |
+|---|---|
+| Invite code issuance | ✅ codlet (`codlet_codes`) on wasm32 |
+| Session issuance | ✅ codlet (`codlet_sessions`) on wasm32 |
+| Session validation | ✅ codlet first, legacy fallback |
+| Session revocation (logout) | ✅ codlet on wasm32 |
+| Form tokens (all handlers) | ✅ codlet (`codlet_form_tokens`) on wasm32 |
+| Legacy table removal | ⏳ After 30-day grace period (Task 1) |
+
+### Testing
+
+- 223 passing. Zero warnings (native). wasm32: zero errors, zero warnings.
+
 ## [0.37.2] — 2026-06-15
 
 Codlet migration: fix two per-request overhead issues identified in post-integration audit.

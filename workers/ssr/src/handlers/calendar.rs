@@ -13,7 +13,6 @@ use zinnias_ciao_contracts::i18n;
 use crate::authz::require_membership;
 use crate::crypto::{hmac_hex, random_token};
 use crate::db::{self, calendar as cal_db};
-use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
 
@@ -34,14 +33,14 @@ pub async fn get_me_calendar(
     let db = env.d1("DB")?;
     let pp = crate::crypto::pepper(env);
 
-    let regen_token = form_token::issue(
-        &db, &pp, &auth.user_id,
+    let regen_token = crate::codlet::issue_token(
+        env, &auth.user_id,
         token_purpose::CALENDAR_REGENERATE, None,
-    ).await.unwrap_or_default();
-    let revoke_token = form_token::issue(
-        &db, &pp, &auth.user_id,
+    ).await;
+    let revoke_token = crate::codlet::issue_token(
+        env, &auth.user_id,
         token_purpose::CALENDAR_REVOKE, None,
-    ).await.unwrap_or_default();
+    ).await;
 
     let active = cal_db::find_active_for_membership(&db, &membership.membership_id, community_id).await
         .unwrap_or(None);
@@ -173,8 +172,8 @@ pub async fn post_regenerate_calendar(
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(
-        &db, &pp, &auth.user_id,
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
         token_purpose::CALENDAR_REGENERATE, &raw_token, None,
     ).await?;
     if replay.is_some() {
@@ -214,12 +213,11 @@ pub async fn post_revoke_calendar(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let replay = form_token::consume(
-        &db, &pp, &auth.user_id,
+    let replay = crate::codlet::consume_token(
+        env, &auth.user_id,
         token_purpose::CALENDAR_REVOKE, &raw_token, None,
     ).await?;
     if replay.is_some() {

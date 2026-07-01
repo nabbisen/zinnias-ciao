@@ -6,7 +6,6 @@ use worker::{Env, Request, Response, Result};
 use crate::authz::require_membership;
 use zinnias_ciao_contracts::i18n;
 use crate::db::{self, membership as membership_db};
-use crate::form_token;
 use crate::render;
 use crate::session::require_auth;
 
@@ -22,11 +21,11 @@ pub async fn get_me(
     };
     let membership = require_membership(&env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
 
-    let logout_token = form_token::issue(
-        &db, &pp, &auth.user_id, token_purpose::LOGOUT, None,
-    ).await.unwrap_or_default();
+    let logout_token = crate::codlet::issue_token(
+        env, &auth.user_id,
+        token_purpose::LOGOUT, None,
+    ).await;
 
     let community = db::community::find_active(&db, community_id).await?;
     let community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or("");
