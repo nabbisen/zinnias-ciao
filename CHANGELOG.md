@@ -2,6 +2,35 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.32.0] — 2026-06-12
+
+Complete Japanese rendering: home card dates and labels; render.rs tests.
+
+### Changed
+
+- **Home event card fully Japanese.** Several strings in `render::event_card` and
+  its date-display helpers were hardcoded English and missed by the RFC-049
+  `i18n::EN_*` sweep:
+  - `apply_offset_display` / `parse_utc_display` — home card date labels now use
+    `tz::date_label_ja`, producing e.g. `6月14日（土） 09:00` instead of `"Jun 14, 09:00"`.
+  - Status counts row — `"Going N · No Go N · No answer N"` replaced with
+    `JA_STATUS_GOING`, `JA_STATUS_NOT_GOING`, `JA_STATUS_NO_ANSWER`.
+  - `"Cancelled"` event badge — replaced with `JA_ADMIN_CANCEL_EVENT_CONFIRM`.
+  - `"N days"` multi-day badge — replaced with `N 日間`.
+  - `admin_note_hide_form` link label — replaced with `JA_NOTE_DELETE`.
+  - Empty participant list message — replaced with `JA_EVENT_MEMBER_FALLBACK`.
+
+### Testing
+
+- **5 new render tests** (213 total, was 208):
+  - `parse_utc_display_uses_ja_format` — asserts the home card date contains 月/日,
+    not "Jun". This is a regression guard against EN date format re-appearing.
+  - `status_display_going` / `status_display_not_going` — assert labels are not
+    English ("Going", "No Go").
+  - `status_display_no_answer_is_default` — unknown status maps to the No Answer label.
+  - `initials_japanese_name` — kanji name produces two-character initials.
+- Zero warnings.
+
 ## [0.31.0] — 2026-06-12
 
 Final in-repo pre-pilot work: offline submit-button contract.
@@ -462,6 +491,11 @@ All documentation was verified against the codebase. Issues found and corrected:
   and RFC index.
 
 - **`NOTICE`**: Apache-2.0 required notice file (was missing).
+
+- **`HANDOFF.md`**: session handoff document capturing exact state for next
+  session: version, test count, token purposes, mandatory verification commands,
+  per-release summary, what remains, key files, architecture reminders, and version
+  bump procedure. Kept at project root for easy access.
 
 ## [0.19.0] — 2026-06-12
 

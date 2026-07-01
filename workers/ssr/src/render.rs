@@ -380,15 +380,17 @@ pub fn admin_note_hide_form(
     _token: &str, // token now issued on the confirmation page (RFC-043)
 ) -> String {
     // Navigate to the route-backed confirmation page; no JS confirm() needed.
+    let label = zinnias_ciao_contracts::i18n::JA_NOTE_DELETE;
     format!(
         "<a href=\"/c/{cid}/admin/events/{eid}/notes/{mid}/hide\" \
          style=\"font-size:.75rem;color:{danger};padding:.25rem .375rem;\
          min-height:44px;line-height:44px;display:inline-block;text-decoration:none\" \
-         aria-label=\"Remove note\">Remove note</a>",
+         aria-label=\"{lbl}\">{lbl}</a>",
         cid    = escape_html(community_id),
         eid    = escape_html(event_id),
         mid    = escape_html(target_membership_id),
         danger = CZ_COLOR_DANGER,
+        lbl    = label,
     )
 }
 
@@ -416,16 +418,23 @@ pub fn event_card(
     let (_, icon, label) = status_display(my_status);
     let (sc, _, _) = status_display(my_status);
     let cancelled_badge = if is_cancelled {
-        "<span style=\"font-size:.75rem;background:#FF3B30;color:#FFFFFF;\
-         border-radius:99px;padding:.125rem .5rem;margin-left:.5rem\">Cancelled</span>"
-    } else { "" };
+        format!("<span style=\"font-size:.75rem;background:#FF3B30;color:#FFFFFF;\
+         border-radius:99px;padding:.125rem .5rem;margin-left:.5rem\">{}</span>",
+         zinnias_ciao_contracts::i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM)
+    } else { String::new() };
     let multi_badge = if total_days > 1 {
-        format!("<span style=\"font-size:.75rem;color:#6E6E73\"> · {total_days} days</span>")
+        format!("<span style=\"font-size:.75rem;color:#6E6E73\"> · {total_days} 日間</span>")
     } else { String::new() };
     let loc_html = location.map(|l| format!(
         "<span style=\"color:#6E6E73;font-size:.875rem\"> · {}</span>",
         escape_html(l)
     )).unwrap_or_default();
+    let counts_line = format!(
+        "{} {} · {} {} · {} {}",
+        zinnias_ciao_contracts::i18n::JA_STATUS_GOING, going,
+        zinnias_ciao_contracts::i18n::JA_STATUS_NOT_GOING, not_going,
+        zinnias_ciao_contracts::i18n::JA_STATUS_NO_ANSWER, no_answer,
+    );
     let muted = if is_cancelled { "opacity:.5;" } else { "" };
 
     format!(
@@ -441,7 +450,7 @@ pub fn event_card(
              {time}{loc}\
            </div>\
            <div style=\"font-size:.8125rem;color:#6E6E73;margin-top:.375rem\">\
-             Going {going} · No Go {ng} · No answer {na}\
+             {counts}\
            </div>\
          </article></a>",
         cid       = escape_html(community_id),
@@ -451,9 +460,7 @@ pub fn event_card(
         multi     = multi_badge,
         time      = format_day_time_tz(nearest_day, tz),
         loc       = loc_html,
-        going     = going,
-        ng        = not_going,
-        na        = no_answer,
+        counts    = counts_line,
     )
 }
 
@@ -485,16 +492,11 @@ fn utc_to_local_parts(utc: &str, offset_mins: i32) -> (String, String) {
 
 /// Apply a UTC offset and return "Mon D, HH:MM" in local time.
 fn apply_offset_display(utc: &str, offset_mins: i32) -> String {
-    let (date, time_hm) = utc_to_local_parts(utc, offset_mins);
-    let segments: Vec<&str> = date.split('-').collect();
-    if segments.len() < 3 { return parse_utc_display(utc); }
-    let month = match segments[1] {
-        "01" => "Jan", "02" => "Feb", "03" => "Mar", "04" => "Apr",
-        "05" => "May", "06" => "Jun", "07" => "Jul", "08" => "Aug",
-        "09" => "Sep", "10" => "Oct", "11" => "Nov", _   => "Dec",
-    };
-    let day = segments[2].trim_start_matches('0');
-    format!("{month} {day}, {time_hm}")
+    let (local_date, time_hm) = utc_to_local_parts(utc, offset_mins);
+    if local_date.is_empty() { return parse_utc_display(utc); }
+    // Japan-first pilot: use JA date label (e.g. "6月14日 09:00")
+    let date_label = zinnias_ciao_contracts::tz::date_label_ja(&local_date);
+    format!("{date_label} {time_hm}")
 }
 
 /// Apply a UTC offset and return only "HH:MM" in local time.
@@ -503,20 +505,13 @@ fn apply_offset_time(utc: &str, offset_mins: i32) -> String {
 }
 
 fn parse_utc_display(utc: &str) -> String {
-    // "2026-06-14T09:00:00.000Z" -> "Jun 14, 09:00"
+    // Japan-first pilot: "2026-06-14T09:00:00.000Z" -> "6月14日（日） 09:00"
     let parts: Vec<&str> = utc.splitn(2, 'T').collect();
     if parts.len() < 2 { return utc.to_owned(); }
     let date = parts[0];
     let time = parts[1].get(..5).unwrap_or("");
-    let segments: Vec<&str> = date.split('-').collect();
-    if segments.len() < 3 { return utc.to_owned(); }
-    let month = match segments[1] {
-        "01" => "Jan", "02" => "Feb", "03" => "Mar", "04" => "Apr",
-        "05" => "May", "06" => "Jun", "07" => "Jul", "08" => "Aug",
-        "09" => "Sep", "10" => "Oct", "11" => "Nov", _   => "Dec",
-    };
-    let day = segments[2].trim_start_matches('0');
-    format!("{month} {day}, {time}")
+    let date_label = zinnias_ciao_contracts::tz::date_label_ja(date);
+    format!("{date_label} {time}")
 }
 
 fn parse_utc_time(utc: &str) -> String {
@@ -541,7 +536,7 @@ pub struct ParticipantEntry<'a> {
 
 pub fn participant_list(participants: &[ParticipantEntry<'_>]) -> String {
     if participants.is_empty() {
-        return "<p style=\"color:#6E6E73;font-size:.875rem\">No participants yet.</p>".to_owned();
+        return format!("<p style=\"color:#6E6E73;font-size:.875rem\">{}</p>", zinnias_ciao_contracts::i18n::JA_EVENT_MEMBER_FALLBACK);
     }
     let rows: String = participants.iter().map(|p| {
         let initials = initials(p.display_name);
@@ -645,7 +640,45 @@ mod tests {
     }
 
     #[test]
+    fn initials_japanese_name() {
+        // Each kanji is one Unicode char; we take the first two.
+        assert_eq!(initials("田中 花子"), "田花");
+    }
+
+    #[test]
     fn parse_utc_time_basic() {
         assert_eq!(parse_utc_time("2026-06-14T10:30:00.000Z"), "10:30");
+    }
+
+    #[test]
+    fn parse_utc_display_uses_ja_format() {
+        // Home card date display must use Japanese convention, not "Jun 14".
+        let out = parse_utc_display("2026-06-14T09:00:00.000Z");
+        assert!(!out.contains("Jun"),   "must not contain English month: {out}");
+        assert!(out.contains("月"),     "must contain 月: {out}");
+        assert!(out.contains("日"),     "must contain 日: {out}");
+        assert!(out.contains("09:00"),  "must contain time: {out}");
+    }
+
+    #[test]
+    fn status_display_going() {
+        let (_, _, label) = status_display(Some("going"));
+        assert!(!label.is_empty());
+        assert!(!label.contains("Going"), "label must be Japanese, got: {label}");
+    }
+
+    #[test]
+    fn status_display_not_going() {
+        let (_, _, label) = status_display(Some("not_going"));
+        assert!(!label.is_empty());
+        assert!(!label.contains("No Go"), "label must be Japanese, got: {label}");
+    }
+
+    #[test]
+    fn status_display_no_answer_is_default() {
+        let (_, _, label_none) = status_display(None);
+        let (_, _, label_unknown) = status_display(Some("unknown_value"));
+        assert_eq!(label_none, label_unknown, "unknown status must use same label as None");
+        assert!(!label_none.is_empty());
     }
 }
