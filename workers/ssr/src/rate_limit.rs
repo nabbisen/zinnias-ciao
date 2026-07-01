@@ -29,9 +29,8 @@ pub async fn record_failure(env: &Env, ip: &str) {
         Ok(Some(v)) => v.trim().parse::<u32>().unwrap_or(0),
         _ => 0,
     };
-    let _ = kv
-        .put(&key, (current + 1).to_string())
-        .unwrap()
+    let Ok(put) = kv.put(&key, (current + 1).to_string()) else { return };
+    let _ = put
         .expiration_ttl(WINDOW_SECONDS)
         .execute()
         .await;

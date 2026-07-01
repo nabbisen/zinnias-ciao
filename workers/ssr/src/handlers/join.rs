@@ -93,7 +93,7 @@ pub async fn post_join(mut req: Request, env: &Env, _rid: &str) -> Result<Respon
             Some(i18n::JA_JOIN_CODE_HINT),
         );
     }
-    let invite = invite.unwrap();
+    let invite = invite.expect("invite is Some: None case returned early above");
     // Valid code — clear the failure counter so a legitimate user isn't
     // locked out by their own earlier mistakes.
     rate_limit::clear_failures(&env, &client_ip).await;

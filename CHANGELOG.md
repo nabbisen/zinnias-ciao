@@ -2,6 +2,32 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.34.3] — 2026-06-12
+
+Safety: remove silent panic paths in worker hot paths.
+
+### Fixed
+
+- **`rate_limit::record_failure` — removed `.unwrap()` on KV `put()` builder.**
+  `kv.put(key, value)` returns `Result<KvBuilder, KvError>`. The previous
+  `.unwrap()` would panic if the builder construction failed (e.g., a future
+  refactor passes an oversized value). Replaced with `let Ok(put) = … else { return }`
+  — rate-limit failures are already silently degraded (the `let Ok(kv)` guard
+  at function entry does the same); consistency is the goal, not
+  correctness-under-normal-conditions.
+
+- **`join.rs` — `.unwrap()` on `invite` replaced with `.expect(…)`.**
+  The unwrap was safe (guarded by an early return on `None`) but left no
+  explanation. Now `.expect("invite is Some: None case returned early above")`
+  so a future reader can verify the invariant without tracing the control flow.
+
+### Testing
+
+- 216 passing. Zero warnings.
+- Post-fix audit: all remaining `.unwrap()` calls in non-test production paths
+  confirmed absent. Remaining `.unwrap()` calls are exclusively inside
+  `#[cfg(test)]` test functions in `event_admin.rs` and `tz.rs`.
+
 ## [0.34.2] — 2026-06-12
 
 Code quality: wrong keep-note string fixed; set_result documented; parity updated.
