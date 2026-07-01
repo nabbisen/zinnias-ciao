@@ -38,6 +38,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Previously visited Home/Event Detail opens offline with banner. *(RFC-042: authenticated routes are network-only; offline navigation returns the pre-cached static `/offline` page. No stale private page is served.)*
 - [x] Unvisited page shows the offline fallback. *(sw.js `OFFLINE_URL = '/offline'`; shell assets pre-cached on install — code-verified)*
 - [x] Form submit while offline does not falsely succeed. *(sw.js: `if (req.method !== 'GET') return;` — non-GET requests bypass SW and reach network, so browser shows its own network error — code-verified via AD-1)*
+- [x] Status, note, and attendance submit buttons are disabled when `navigator.onLine` is false; Japanese tooltip explains the read-only contract. *(app.js `setOfflineSubmitState` — RFC-055)*
 
 ## UX / accessibility gates
 
@@ -71,20 +72,26 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
 - [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
-- [x] i18n parity test covers all 120 EN/JA string pairs (expanded from 9); catches empty strings and copy-paste errors.
+- [x] i18n parity test covers all 141 EN/JA string pairs (expanded from 9); catches empty strings and copy-paste errors. *(v0.34.0: parity gap closed — 21 new pairs from v0.33.x sweep registered)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
 ## Pre-pilot hardening gates (v0.30.0 — RFC-048, RFC-049 + timezone hardening)
 
 - [x] `Cache-Control: no-store` on all authenticated HTML responses (RFC-048); static assets retain public/max-age.
-- [x] CSP extended: `base-uri 'self'`, `form-action 'self'`, `object-src 'none'` added; `unsafe-inline` exception documented (RFC-048).
+- [x] CSP extended: `base-uri 'none'`, `form-action 'self'`, `object-src 'none'` added; `unsafe-inline` exception documented (RFC-048). *(tightened to `base-uri 'none'` in v0.30.x — app uses no `<base>` tag)*
 - [x] `Permissions-Policy` header added (RFC-048).
 - [x] `Referrer-Policy` changed to `same-origin` (RFC-048).
 - [x] All UI strings render in Japanese (`JA_*`); HTML `lang="ja"` (RFC-049).
 - [x] Unknown community timezone returns a hard error on write paths, not a silent UTC fallback (P1-timezone).
 - [x] Query budget for max-recurring Event Detail updated from ≤65 to ≤13 (correct after RFC-046).
 - [~] Security header values verified in a real browser on staging. *(staging runtime)*
+
+## Release-gate hardening (v0.34.0 — RFC-044 partial)
+
+- [x] i18n parity gate covers all 141 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count` — v0.34.0)*
+- [x] Static query-count gates: home.rs, event.rs, export.rs `.await` counts verified within ceiling bounds. *(release_gates.rs `*_await_count_within_budget` — v0.34.0)*
+- [x] SW `CACHE_VERSION` matches workspace version. *(release_gates.rs `sw_cache_version_matches_workspace_version`)*
 
 ## Operational gates
 

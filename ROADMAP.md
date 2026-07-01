@@ -2,23 +2,24 @@
 
 ## Status
 
-**v0.34.0** — 42 of 55 RFCs implemented (13 proposed). 216 passing unit tests. Zero warnings.
+**v0.34.1** — 42 of 55 RFCs implemented (13 proposed). 216 passing unit tests. Zero warnings.
 
-**Pre-pilot hardening complete.** All in-repo code work for the pilot is done.
-RFC-055 (offline read-only contract) closed with a one-line app.js enhancement
-that disables status/note submit buttons while offline and shows Japanese copy.
-The ICS feed scope (RFC-053) was verified in source: title and times only,
-no participant or member data.
+**Pre-pilot hardening complete.** All in-repo code work for the pilot is done:
+- All user-visible strings are Japanese (RFC-049, v0.30.0–v0.33.1).
+- Offline read-only contract enforced: submit buttons disabled offline (RFC-055, v0.31.0).
+- i18n parity gate covers all 141 EN/JA pairs; static query-count gates added (v0.34.0).
+- ICS feed verified in source: title and times only, no participant data (RFC-053).
+- Launch runbook and release checklist are current.
 
 All remaining pilot gates require a live Cloudflare environment, human review,
 or explicit product/operator decisions — none can be progressed in-repo:
-- RFC-050: staging deployment and runtime evidence pack
-- RFC-051: multi-day edit semantics (product decision needed)
-- RFC-052: audit retention policy (document first)
-- RFC-053: ICS privacy UX copy (needs RFC-054)
-- RFC-054: Japanese copy review (native-speaker reviewer)
-- RFC-044/049: live-D1 integration harness (gates beta)
-- Operator tasks: secrets, migrations, Logpush
+- **RFC-050:** staging deployment and runtime evidence pack
+- **RFC-051:** multi-day edit semantics (product decision needed from nabbisen)
+- **RFC-052:** audit retention policy (document first)
+- **RFC-053:** ICS privacy UX copy (needs RFC-054)
+- **RFC-054:** Japanese copy review (native-speaker reviewer)
+- **RFC-044:** live-D1 integration harness (gates beta, not pilot)
+- **Operator:** secrets, migrations, Logpush (launch-runbook §2–§6)
 
 ---
 

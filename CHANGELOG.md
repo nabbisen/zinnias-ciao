@@ -2,6 +2,26 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.34.1] — 2026-06-12
+
+Documentation housekeeping: release checklist, launch runbook, ROADMAP.
+
+### Changed
+
+- **release-checklist.md:** three stale entries corrected:
+  - i18n parity count updated from 120 to 141 pairs.
+  - CSP `base-uri` entry corrected from `'self'` to `'none'` (tightened in v0.30.x).
+  - RFC-055 offline submit-button gate added.
+  - New v0.34.0 section: i18n parity gate and static query-count gates.
+- **launch-runbook.md:** version references updated from v0.23.0 / v0.8.0
+  to v0.34.0.
+- **ROADMAP.md:** status section rewritten to accurately reflect the v0.34.0
+  complete state; remaining pilot gates listed with explicit owners.
+
+### Testing
+
+- 216 passing. Zero warnings.
+
 ## [0.34.0] — 2026-06-12
 
 Release gate hardening: i18n parity gap closed, static query-count guards added.
