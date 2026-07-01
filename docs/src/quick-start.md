@@ -28,7 +28,7 @@ Opens the worker locally on `http://localhost:8787`.
 ## Tests
 
 ```sh
-cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts
+cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr
 ```
 
 Domain and contracts tests run as native Rust binaries (no wasm needed).

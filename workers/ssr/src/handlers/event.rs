@@ -299,10 +299,14 @@ pub async fn post_my_status(
 
     // Load the day to compute time state
     let days = event_db::days_for_event(&db, event_id).await?;
-    let day  = days.iter().find(|d| d.id == day_id)
-        .ok_or_else(|| worker::Error::RustError("Day not found".to_string()))?;
-    let event = event_db::find_for_community(&db, event_id, community_id).await?
-        .ok_or_else(|| worker::Error::RustError("Event not found".to_string()))?;
+    let day  = match days.iter().find(|d| d.id == day_id) {
+        Some(d) => d,
+        None    => return render::not_found(), // day_id not in this event
+    };
+    let event = match event_db::find_for_community(&db, event_id, community_id).await? {
+        Some(e) => e,
+        None    => return render::not_found(),
+    };
 
     let now_utc    = db::now_utc();
     let time_state = classify_day(&day.starts_at_utc, &day.ends_at_utc, &now_utc);

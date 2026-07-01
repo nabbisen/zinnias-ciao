@@ -2,6 +2,60 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.35.0] — 2026-06-13
+
+Comprehensive audit: RFC-to-code verification, ad hoc code review, doc accuracy.
+
+### Fixed
+
+- **Day-not-found and event-not-found in `post_my_status` return 404 not 500.**
+  Both errors previously raised `worker::Error::RustError("…")` which maps to a
+  500. An invalid `day_id` in the URL (not belonging to the event) or a deleted
+  event now returns `render::not_found()` instead, consistent with the community
+  isolation RFC-004 principle.
+
+- **Dead POST `/c/:cid/select` route removed.** No form in the application
+  generates a POST to this URL (the community switcher uses a GET to `/switch`).
+  The route was a leftover from an earlier iteration. Removing it avoids confusion
+  for future readers.
+
+- **`authz.rs` dead_code allow documented.** `MembershipContext.community_id` and
+  `.user_id` are populated but not read by current handlers (they use the URL
+  parameter directly). The file-level `#![allow(dead_code)]` was unexplained;
+  it now has a comment describing which fields are unused and why they are kept.
+
+### Documentation
+
+- **README and `docs/src/quick-start.md` test command corrected.** Both said
+  `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts`, omitting
+  `-p zinnias-ciao-ssr`. Developers following the README would silently skip
+  13 SSR tests including the release gates.
+
+### Verified (no changes needed)
+
+RFC-to-code audit confirmed the following are correctly implemented:
+- RFC-004 community isolation: every community-scoped handler calls
+  `require_membership` or `require_admin`.
+- RFC-006 status lifecycle: `validate_status_transition` enforces all state/role
+  rules; NULL (no answer) is distinct from explicit values.
+- RFC-007 note safety: 200-char limit enforced; all user text goes through
+  `escape_html` before rendering.
+- RFC-012 HMAC pepper: all secrets go through `crypto::pepper(env)`.
+- RFC-013 CSRF: every state-changing handler consumes a form token.
+- RFC-018/039 timezone write path: `local_to_utc` used in event creation/edit.
+- RFC-037 token subject: token bound to `auth.user_id` + purpose + optional resource.
+- RFC-038 session secrets: stored as HMAC hash only, never plaintext.
+- RFC-041 atomic invite redemption: join-ticket cookie ensures two-phase commit.
+- RFC-042 private cache: `Cache-Control: no-store` on all authenticated responses.
+- RFC-046 event-bound token: `SET_STATUS` bound to `event_id`, day validated in handler.
+- RFC-048 security headers: CSP, DENY framing, `base-uri 'none'`, Referrer-Policy all present.
+- RFC-055 offline contract: service worker blocks non-GET; app.js disables submit buttons.
+- Migration schema matches all DB query column names.
+
+### Testing
+
+- 216 passing. Zero warnings.
+
 ## [0.34.3] — 2026-06-12
 
 Safety: remove silent panic paths in worker hot paths.

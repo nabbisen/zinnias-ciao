@@ -135,11 +135,6 @@ pub async fn dispatch_post(req: Request, env: &Env, rid: &str, path: &str) -> Re
                 _ => render::not_found(),
             }
         }
-        "select" => {
-            let mut r = worker::Response::empty()?;
-            r.headers_mut().set("Location", &format!("/c/{cid}/home"))?;
-            Ok(r.with_status(303))
-        }
         // ── Admin POST routes ─────────────────────────────────────────────
         t if t.starts_with("admin/") => {
             let admin_tail = &t[6..];

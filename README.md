@@ -42,7 +42,7 @@ bun run setup
 bun run dev
 
 # Run the test suite
-cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts
+cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr
 
 # Type-check the SSR worker for wasm32 (required before every commit)
 cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown

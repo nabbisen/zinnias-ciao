@@ -1,5 +1,8 @@
+// `community_id` and `user_id` are populated for completeness (RFC-004 context object)
+// but most handlers address the community via the validated URL parameter directly.
+// `membership_id`, `role`, and `display_name` are the fields actually read.
 #![allow(dead_code)]
-//! Community-scoped authorization — RFC-004.
+
 //!
 //! Every community-scoped route calls `require_membership` before acting.
 //! A missing or removed membership returns the same generic not-found response
