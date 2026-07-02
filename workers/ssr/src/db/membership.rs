@@ -230,21 +230,22 @@ pub async fn soft_remove(db: &D1Database, membership_id: &str, community_id: &st
     Ok(())
 }
 
-/// One community entry for the header switcher: id + display name.
+/// One community entry for user-scoped navigation and summaries.
 pub struct CommunitySummary {
     pub community_id: String,
     pub community_name: String,
+    pub timezone: String,
 }
 
-/// All communities a user is an active member of, with community names,
-/// ordered by joined_at. Used for the header community switcher.
+/// All communities a user is an active member of, with display metadata,
+/// ordered by joined_at. Used for navigation and multi-community summaries.
 pub async fn list_communities_for_user(
     db: &D1Database,
     user_id: &str,
 ) -> Result<Vec<CommunitySummary>> {
     let rows = db
         .prepare(
-            "SELECT m.community_id, c.name AS community_name \
+            "SELECT m.community_id, c.name AS community_name, c.timezone \
              FROM community_memberships m \
              JOIN communities c ON c.id = m.community_id \
              WHERE m.user_id = ?1 AND m.removed_at IS NULL \
@@ -261,6 +262,11 @@ pub async fn list_communities_for_user(
             Some(CommunitySummary {
                 community_id: v.get("community_id")?.as_str()?.to_owned(),
                 community_name: v.get("community_name")?.as_str()?.to_owned(),
+                timezone: v
+                    .get("timezone")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("UTC")
+                    .to_owned(),
             })
         })
         .collect())

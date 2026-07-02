@@ -55,6 +55,12 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 055 | [Offline Read-Only Contract](./done/055-offline-read-only-contract.md) | v0.31.0 |
 | 052 | [Audit Retention and Operator Access Policy](./done/052-audit-retention-and-operator-access-policy.md) | v0.36.0 |
 
+## Done — F8 workflow improvements
+
+| ID | Title | Shipped in |
+|----|-------|------------|
+| 056 | [Calendar-Centered Home Dashboard](./done/056-calendar-centered-home-dashboard.md) | v0.40.0 |
+
 ## Also Done
 
 | ID | Title | Shipped in |

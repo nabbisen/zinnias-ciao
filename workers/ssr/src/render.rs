@@ -164,6 +164,15 @@ pub fn header_with_switcher(
     current_community_id: &str,
     communities: &[(impl AsRef<str>, impl AsRef<str>)],
 ) -> String {
+    header_with_switcher_next(title, current_community_id, communities, "home")
+}
+
+pub fn header_with_switcher_next(
+    title: &str,
+    current_community_id: &str,
+    communities: &[(impl AsRef<str>, impl AsRef<str>)],
+    next: &str,
+) -> String {
     let title_s = escape_html(title);
 
     // <option> elements — use single-quoted HTML attributes to avoid \" in Rust strings.
@@ -187,18 +196,21 @@ pub fn header_with_switcher(
     h.push_str("<header style='position:sticky;top:0;background:#FFFFFF;");
     h.push_str("border-bottom:1px solid #E5E5EA;");
     h.push_str("padding:.875rem 1rem;display:flex;justify-content:space-between;");
-    h.push_str("align-items:center;gap:.5rem;z-index:10'>");
-    h.push_str("<span style='font-size:1.25rem;font-weight:600;white-space:nowrap'>");
+    h.push_str("align-items:center;gap:.5rem;flex-wrap:wrap;z-index:10'>");
+    h.push_str("<span style='font-size:1.25rem;font-weight:600;white-space:nowrap;min-width:0'>");
     h.push_str(&title_s);
     // No-JS: a GET form to /switch with a submit button works without scripts.
     // Progressive enhancement: onchange auto-submits so JS users skip the button.
     h.push_str("</span>");
-    h.push_str("<form method='get' action='/switch' style='margin:0'>");
+    h.push_str("<form method='get' action='/switch' style='margin:0;min-width:0;max-width:100%'>");
+    h.push_str("<input type='hidden' name='next' value='");
+    h.push_str(&escape_html(next));
+    h.push_str("'>");
     h.push_str("<select name='community' aria-label='Switch community' ");
     h.push_str("onchange='this.form.submit()' ");
     h.push_str("style='font-size:.8125rem;color:#6E6E73;background:none;border:none;");
     h.push_str("border-bottom:1px solid #E5E5EA;padding:.125rem .25rem;");
-    h.push_str("max-width:160px;cursor:pointer'>");
+    h.push_str("max-width:100%;box-sizing:border-box;cursor:pointer'>");
     h.push_str(&options);
     h.push_str("</select>");
     h.push_str("<noscript><button type='submit' style='font-size:.8125rem;");

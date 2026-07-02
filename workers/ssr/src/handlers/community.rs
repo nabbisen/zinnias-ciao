@@ -20,6 +20,10 @@ pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response>
         .query_pairs()
         .find(|(k, _)| k == "community")
         .map(|(_, v)| v.to_string());
+    let next: Option<String> = url
+        .query_pairs()
+        .find(|(k, _)| k == "next")
+        .map(|(_, v)| v.to_string());
 
     let db = env.d1("DB")?;
     let memberships = membership_db::list_communities_for_user(&db, &auth.user_id)
@@ -29,7 +33,10 @@ pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response>
     // Only redirect to a community the user actually belongs to.
     let dest = match target {
         Some(ref cid) if memberships.iter().any(|m| &m.community_id == cid) => {
-            format!("/c/{cid}/home")
+            match next.as_deref() {
+                Some("communities") => format!("/c/{cid}/communities"),
+                _ => format!("/c/{cid}/home"),
+            }
         }
         // Unknown / non-member target: send to their first community, or /join.
         _ => match memberships.first() {

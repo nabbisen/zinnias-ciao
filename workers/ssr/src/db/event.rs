@@ -88,6 +88,7 @@ pub async fn days_for_event(db: &D1Database, event_id: &str) -> Result<Vec<Event
 /// Home list query: upcoming event_days for one community within a date window.
 /// Returns rows joined with event title/location/status; ordered by starts_at_utc.
 pub struct HomeEventRow {
+    pub community_id: String,
     pub event_id: String,
     pub event_title: String,
     pub event_location: Option<String>,
@@ -130,6 +131,72 @@ pub async fn home_upcoming(
         .into_iter()
         .filter_map(|v| {
             Some(HomeEventRow {
+                community_id: community_id.to_owned(),
+                event_id: v.get("event_id")?.as_str()?.to_owned(),
+                event_title: v.get("event_title")?.as_str()?.to_owned(),
+                event_location: v
+                    .get("event_location")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_owned()),
+                event_status: v.get("event_status")?.as_str()?.to_owned(),
+                day_id: v.get("day_id")?.as_str()?.to_owned(),
+                day_date: v.get("day_date")?.as_str()?.to_owned(),
+                starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
+                ends_at_utc: v.get("ends_at_utc")?.as_str()?.to_owned(),
+                seq: v.get("seq")?.as_u64()? as u32,
+                total_days: v.get("total_days")?.as_u64()? as u32,
+            })
+        })
+        .collect())
+}
+
+pub async fn home_upcoming_for_communities(
+    db: &D1Database,
+    community_ids: &[&str],
+    from_utc: &str,
+    to_utc: &str,
+) -> Result<Vec<HomeEventRow>> {
+    if community_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let placeholders = zinnias_ciao_contracts::build_in_placeholders(community_ids.len(), 0);
+    let from_ph = format!("?{}", community_ids.len() + 1);
+    let to_ph = format!("?{}", community_ids.len() + 2);
+    let sql = format!(
+        "SELECT \
+           e.community_id AS community_id, \
+           e.id AS event_id, e.title AS event_title, \
+           e.location AS event_location, e.status AS event_status, \
+           d.id AS day_id, d.day_date, d.starts_at_utc, d.ends_at_utc, d.seq, \
+           (SELECT COUNT(*) FROM event_days d2 WHERE d2.event_id = e.id) AS total_days \
+         FROM event_days d \
+         JOIN events e ON e.id = d.event_id \
+         WHERE d.community_id IN ({placeholders}) \
+           AND d.starts_at_utc >= {from_ph} \
+           AND d.starts_at_utc <  {to_ph} \
+         ORDER BY d.community_id ASC, d.starts_at_utc ASC \
+         LIMIT 300"
+    );
+    let mut binds: Vec<worker::wasm_bindgen::JsValue> = community_ids
+        .iter()
+        .map(|id| worker::wasm_bindgen::JsValue::from_str(id))
+        .collect();
+    binds.push(worker::wasm_bindgen::JsValue::from_str(from_utc));
+    binds.push(worker::wasm_bindgen::JsValue::from_str(to_utc));
+
+    let rows = db
+        .prepare(&sql)
+        .bind(&binds)?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(HomeEventRow {
+                community_id: v.get("community_id")?.as_str()?.to_owned(),
                 event_id: v.get("event_id")?.as_str()?.to_owned(),
                 event_title: v.get("event_title")?.as_str()?.to_owned(),
                 event_location: v

@@ -114,8 +114,8 @@ fn all_state_changing_routes_have_token_purpose() {
 
 // ── i18n parity gate ──────────────────────────────────────────────────────
 // Every EN_* constant must have a non-empty JA_* counterpart.
-// This test covers all 120 string pairs so a JA string going empty or
-// missing causes `cargo test` to fail immediately.
+// This test registers every member-facing string pair so a JA string going
+// empty or missing causes `cargo test` to fail immediately.
 // To add a new string: add EN_FOO and JA_FOO in i18n.rs, then add the pair below.
 
 #[test]
@@ -156,6 +156,11 @@ fn i18n_en_ja_parity_count() {
         (EN_HOME_LATER, JA_HOME_LATER),
         (EN_HOME_CREATE_EVENT, JA_HOME_CREATE_EVENT),
         (EN_HOME_INVITE_MEMBERS, JA_HOME_INVITE_MEMBERS),
+        (EN_HOME_CALENDAR_TITLE, JA_HOME_CALENDAR_TITLE),
+        (EN_HOME_CALENDAR_HELPER, JA_HOME_CALENDAR_HELPER),
+        (EN_HOME_CALENDAR_EMPTY, JA_HOME_CALENDAR_EMPTY),
+        (EN_HOME_CALENDAR_COUNT_SUFFIX, JA_HOME_CALENDAR_COUNT_SUFFIX),
+        (EN_HOME_AGENDA_TITLE, JA_HOME_AGENDA_TITLE),
         (EN_STATUS_CLEAR, JA_STATUS_CLEAR),
         (EN_STATUS_CLEAR_LABEL, JA_STATUS_CLEAR_LABEL),
         (EN_NOTE_SECTION_LABEL, JA_NOTE_SECTION_LABEL),
@@ -582,6 +587,73 @@ fn no_known_english_ui_leaks_in_rendered_text() {
                  Pilot is Japanese-only (RFC-049) — use a JA_* i18n constant."
             );
         }
+    }
+}
+
+#[test]
+fn rfc056_home_lists_communities_without_switcher() {
+    assert!(
+        HOME_HANDLER_SRC.contains("home_upcoming_for_communities"),
+        "Home must batch nearby events across all user communities"
+    );
+    assert!(
+        HOME_HANDLER_SRC.contains("render_home_communities"),
+        "Home must render communities one by one"
+    );
+    assert!(
+        HOME_HANDLER_SRC.contains("render::header(i18n::JA_NAV_HOME"),
+        "Home must use a simple header without the community switcher"
+    );
+    assert!(
+        !HOME_HANDLER_SRC.contains("header_with_switcher(i18n::JA_NAV_HOME"),
+        "Home must not render the community switcher"
+    );
+}
+
+#[test]
+fn rfc056_calendar_page_owns_calendar_and_switcher() {
+    assert!(
+        COMMUNITIES_SRC.contains("render_month_calendar"),
+        "The former Communities tab must render the active community calendar"
+    );
+    assert!(
+        COMMUNITIES_SRC.contains("header_with_switcher_next"),
+        "Calendar page must keep the community switcher"
+    );
+    assert!(
+        COMMUNITIES_SRC.contains("\"communities\""),
+        "Calendar switcher must stay on the Calendar page after switching"
+    );
+    assert!(
+        HOME_HANDLER_SRC.contains("grid-template-columns:repeat(7,minmax(0,1fr))"),
+        "Calendar overview must keep a stable seven-column grid"
+    );
+}
+
+#[test]
+fn calendar_overview_contract_is_explicit() {
+    let calendar_src = HOME_HANDLER_SRC
+        .split("fn render_month_calendar")
+        .nth(1)
+        .expect("Home must keep a dedicated calendar renderer");
+
+    assert!(
+        calendar_src.contains("JA_HOME_CALENDAR_HELPER"),
+        "Calendar overview must include helper copy explaining that details are in the list below"
+    );
+    assert!(
+        calendar_src.contains("今日"),
+        "Today must be identified by visible text, not color alone"
+    );
+    assert!(
+        calendar_src.contains('●'),
+        "Event presence must use a visible marker, not color alone"
+    );
+    for forbidden in ["<a ", "<button", "tabindex"] {
+        assert!(
+            !calendar_src.contains(forbidden),
+            "Calendar day cells are non-interactive in v0.40.0 and must not contain {forbidden:?}"
+        );
     }
 }
 

@@ -90,11 +90,11 @@ pub const JA_EMPTY_EVENTS_ADMIN: &str =
 
 // ── Navigation ────────────────────────────────────────────────────────────
 pub const EN_NAV_HOME: &str = "Home";
-pub const EN_NAV_COMMUNITIES: &str = "Communities";
+pub const EN_NAV_COMMUNITIES: &str = "Calendar";
 pub const EN_NAV_ME: &str = "Me";
 
 pub const JA_NAV_HOME: &str = "ホーム";
-pub const JA_NAV_COMMUNITIES: &str = "コミュニティ";
+pub const JA_NAV_COMMUNITIES: &str = "カレンダー";
 pub const JA_NAV_ME: &str = "マイページ";
 pub const EN_NAV_BACK: &str = "Back to event";
 pub const JA_NAV_BACK: &str = "イベントに戻る";
@@ -107,12 +107,24 @@ pub const EN_HOME_THIS_WEEK: &str = "This Week";
 pub const EN_HOME_LATER: &str = "Later";
 pub const EN_HOME_CREATE_EVENT: &str = "+ Create event";
 pub const EN_HOME_INVITE_MEMBERS: &str = "Invite members";
+pub const EN_HOME_CALENDAR_TITLE: &str = "Upcoming this month";
+pub const EN_HOME_CALENDAR_HELPER: &str =
+    "Marked days have upcoming events. See the list below for details.";
+pub const EN_HOME_CALENDAR_EMPTY: &str = "No upcoming events yet.";
+pub const EN_HOME_CALENDAR_COUNT_SUFFIX: &str = " events";
+pub const EN_HOME_AGENDA_TITLE: &str = "Event list";
 
 pub const JA_HOME_TODAY: &str = "今日";
 pub const JA_HOME_THIS_WEEK: &str = "今週";
 pub const JA_HOME_LATER: &str = "それ以降";
 pub const JA_HOME_CREATE_EVENT: &str = "+ イベントを作成";
 pub const JA_HOME_INVITE_MEMBERS: &str = "メンバーを招待";
+pub const JA_HOME_CALENDAR_TITLE: &str = "今月のこれからの予定";
+pub const JA_HOME_CALENDAR_HELPER: &str =
+    "予定がある日に印をつけています。詳しくは下の一覧をご覧ください。";
+pub const JA_HOME_CALENDAR_EMPTY: &str = "これからの予定はまだありません。";
+pub const JA_HOME_CALENDAR_COUNT_SUFFIX: &str = "件";
+pub const JA_HOME_AGENDA_TITLE: &str = "予定の一覧";
 
 // ── Status actions ────────────────────────────────────────────────────────
 pub const EN_STATUS_CLEAR: &str = "Clear";
@@ -441,6 +453,11 @@ mod tests {
             "HOME_LATER",
             "HOME_CREATE_EVENT",
             "HOME_INVITE_MEMBERS",
+            "HOME_CALENDAR_TITLE",
+            "HOME_CALENDAR_HELPER",
+            "HOME_CALENDAR_EMPTY",
+            "HOME_CALENDAR_COUNT_SUFFIX",
+            "HOME_AGENDA_TITLE",
             // Me
             "ME_SECTION_NAME",
             "ME_SECTION_COMMUNITY",
@@ -536,7 +553,7 @@ mod tests {
             "JOIN_PAGE_TITLE",
             "JOIN_PROFILE_PAGE_TITLE",
         ];
-        assert_eq!(en_keys.len(), 120, "update parity list when adding strings");
+        assert_eq!(en_keys.len(), 125, "update parity list when adding strings");
         for key in en_keys {
             assert!(!key.is_empty(), "empty key: {key}");
         }

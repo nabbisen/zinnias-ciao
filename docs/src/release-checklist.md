@@ -12,7 +12,8 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Display name is collected and visible in the community. *(join.rs post_profile, membership.display_name)*
 - [x] Session is issued, validated, and revoked on logout. *(session.rs, auth.rs post_logout)*
 - [x] Community membership enforced (non-members see generic 404). *(authz.rs require_membership: checks user_id AND community_id)*
-- [x] Home shows upcoming events grouped Today / This Week / Later. *(home.rs: day_date comparisons against today_date)*
+- [x] Home shows active communities one by one with nearby event links, without a header community switcher. *(home.rs: `home_upcoming_for_communities`, `render_home_communities`)*
+- [x] Calendar tab shows the active community month overview and keeps the community switcher. *(communities.rs: `render_month_calendar`, `header_with_switcher_next`)*
 - [x] Event Detail shows status, participants, and notes. *(event.rs get_event_detail)*
 - [x] Member can set own status (Going / No Go / clear). *(event.rs post_my_status + validate_status_transition)*
 - [x] Member can save, edit, and delete own note. *(event.rs post_my_note, delete_my_note)*
@@ -57,6 +58,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] All critical controls ≥ 44 × 44 px. *(app.css L88: `button, a, [role="button"] { min-height: var(--cz-touch-min); }` where `--cz-touch-min: 44px` (L57); all inline buttons also set `min-height:44px` — code-verified)*
 - [x] Status chip shows icon + label + colour (grayscale test: still legible). *(render.rs `status_display()` always returns `(fg_color, icon, label)` tuple; AA-passing fg colors on white: Going 5.0:1, Not Going 5.9:1, Attended 4.7:1 — code-verified)*
 - [~] Event Detail usable at 200% text scaling. *(requires browser test)*
+- [x] Home multi-community nearby-events dashboard and Calendar overview usable at 360-428 px and 200% text scaling. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc056/rfc056-route-split-smoke-results.json`)*
 - [x] Reduced-motion mode disables animations. *(app.css: `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }` — code-verified)*
 - [x] Error messages use plain language (no SQL/JWT/token/cookie). *(release_gates.rs `not_found_and_forbidden_same_message`; domain tests verify no 'sql'/'panic' in event/note error strings — automated)*
 
@@ -83,7 +85,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
 - [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
-- [x] i18n parity test covers all 141 EN/JA string pairs (expanded from 9); catches empty strings and copy-paste errors. *(v0.34.0: parity gap closed — 21 new pairs from v0.33.x sweep registered)*
+- [x] i18n parity test covers all 148 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
@@ -100,7 +102,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Release-gate hardening (v0.34.0 — RFC-044 partial)
 
-- [x] i18n parity gate covers all 141 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count` — v0.34.0)*
+- [x] i18n parity gate covers all 148 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] Static query-count gates: home.rs, event.rs, export.rs `.await` counts verified within ceiling bounds. *(release_gates.rs `*_await_count_within_budget` — v0.34.0)*
 - [x] SW `CACHE_VERSION` matches workspace version. *(release_gates.rs `sw_cache_version_matches_workspace_version`)*
 

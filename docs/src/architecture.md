@@ -6,7 +6,7 @@
 Cargo.toml                   workspace root
 packages/
   domain/                    pure business logic; native-testable; no Worker/WASM deps
-  contracts/                 DTOs, error model, i18n strings (114 EN/JA pairs); native-testable
+  contracts/                 DTOs, error model, i18n strings (148 EN/JA pairs); native-testable
 workers/
   ssr/                       Cloudflare Worker: SSR renderer + route handlers
     src/
@@ -26,12 +26,12 @@ workers/
         admin.rs             Admin: event create/edit/cancel, invites, members, attendance
         auth.rs              Logout POST handler
         calendar.rs          Calendar feed page + ICS download (RFC-023)
-        communities.rs       Communities tab
+        communities.rs       Calendar tab for active community (former Communities route)
         community.rs         Community-scoped router (dispatches admin/member routes)
         event.rs             Event detail, status update, note save/delete
         export.rs            Admin community data export (RFC-027)
         health.rs            GET /healthz  GET /version
-        home.rs              Home event list + first-run admin card (RFC-030)
+        home.rs              Multi-community nearby-events Home + first-run admin card (RFC-056/RFC-030)
         join.rs              Invite redemption + display name collection
         me.rs                Me tab: profile, sync state, about (RFC-035)
         static_files.rs      Static asset handler
@@ -61,7 +61,7 @@ scripts/
   setup.mjs                  Dev bootstrap: D1 migrations + seed data
 docs/src/                    mdbook documentation (SUMMARY.md is the index)
 rfcs/
-  done/                      32 implemented RFCs
+  done/                      33 implemented RFCs
   proposed/                  6 backlog RFCs (see ROADMAP.md)
   README.md                  RFC index
 ```

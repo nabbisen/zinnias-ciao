@@ -2,6 +2,54 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.40.0] — 2026-07-02
+
+RFC-056 Home/Calendar workflow split.
+
+### Added
+
+- **Home now shows communities one by one.**
+  `/c/:cid/home` renders each active community with nearby upcoming event links
+  and no header community switcher.
+
+- **The former Communities page is now Calendar.**
+  `/c/:cid/communities` keeps route compatibility but renders the active
+  community's month overview with the community switcher in the header.
+
+- **RFC-056 documents the Home/Calendar workflow split.**
+  RFC-005 remains the original MVP list/detail RFC; RFC-056 amends it so the
+  Home page is a cross-community nearby-events dashboard and the Calendar tab is
+  the active-community month view.
+
+- **Release gates now protect the RFC-056 route split.**
+  `release_gates.rs` checks that Home batches and renders all communities
+  without the switcher, while Calendar owns the grid and switcher.
+
+### Changed
+
+- **Bottom navigation now labels the former Communities tab as Calendar.**
+  The route remains `/c/:cid/communities` for compatibility.
+
+- **Home admin setup copy now uses i18n constants.**
+  Remaining hardcoded English labels in the Home first-run/admin shortcuts were
+  replaced with Japanese constants covered by EN/JA parity.
+
+- **Release version bumped to v0.40.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, and
+  `workers/ssr/static/sw.js` are aligned.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- RFC-056 route-split browser smoke passed with sandboxed incognito Chromium:
+  Home at 390/360 px, Home at 360 px with 200% text, Calendar at 360 px,
+  Calendar at 360 px with 200% text, empty-active Home, and empty Calendar.
+  Evidence: `.git-exclude/evidence/rfc056/rfc056-route-split-smoke-results.json`.
+
 ## [0.39.0] — 2026-07-01
 
 RFC-054/RFC-053 Japanese copy hardening before runtime verification.

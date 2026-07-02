@@ -26,7 +26,7 @@ Defines the core member UI: a Home upcoming-list and a route-backed Event Detail
 
 ## 4. External Behavior
 
-Bottom tabs: Home | Communities | Me (links, not client routing). Event card (single-day shown compactly; multi-day shows a day count):
+Bottom tabs: Home | Communities | Me (links, not client routing). RFC-056 later renames the Communities tab to Calendar. Event card (single-day shown compactly; multi-day shows a day count):
 
 ```text
 [Going ✓] Neighborhood Cleanup
@@ -94,3 +94,5 @@ The Home query is the bounded `event_days` window from RFC-002 §6 (no N+1). Det
 ## 10. Open Questions / Decisions
 
 Decision: weekly/monthly grids are not MVP default. For multi-day events the card shows the nearest upcoming day plus a day-count; the detail lists all days.
+
+Post-MVP amendment: RFC-056 changes Home into a multi-community nearby-events dashboard and changes the Communities page into a Calendar page for the active community.
