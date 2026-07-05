@@ -14,6 +14,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Community membership enforced (non-members see generic 404). *(authz.rs require_membership: checks user_id AND community_id)*
 - [x] Home shows active communities one by one with nearby event links, without a header community switcher. *(home.rs: `home_upcoming_for_communities`, `render_home_communities`)*
 - [x] Calendar tab shows the active community's month overview and event links, supports route-backed month navigation and day filtering, and keeps the community switcher. *(communities.rs: `calendar_month_for_community`, `render_calendar_month`, `render_calendar_events`, `header_with_switcher_next` — RFC-058)*
+- [x] Calendar selected-day agenda offers active admins a route-backed Create Event action with the date prefilled. *(communities.rs + admin/events.rs — RFC-059)*
 - [x] Community switcher auto-submit is implemented in external `app.js`, not inline `onchange`, and the shell cache-busts `app.js` with a visible submit fallback for stale/no JS. *(render.rs + app.js + release gate)*
 - [x] Event Detail shows status, participants, and notes. *(event.rs get_event_detail)*
 - [x] Member can set own status (Going / No Go / clear). *(event.rs post_my_status + validate_status_transition)*
@@ -91,7 +92,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
 - [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
-- [x] i18n parity test covers all 171 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity test covers all 172 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
@@ -108,7 +109,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Release-gate hardening (v0.34.0 — RFC-044 partial)
 
-- [x] i18n parity gate covers all 171 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity gate covers all 172 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] Static query-count gates: home.rs, event.rs, export.rs `.await` counts verified within ceiling bounds. *(release_gates.rs `*_await_count_within_budget` — v0.34.0)*
 - [x] SW `CACHE_VERSION` matches workspace version. *(release_gates.rs `sw_cache_version_matches_workspace_version`)*
 
@@ -128,6 +129,13 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Calendar event queries remain active-community and visible-month scoped. *(communities.rs `calendar_month_for_community`)*
 - [x] Calendar community switching preserves selected month/day with validated `communities:YYYY-MM[:YYYY-MM-DD]` next values. *(community.rs `calendar_next_destination`)*
 - [x] Browser smoke verifies month navigation, day filtering, clear filter, and community switching at mobile widths and with JavaScript disabled. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc058/rfc058-calendar-smoke-results.json`)*
+
+## Calendar admin workflow gates (v0.43.0 — RFC-059)
+
+- [x] Selected Calendar day renders a create-event link only for active admins. *(release_gates.rs `rfc059_calendar_create_from_day_is_route_backed`)*
+- [x] Create Event validates `day=YYYY-MM-DD` and prefills the date field. *(admin/events.rs `valid_prefill_day`)*
+- [x] Create Event community switcher preserves a valid Calendar-selected day. *(community.rs `admin_events_new_destination`)*
+- [x] Browser smoke verifies admin create-from-day, date prefill, switch preservation, and non-admin absence. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc059/rfc059-calendar-create-day-smoke-results.json`)*
 
 ## Operational gates
 

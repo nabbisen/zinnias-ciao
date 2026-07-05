@@ -27,3 +27,23 @@ fn calendar_next_destination_rejects_bad_dates() {
         None
     );
 }
+
+#[test]
+fn admin_events_new_destination_preserves_day() {
+    assert_eq!(
+        admin_events_new_destination("community-a", "admin_events_new:2026-07-05").as_deref(),
+        Some("/c/community-a/admin/events/new?day=2026-07-05")
+    );
+}
+
+#[test]
+fn admin_events_new_destination_rejects_bad_dates() {
+    assert_eq!(
+        admin_events_new_destination("community-a", "admin_events_new:2026-07-32"),
+        None
+    );
+    assert_eq!(
+        admin_events_new_destination("community-a", "admin_events_new:2026/07/05"),
+        None
+    );
+}

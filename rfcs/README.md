@@ -62,6 +62,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 056 | [Calendar-Centered Home Dashboard](./done/056-calendar-centered-home-dashboard.md) | v0.40.0 |
 | 057 | [Community Creation and Bootstrap Flow](./done/057-community-creation-and-bootstrap-flow.md) | v0.41.0 |
 | 058 | [Calendar Month Navigation and Day Agenda](./done/058-calendar-month-navigation-and-day-agenda.md) | v0.42.0 |
+| 059 | [Calendar Create Event From Day](./done/059-calendar-create-event-from-day.md) | v0.43.0 |
 
 ## Also Done
 

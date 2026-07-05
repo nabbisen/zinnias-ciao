@@ -120,6 +120,7 @@ pub const EN_CALENDAR_THIS_MONTH: &str = "This month";
 pub const EN_CALENDAR_ALL_DAYS: &str = "All days";
 pub const EN_CALENDAR_EMPTY_MONTH: &str = "No events this month.";
 pub const EN_CALENDAR_EMPTY_DAY: &str = "No events on this day.";
+pub const EN_CALENDAR_CREATE_ON_DAY: &str = "Create event on this day";
 
 pub const JA_HOME_TODAY: &str = "今日";
 pub const JA_HOME_THIS_WEEK: &str = "今週";
@@ -139,6 +140,7 @@ pub const JA_CALENDAR_THIS_MONTH: &str = "今月";
 pub const JA_CALENDAR_ALL_DAYS: &str = "月全体";
 pub const JA_CALENDAR_EMPTY_MONTH: &str = "今月の予定はありません。";
 pub const JA_CALENDAR_EMPTY_DAY: &str = "この日の予定はありません。";
+pub const JA_CALENDAR_CREATE_ON_DAY: &str = "この日にイベントを作成";
 
 // ── Status actions ────────────────────────────────────────────────────────
 pub const EN_STATUS_CLEAR: &str = "Clear";

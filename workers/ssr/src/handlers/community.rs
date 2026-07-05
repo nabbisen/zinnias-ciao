@@ -40,6 +40,10 @@ pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response>
                         .unwrap_or_else(|| format!("/c/{cid}/communities"))
                 }
                 Some("admin_events_new") => format!("/c/{cid}/admin/events/new"),
+                Some(next) if next.starts_with("admin_events_new:") => {
+                    admin_events_new_destination(cid, next)
+                        .unwrap_or_else(|| format!("/c/{cid}/admin/events/new"))
+                }
                 _ => format!("/c/{cid}/home"),
             }
         }
@@ -76,6 +80,19 @@ fn calendar_next_destination(cid: &str, next: &str) -> Option<String> {
         dest.push_str(day);
     }
     Some(dest)
+}
+
+fn admin_events_new_destination(cid: &str, next: &str) -> Option<String> {
+    let mut parts = next.split(':');
+    if parts.next()? != "admin_events_new" {
+        return None;
+    }
+    let day = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    parse_ymd(day)?;
+    Some(format!("/c/{cid}/admin/events/new?day={day}"))
 }
 
 fn parse_month(month: &str) -> Option<(i32, i32)> {

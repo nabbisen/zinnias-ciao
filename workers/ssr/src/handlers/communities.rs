@@ -23,6 +23,11 @@ pub async fn get_communities(
     if !summaries.iter().any(|s| s.community_id == community_id) {
         return render::not_found();
     }
+    let active_membership = membership_db::find_active(&db, &auth.user_id, community_id).await?;
+    let can_create_event = active_membership
+        .as_ref()
+        .map(|membership| membership.role == "admin")
+        .unwrap_or(false);
 
     let community = db::community::find_active(&db, community_id).await?;
     let community_tz = community
@@ -72,6 +77,7 @@ pub async fn get_communities(
         selected_day.as_deref(),
         year,
         month,
+        can_create_event,
     );
 
     // Header uses list_communities_for_user result as switcher pairs.
@@ -165,39 +171,58 @@ fn render_calendar_month(
         let bg = if is_selected {
             "#EAF3FF"
         } else if is_today {
-            "#F2F8FF"
+            "#FAFAFB"
         } else if has_events {
             "#FFFFFF"
         } else {
             "#F5F5F7"
         };
-        let border = if is_selected || is_today {
+        let border = if is_selected {
             "#007AFF"
-        } else if has_events {
+        } else if is_today || has_events {
             "#D1D1D6"
         } else {
             "#F5F5F7"
         };
-        let day_color = if is_selected || is_today {
+        let border_width = if is_today && !is_selected {
+            "2px"
+        } else {
+            "1px"
+        };
+        let day_color = if is_selected {
             "#0057B8"
+        } else if is_today {
+            "#3A3A3C"
         } else {
             "#1D1D1F"
         };
-        let marker_html = match (is_today, has_events) {
-            (true, true) => "<span style=\"display:flex;gap:.125rem;align-items:center;\
+        let marker_html = match (is_today, has_events, is_selected) {
+            (true, true, true) => "<span style=\"display:flex;gap:.125rem;align-items:center;\
                  justify-content:center;font-size:.6875rem;font-weight:700;\
                  color:#0057B8;line-height:1.2\">\
                  <span>今日</span><span aria-hidden=\"true\">●</span></span>"
                 .to_string(),
-            (true, false) => "<span style=\"font-size:.6875rem;font-weight:700;color:#0057B8;\
-                 line-height:1.2\">今日</span>"
+            (true, true, false) => "<span style=\"display:flex;gap:.125rem;align-items:center;\
+                 justify-content:center;font-size:.6875rem;font-weight:600;\
+                 color:#6E6E73;line-height:1.2\">\
+                 <span>今日</span><span aria-hidden=\"true\">●</span></span>"
                 .to_string(),
-            (false, true) => {
+            (true, false, true) => {
+                "<span style=\"font-size:.6875rem;font-weight:700;color:#0057B8;\
+                 line-height:1.2\">今日</span>"
+                    .to_string()
+            }
+            (true, false, false) => {
+                "<span style=\"font-size:.6875rem;font-weight:600;color:#6E6E73;\
+                 line-height:1.2\">今日</span>"
+                    .to_string()
+            }
+            (false, true, _) => {
                 "<span aria-hidden=\"true\" style=\"font-size:.8125rem;font-weight:700;\
                  color:#007AFF;line-height:1.2\">●</span>"
                     .to_string()
             }
-            (false, false) => {
+            (false, false, _) => {
                 "<span aria-hidden=\"true\" style=\"font-size:.6875rem;line-height:1.2\">\
                  &nbsp;</span>"
                     .to_string()
@@ -221,7 +246,7 @@ fn render_calendar_month(
         };
         cells.push_str(&format!(
             "<a href=\"/c/{cid}/communities?month={month_key}&amp;day={day_date}\" \
-             aria-label=\"{aria}\"{aria_current} style=\"min-height:60px;border:1px solid {border};\
+             aria-label=\"{aria}\"{aria_current} style=\"min-height:60px;border:{border_width} solid {border};\
              border-radius:10px;background:{bg};padding:.375rem .25rem;display:flex;\
              flex-direction:column;align-items:center;justify-content:space-between;\
              text-align:center;box-sizing:border-box;text-decoration:none;color:inherit\">\
@@ -233,6 +258,7 @@ fn render_calendar_month(
             aria = render::escape_html(&aria_label),
             aria_current = aria_current,
             border = border,
+            border_width = border_width,
             bg = bg,
             day_color = day_color,
             day = day,
@@ -316,6 +342,7 @@ fn render_calendar_events(
     selected_day: Option<&str>,
     year: i32,
     month: i32,
+    can_create_event: bool,
 ) -> String {
     let items: String = rows
         .iter()
@@ -382,16 +409,29 @@ fn render_calendar_events(
     } else {
         format!("<ul style=\"list-style:none;margin:.5rem 0 0;padding:0\">{items}</ul>")
     };
+    let create_on_day = match (selected_day, can_create_event) {
+        (Some(day), true) => format!(
+            "<a href=\"/c/{cid}/admin/events/new?day={day}\" \
+             style=\"display:inline-flex;align-items:center;justify-content:center;\
+             min-height:44px;margin:.75rem 0 0;color:#007AFF;text-decoration:none;\
+             font-size:.875rem;font-weight:600\">{label}</a>",
+            cid = render::escape_html(community_id),
+            day = render::escape_html(day),
+            label = i18n::JA_CALENDAR_CREATE_ON_DAY
+        ),
+        _ => String::new(),
+    };
 
     format!(
         "<section style=\"margin:0 auto 1.5rem;max-width:42rem\">\
          <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{title}</h2>\
          <p style=\"font-size:.8125rem;color:#6e6e73;margin:.25rem 0 0\">{scope}</p>\
-         {content}</section>",
+         {create_on_day}{content}</section>",
         title = i18n::JA_HOME_AGENDA_TITLE,
         scope = selected_day
             .map(render::escape_html)
             .unwrap_or_else(|| format!("{year:04}-{month:02}")),
+        create_on_day = create_on_day,
         content = content
     )
 }

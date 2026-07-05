@@ -2,6 +2,44 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.43.0] — 2026-07-05
+
+RFC-059 Calendar create event from day.
+
+### Added
+
+- **Admins can create an event from a selected Calendar day.**
+  The selected-day agenda now shows `この日にイベントを作成` for active admins,
+  linking to Create Event with `day=YYYY-MM-DD`.
+
+- **Create Event accepts a Calendar date prefill.**
+  `/c/:cid/admin/events/new?day=YYYY-MM-DD` validates the date and pre-fills
+  the existing date field while leaving title and time choices to the admin.
+
+- **RFC-059 documents the Calendar admin workflow.**
+  The RFC keeps Calendar creation route-backed, no-JS compatible, and scoped to
+  existing admin authorization.
+
+### Changed
+
+- **Create Event switching preserves Calendar-selected dates.**
+  The community switcher accepts validated `admin_events_new:YYYY-MM-DD` next
+  values, so changing community on Create Event keeps the selected date.
+
+- **Release version bumped to v0.43.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, and
+  `workers/ssr/static/sw.js` are aligned.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo test -p zinnias-ciao-contracts --test release_gates -- --nocapture`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `node .git-exclude/tmp/rfc059-smoke.mjs` *(sandboxed incognito Chromium; evidence in `.git-exclude/evidence/rfc059/`)*
+
 ## [0.42.0] — 2026-07-05
 
 RFC-058 Calendar month navigation and day agenda.

@@ -58,6 +58,11 @@ pub async fn get_create_event(
         .query_pairs()
         .find(|(k, _)| k == "err")
         .map(|(_, v)| v.to_string());
+    let prefill_day = url
+        .query_pairs()
+        .find(|(k, _)| k == "day")
+        .map(|(_, v)| v.to_string())
+        .filter(|day| valid_prefill_day(day));
     let (prefill_title, prefill_location) = if let Some(ref tid) = template_id {
         let tmpl = db::event_template::find_active(&db, tid, community_id)
             .await
@@ -97,7 +102,7 @@ pub async fn get_create_event(
             i18n::JA_ADMIN_CREATE_EVENT_TITLE,
             community_id,
             &_community_pairs,
-            "admin_events_new"
+            &admin_events_new_next(prefill_day.as_deref())
         ),
         cid = render::escape_html(community_id),
         tok = render::escape_html(&token),
@@ -106,7 +111,7 @@ pub async fn get_create_event(
             prefill_location.as_deref(),
             None,
             err_msg.as_deref(),
-            None,
+            prefill_day.as_deref(),
             None,
             None,
             true
@@ -1113,3 +1118,31 @@ fn event_form_fields(
         },
     )
 }
+
+fn admin_events_new_next(prefill_day: Option<&str>) -> String {
+    match prefill_day {
+        Some(day) => format!("admin_events_new:{day}"),
+        None => "admin_events_new".to_string(),
+    }
+}
+
+fn valid_prefill_day(day: &str) -> bool {
+    if day.len() != 10 || day.get(4..5) != Some("-") || day.get(7..8) != Some("-") {
+        return false;
+    }
+    let Some(year) = day.get(..4).and_then(|part| part.parse::<i32>().ok()) else {
+        return false;
+    };
+    let Some(month) = day.get(5..7).and_then(|part| part.parse::<i32>().ok()) else {
+        return false;
+    };
+    let Some(day_num) = day.get(8..10).and_then(|part| part.parse::<i32>().ok()) else {
+        return false;
+    };
+    (1..=12).contains(&month)
+        && (1..=zinnias_ciao_contracts::tz::days_in_month(year, month)).contains(&day_num)
+}
+
+#[cfg(test)]
+#[path = "events/tests.rs"]
+mod tests;

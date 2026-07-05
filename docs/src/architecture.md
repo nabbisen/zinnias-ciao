@@ -6,7 +6,7 @@
 Cargo.toml                   workspace root
 packages/
   domain/                    pure business logic; native-testable; no Worker/WASM deps
-  contracts/                 DTOs, error model, i18n strings (171 EN/JA pairs); native-testable
+  contracts/                 DTOs, error model, i18n strings (172 EN/JA pairs); native-testable
 workers/
   ssr/                       Cloudflare Worker: SSR renderer + route handlers
     src/

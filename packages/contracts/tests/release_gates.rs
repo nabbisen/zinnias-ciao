@@ -169,6 +169,7 @@ fn i18n_en_ja_parity_count() {
         (EN_CALENDAR_ALL_DAYS, JA_CALENDAR_ALL_DAYS),
         (EN_CALENDAR_EMPTY_MONTH, JA_CALENDAR_EMPTY_MONTH),
         (EN_CALENDAR_EMPTY_DAY, JA_CALENDAR_EMPTY_DAY),
+        (EN_CALENDAR_CREATE_ON_DAY, JA_CALENDAR_CREATE_ON_DAY),
         (EN_STATUS_CLEAR, JA_STATUS_CLEAR),
         (EN_STATUS_CLEAR_LABEL, JA_STATUS_CLEAR_LABEL),
         (EN_NOTE_SECTION_LABEL, JA_NOTE_SECTION_LABEL),
@@ -834,8 +835,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.42.0-calendar-nav")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.42.0-calendar-nav"),
+        RENDER_SRC.contains("/static/app.js?v=0.43.0-calendar-create-day")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.43.0-calendar-create-day"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(
@@ -885,6 +886,42 @@ fn calendar_overview_contract_is_explicit() {
             && calendar_src.contains("aria-current=\\\"date\\\"")
             && calendar_src.contains("JA_CALENDAR_ALL_DAYS"),
         "Calendar day cells are interactive in v0.42.0 and must expose selected-day state plus a clear filter"
+    );
+    assert!(
+        !calendar_src.contains("is_selected || is_today")
+            && calendar_src.contains("#FAFAFB")
+            && calendar_src.contains("let border_width = if is_today && !is_selected")
+            && calendar_src.contains("border:{border_width} solid {border}")
+            && calendar_src.contains("#6E6E73"),
+        "Today styling must stay calmer than selected-day styling and distinct from ordinary event days"
+    );
+}
+
+#[test]
+fn rfc059_calendar_create_from_day_is_route_backed() {
+    assert!(
+        COMMUNITIES_SRC.contains("membership_db::find_active")
+            && COMMUNITIES_SRC.contains("membership.role == \"admin\"")
+            && COMMUNITIES_SRC.contains("can_create_event"),
+        "Calendar create-from-day action must be rendered only for active admins"
+    );
+    assert!(
+        COMMUNITIES_SRC.contains("/admin/events/new?day={day}")
+            && COMMUNITIES_SRC.contains("JA_CALENDAR_CREATE_ON_DAY"),
+        "Selected Calendar days must expose a route-backed create-event link"
+    );
+    assert!(
+        ADMIN_EVENTS_SRC.contains("valid_prefill_day")
+            && ADMIN_EVENTS_SRC.contains("query_pairs()")
+            && ADMIN_EVENTS_SRC.contains("\"day\"")
+            && ADMIN_EVENTS_SRC.contains("prefill_day.as_deref()"),
+        "Create Event must validate and prefill the Calendar-selected day"
+    );
+    assert!(
+        ADMIN_EVENTS_SRC.contains("admin_events_new_next")
+            && COMMUNITY_HANDLER_SRC.contains("admin_events_new:")
+            && COMMUNITY_HANDLER_SRC.contains("admin_events_new_destination"),
+        "Create Event switcher must preserve a Calendar-selected day when switching communities"
     );
 }
 
