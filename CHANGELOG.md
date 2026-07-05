@@ -2,6 +2,83 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.41.0] — 2026-07-02
+
+RFC-057 trusted-admin community creation.
+
+### Added
+
+- **Eligible admins can create additional communities.**
+  `/communities/new` lets an authenticated active admin create a new private
+  community when `COMMUNITY_CREATION_ENABLED=true`. The creator becomes the
+  first admin and is redirected to the new community Home first-run state.
+
+- **Community creation is guarded and auditable.**
+  The flow is feature-flagged, active-admin-only, form-token protected,
+  idempotent on replay, rate-limited by user/session/IP, and writes
+  `community.created` plus `membership.created_first_admin` audit events.
+
+- **Me page has the quiet entry point.**
+  Eligible admins see `新しいコミュニティを作る`; ineligible users do not see the
+  action.
+
+- **Release gates cover RFC-057.**
+  Source gates verify auth policy, feature flag defaults, idempotency, rate
+  limiting, fixed Japan-time selection, audit events, no data copy, and no
+  automatic invite-code generation.
+
+### Changed
+
+- **Production defaults keep creation disabled.**
+  `COMMUNITY_CREATION_ENABLED` is true for dev/staging review and false for
+  production by default.
+
+- **Release version bumped to v0.41.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, and
+  `workers/ssr/static/sw.js` are aligned.
+
+### Fixed
+
+- **Community creation audit insert now matches the deployed D1 schema.**
+  The RFC-057 batch insert uses `audit_log.metadata_json`, matching migration
+  0001 and the shared audit writer. A release gate now checks this column name.
+
+- **Calendar page now shows active-community event links.**
+  The Calendar tab keeps the community switcher and renders the selected
+  community's current-month events below the month grid, so changing the combobox
+  changes both the calendar markers and visible event list.
+
+- **Calendar grid now uses the selected community's visible month.**
+  The Calendar tab no longer uses Home's next-30-days query. It draws the month
+  grid and event links from `event_days.day_date` for the selected community's
+  current local month.
+
+- **Community switcher now works under CSP.**
+  The select auto-submit moved from an inline `onchange` handler to
+  `app.js`, because the production CSP blocks inline event handlers.
+
+- **Community switcher now survives stale static JS.**
+  The HTML shell requests a revisioned `app.js` URL and renders a visible
+  switch button that app.js hides only after loading, avoiding same-version
+  service-worker cache issues.
+
+- **Create-event switching keeps the selected community.**
+  Switching community from the Create Event page now opens that selected
+  community's Create Event page instead of falling back to Home/default context.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo test -p zinnias-ciao-contracts --test release_gates -- --nocapture`
+
+Runtime/browser smoke for RFC-057 is still marked `[~]` in
+`docs/src/release-checklist.md` because it needs a known local or staging admin
+session without resetting the owner's dev database.
+
 ## [0.40.0] — 2026-07-02
 
 RFC-056 Home/Calendar workflow split.

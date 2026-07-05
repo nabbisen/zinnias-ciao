@@ -34,6 +34,10 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
     } else {
         i18n::JA_ROLE_MEMBER
     };
+    let can_create_community = crate::handlers::community_create::community_creation_enabled(env)
+        && membership_db::find_first_admin_for_user(&db, &auth.user_id)
+            .await?
+            .is_some();
 
     // RFC-035: support diagnostics
     let app_version = env
@@ -53,6 +57,14 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
     } else {
         String::new()
     };
+    let community_create_html = if can_create_community {
+        format!(
+            "<a href=\"/communities/new\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{}</a>",
+            i18n::JA_COMMUNITY_CREATE_LINK,
+        )
+    } else {
+        String::new()
+    };
 
     let nav = render::bottom_nav(community_id, "me");
     let body = format!(
@@ -68,6 +80,7 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
              text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">\
              {lbl_community}</h2>\
              <p style=\"font-size:1rem;margin:0\">{community} · {role}</p>\
+             {community_create}\
            </section>\
            <section style=\"margin-bottom:1.5rem\">\
              <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
@@ -102,6 +115,7 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
         name = render::escape_html(&membership.display_name),
         community = render::escape_html(community_name),
         role = role_label,
+        community_create = community_create_html,
         cid = render::escape_html(community_id),
         cal_section = i18n::JA_CALENDAR_TITLE,
         cal_feed_lbl = i18n::JA_ME_CALENDAR_LABEL,

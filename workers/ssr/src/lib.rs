@@ -48,6 +48,12 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             handlers::home::redirect_to_home(req, &env, &request_id).await
         }
         (Method::Get, "/switch") => handlers::community::get_switch(req, &env, &request_id).await,
+        (Method::Get, "/communities/new") => {
+            handlers::community_create::get_new_community(req, &env, &request_id).await
+        }
+        (Method::Post, "/communities/new") => {
+            handlers::community_create::post_new_community(req, &env, &request_id).await
+        }
         (Method::Get, p) if p.starts_with("/c/") => {
             handlers::community::dispatch_get(req, &env, &request_id, p).await
         }

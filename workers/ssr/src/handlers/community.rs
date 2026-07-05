@@ -35,6 +35,7 @@ pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response>
         Some(ref cid) if memberships.iter().any(|m| &m.community_id == cid) => {
             match next.as_deref() {
                 Some("communities") => format!("/c/{cid}/communities"),
+                Some("admin_events_new") => format!("/c/{cid}/admin/events/new"),
                 _ => format!("/c/{cid}/home"),
             }
         }

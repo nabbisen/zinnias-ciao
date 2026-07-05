@@ -150,6 +150,60 @@ pub async fn home_upcoming(
         .collect())
 }
 
+pub async fn calendar_month_for_community(
+    db: &D1Database,
+    community_id: &str,
+    from_day_date: &str,
+    to_day_date: &str,
+) -> Result<Vec<HomeEventRow>> {
+    let rows = db
+        .prepare(
+            "SELECT \
+               e.community_id AS community_id, \
+               e.id AS event_id, e.title AS event_title, \
+               e.location AS event_location, e.status AS event_status, \
+               d.id AS day_id, d.day_date, d.starts_at_utc, d.ends_at_utc, d.seq, \
+               (SELECT COUNT(*) FROM event_days d2 WHERE d2.event_id = e.id) AS total_days \
+             FROM event_days d \
+             JOIN events e ON e.id = d.event_id \
+             WHERE d.community_id = ?1 \
+               AND d.day_date >= ?2 \
+               AND d.day_date <  ?3 \
+             ORDER BY d.day_date ASC, d.starts_at_utc ASC \
+             LIMIT 300",
+        )
+        .bind(&[
+            community_id.into(),
+            from_day_date.into(),
+            to_day_date.into(),
+        ])?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(HomeEventRow {
+                community_id: v.get("community_id")?.as_str()?.to_owned(),
+                event_id: v.get("event_id")?.as_str()?.to_owned(),
+                event_title: v.get("event_title")?.as_str()?.to_owned(),
+                event_location: v
+                    .get("event_location")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_owned()),
+                event_status: v.get("event_status")?.as_str()?.to_owned(),
+                day_id: v.get("day_id")?.as_str()?.to_owned(),
+                day_date: v.get("day_date")?.as_str()?.to_owned(),
+                starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
+                ends_at_utc: v.get("ends_at_utc")?.as_str()?.to_owned(),
+                seq: v.get("seq")?.as_u64()? as u32,
+                total_days: v.get("total_days")?.as_u64()? as u32,
+            })
+        })
+        .collect())
+}
+
 pub async fn home_upcoming_for_communities(
     db: &D1Database,
     community_ids: &[&str],

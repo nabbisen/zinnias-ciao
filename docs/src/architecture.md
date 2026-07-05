@@ -6,7 +6,7 @@
 Cargo.toml                   workspace root
 packages/
   domain/                    pure business logic; native-testable; no Worker/WASM deps
-  contracts/                 DTOs, error model, i18n strings (148 EN/JA pairs); native-testable
+  contracts/                 DTOs, error model, i18n strings (164 EN/JA pairs); native-testable
 workers/
   ssr/                       Cloudflare Worker: SSR renderer + route handlers
     src/
@@ -14,7 +14,7 @@ workers/
       db/                    D1 data-access layer (parameterised queries only)
         attendance.rs        Attendance reads + batch IN-clause helpers (RFC-029)
         calendar.rs          Calendar feed token helpers (RFC-023)
-        community.rs         Community lookup
+        community.rs         Community lookup + additional community creation helper (RFC-057)
         event.rs             Event + event_day queries
         event_note.rs        Note read/write + soft-delete + admin hide
         event_template.rs    Event template CRUD (RFC-032)
@@ -28,6 +28,7 @@ workers/
         calendar.rs          Calendar feed page + ICS download (RFC-023)
         communities.rs       Calendar tab for active community (former Communities route)
         community.rs         Community-scoped router (dispatches admin/member routes)
+        community_create.rs  Additional community creation flow (RFC-057)
         event.rs             Event detail, status update, note save/delete
         export.rs            Admin community data export (RFC-027)
         health.rs            GET /healthz  GET /version
@@ -39,9 +40,9 @@ workers/
       render.rs              HTML render helpers, escape_html, status_display
       session.rs             Session cookie middleware
       form_token.rs          Server-issued CSRF + idempotency tokens (AD-4)
-      authz.rs               Community-scoped authorization guards
+      authz.rs               Community-scoped and active-admin-somewhere authorization guards
       audit.rs               Structured audit log writer (RFC-014)
-      rate_limit.rs          KV-backed invite failure counter (RFC-012)
+      rate_limit.rs          KV-backed invite failure and community-creation counters
       crypto.rs              HMAC-SHA256 helpers (AD-3)
     static/
       app.css                Design tokens + base styles (RFC-011)
@@ -61,8 +62,8 @@ scripts/
   setup.mjs                  Dev bootstrap: D1 migrations + seed data
 docs/src/                    mdbook documentation (SUMMARY.md is the index)
 rfcs/
-  done/                      33 implemented RFCs
-  proposed/                  6 backlog RFCs (see ROADMAP.md)
+  done/                      Implemented RFCs
+  proposed/                  Backlog RFCs (see ROADMAP.md)
   README.md                  RFC index
 ```
 
@@ -106,7 +107,7 @@ The ≤200-char note is per `(event, membership)`, not per day.
 
 ```
 packages/domain/   — 96 pure-Rust unit tests (validation, status transitions, recurrence)
-packages/contracts/ — 64 tests (token uniqueness, i18n parity, session gates, error model)
+packages/contracts/ — tests for token uniqueness, i18n parity, session gates, error model, and release gates
 ```
 
 SSR handlers are not unit-tested (WASM environment); integration testing is via

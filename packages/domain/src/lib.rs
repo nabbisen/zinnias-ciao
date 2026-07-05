@@ -10,7 +10,7 @@ pub mod note;
 pub mod session;
 pub mod status;
 
-pub use community::Community;
+pub use community::{COMMUNITY_NAME_MAX, Community, CommunityNameError, validate_community_name};
 pub use display_name::{DISPLAY_NAME_MAX, DisplayNameError, validate_display_name};
 pub use event::{Event, EventDay};
 pub use event_admin::{

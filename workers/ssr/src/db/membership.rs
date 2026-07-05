@@ -102,6 +102,35 @@ pub async fn list_active_for_user(db: &D1Database, user_id: &str) -> Result<Vec<
         .collect())
 }
 
+/// First active admin membership for a user, if any.
+/// Used by non-community-scoped flows that still require an existing admin.
+pub async fn find_first_admin_for_user(
+    db: &D1Database,
+    user_id: &str,
+) -> Result<Option<MembershipRow>> {
+    let row = db
+        .prepare(
+            "SELECT id, community_id, user_id, role, display_name \
+             FROM community_memberships \
+             WHERE user_id = ?1 AND role = 'admin' AND removed_at IS NULL \
+             ORDER BY joined_at ASC LIMIT 1",
+        )
+        .bind(&[user_id.into()])?
+        .first::<serde_json::Value>(None)
+        .await?;
+
+    Ok(row.and_then(|v| {
+        Some(MembershipRow {
+            id: v.get("id")?.as_str()?.to_owned(),
+            community_id: v.get("community_id")?.as_str()?.to_owned(),
+            user_id: v.get("user_id")?.as_str()?.to_owned(),
+            role: v.get("role")?.as_str()?.to_owned(),
+            display_name: v.get("display_name")?.as_str()?.to_owned(),
+            is_active: true,
+        })
+    }))
+}
+
 /// Create a user row (used during invite redemption for new users).
 pub async fn insert_user(db: &D1Database, user_id: &str) -> Result<()> {
     let now = now_utc();

@@ -35,6 +35,7 @@ pub mod token_purpose {
     pub const REDEEM_INVITE: &str = "redeem_invite";
     pub const JOIN_PROFILE: &str = "join_profile";
     pub const LOGOUT: &str = "logout";
+    pub const CREATE_COMMUNITY: &str = "create_community";
 }
 
 /// Outcome of attempting to consume a single-use form token.

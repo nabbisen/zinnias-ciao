@@ -13,15 +13,18 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Session is issued, validated, and revoked on logout. *(session.rs, auth.rs post_logout)*
 - [x] Community membership enforced (non-members see generic 404). *(authz.rs require_membership: checks user_id AND community_id)*
 - [x] Home shows active communities one by one with nearby event links, without a header community switcher. *(home.rs: `home_upcoming_for_communities`, `render_home_communities`)*
-- [x] Calendar tab shows the active community month overview and keeps the community switcher. *(communities.rs: `render_month_calendar`, `header_with_switcher_next`)*
+- [x] Calendar tab shows the active community's current-month overview and event links, and keeps the community switcher. *(communities.rs: `calendar_month_for_community`, `render_month_calendar`, `render_calendar_events`, `header_with_switcher_next`)*
+- [x] Community switcher auto-submit is implemented in external `app.js`, not inline `onchange`, and the shell cache-busts `app.js` with a visible submit fallback for stale/no JS. *(render.rs + app.js + release gate)*
 - [x] Event Detail shows status, participants, and notes. *(event.rs get_event_detail)*
 - [x] Member can set own status (Going / No Go / clear). *(event.rs post_my_status + validate_status_transition)*
 - [x] Member can save, edit, and delete own note. *(event.rs post_my_note, delete_my_note)*
 - [x] Admin can create event (single and multi-day). *(admin.rs post_create_event + event_write::create_event)*
+- [x] Admin Create Event switcher stays on Create Event for the selected community, so new events bind to the selected community URL. *(admin/events.rs + `/switch?next=admin_events_new`)*
 - [x] Admin can cancel event (confirmation required). *(admin.rs get_cancel_event shows confirmation; post_cancel_event soft-cancels)*
 - [x] Admin can generate and revoke invite codes. *(admin/members.rs: rejection-sampling generator writes HMACs to `invite_codes`; `codlet::revoke_invite` delegates to `invite_db::revoke`)*
 - [x] Admin can remove member (last-admin guard active). *(admin.rs post_remove_member: count_admins guard)*
 - [x] Admin can mark Attended after event day ends. *(admin.rs get_attendance / post_attendance; classify_day gate)*
+- [x] Existing active admins can create an additional community when `COMMUNITY_CREATION_ENABLED=true`; creator becomes first admin and redirects to the new Home. *(community_create.rs, community.rs DB helper — RFC-057)*
 
 ## Safety gates
 
@@ -31,6 +34,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Failed invite redemptions are rate-limited. *(rate_limit.rs: 10 failures / 5-minute window per IP, KV-backed via `RATE_LIMIT`, fails open on KV unavailability)*
 - [x] Session cookies have `HttpOnly; Secure; SameSite=Strict`. Host-only by default (no `Domain` attribute unless `SESSION_COOKIE_DOMAIN` var is set). *(session.rs build_session_cookie — RFC-038)*
 - [x] Form token absent/replayed → POST rejected. `codlet::consume_token` is the handler-facing compatibility wrapper; it delegates to `form_token.rs::consume`, which performs a conditional UPDATE on `form_tokens`. Subject is the authenticated `user_id`; replay returns `Ok(Some(...))`, invalid returns `Err`. *(codlet.rs, form_token.rs — RFC-037)*
+- [x] Community creation is authenticated, active-admin-only, feature-flagged, token-protected, idempotent, rate-limited by user/session/IP, audited, and does not auto-generate invite codes. *(release_gates.rs RFC-057 gates)*
 - [x] Script tag in note/title/name renders as text (not executed). *(render.rs escape_html used at every user-content insertion; test: escape_script_tag)*
 - [x] Private page cache cleared on logout. *(RFC-042: authenticated HTML is never cached; only static shell assets are stored. No private cache exists to clear — the property holds trivially. PURGE_PRIVATE is retained for defence-in-depth.)*
 
@@ -59,6 +63,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Status chip shows icon + label + colour (grayscale test: still legible). *(render.rs `status_display()` always returns `(fg_color, icon, label)` tuple; AA-passing fg colors on white: Going 5.0:1, Not Going 5.9:1, Attended 4.7:1 — code-verified)*
 - [~] Event Detail usable at 200% text scaling. *(requires browser test)*
 - [x] Home multi-community nearby-events dashboard and Calendar overview usable at 360-428 px and 200% text scaling. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc056/rfc056-route-split-smoke-results.json`)*
+- [~] Community creation form usable at 360-428 px, 200% text scaling, and with JavaScript disabled. *(requires browser smoke for RFC-057)*
 - [x] Reduced-motion mode disables animations. *(app.css: `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }` — code-verified)*
 - [x] Error messages use plain language (no SQL/JWT/token/cookie). *(release_gates.rs `not_found_and_forbidden_same_message`; domain tests verify no 'sql'/'panic' in event/note error strings — automated)*
 
@@ -85,7 +90,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
 - [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
-- [x] i18n parity test covers all 148 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity test covers all 164 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
@@ -102,9 +107,19 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Release-gate hardening (v0.34.0 — RFC-044 partial)
 
-- [x] i18n parity gate covers all 148 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity gate covers all 164 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] Static query-count gates: home.rs, event.rs, export.rs `.await` counts verified within ceiling bounds. *(release_gates.rs `*_await_count_within_budget` — v0.34.0)*
 - [x] SW `CACHE_VERSION` matches workspace version. *(release_gates.rs `sw_cache_version_matches_workspace_version`)*
+
+## Community creation gates (v0.41.0 — RFC-057)
+
+- [x] `/communities/new` is a top-level route guarded by `require_auth` and `require_active_admin_somewhere`. *(release_gates.rs `rfc057_community_creation_is_guarded_active_admin_only`)*
+- [x] `COMMUNITY_CREATION_ENABLED` is explicit: true for dev/staging review, false for production default. *(wrangler.toml + release gate)*
+- [x] Create POST uses `CREATE_COMMUNITY` form-token purpose, stores the created community id as replay result, and redirects duplicate submits to the created community. *(release_gates.rs `rfc057_token_idempotency_rate_limit_and_timezone_are_fixed`)*
+- [x] Creation is rate-limited by authenticated user, session, and client IP. *(rate_limit.rs + release gate)*
+- [x] Production UI exposes Japan time only and rejects unsupported timezone submissions server-side. *(community_create.rs + release gate)*
+- [x] D1 writes are limited to `communities`, `community_memberships`, and `audit_log`; no members/events/templates/notes/invites are copied or generated. *(release_gates.rs `rfc057_creation_writes_only_community_membership_and_audit`)*
+- [~] Staging/local smoke verifies eligible admin success, anonymous denial, non-admin denial, token replay, rate limit, and audit rows. *(runtime evidence pending)*
 
 ## Operational gates
 

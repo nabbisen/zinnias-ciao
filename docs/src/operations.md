@@ -44,6 +44,32 @@ INSERT INTO invite_codes
 VALUES ('inv_xxx', 'com_xxx', '<computed_hmac>', 'mem_xxx', '2099-12-31T23:59:59Z', 'admin', datetime('now'));
 ```
 
+## Additional community creation
+
+RFC-057 adds an in-app route for additional communities:
+
+```text
+GET/POST /communities/new
+```
+
+This does not replace first-community bootstrap. The first production and
+staging community still comes from the operator runbook above. The in-app route
+is only for authenticated users who are already active admins in at least one
+community.
+
+Runtime flag:
+
+```toml
+COMMUNITY_CREATION_ENABLED = "true"  # dev/staging review
+COMMUNITY_CREATION_ENABLED = "false" # production default
+```
+
+When enabled, eligible admins see `新しいコミュニティを作る` on the Me page.
+Creation writes a new `communities` row, the creator's first admin membership,
+and audit events `community.created` and `membership.created_first_admin`.
+It does not copy members/events/templates/notes and does not generate invite
+codes. The new admin uses the existing invite screen intentionally.
+
 ### Timezone scope (important)
 
 The `communities.timezone` column accepts an IANA zone name (e.g. `Asia/Tokyo`).

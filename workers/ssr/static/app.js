@@ -48,6 +48,19 @@ window.addEventListener('online',  updateOfflineBanner);
 window.addEventListener('offline', updateOfflineBanner);
 updateOfflineBanner();
 
+// ── Community switcher ───────────────────────────────────────────────────
+// CSP blocks inline event handlers, so select auto-submit lives here.
+// The server-rendered submit button remains visible when JS is disabled or stale.
+document.querySelectorAll('form[action="/switch"]').forEach(function(form) {
+  var select = form.querySelector('select[name="community"]');
+  var button = form.querySelector('button[type="submit"]');
+  if (!select) return;
+  if (button) button.hidden = true;
+  select.addEventListener('change', function() {
+    form.submit();
+  });
+});
+
 // ── Note character counter (progressive enhancement) ─────────────────────
 // With JS off the textarea still works; the server enforces the limit.
 document.querySelectorAll('textarea[name="note"]').forEach(function(ta) {

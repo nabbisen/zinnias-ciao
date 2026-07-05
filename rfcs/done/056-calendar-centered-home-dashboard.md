@@ -22,7 +22,7 @@ The Calendar tab replaces the previous Communities page. It shows a month-shaped
 - Change `/c/:cid/communities` into the Calendar page for the active community.
 - Keep the Calendar page header community switcher, and keep the user on Calendar after switching.
 - Highlight today on the Calendar page using the community timezone.
-- Mark upcoming event days from the active community's Home agenda result.
+- Mark event days from the active community's visible month.
 - Keep Home and Calendar server-rendered and no-JS compatible.
 - Keep Japanese-only pilot copy covered by i18n parity gates.
 
@@ -49,7 +49,7 @@ On Calendar, members see:
 2. A centered "今月のこれからの予定" calendar-shaped overview for the active community.
 3. A helper line: "予定がある日に印をつけています。詳しくは下の一覧をご覧ください。"
 
-The calendar does not claim to be a complete month history. It marks upcoming event days already present in the Home agenda result. Past days earlier in the month may be unmarked because Home is focused on upcoming activity.
+The Calendar page is active-community scoped. It marks event days from the visible month in that community, independent from Home's nearby-events window.
 
 Days with events show a simple marker. Today is identified with visible text and styling. Calendar day cells are non-interactive in v0.40.0: they are not links or buttons and must not look tappable. Home event links remain the place to open Event Detail and answer attendance.
 
@@ -62,19 +62,19 @@ Days with events show a simple marker. Today is identified with visible text and
 - Rendering each community as its own section.
 - Rendering event links directly to `/c/:cid/events/:eid`.
 
-`workers/ssr/src/handlers/communities.rs` now renders the Calendar page for the active community. It uses the calendar helper from `home.rs`:
+`workers/ssr/src/handlers/communities.rs` now renders the Calendar page for the active community. It uses the calendar helper from `home.rs` and renders the same active community's current-month event links below the grid:
 
 - Parse the community-local current date.
-- Count upcoming `event_days` rows from the existing Home result that fall in the visible month.
+- Count `event_days` rows from the selected community's visible month.
 - Render a stable seven-column CSS grid with weekday labels and fixed minimum cell heights.
 
 The Calendar handler reuses the existing active-community Home query:
 
 ```text
-home_upcoming(db, community_id, now, now + 30 days)
+calendar_month_for_community(db, community_id, month_start, next_month_start)
 ```
 
-Home uses `home_upcoming_for_communities` so it does not issue one event query per community. The Calendar page remains active-community scoped. Because the calendar source is the active community's agenda result, the calendar is an upcoming overview rather than a complete current-month history.
+Home uses `home_upcoming_for_communities` so it does not issue one event query per community. The Calendar page remains active-community scoped and uses a separate month query so the selected community's visible month is complete.
 
 ## 6. Safety and Privacy
 
@@ -99,7 +99,7 @@ Home uses `home_upcoming_for_communities` so it does not issue one event query p
 
 - Home renders community sections and does not render the community switcher.
 - Home event links point to community-scoped Event Detail routes.
-- Calendar page renders the active-community month grid and keeps the community switcher.
+- Calendar page renders the active-community month grid and active-community event links, and keeps the community switcher.
 - Calendar uses a stable seven-column grid.
 - Today is calculated from community-local display time.
 - Release gates cover Home multi-community layout, Calendar ownership of the grid/switcher, and i18n parity.

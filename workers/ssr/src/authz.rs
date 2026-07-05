@@ -60,3 +60,24 @@ pub async fn require_admin(
     }
     Ok(ctx)
 }
+
+/// Require that the user is an active admin in at least one community.
+/// This supports guarded bootstrap flows that are not scoped to an existing
+/// community URL, without granting access to anonymous or member-only users.
+pub async fn require_active_admin_somewhere(
+    env: &Env,
+    auth: &AuthContext,
+) -> Result<MembershipContext> {
+    let db = env.d1("DB")?;
+    let row = membership_db::find_first_admin_for_user(&db, &auth.user_id)
+        .await?
+        .ok_or_else(|| worker::Error::RustError("Not found.".to_string()))?;
+
+    Ok(MembershipContext {
+        membership_id: row.id,
+        community_id: row.community_id,
+        user_id: row.user_id,
+        role: row.role,
+        display_name: row.display_name,
+    })
+}

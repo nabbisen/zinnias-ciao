@@ -51,7 +51,7 @@ const ICON_NO_ANSWER: &str = "<svg aria-hidden='true' width='1em' height='1em' v
 // ── Static asset paths ────────────────────────────────────────────────────
 const MANIFEST: &str = "/manifest.webmanifest";
 const CSS: &str = "/static/app.css";
-const JS: &str = "/static/app.js";
+const JS: &str = "/static/app.js?v=0.41.0-switcher-2";
 const THEME: &str = "#007AFF";
 
 // ── Shell ─────────────────────────────────────────────────────────────────
@@ -157,8 +157,7 @@ pub fn header(title: &str, community_name: &str) -> String {
 /// `communities` is a slice of `(community_id, community_name)` pairs for the
 /// current user. When the user has only one community the select is still shown
 /// (consistent UI) but there is nothing else to switch to.
-/// Submits via a tiny inline form (no JS needed; works with JS off via POST,
-/// enhanced by an onchange JS redirect when JS is available).
+/// Submits via a tiny GET form; app.js auto-submits on change when available.
 pub fn header_with_switcher(
     title: &str,
     current_community_id: &str,
@@ -190,8 +189,7 @@ pub fn header_with_switcher_next(
         })
         .collect();
 
-    // onchange navigates immediately with JS.
-    // Without JS the select still shows the current community visually.
+    // app.js submits on change. The visible button is the no-JS/stale-JS fallback.
     let mut h = String::new();
     h.push_str("<header style='position:sticky;top:0;background:#FFFFFF;");
     h.push_str("border-bottom:1px solid #E5E5EA;");
@@ -199,24 +197,24 @@ pub fn header_with_switcher_next(
     h.push_str("align-items:center;gap:.5rem;flex-wrap:wrap;z-index:10'>");
     h.push_str("<span style='font-size:1.25rem;font-weight:600;white-space:nowrap;min-width:0'>");
     h.push_str(&title_s);
-    // No-JS: a GET form to /switch with a submit button works without scripts.
-    // Progressive enhancement: onchange auto-submits so JS users skip the button.
+    // GET form to /switch works without scripts; app.js auto-submits for JS users.
     h.push_str("</span>");
     h.push_str("<form method='get' action='/switch' style='margin:0;min-width:0;max-width:100%'>");
     h.push_str("<input type='hidden' name='next' value='");
     h.push_str(&escape_html(next));
     h.push_str("'>");
     h.push_str("<select name='community' aria-label='Switch community' ");
-    h.push_str("onchange='this.form.submit()' ");
     h.push_str("style='font-size:.8125rem;color:#6E6E73;background:none;border:none;");
     h.push_str("border-bottom:1px solid #E5E5EA;padding:.125rem .25rem;");
     h.push_str("max-width:100%;box-sizing:border-box;cursor:pointer'>");
     h.push_str(&options);
     h.push_str("</select>");
-    h.push_str("<noscript><button type='submit' style='font-size:.8125rem;");
-    h.push_str("margin-left:.25rem;min-height:44px;cursor:pointer'>");
+    h.push_str("<button type='submit' style='font-size:.8125rem;");
+    h.push_str("margin-left:.25rem;min-height:44px;cursor:pointer;");
+    h.push_str("background:#F5F5F7;color:#1D1D1F;border:1px solid #D1D1D6;");
+    h.push_str("border-radius:8px;padding:.25rem .5rem'>");
     h.push_str(i18n::JA_NAV_SWITCH_GO);
-    h.push_str("</button></noscript>");
+    h.push_str("</button>");
     h.push_str("</form>");
     h.push_str("</header>");
     h

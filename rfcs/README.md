@@ -60,6 +60,7 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | ID | Title | Shipped in |
 |----|-------|------------|
 | 056 | [Calendar-Centered Home Dashboard](./done/056-calendar-centered-home-dashboard.md) | v0.40.0 |
+| 057 | [Community Creation and Bootstrap Flow](./done/057-community-creation-and-bootstrap-flow.md) | v0.41.0 |
 
 ## Also Done
 
@@ -93,8 +94,6 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 | 051 | [Multi-Day and Recurring Event Edit Semantics](./proposed/051-multi-day-and-recurring-event-edit-semantics.md) | Product decision needed |
 | 053 | [ICS Feed Privacy and Revocation UX](./proposed/053-ics-feed-privacy-and-revocation-ux.md) | Copy review (RFC-054) |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
-
-
 ## Archive
 
 _None._

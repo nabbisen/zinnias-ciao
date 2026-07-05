@@ -3,6 +3,7 @@ pub mod auth;
 pub mod calendar;
 pub mod communities;
 pub mod community;
+pub mod community_create;
 pub mod event;
 pub mod export;
 pub mod health;

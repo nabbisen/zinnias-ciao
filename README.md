@@ -81,7 +81,7 @@ Full setup and deployment instructions are in [`docs/src/quick-start.md`](docs/s
 | [`docs/src/backup-recovery.md`](docs/src/backup-recovery.md) | D1 backup, restore, incident response |
 | [`docs/src/operations.md`](docs/src/operations.md) | Operator reference |
 | [`docs/src/launch-runbook.md`](docs/src/launch-runbook.md) | Pre-launch checklist and bootstrap sequence |
-| [`docs/src/release-checklist.md`](docs/src/release-checklist.md) | Release gate status (32/38 verified by code) |
+| [`docs/src/release-checklist.md`](docs/src/release-checklist.md) | Release gate status |
 | [`ROADMAP.md`](ROADMAP.md) | Implemented RFCs, backlog, and pilot deployment gates |
 | [`CHANGELOG.md`](CHANGELOG.md) | Version history |
-| [`rfcs/README.md`](rfcs/README.md) | RFC index (30 done, 6 proposed/backlog) |
+| [`rfcs/README.md`](rfcs/README.md) | RFC index |

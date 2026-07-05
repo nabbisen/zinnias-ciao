@@ -102,6 +102,7 @@ fn all_state_changing_routes_have_token_purpose() {
         token_purpose::REDEEM_INVITE,
         token_purpose::JOIN_PROFILE,
         token_purpose::LOGOUT,
+        token_purpose::CREATE_COMMUNITY,
     ];
     for p in required {
         assert!(!p.is_empty(), "token purpose must not be empty: {p}");
@@ -213,6 +214,52 @@ fn i18n_en_ja_parity_count() {
         (EN_ADMIN_REMOVE_CONSEQUENCE, JA_ADMIN_REMOVE_CONSEQUENCE),
         (EN_ADMIN_LAST_ADMIN, JA_ADMIN_LAST_ADMIN),
         (EN_COMMUNITIES_JOIN_ANOTHER, JA_COMMUNITIES_JOIN_ANOTHER),
+        (EN_COMMUNITY_CREATE_LINK, JA_COMMUNITY_CREATE_LINK),
+        (EN_COMMUNITY_CREATE_TITLE, JA_COMMUNITY_CREATE_TITLE),
+        (EN_COMMUNITY_CREATE_BODY, JA_COMMUNITY_CREATE_BODY),
+        (
+            EN_COMMUNITY_CREATE_NAME_LABEL,
+            JA_COMMUNITY_CREATE_NAME_LABEL,
+        ),
+        (
+            EN_COMMUNITY_CREATE_DISPLAY_NAME_LABEL,
+            JA_COMMUNITY_CREATE_DISPLAY_NAME_LABEL,
+        ),
+        (
+            EN_COMMUNITY_CREATE_TIMEZONE_LABEL,
+            JA_COMMUNITY_CREATE_TIMEZONE_LABEL,
+        ),
+        (
+            EN_COMMUNITY_CREATE_TIMEZONE_JAPAN,
+            JA_COMMUNITY_CREATE_TIMEZONE_JAPAN,
+        ),
+        (EN_COMMUNITY_CREATE_SUBMIT, JA_COMMUNITY_CREATE_SUBMIT),
+        (EN_COMMUNITY_CREATE_CANCEL, JA_COMMUNITY_CREATE_CANCEL),
+        (EN_COMMUNITY_CREATE_DISABLED, JA_COMMUNITY_CREATE_DISABLED),
+        (
+            EN_COMMUNITY_CREATE_RATE_LIMITED,
+            JA_COMMUNITY_CREATE_RATE_LIMITED,
+        ),
+        (
+            EN_COMMUNITY_CREATE_NAME_ERROR,
+            JA_COMMUNITY_CREATE_NAME_ERROR,
+        ),
+        (
+            EN_COMMUNITY_CREATE_NAME_TOO_LONG,
+            JA_COMMUNITY_CREATE_NAME_TOO_LONG,
+        ),
+        (
+            EN_COMMUNITY_CREATE_NAME_INVALID,
+            JA_COMMUNITY_CREATE_NAME_INVALID,
+        ),
+        (
+            EN_COMMUNITY_CREATE_DISPLAY_NAME_ERROR,
+            JA_COMMUNITY_CREATE_DISPLAY_NAME_ERROR,
+        ),
+        (
+            EN_COMMUNITY_CREATE_TIMEZONE_ERROR,
+            JA_COMMUNITY_CREATE_TIMEZONE_ERROR,
+        ),
         (EN_ROLE_ADMIN, JA_ROLE_ADMIN),
         (EN_ROLE_MEMBER, JA_ROLE_MEMBER),
         (EN_HOME_FIRST_RUN_WELCOME, JA_HOME_FIRST_RUN_WELCOME),
@@ -422,6 +469,14 @@ fn query_budgets_are_positive_and_ordered() {
 const HOME_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/home.rs");
 const EVENT_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/event.rs");
 const EXPORT_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/export.rs");
+const COMMUNITY_CREATE_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/community_create.rs");
+const ME_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/me.rs");
+const LIB_SRC: &str = include_str!("../../../workers/ssr/src/lib.rs");
+const AUTHZ_SRC: &str = include_str!("../../../workers/ssr/src/authz.rs");
+const RATE_LIMIT_SRC: &str = include_str!("../../../workers/ssr/src/rate_limit.rs");
+const COMMUNITY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/community.rs");
+const WRANGLER_TOML_SRC: &str = include_str!("../../../wrangler.toml");
 
 /// Count non-comment lines containing `.await` in a source string.
 fn count_awaits(src: &str) -> usize {
@@ -561,6 +616,8 @@ fn sw_cache_version_matches_workspace_version() {
 // values, and HTTP header literals must remain unflagged).
 
 const COMMUNITIES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/communities.rs");
+const ADMIN_EVENTS_SRC: &str = include_str!("../../../workers/ssr/src/handlers/admin/events.rs");
+const APP_JS_SRC: &str = include_str!("../../../workers/ssr/static/app.js");
 const RENDER_SRC: &str = include_str!("../../../workers/ssr/src/render.rs");
 
 #[test]
@@ -579,6 +636,7 @@ fn no_known_english_ui_leaks_in_rendered_text() {
         COMMUNITIES_SRC,
         RENDER_SRC,
         HOME_HANDLER_SRC,
+        COMMUNITY_CREATE_HANDLER_SRC,
     ] {
         for needle in forbidden {
             assert!(
@@ -588,6 +646,108 @@ fn no_known_english_ui_leaks_in_rendered_text() {
             );
         }
     }
+}
+
+#[test]
+fn rfc057_community_creation_is_guarded_active_admin_only() {
+    assert!(
+        LIB_SRC.contains("(Method::Get, \"/communities/new\")")
+            && LIB_SRC.contains("(Method::Post, \"/communities/new\")"),
+        "RFC-057 route must be top-level /communities/new, not scoped under /c/:id"
+    );
+    assert!(
+        COMMUNITY_CREATE_HANDLER_SRC.contains("require_auth")
+            && COMMUNITY_CREATE_HANDLER_SRC.contains("require_active_admin_somewhere"),
+        "Community creation must require an authenticated active admin somewhere"
+    );
+    assert!(
+        AUTHZ_SRC.contains("find_first_admin_for_user"),
+        "Active-admin-somewhere eligibility must be enforced through authz"
+    );
+    assert!(
+        COMMUNITY_CREATE_HANDLER_SRC.contains("COMMUNITY_CREATION_ENABLED"),
+        "Community creation must be guarded by an operator feature flag"
+    );
+}
+
+#[test]
+fn rfc057_token_idempotency_rate_limit_and_timezone_are_fixed() {
+    assert!(
+        COMMUNITY_CREATE_HANDLER_SRC.contains("token_purpose::CREATE_COMMUNITY")
+            && COMMUNITY_CREATE_HANDLER_SRC.contains("set_result")
+            && COMMUNITY_CREATE_HANDLER_SRC.contains("if let Some(community_id) = replay"),
+        "Community creation must use scoped form tokens and replay to the created community"
+    );
+    assert!(
+        RATE_LIMIT_SRC.contains("community_create_user")
+            && RATE_LIMIT_SRC.contains("community_create_session")
+            && RATE_LIMIT_SRC.contains("community_create_ip")
+            && RATE_LIMIT_SRC.contains("COMMUNITY_CREATION_MAX_PER_WINDOW"),
+        "Community creation must be rate-limited by user, session, and IP"
+    );
+    assert!(
+        COMMUNITY_CREATE_HANDLER_SRC.contains("SUPPORTED_TIMEZONE: &str = \"Asia/Tokyo\"")
+            && COMMUNITY_CREATE_HANDLER_SRC.contains("timezone != SUPPORTED_TIMEZONE"),
+        "v0.41.0 must expose only the reviewed Japan-time selection"
+    );
+}
+
+#[test]
+fn rfc057_creation_writes_only_community_membership_and_audit() {
+    assert!(
+        COMMUNITY_DB_SRC.contains("INSERT INTO communities")
+            && COMMUNITY_DB_SRC.contains("INSERT INTO community_memberships")
+            && COMMUNITY_DB_SRC.contains("INSERT INTO audit_log")
+            && COMMUNITY_DB_SRC.contains("db.batch"),
+        "Community creation must batch community, first-admin membership, and audit writes"
+    );
+    assert!(
+        COMMUNITY_DB_SRC.contains("community.created")
+            && COMMUNITY_DB_SRC.contains("membership.created_first_admin"),
+        "Community creation must emit the reviewed audit events"
+    );
+    assert!(
+        COMMUNITY_DB_SRC.contains("metadata_json")
+            && !COMMUNITY_DB_SRC.contains("action, metadata, created_at"),
+        "Community creation audit insert must match the D1 schema column metadata_json"
+    );
+    for forbidden in [
+        "event_days",
+        "events",
+        "attendance",
+        "notes",
+        "invite_codes",
+        "event_templates",
+    ] {
+        assert!(
+            !COMMUNITY_DB_SRC.contains(forbidden),
+            "Community creation DB helper must not copy or generate {forbidden}"
+        );
+    }
+    assert!(
+        !COMMUNITY_CREATE_HANDLER_SRC.contains("GENERATE_INVITE")
+            && !COMMUNITY_CREATE_HANDLER_SRC.contains("insert_invite")
+            && !COMMUNITY_CREATE_HANDLER_SRC.contains("invite_code"),
+        "Community creation must not auto-generate an invite code"
+    );
+}
+
+#[test]
+fn rfc057_me_entry_and_feature_flag_defaults_are_reviewed() {
+    assert!(
+        ME_HANDLER_SRC.contains("JA_COMMUNITY_CREATE_LINK")
+            && ME_HANDLER_SRC.contains("/communities/new")
+            && ME_HANDLER_SRC.contains("find_first_admin_for_user")
+            && ME_HANDLER_SRC.contains("community_creation_enabled"),
+        "Me page must show the quiet create-community entry only for eligible admins"
+    );
+    assert!(
+        WRANGLER_TOML_SRC.contains("[env.dev.vars]")
+            && WRANGLER_TOML_SRC.contains("COMMUNITY_CREATION_ENABLED = \"true\"")
+            && WRANGLER_TOML_SRC.contains("[env.production.vars]")
+            && WRANGLER_TOML_SRC.contains("COMMUNITY_CREATION_ENABLED = \"false\""),
+        "Community creation flag should be enabled for local/staging review and off in production by default"
+    );
 }
 
 #[test]
@@ -617,12 +777,56 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "The former Communities tab must render the active community calendar"
     );
     assert!(
+        COMMUNITIES_SRC.contains("render_calendar_events"),
+        "Calendar page must render the active community event list below the month grid"
+    );
+    assert!(
+        COMMUNITIES_SRC.contains("event_db::calendar_month_for_community")
+            && COMMUNITIES_SRC.contains("community_id")
+            && COMMUNITIES_SRC.contains("month_start")
+            && COMMUNITIES_SRC.contains("next_month_start"),
+        "Calendar page events must be scoped to the selected active community and visible month"
+    );
+    assert!(
+        !COMMUNITIES_SRC.contains("home_upcoming(&db, community_id"),
+        "Calendar page must not use the Home next-30-days query for its month grid"
+    );
+    assert!(
+        COMMUNITIES_SRC.contains("href=\\\"/c/{cid}/events/{eid}\\\""),
+        "Calendar page event list must link into the selected community's Event Detail"
+    );
+    assert!(
         COMMUNITIES_SRC.contains("header_with_switcher_next"),
         "Calendar page must keep the community switcher"
     );
     assert!(
         COMMUNITIES_SRC.contains("\"communities\""),
         "Calendar switcher must stay on the Calendar page after switching"
+    );
+    assert!(
+        !RENDER_SRC.contains("onchange='this.form.submit()'"),
+        "Community switcher must not rely on inline onchange handlers because CSP blocks them"
+    );
+    assert!(
+        RENDER_SRC.contains("/static/app.js?v=0.41.0-switcher-2"),
+        "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
+    );
+    assert!(
+        RENDER_SRC.contains("<button type='submit'")
+            && RENDER_SRC.contains("JA_NAV_SWITCH_GO")
+            && !RENDER_SRC.contains("<noscript><button type='submit'"),
+        "Community switcher must have a visible submit fallback, not only a noscript-only button"
+    );
+    assert!(
+        APP_JS_SRC.contains("form[action=\"/switch\"]")
+            && APP_JS_SRC.contains("select[name=\"community\"]")
+            && APP_JS_SRC.contains("button.hidden = true")
+            && APP_JS_SRC.contains("form.submit()"),
+        "External app.js must auto-submit the community switcher under CSP"
+    );
+    assert!(
+        ADMIN_EVENTS_SRC.contains("admin_events_new"),
+        "Admin event creation switcher must keep users on the create-event page for the selected community"
     );
     assert!(
         HOME_HANDLER_SRC.contains("grid-template-columns:repeat(7,minmax(0,1fr))"),

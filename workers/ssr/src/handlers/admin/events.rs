@@ -93,10 +93,11 @@ pub async fn get_create_event(
          </form>\
          {tmpl_link}\
          </main>{nav}",
-        header = render::header_with_switcher(
+        header = render::header_with_switcher_next(
             i18n::JA_ADMIN_CREATE_EVENT_TITLE,
             community_id,
-            &_community_pairs
+            &_community_pairs,
+            "admin_events_new"
         ),
         cid = render::escape_html(community_id),
         tok = render::escape_html(&token),

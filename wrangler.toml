@@ -27,14 +27,16 @@ id      = "local"
 # host-only cookie (correct for a single-host deployment).
 
 [vars]
-BUILD_VERSION = "dev"
-LOG_LEVEL     = "info"
+BUILD_VERSION              = "dev"
+LOG_LEVEL                  = "info"
+COMMUNITY_CREATION_ENABLED = "false"
 
 [env.dev]
 name = "zinnias-ciao-ssr-dev"
 [env.dev.vars]
-BUILD_VERSION = "dev"
-LOG_LEVEL     = "debug"
+BUILD_VERSION              = "dev"
+LOG_LEVEL                  = "debug"
+COMMUNITY_CREATION_ENABLED = "true"
 
 [[env.dev.d1_databases]]
 binding       = "DB"
@@ -48,8 +50,9 @@ id      = "local"
 [env.staging]
 name = "zinnias-ciao-ssr-stg"
 [env.staging.vars]
-LOG_LEVEL     = "info"
-BUILD_VERSION = "staging"
+LOG_LEVEL                  = "info"
+BUILD_VERSION              = "staging"
+COMMUNITY_CREATION_ENABLED = "true"
 
 [[env.staging.d1_databases]]
 binding       = "DB"
@@ -63,8 +66,9 @@ id      = "REPLACE_WITH_STAGING_KV_ID"         # create with: wrangler kv:namesp
 [env.production]
 name = "zinnias-ciao-ssr-prd"
 [env.production.vars]
-LOG_LEVEL     = "warn"
-BUILD_VERSION = "production"
+LOG_LEVEL                  = "warn"
+BUILD_VERSION              = "production"
+COMMUNITY_CREATION_ENABLED = "false"
 
 [[env.production.d1_databases]]
 binding       = "DB"
