@@ -10,15 +10,52 @@ use crate::handlers::event::classify_day;
 use crate::render;
 use crate::session::require_auth;
 use zinnias_ciao_contracts::i18n;
+use zinnias_ciao_domain::event_admin::{EVENT_DESC_MAX, EVENT_LOCATION_MAX, EVENT_TITLE_MAX};
 use zinnias_ciao_domain::status::DayTimeState;
 use zinnias_ciao_domain::{
-    DayInput, EventInput, RecurrenceFreq, expand_recurrence, validate_event,
+    DayInput, EventInput, EventValidationError, RecurrenceFreq, expand_recurrence, validate_event,
 };
 
 fn redirect(url: &str) -> Result<Response> {
     let mut r = Response::empty()?;
     r.headers_mut().set("Location", url)?;
     Ok(r.with_status(303))
+}
+
+struct EventDetailsEdit {
+    title: String,
+    location: Option<String>,
+    description: Option<String>,
+}
+
+struct EventDayUpdate {
+    day_date: String,
+    starts_at_utc: String,
+    ends_at_utc: String,
+}
+
+struct EventEditSubmission {
+    details: EventDetailsEdit,
+    day_update: Option<EventDayUpdate>,
+}
+
+fn query_escape(value: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut out = String::new();
+    for &byte in value.as_bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(byte as char);
+            }
+            b' ' => out.push('+'),
+            _ => {
+                out.push('%');
+                out.push(HEX[(byte >> 4) as usize] as char);
+                out.push(HEX[(byte & 0x0F) as usize] as char);
+            }
+        }
+    }
+    out
 }
 
 // ── GET /c/:cid/admin/events/new ─────────────────────────────────────────
@@ -106,7 +143,7 @@ pub async fn get_create_event(
         ),
         cid = render::escape_html(community_id),
         tok = render::escape_html(&token),
-        fields = event_form_fields(
+        fields = render_event_create_fields(
             prefill_title.as_deref(),
             prefill_location.as_deref(),
             None,
@@ -114,7 +151,6 @@ pub async fn get_create_event(
             prefill_day.as_deref(),
             None,
             None,
-            true
         ),
         submit = i18n::JA_ADMIN_CREATE_EVENT_SUBMIT,
         tmpl_link = templates_link,
@@ -176,7 +212,7 @@ pub async fn post_create_event(
     let validated = match validate_event(input) {
         Ok(v) => v,
         Err(e) => {
-            let msg = render::escape_html(&e.to_string());
+            let msg = query_escape(&e.to_string());
             return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
         }
     };
@@ -186,7 +222,7 @@ pub async fn post_create_event(
     let expanded = match expand_recurrence(&base_day, freq, rep_count) {
         Ok(v) => v,
         Err(e) => {
-            let msg = render::escape_html(&e.to_string());
+            let msg = query_escape(&e.to_string());
             return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
         }
     };
@@ -277,6 +313,8 @@ pub async fn get_cancel_event(
         Some(e) => e,
         None => return render::not_found(),
     };
+    let days = event_db::days_for_event(&db, event_id).await?;
+    let whole_event_scope = !event_schedule_editable(&event, &days);
     let community = db::community::find_active(&db, community_id).await?;
     let _community_name = community.map(|c| c.name).unwrap_or_default();
     let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
@@ -294,16 +332,19 @@ pub async fn get_cancel_event(
          <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{cat}</h1>\
          <p style=\"font-size:.9375rem;color:#6e6e73\"><strong>{title}</strong></p>\
          <p style=\"font-size:.875rem;color:#6e6e73\">{body_text}</p>\
-         <div style=\"display:flex;gap:.75rem;margin-top:1.5rem\">\
+         <div style=\"display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.5rem\">\
            <a href=\"/c/{cid}/events/{eid}\" \
-              style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
-              text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600\">\
+              style=\"flex:1 1 9rem;min-width:0;box-sizing:border-box;padding:.875rem;\
+              border:2px solid #e5e5ea;border-radius:14px;text-align:center;\
+              text-decoration:none;color:#1D1D1F;font-weight:600;overflow-wrap:anywhere\">\
               {keep}</a>\
-           <form method=\"post\" action=\"/c/{cid}/admin/events/{eid}/cancel\" style=\"flex:1\">\
+           <form method=\"post\" action=\"/c/{cid}/admin/events/{eid}/cancel\" \
+             style=\"flex:1 1 9rem;min-width:0;margin:0\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
              <button type=\"submit\" \
-               style=\"width:100%;padding:.875rem;background:#FF3B30;color:#fff;\
-               border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
+               style=\"width:100%;box-sizing:border-box;padding:.875rem;background:#FF3B30;\
+               color:#fff;border:none;border-radius:14px;font-weight:600;min-height:44px;\
+               cursor:pointer;white-space:normal;overflow-wrap:anywhere\">\
                {confirm}</button>\
            </form>\
          </div></main>{nav}",
@@ -318,9 +359,17 @@ pub async fn get_cancel_event(
         tok = render::escape_html(&token),
         nav = nav,
         cat = i18n::JA_ADMIN_CANCEL_EVENT_TITLE,
-        body_text = i18n::JA_ADMIN_CANCEL_EVENT_BODY,
+        body_text = if whole_event_scope {
+            i18n::JA_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS
+        } else {
+            i18n::JA_ADMIN_CANCEL_EVENT_BODY
+        },
         keep = i18n::JA_ADMIN_CANCEL_EVENT_KEEP,
-        confirm = i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM,
+        confirm = if whole_event_scope {
+            i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS
+        } else {
+            i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM
+        },
     );
     render::page(i18n::JA_ADMIN_CANCEL_EVENT_TITLE, &body)
 }
@@ -425,14 +474,12 @@ pub async fn get_edit_event(
     )
     .await;
 
-    // Prefill date/time from the existing day, converted UTC → community-local.
-    // Only single-day events support time editing; multi-day events edit details only.
-    let is_single_day = days.len() == 1;
-    let (prefill_date, prefill_start, prefill_end) = if is_single_day {
-        let community_tz = db::community::find_active(&db, community_id)
-            .await?
-            .map(|c| c.timezone)
-            .unwrap_or_else(|| "UTC".to_string());
+    let community_tz = db::community::find_active(&db, community_id)
+        .await?
+        .map(|c| c.timezone)
+        .unwrap_or_else(|| "UTC".to_string());
+    let schedule_editable = event_schedule_editable(&event, &days);
+    let (prefill_date, prefill_start, prefill_end) = if schedule_editable {
         // Display path: fall back to UTC for unknown zones (shows UTC times rather
         // than wrong local times; correct config should be enforced at write time).
         let off = zinnias_ciao_contracts::tz::offset_minutes_or_utc(&community_tz);
@@ -459,6 +506,20 @@ pub async fn get_edit_event(
         .query_pairs()
         .find(|(k, _)| k == "err")
         .map(|(_, v)| v.to_string());
+
+    let fields = if schedule_editable {
+        render_single_day_edit_fields(
+            Some(&event.title),
+            event.location.as_deref(),
+            event.description.as_deref(),
+            err.as_deref(),
+            prefill_date.as_deref(),
+            prefill_start.as_deref(),
+            prefill_end.as_deref(),
+        )
+    } else {
+        render_details_only_event_edit_fields(&event, &days, &community_tz, err.as_deref())
+    };
 
     let eet = i18n::JA_ADMIN_EDIT_EVENT_TITLE;
     let ees = i18n::JA_ADMIN_EDIT_EVENT_SUBMIT;
@@ -491,16 +552,7 @@ pub async fn get_edit_event(
         muted = "#6E6E73",
         back = i18n::JA_NAV_BACK,
         going = "#007AFF",
-        fields = event_form_fields(
-            Some(&event.title),
-            event.location.as_deref(),
-            event.description.as_deref(),
-            err.as_deref(),
-            prefill_date.as_deref(),
-            prefill_start.as_deref(),
-            prefill_end.as_deref(),
-            false, // edit hides recurrence
-        ),
+        fields = fields,
         nav = nav,
     );
     render::page(i18n::JA_ADMIN_EDIT_EVENT_TITLE, &body)
@@ -553,32 +605,28 @@ pub async fn post_edit_event(
         return render::not_found(); // same generic response — consistent with GET guard
     }
 
-    let input = EventInput {
-        title: body.get_field("title").unwrap_or_default(),
-        location: Some(body.get_field("location").unwrap_or_default()),
-        description: Some(body.get_field("description").unwrap_or_default()),
-        days: vec![zinnias_ciao_domain::DayInput {
-            day_date: body.get_field("day_date").unwrap_or_default(),
-            starts_at: body.get_field("starts_at").unwrap_or_default(),
-            ends_at: body.get_field("ends_at").unwrap_or_default(),
-        }],
-    };
+    let schedule_editable = event_schedule_editable(&event, &days_check);
+    let submission = if schedule_editable {
+        let input = EventInput {
+            title: body.get_field("title").unwrap_or_default(),
+            location: Some(body.get_field("location").unwrap_or_default()),
+            description: Some(body.get_field("description").unwrap_or_default()),
+            days: vec![zinnias_ciao_domain::DayInput {
+                day_date: body.get_field("day_date").unwrap_or_default(),
+                starts_at: body.get_field("starts_at").unwrap_or_default(),
+                ends_at: body.get_field("ends_at").unwrap_or_default(),
+            }],
+        };
 
-    let validated = match validate_event(input) {
-        Ok(v) => v,
-        Err(e) => {
-            let msg = render::escape_html(&e.to_string());
-            return redirect(&format!(
-                "/c/{community_id}/admin/events/{event_id}/edit?err={msg}"
-            ));
-        }
-    };
-
-    // Determine whether this is a single-day event. Per-day time editing is
-    // only supported for single-day events; multi-day/recurring events edit
-    // details only (RFC-040 will define multi-day edit semantics).
-    let existing_days = event_db::days_for_event(&db, event_id).await?;
-    let day_utc: Option<(String, String, String)> = if existing_days.len() == 1 {
+        let validated = match validate_event(input) {
+            Ok(v) => v,
+            Err(e) => {
+                let msg = query_escape(&e.to_string());
+                return redirect(&format!(
+                    "/c/{community_id}/admin/events/{event_id}/edit?err={msg}"
+                ));
+            }
+        };
         let community_tz = db::community::find_active(&db, community_id)
             .await?
             .map(|c| c.timezone)
@@ -594,24 +642,61 @@ pub async fn post_edit_event(
             }
         };
         let d = &validated.days[0];
-        Some((
-            d.day_date.clone(),
-            zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.starts_at, off),
-            zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.ends_at, off),
-        ))
+        EventEditSubmission {
+            details: EventDetailsEdit {
+                title: validated.title,
+                location: validated.location,
+                description: validated.description,
+            },
+            day_update: Some(EventDayUpdate {
+                day_date: d.day_date.clone(),
+                starts_at_utc: zinnias_ciao_contracts::tz::local_to_utc(
+                    &d.day_date,
+                    &d.starts_at,
+                    off,
+                ),
+                ends_at_utc: zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.ends_at, off),
+            }),
+        }
     } else {
-        None
+        if edit_post_contains_schedule_fields(&body) {
+            return redirect(&format!(
+                "/c/{community_id}/admin/events/{event_id}/edit?err={}",
+                query_escape(i18n::JA_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE)
+            ));
+        }
+        let details = match validate_event_details(
+            body.get_field("title").unwrap_or_default(),
+            body.get_field("location").unwrap_or_default(),
+            body.get_field("description").unwrap_or_default(),
+        ) {
+            Ok(v) => v,
+            Err(e) => {
+                let msg = query_escape(&e.to_string());
+                return redirect(&format!(
+                    "/c/{community_id}/admin/events/{event_id}/edit?err={msg}"
+                ));
+            }
+        };
+        EventEditSubmission {
+            details,
+            day_update: None,
+        }
     };
 
     event_write::edit_event(
         &db,
         event_id,
-        &validated.title,
-        validated.location.as_deref(),
-        validated.description.as_deref(),
-        day_utc
-            .as_ref()
-            .map(|(d, s, e)| (d.as_str(), s.as_str(), e.as_str())),
+        &submission.details.title,
+        submission.details.location.as_deref(),
+        submission.details.description.as_deref(),
+        submission.day_update.as_ref().map(|day| {
+            (
+                day.day_date.as_str(),
+                day.starts_at_utc.as_str(),
+                day.ends_at_utc.as_str(),
+            )
+        }),
     )
     .await?;
 
@@ -623,7 +708,9 @@ pub async fn post_edit_event(
         "event",
         Some(event_id),
         "edited",
-        Some(serde_json::json!({ "title": validated.title })),
+        Some(serde_json::json!({
+            "edit_scope": if schedule_editable { "single_day_schedule" } else { "details_only" }
+        })),
     )
     .await;
 
@@ -989,8 +1076,7 @@ pub async fn post_admin_hide_note(
     ))
 }
 
-#[allow(clippy::too_many_arguments)]
-fn event_form_fields(
+fn render_event_create_fields(
     title: Option<&str>,
     location: Option<&str>,
     description: Option<&str>,
@@ -998,37 +1084,205 @@ fn event_form_fields(
     day_date: Option<&str>,
     starts_at: Option<&str>,
     ends_at: Option<&str>,
-    show_recurrence: bool,
 ) -> String {
-    let err_html = error
+    format!(
+        "{err}\
+         {title}\
+         {date}\
+         {start}\
+         {end}\
+         {loc}\
+         {repeat}\
+         {desc}",
+        err = render_error_html(error),
+        title = form_field(
+            i18n::JA_FORM_FIELD_TITLE,
+            "title",
+            "text",
+            title.unwrap_or(""),
+            true
+        ),
+        date = form_field(
+            i18n::JA_FORM_FIELD_DATE,
+            "day_date",
+            "date",
+            day_date.unwrap_or(""),
+            true
+        ),
+        start = form_field(
+            i18n::JA_FORM_FIELD_START,
+            "starts_at",
+            "time",
+            starts_at.unwrap_or(""),
+            true
+        ),
+        end = form_field(
+            i18n::JA_FORM_FIELD_END,
+            "ends_at",
+            "time",
+            ends_at.unwrap_or(""),
+            true
+        ),
+        loc = form_field(
+            i18n::JA_FORM_FIELD_LOCATION,
+            "location",
+            "text",
+            location.unwrap_or(""),
+            false
+        ),
+        repeat = render_repeat_fields(),
+        desc = description_field(description),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_single_day_edit_fields(
+    title: Option<&str>,
+    location: Option<&str>,
+    description: Option<&str>,
+    error: Option<&str>,
+    day_date: Option<&str>,
+    starts_at: Option<&str>,
+    ends_at: Option<&str>,
+) -> String {
+    format!(
+        "{err}\
+         {title}\
+         {date}\
+         {start}\
+         {end}\
+         {loc}\
+         {desc}",
+        err = render_error_html(error),
+        title = form_field(
+            i18n::JA_FORM_FIELD_TITLE,
+            "title",
+            "text",
+            title.unwrap_or(""),
+            true
+        ),
+        date = form_field(
+            i18n::JA_FORM_FIELD_DATE,
+            "day_date",
+            "date",
+            day_date.unwrap_or(""),
+            true
+        ),
+        start = form_field(
+            i18n::JA_FORM_FIELD_START,
+            "starts_at",
+            "time",
+            starts_at.unwrap_or(""),
+            true
+        ),
+        end = form_field(
+            i18n::JA_FORM_FIELD_END,
+            "ends_at",
+            "time",
+            ends_at.unwrap_or(""),
+            true
+        ),
+        loc = form_field(
+            i18n::JA_FORM_FIELD_LOCATION,
+            "location",
+            "text",
+            location.unwrap_or(""),
+            false
+        ),
+        desc = description_field(description),
+    )
+}
+
+fn render_details_only_event_edit_fields(
+    event: &event_db::EventRow,
+    days: &[event_db::EventDayRow],
+    community_tz: &str,
+    error: Option<&str>,
+) -> String {
+    let is_recurring = event_is_recurring(event);
+    let helper = if is_recurring {
+        i18n::JA_ADMIN_EDIT_RECURRING_HELPER
+    } else {
+        i18n::JA_ADMIN_EDIT_MULTI_DAY_HELPER
+    };
+
+    format!(
+        "{err}\
+         {summary}\
+         <section style=\"margin:1.25rem 0 1rem\">\
+         <h2 style=\"font-size:1rem;font-weight:700;margin:0 0 .5rem\">{heading}</h2>\
+         <p style=\"font-size:.875rem;color:#6e6e73;line-height:1.5;margin:.25rem 0 1rem\">\
+         {helper}</p>\
+         <p style=\"font-size:.8125rem;color:#6e6e73;line-height:1.5;margin:.25rem 0 1rem\">\
+         {preserved}</p>\
+         {title}{loc}{desc}</section>",
+        err = render_error_html(error),
+        summary = render_schedule_summary(days, community_tz),
+        heading = i18n::JA_ADMIN_EDIT_DETAILS_ONLY_HEADING,
+        helper = helper,
+        preserved = i18n::JA_ADMIN_EDIT_RESPONSES_PRESERVED,
+        title = form_field(
+            i18n::JA_FORM_FIELD_TITLE,
+            "title",
+            "text",
+            &event.title,
+            true
+        ),
+        loc = form_field(
+            i18n::JA_FORM_FIELD_LOCATION,
+            "location",
+            "text",
+            event.location.as_deref().unwrap_or(""),
+            false
+        ),
+        desc = description_field(event.description.as_deref()),
+    )
+}
+
+fn render_error_html(error: Option<&str>) -> String {
+    error
         .map(|e| {
             format!(
                 "<p role=\"alert\" style=\"color:#FF3B30;font-size:.875rem\">{}</p>",
                 render::escape_html(e)
             )
         })
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
 
-    let field = |label: &str, name: &str, ftype: &str, val: &str, required: bool| {
-        let req_attr = if required { " required" } else { "" };
-        format!(
-            "<label style=\"display:block;margin-bottom:1rem\">\
-             <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{label}</span>\
-             <input type=\"{ftype}\" name=\"{name}\" value=\"{val}\" \
-               style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
-               border-radius:12px;font-size:1rem\"{req_attr}>\
-             </label>",
-            label = label,
-            ftype = ftype,
-            name = name,
-            val = render::escape_html(val),
-        )
-    };
+fn form_field(label: &str, name: &str, ftype: &str, val: &str, required: bool) -> String {
+    let req_attr = if required { " required" } else { "" };
+    format!(
+        "<label style=\"display:block;margin-bottom:1rem\">\
+         <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{label}</span>\
+         <input type=\"{ftype}\" name=\"{name}\" value=\"{val}\" \
+           style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
+           border-radius:12px;font-size:1rem\"{req_attr}>\
+         </label>",
+        label = label,
+        ftype = ftype,
+        name = name,
+        val = render::escape_html(val),
+    )
+}
 
-    // RFC-022: repeat fields (create only — edit hides recurrence).
-    let repeat_html = if show_recurrence {
-        format!(
-            "<div style=\"margin-bottom:1rem\">\
+fn description_field(description: Option<&str>) -> String {
+    let dval = render::escape_html(description.unwrap_or(""));
+    format!(
+        "<label style=\"display:block;margin-bottom:1rem\">\
+         <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">\
+         {desc_lbl}</span>\
+         <textarea name=\"description\" rows=\"3\" \
+           style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
+           border-radius:12px;font-size:1rem\">{dval}</textarea>\
+         </label>",
+        desc_lbl = i18n::JA_FORM_FIELD_DESC,
+    )
+}
+
+fn render_repeat_fields() -> String {
+    format!(
+        "<div style=\"margin-bottom:1rem\">\
          <label style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{repeat_lbl}</label>\
          <div style=\"display:flex;gap:.75rem;align-items:center\">\
            <select name=\"repeat_rule\" style=\"padding:.625rem;border:1px solid #e5e5ea;\
@@ -1045,78 +1299,135 @@ fn event_form_fields(
          </div>\
          <p style=\"font-size:.75rem;color:#6e6e73;margin:.25rem 0 0\">{hint}</p>\
          </div>",
-            repeat_lbl = i18n::JA_REPEAT_LABEL,
-            opt_none = i18n::JA_REPEAT_NONE,
-            opt_weekly = i18n::JA_REPEAT_WEEKLY,
-            opt_biweekly = i18n::JA_REPEAT_BIWEEKLY,
-            opt_monthly = i18n::JA_REPEAT_MONTHLY,
-            unit = i18n::JA_REPEAT_COUNT_UNIT,
-            hint = i18n::JA_REPEAT_COUNT_HINT,
-        )
+        repeat_lbl = i18n::JA_REPEAT_LABEL,
+        opt_none = i18n::JA_REPEAT_NONE,
+        opt_weekly = i18n::JA_REPEAT_WEEKLY,
+        opt_biweekly = i18n::JA_REPEAT_BIWEEKLY,
+        opt_monthly = i18n::JA_REPEAT_MONTHLY,
+        unit = i18n::JA_REPEAT_COUNT_UNIT,
+        hint = i18n::JA_REPEAT_COUNT_HINT,
+    )
+}
+
+fn render_schedule_summary(days: &[event_db::EventDayRow], community_tz: &str) -> String {
+    if days.is_empty() {
+        return String::new();
+    }
+    let labels: Vec<String> = days
+        .iter()
+        .map(|day| {
+            render::format_day_time_tz(
+                &render::CardDay {
+                    starts_at_utc: &day.starts_at_utc,
+                    ends_at_utc: &day.ends_at_utc,
+                    day_date: &day.day_date,
+                },
+                community_tz,
+            )
+        })
+        .collect();
+
+    let content = if labels.len() <= 3 {
+        let items: String = labels
+            .iter()
+            .map(|label| {
+                format!(
+                    "<li style=\"font-size:.875rem;color:#1D1D1F;margin:.25rem 0\">{}</li>",
+                    render::escape_html(label)
+                )
+            })
+            .collect();
+        format!("<ul style=\"margin:.5rem 0 0;padding-left:1.25rem\">{items}</ul>")
     } else {
-        String::new()
+        let first = labels.first().map(String::as_str).unwrap_or("");
+        let last = labels.last().map(String::as_str).unwrap_or("");
+        format!(
+            "<p style=\"font-size:.875rem;color:#1D1D1F;margin:.5rem 0 .25rem\">\
+             {total_prefix}{count}{total_suffix}</p>\
+             <p style=\"font-size:.875rem;color:#1D1D1F;margin:.25rem 0\">\
+             {first_label}: {first}</p>\
+             <p style=\"font-size:.875rem;color:#1D1D1F;margin:.25rem 0\">\
+             {last_label}: {last}</p>",
+            total_prefix = i18n::JA_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX,
+            count = labels.len(),
+            total_suffix = i18n::JA_ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX,
+            first_label = i18n::JA_ADMIN_EDIT_SCHEDULE_FIRST,
+            first = render::escape_html(first),
+            last_label = i18n::JA_ADMIN_EDIT_SCHEDULE_LAST,
+            last = render::escape_html(last),
+        )
     };
 
     format!(
-        "{err}\
-         {title}\
-         {date}\
-         {start}\
-         {end}\
-         {loc}\
-         {repeat}\
-         {desc}",
-        err = err_html,
-        title = field(
-            i18n::JA_FORM_FIELD_TITLE,
-            "title",
-            "text",
-            title.unwrap_or(""),
-            true
-        ),
-        date = field(
-            i18n::JA_FORM_FIELD_DATE,
-            "day_date",
-            "date",
-            day_date.unwrap_or(""),
-            true
-        ),
-        start = field(
-            i18n::JA_FORM_FIELD_START,
-            "starts_at",
-            "time",
-            starts_at.unwrap_or(""),
-            true
-        ),
-        end = field(
-            i18n::JA_FORM_FIELD_END,
-            "ends_at",
-            "time",
-            ends_at.unwrap_or(""),
-            true
-        ),
-        repeat = repeat_html,
-        loc = field(
-            i18n::JA_FORM_FIELD_LOCATION,
-            "location",
-            "text",
-            location.unwrap_or(""),
-            false
-        ),
-        desc = {
-            let dval = render::escape_html(description.unwrap_or(""));
-            format!(
-                "<label style=\"display:block;margin-bottom:1rem\">\
-                 <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">\
-                 {desc_lbl}</span>\
-                 <textarea name=\"description\" rows=\"3\" \
-                   style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
-                   border-radius:12px;font-size:1rem\">{dval}</textarea>\
-                 </label>",
-                desc_lbl = i18n::JA_FORM_FIELD_DESC,
-            )
-        },
+        "<section aria-label=\"{heading}\" style=\"margin:0 0 1.25rem;padding:1rem;\
+         border:1px solid #E5E5EA;border-radius:12px;background:#FAFAFB\">\
+         <h2 style=\"font-size:1rem;font-weight:700;margin:0\">{heading}</h2>\
+         {content}</section>",
+        heading = i18n::JA_ADMIN_EDIT_SCHEDULE_HEADING,
+        content = content,
     )
+}
+
+fn event_is_recurring(event: &event_db::EventRow) -> bool {
+    event.repeat_rule != "none" || event.repeat_count.is_some()
+}
+
+fn event_schedule_editable(event: &event_db::EventRow, days: &[event_db::EventDayRow]) -> bool {
+    days.len() == 1 && !event_is_recurring(event)
+}
+
+fn edit_post_contains_schedule_fields(body: &worker::FormData) -> bool {
+    [
+        "day_date",
+        "starts_at",
+        "ends_at",
+        "repeat_rule",
+        "repeat_count",
+    ]
+    .iter()
+    .any(|name| body.get_field(name).is_some())
+}
+
+fn validate_event_details(
+    title_raw: String,
+    location_raw: String,
+    description_raw: String,
+) -> std::result::Result<EventDetailsEdit, EventValidationError> {
+    let title = title_raw.trim().to_string();
+    if title.is_empty() {
+        return Err(EventValidationError::TitleEmpty);
+    }
+    if title.chars().count() > EVENT_TITLE_MAX {
+        return Err(EventValidationError::TitleTooLong);
+    }
+
+    let location = Some(location_raw.trim())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+    if location
+        .as_deref()
+        .map(|l| l.chars().count() > EVENT_LOCATION_MAX)
+        .unwrap_or(false)
+    {
+        return Err(EventValidationError::LocationTooLong);
+    }
+
+    let description = Some(description_raw.trim())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+    if description
+        .as_deref()
+        .map(|d| d.chars().count() > EVENT_DESC_MAX)
+        .unwrap_or(false)
+    {
+        return Err(EventValidationError::DescriptionTooLong);
+    }
+
+    Ok(EventDetailsEdit {
+        title,
+        location,
+        description,
+    })
 }
 
 fn admin_events_new_next(prefill_day: Option<&str>) -> String {

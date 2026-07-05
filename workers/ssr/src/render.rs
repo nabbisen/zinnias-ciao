@@ -51,7 +51,7 @@ const ICON_NO_ANSWER: &str = "<svg aria-hidden='true' width='1em' height='1em' v
 // ── Static asset paths ────────────────────────────────────────────────────
 const MANIFEST: &str = "/manifest.webmanifest";
 const CSS: &str = "/static/app.css";
-const JS: &str = "/static/app.js?v=0.43.0-calendar-create-day";
+const JS: &str = "/static/app.js?v=0.44.0-edit-semantics";
 const THEME: &str = "#007AFF";
 
 // ── Shell ─────────────────────────────────────────────────────────────────
@@ -195,7 +195,8 @@ pub fn header_with_switcher_next(
     h.push_str("border-bottom:1px solid #E5E5EA;");
     h.push_str("padding:.875rem 1rem;display:flex;justify-content:space-between;");
     h.push_str("align-items:center;gap:.5rem;flex-wrap:wrap;z-index:10'>");
-    h.push_str("<span style='font-size:1.25rem;font-weight:600;white-space:nowrap;min-width:0'>");
+    h.push_str("<span style='font-size:1.25rem;font-weight:600;flex:1 1 12rem;");
+    h.push_str("min-width:0;white-space:normal;overflow-wrap:anywhere'>");
     h.push_str(&title_s);
     // GET form to /switch works without scripts; app.js auto-submits for JS users.
     h.push_str("</span>");

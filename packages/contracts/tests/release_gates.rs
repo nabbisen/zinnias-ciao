@@ -185,10 +185,52 @@ fn i18n_en_ja_parity_count() {
         (EN_ADMIN_EDIT_EVENT_TITLE, JA_ADMIN_EDIT_EVENT_TITLE),
         (EN_ADMIN_EDIT_EVENT_SUBMIT, JA_ADMIN_EDIT_EVENT_SUBMIT),
         (EN_ADMIN_EDIT_EVENT_HINT, JA_ADMIN_EDIT_EVENT_HINT),
+        (
+            EN_ADMIN_EDIT_DETAILS_ONLY_HEADING,
+            JA_ADMIN_EDIT_DETAILS_ONLY_HEADING,
+        ),
+        (
+            EN_ADMIN_EDIT_SCHEDULE_HEADING,
+            JA_ADMIN_EDIT_SCHEDULE_HEADING,
+        ),
+        (
+            EN_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX,
+            JA_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX,
+        ),
+        (
+            EN_ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX,
+            JA_ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX,
+        ),
+        (EN_ADMIN_EDIT_SCHEDULE_FIRST, JA_ADMIN_EDIT_SCHEDULE_FIRST),
+        (EN_ADMIN_EDIT_SCHEDULE_LAST, JA_ADMIN_EDIT_SCHEDULE_LAST),
+        (
+            EN_ADMIN_EDIT_MULTI_DAY_HELPER,
+            JA_ADMIN_EDIT_MULTI_DAY_HELPER,
+        ),
+        (
+            EN_ADMIN_EDIT_RECURRING_HELPER,
+            JA_ADMIN_EDIT_RECURRING_HELPER,
+        ),
+        (
+            EN_ADMIN_EDIT_RESPONSES_PRESERVED,
+            JA_ADMIN_EDIT_RESPONSES_PRESERVED,
+        ),
+        (
+            EN_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE,
+            JA_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE,
+        ),
         (EN_ADMIN_CANCEL_EVENT_TITLE, JA_ADMIN_CANCEL_EVENT_TITLE),
         (EN_ADMIN_CANCEL_EVENT_BODY, JA_ADMIN_CANCEL_EVENT_BODY),
+        (
+            EN_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS,
+            JA_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS,
+        ),
         (EN_ADMIN_CANCEL_EVENT_KEEP, JA_ADMIN_CANCEL_EVENT_KEEP),
         (EN_ADMIN_CANCEL_EVENT_CONFIRM, JA_ADMIN_CANCEL_EVENT_CONFIRM),
+        (
+            EN_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS,
+            JA_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS,
+        ),
         (
             EN_ADMIN_CANNOT_EDIT_CANCELLED,
             JA_ADMIN_CANNOT_EDIT_CANCELLED,
@@ -835,8 +877,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.43.0-calendar-create-day")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.43.0-calendar-create-day"),
+        RENDER_SRC.contains("/static/app.js?v=0.44.0-edit-semantics")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.44.0-edit-semantics"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(
@@ -922,6 +964,58 @@ fn rfc059_calendar_create_from_day_is_route_backed() {
             && COMMUNITY_HANDLER_SRC.contains("admin_events_new:")
             && COMMUNITY_HANDLER_SRC.contains("admin_events_new_destination"),
         "Create Event switcher must preserve a Calendar-selected day when switching communities"
+    );
+}
+
+#[test]
+fn rfc051_event_edit_semantics_are_details_only_for_multi_day() {
+    assert!(
+        ADMIN_EVENTS_SRC.contains("fn event_schedule_editable")
+            && ADMIN_EVENTS_SRC.contains("days.len() == 1 && !event_is_recurring(event)")
+            && ADMIN_EVENTS_SRC.contains("repeat_rule != \"none\"")
+            && ADMIN_EVENTS_SRC.contains("repeat_count.is_some()"),
+        "RFC-051 schedule editing must be limited to one-day non-recurring events"
+    );
+    assert!(
+        ADMIN_EVENTS_SRC.contains("render_single_day_edit_fields")
+            && ADMIN_EVENTS_SRC.contains("render_details_only_event_edit_fields")
+            && ADMIN_EVENTS_SRC.contains("render_schedule_summary"),
+        "RFC-051 edit UI must split single-day edit from details-only edit with a schedule summary"
+    );
+    assert!(
+        ADMIN_EVENTS_SRC.contains("JA_ADMIN_EDIT_MULTI_DAY_HELPER")
+            && ADMIN_EVENTS_SRC.contains("JA_ADMIN_EDIT_RECURRING_HELPER")
+            && ADMIN_EVENTS_SRC.contains("JA_ADMIN_EDIT_RESPONSES_PRESERVED"),
+        "Details-only edit must explain what can be changed and that schedule/attendance stay unchanged"
+    );
+    let details_only_src = ADMIN_EVENTS_SRC
+        .split("fn render_details_only_event_edit_fields")
+        .nth(1)
+        .and_then(|s| s.split("fn render_error_html").next())
+        .expect("details-only edit renderer must exist");
+    for forbidden in [
+        "name=\"day_date\"",
+        "name=\"starts_at\"",
+        "name=\"ends_at\"",
+        "name=\"repeat_rule\"",
+        "name=\"repeat_count\"",
+    ] {
+        assert!(
+            !details_only_src.contains(forbidden),
+            "Details-only edit form must not render schedule or recurrence control {forbidden}"
+        );
+    }
+    assert!(
+        ADMIN_EVENTS_SRC.contains("edit_post_contains_schedule_fields")
+            && ADMIN_EVENTS_SRC.contains("JA_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE")
+            && ADMIN_EVENTS_SRC.contains("validate_event_details")
+            && ADMIN_EVENTS_SRC.contains("edit_scope"),
+        "Details-only POST must reject direct schedule fields, validate only details, and audit the edit scope"
+    );
+    assert!(
+        ADMIN_EVENTS_SRC.contains("JA_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS")
+            && ADMIN_EVENTS_SRC.contains("JA_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS"),
+        "Cancellation confirmation must state whole-event scope for multi-day/recurring events"
     );
 }
 

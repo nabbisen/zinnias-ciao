@@ -131,7 +131,7 @@ action-label convention.
 | `JA_ADMIN_EDIT_EVENT_HINT` | メンバーには更新されたイベント詳細が表示されます。 |
 | `JA_ADMIN_CANCEL_EVENT_TITLE` | このイベントをキャンセルしますか？ |
 | `JA_ADMIN_CANCEL_EVENT_BODY` | メンバーにはキャンセルされたことが引き続き表示されます。 |
-| `JA_ADMIN_CANCEL_EVENT_KEEP` | イベントを保持 |
+| `JA_ADMIN_CANCEL_EVENT_KEEP` | 戻る |
 | `JA_ADMIN_CANCEL_EVENT_CONFIRM` | イベントをキャンセル |
 | `JA_ADMIN_CANNOT_EDIT_CANCELLED` | キャンセル済みのイベントは編集できません。 |
 | `JA_ADMIN_CANNOT_EDIT_STARTED` | このイベントはすでに開始しているため編集できません。 |

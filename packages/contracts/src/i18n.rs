@@ -182,10 +182,25 @@ pub const EN_ADMIN_CREATE_EVENT_SUBMIT: &str = "Create Event";
 pub const EN_ADMIN_EDIT_EVENT_TITLE: &str = "Edit Event";
 pub const EN_ADMIN_EDIT_EVENT_SUBMIT: &str = "Save Changes";
 pub const EN_ADMIN_EDIT_EVENT_HINT: &str = "Members will see the updated event details.";
+pub const EN_ADMIN_EDIT_DETAILS_ONLY_HEADING: &str = "Editable details";
+pub const EN_ADMIN_EDIT_SCHEDULE_HEADING: &str = "Current schedule";
+pub const EN_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX: &str = "Total";
+pub const EN_ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX: &str = "dates";
+pub const EN_ADMIN_EDIT_SCHEDULE_FIRST: &str = "First";
+pub const EN_ADMIN_EDIT_SCHEDULE_LAST: &str = "Last";
+pub const EN_ADMIN_EDIT_MULTI_DAY_HELPER: &str = "This event has multiple dates. You can change only the title, location, and description here. To change dates or times, cancel this event and create it again.";
+pub const EN_ADMIN_EDIT_RECURRING_HELPER: &str = "This event repeats. You can change only the title, location, and description here. To change dates, times, or the number of occurrences, cancel this event and create it again.";
+pub const EN_ADMIN_EDIT_RESPONSES_PRESERVED: &str =
+    "Dates stay the same, and attendance answers remain attached to those dates.";
+pub const EN_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE: &str =
+    "Date and time cannot be changed for this event.";
 pub const EN_ADMIN_CANCEL_EVENT_TITLE: &str = "Cancel this event?";
 pub const EN_ADMIN_CANCEL_EVENT_BODY: &str = "Members will still see that it was cancelled.";
-pub const EN_ADMIN_CANCEL_EVENT_KEEP: &str = "Keep Event";
+pub const EN_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS: &str =
+    "All dates for this event will be cancelled. Attendance answers can no longer be changed.";
+pub const EN_ADMIN_CANCEL_EVENT_KEEP: &str = "Back";
 pub const EN_ADMIN_CANCEL_EVENT_CONFIRM: &str = "Cancel Event";
+pub const EN_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS: &str = "Cancel all";
 pub const EN_ADMIN_CANNOT_EDIT_CANCELLED: &str = "Cancelled events cannot be edited.";
 pub const EN_ADMIN_CANNOT_EDIT_STARTED: &str =
     "This event has already started and cannot be edited.";
@@ -199,11 +214,25 @@ pub const JA_ADMIN_CREATE_EVENT_SUBMIT: &str = "イベントを作成";
 pub const JA_ADMIN_EDIT_EVENT_TITLE: &str = "イベントを編集";
 pub const JA_ADMIN_EDIT_EVENT_SUBMIT: &str = "変更を保存";
 pub const JA_ADMIN_EDIT_EVENT_HINT: &str = "メンバーには更新されたイベント詳細が表示されます。";
+pub const JA_ADMIN_EDIT_DETAILS_ONLY_HEADING: &str = "変更できる内容";
+pub const JA_ADMIN_EDIT_SCHEDULE_HEADING: &str = "現在の日程";
+pub const JA_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX: &str = "全";
+pub const JA_ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX: &str = "回";
+pub const JA_ADMIN_EDIT_SCHEDULE_FIRST: &str = "最初";
+pub const JA_ADMIN_EDIT_SCHEDULE_LAST: &str = "最後";
+pub const JA_ADMIN_EDIT_MULTI_DAY_HELPER: &str = "このイベントは複数の日程があります。ここでは、タイトル・場所・説明だけを変更できます。日時を変える場合は、このイベントをキャンセルして、作り直してください。";
+pub const JA_ADMIN_EDIT_RECURRING_HELPER: &str = "このイベントは繰り返しの予定です。ここでは、タイトル・場所・説明だけを変更できます。日時や回数を変える場合は、このイベントをキャンセルして、作り直してください。";
+pub const JA_ADMIN_EDIT_RESPONSES_PRESERVED: &str =
+    "日時は変わらず、参加の回答もそのまま残ります。";
+pub const JA_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE: &str = "このイベントでは日時を変更できません。";
 pub const JA_ADMIN_CANCEL_EVENT_TITLE: &str = "このイベントをキャンセルしますか？";
 pub const JA_ADMIN_CANCEL_EVENT_BODY: &str =
     "メンバーにはキャンセルされたことが引き続き表示されます。";
-pub const JA_ADMIN_CANCEL_EVENT_KEEP: &str = "イベントを保持";
+pub const JA_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS: &str =
+    "このイベントのすべての日程をキャンセルします。参加の回答も、これ以上変更できなくなります。";
+pub const JA_ADMIN_CANCEL_EVENT_KEEP: &str = "戻る";
 pub const JA_ADMIN_CANCEL_EVENT_CONFIRM: &str = "イベントをキャンセル";
+pub const JA_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS: &str = "すべてキャンセル";
 pub const JA_ADMIN_CANNOT_EDIT_CANCELLED: &str = "キャンセル済みのイベントは編集できません。";
 pub const JA_ADMIN_CANNOT_EDIT_STARTED: &str =
     "このイベントはすでに開始しているため編集できません。";

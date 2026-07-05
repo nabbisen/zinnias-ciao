@@ -60,7 +60,7 @@ pub async fn get_offline(_req: Request, _env: &Env) -> Result<Response> {
     <h1 style="font-size:1.25rem;font-weight:600">オフラインです</h1>
     <p style="color:#6e6e73">電波がある場所で再度開いてください。</p>
   </main>
-  <script src="/static/app.js?v=0.43.0-calendar-create-day" defer></script>
+  <script src="/static/app.js?v=0.44.0-edit-semantics" defer></script>
 </body>
 </html>"#;
     let mut r = Response::from_html(html)?;

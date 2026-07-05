@@ -73,10 +73,22 @@ fn en_ja_parity() {
         "ADMIN_EDIT_EVENT_TITLE",
         "ADMIN_EDIT_EVENT_SUBMIT",
         "ADMIN_EDIT_EVENT_HINT",
+        "ADMIN_EDIT_DETAILS_ONLY_HEADING",
+        "ADMIN_EDIT_SCHEDULE_HEADING",
+        "ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX",
+        "ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX",
+        "ADMIN_EDIT_SCHEDULE_FIRST",
+        "ADMIN_EDIT_SCHEDULE_LAST",
+        "ADMIN_EDIT_MULTI_DAY_HELPER",
+        "ADMIN_EDIT_RECURRING_HELPER",
+        "ADMIN_EDIT_RESPONSES_PRESERVED",
+        "ADMIN_EDIT_SCHEDULE_NOT_EDITABLE",
         "ADMIN_CANCEL_EVENT_TITLE",
         "ADMIN_CANCEL_EVENT_BODY",
+        "ADMIN_CANCEL_EVENT_BODY_ALL_DAYS",
         "ADMIN_CANCEL_EVENT_KEEP",
         "ADMIN_CANCEL_EVENT_CONFIRM",
+        "ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS",
         "ADMIN_CANNOT_EDIT_CANCELLED",
         "ADMIN_CANNOT_EDIT_STARTED",
         "ADMIN_CANNOT_ATTEND_CANCELLED",
@@ -174,7 +186,7 @@ fn en_ja_parity() {
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
     ];
-    assert_eq!(en_keys.len(), 149, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 161, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

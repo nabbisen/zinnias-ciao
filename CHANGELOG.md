@@ -2,6 +2,57 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.44.0] — 2026-07-05
+
+RFC-051 Multi-day and recurring event edit semantics.
+
+### Added
+
+- **Details-only edit mode for multi-day and recurring events.**
+  Edit now shows a read-only schedule summary and helper copy, then limits
+  editable fields to title, location, and description.
+
+- **Whole-event cancellation copy.**
+  Multi-day and recurring cancellation confirms that all dates are cancelled.
+
+- **RFC-051 release evidence.**
+  Focused tests and browser smoke now protect the single-day vs multi-date edit
+  behavior.
+
+### Changed
+
+- **Single-day schedule editing is explicit.**
+  Date/time edits are available only for single-day non-recurring events before
+  start.
+
+- **Unexpected schedule changes are rejected.**
+  If an old or mismatched form tries to change dates or times for a multi-date
+  event, the app keeps the schedule unchanged and asks the admin to review the
+  edit again.
+
+- **Release version bumped to v0.44.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, and
+  `workers/ssr/static/sw.js` are aligned.
+
+### Fixed
+
+- **Cancellation confirmation at large text sizes.**
+  The shared community-switcher header and cancel action row now wrap cleanly
+  at 200% text scaling, and the safe action copy follows the RFC-051 review
+  recommendation: `戻る`.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo test -p zinnias-ciao-contracts --test release_gates -- --nocapture`
+- `cargo test -p zinnias-ciao-ssr`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `node .git-exclude/tmp/rfc051-smoke.mjs` *(sandboxed incognito Chromium; evidence:
+  `.git-exclude/evidence/rfc051/rfc051-event-edit-semantics-smoke-results.json`)*
+
 ## [0.43.0] — 2026-07-05
 
 RFC-059 Calendar create event from day.

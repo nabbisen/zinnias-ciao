@@ -10,6 +10,8 @@ pub struct EventRow {
     pub description: Option<String>,
     pub location: Option<String>,
     pub status: String, // "scheduled" | "cancelled"
+    pub repeat_rule: String,
+    pub repeat_count: Option<u32>,
 }
 
 pub struct EventDayRow {
@@ -29,7 +31,8 @@ pub async fn find_for_community(
 ) -> Result<Option<EventRow>> {
     let row = db
         .prepare(
-            "SELECT id, community_id, title, description, location, status \
+            "SELECT id, community_id, title, description, location, status, \
+                    repeat_rule, repeat_count \
              FROM events \
              WHERE id = ?1 AND community_id = ?2 \
              LIMIT 1",
@@ -52,6 +55,15 @@ pub async fn find_for_community(
                 .and_then(|x| x.as_str())
                 .map(|s| s.to_owned()),
             status: v.get("status")?.as_str()?.to_owned(),
+            repeat_rule: v
+                .get("repeat_rule")
+                .and_then(|x| x.as_str())
+                .unwrap_or("none")
+                .to_owned(),
+            repeat_count: v
+                .get("repeat_count")
+                .and_then(|x| x.as_u64())
+                .map(|n| n as u32),
         })
     }))
 }

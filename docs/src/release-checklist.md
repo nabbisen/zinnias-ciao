@@ -92,7 +92,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
 - [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
-- [x] i18n parity test covers all 172 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity test covers all 184 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
@@ -109,7 +109,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Release-gate hardening (v0.34.0 — RFC-044 partial)
 
-- [x] i18n parity gate covers all 172 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity gate covers all 184 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] Static query-count gates: home.rs, event.rs, export.rs `.await` counts verified within ceiling bounds. *(release_gates.rs `*_await_count_within_budget` — v0.34.0)*
 - [x] SW `CACHE_VERSION` matches workspace version. *(release_gates.rs `sw_cache_version_matches_workspace_version`)*
 
@@ -136,6 +136,14 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Create Event validates `day=YYYY-MM-DD` and prefills the date field. *(admin/events.rs `valid_prefill_day`)*
 - [x] Create Event community switcher preserves a valid Calendar-selected day. *(community.rs `admin_events_new_destination`)*
 - [x] Browser smoke verifies admin create-from-day, date prefill, switch preservation, and non-admin absence. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc059/rfc059-calendar-create-day-smoke-results.json`)*
+
+## Event edit semantics gates (v0.44.0 — RFC-051)
+
+- [x] Schedule editing is limited to single-day non-recurring events. *(admin/events.rs `event_schedule_editable`)*
+- [x] Multi-day and recurring edit screens render only title/location/description fields plus a read-only schedule summary. *(release_gates.rs `rfc051_event_edit_semantics_are_details_only_for_multi_day`)*
+- [x] Details-only validation does not require schedule values and rejects direct schedule-field submissions. *(admin/events.rs `validate_event_details`, `edit_post_contains_schedule_fields`)*
+- [x] Whole-event cancellation copy states all dates are cancelled for multi-day/recurring events. *(admin/events.rs + i18n)*
+- [x] Browser smoke verifies single-day, multi-day, recurring edit screens and whole-event cancellation at mobile width and 200% text scaling. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc051/rfc051-event-edit-semantics-smoke-results.json`)*
 
 ## Operational gates
 
