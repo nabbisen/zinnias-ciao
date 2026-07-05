@@ -245,3 +245,16 @@ details, not a full clone.
   it resolves to a cancelled event in the submitted community.
 - Safe provenance may be recorded as
   `created_from_cancelled_event_id` in audit metadata.
+
+## 12. Post-Release Follow-Up Notes
+
+The v0.45.0 RC review approved release with non-blocking follow-ups only:
+
+- Preserve the browser-smoke evidence summary in the release/review archive.
+- Keep product wording modest. Avoid clone-style wording in UI, release notes,
+  and future docs; prefer “similar new event” / `似た内容`.
+- If audit export or admin-facing support views later expose replacement
+  provenance, do not casually show raw internal event IDs to non-technical
+  users. Render a plain operational explanation or keep the metadata internal.
+- Do not add a pre-cancel replacement shortcut as a small patch. It reopens the
+  duplicate-active-event risk and should be designed as a separate RFC.
