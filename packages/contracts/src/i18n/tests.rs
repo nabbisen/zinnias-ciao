@@ -179,6 +179,8 @@ fn en_ja_parity() {
         "CALENDAR_DISABLE",
         "CALENDAR_REGENERATE",
         "CALENDAR_PRIVACY_NOTE",
+        "CALENDAR_GENERATED_FLASH",
+        "CALENDAR_REVOKED_FLASH",
         // Event detail (RFC-006/025)
         "EVENT_TITLE_HEADER",
         "EVENT_ATTENDED_UNAVAILABLE",
@@ -188,7 +190,7 @@ fn en_ja_parity() {
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
     ];
-    assert_eq!(en_keys.len(), 163, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 165, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

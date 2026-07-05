@@ -445,6 +445,8 @@ pub const EN_CALENDAR_GENERATE: &str = "Generate feed URL";
 pub const EN_CALENDAR_DISABLE: &str = "Disable feed";
 pub const EN_CALENDAR_REGENERATE: &str = "Regenerate URL";
 pub const EN_CALENDAR_PRIVACY_NOTE: &str = "Your personal calendar feed URL. Keep this private — anyone with the URL can read your community events.";
+pub const EN_CALENDAR_GENERATED_FLASH: &str = "Calendar link created.";
+pub const EN_CALENDAR_REVOKED_FLASH: &str = "Calendar link disabled.";
 
 pub const JA_CALENDAR_TITLE: &str = "予定をカレンダーに入れる";
 pub const JA_CALENDAR_DESCRIPTION: &str =
@@ -453,6 +455,8 @@ pub const JA_CALENDAR_GENERATE: &str = "リンクを作成";
 pub const JA_CALENDAR_DISABLE: &str = "リンクを無効化";
 pub const JA_CALENDAR_REGENERATE: &str = "リンクを再作成";
 pub const JA_CALENDAR_PRIVACY_NOTE: &str = "このカレンダーリンクは、持っている人なら誰でもあなたのコミュニティの予定を見られます。公開しないでください。こちらで再発行または無効化できます。";
+pub const JA_CALENDAR_GENERATED_FLASH: &str = "カレンダーリンクを作成しました。";
+pub const JA_CALENDAR_REVOKED_FLASH: &str = "カレンダーリンクを無効化しました。";
 
 // ── Event detail page (RFC-006 / RFC-025) ─────────────────────────────────
 pub const EN_EVENT_TITLE_HEADER: &str = "Event";

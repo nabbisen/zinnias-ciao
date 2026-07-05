@@ -2,6 +2,62 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.46.0] — 2026-07-05
+
+RFC-053 ICS feed privacy and revocation UX.
+
+### Added
+
+- **Calendar feed privacy release gate.**
+  Source gates now verify the reviewed privacy copy, fixed post-action flash
+  codes, token-free audit metadata, private feed headers, and scoped ICS output.
+
+- **Fixed Japanese calendar-feed status messages.**
+  Generate and disable actions now render reviewed Japanese success copy instead
+  of reflecting arbitrary query text.
+
+### Changed
+
+- **ICS feed responses are more defensive.**
+  Bearer feed responses keep `Cache-Control: no-store, private` and now also
+  send `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff`.
+
+- **Calendar feed post-action redirects use stable codes.**
+  Redirects now use `flash=generated` / `flash=disabled`; the page maps only
+  those codes to fixed copy.
+
+- **Global security headers preserve tighter handler policies.**
+  The shared header hook no longer overwrites a handler-supplied
+  `Referrer-Policy`, allowing bearer ICS responses to keep `no-referrer`.
+
+- **Release version bumped to v0.46.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+### Fixed
+
+- **English calendar-feed flash text removed.**
+  The feed generate/disable flow no longer redirects with `Feed URL generated`
+  or `Feed disabled`.
+
+- **Calendar feed URLs preserve the request port.**
+  Local and non-default-port deployments now render usable feed URLs instead of
+  dropping the port from the origin.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo test -p zinnias-ciao-contracts --test release_gates -- --nocapture`
+- `cargo test -p zinnias-ciao-ssr`
+- `cargo test -p zinnias-ciao-contracts`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `mdbook build docs`
+- `node .git-exclude/tmp/rfc053-smoke.mjs` *(sandboxed incognito Chromium; evidence:
+  `.git-exclude/evidence/rfc053/rfc053-calendar-feed-privacy-smoke-results.json`)*
+
 ## [0.45.0] — 2026-07-05
 
 RFC-060 Cancel-and-recreate assistance.

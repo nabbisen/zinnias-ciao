@@ -94,7 +94,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
 - [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
-- [x] i18n parity test covers all 186 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity test covers all 188 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
@@ -111,7 +111,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Release-gate hardening (v0.34.0 — RFC-044 partial)
 
-- [x] i18n parity gate covers all 186 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity gate covers all 188 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] Static query-count gates: home.rs, event.rs, export.rs `.await` counts verified within ceiling bounds. *(release_gates.rs `*_await_count_within_budget` — v0.34.0)*
 - [x] SW `CACHE_VERSION` matches workspace version. *(release_gates.rs `sw_cache_version_matches_workspace_version`)*
 
@@ -155,6 +155,16 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Replacement POST revalidates `copy_source_event_id`; active, cross-community, or inaccessible sources are rejected. *(admin/events.rs `post_create_event`)*
 - [x] Replacement create records only safe source-event provenance when present. *(audit metadata `created_from_cancelled_event_id`)*
 - [x] Browser smoke verifies mobile-width admin/member cancelled Event Detail, 200% replacement form, no horizontal scroll, explicit schedule entry, helper copy readability, and old event remains cancelled. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc060/rfc060-cancel-recreate-smoke-results.json`)*
+
+## Calendar feed privacy gates (v0.46.0 — RFC-053)
+
+- [x] Calendar feed page shows the reviewed bearer-link privacy warning and fixed Japanese generate/disable status messages. *(calendar.rs + i18n)*
+- [x] Calendar feed redirects use fixed flash codes, not raw user-controlled query text or English messages. *(release_gates.rs `rfc053_calendar_feed_privacy_and_revocation_ux_is_guarded`)*
+- [x] Regenerating a feed revokes the old token before issuing the replacement; disabling revokes active tokens for that membership/community. *(calendar.rs + db/calendar.rs)*
+- [x] Calendar token generate/revoke audit rows do not include token-bearing metadata. *(release gate)*
+- [x] ICS output remains community-scoped and limited to title, time, location, and status; no participant status, notes, invite codes, member names, descriptions, or admin fields. *(release gate)*
+- [x] ICS feed responses send `Cache-Control: no-store, private`, `Referrer-Policy: no-referrer`, and `X-Content-Type-Options: nosniff`. *(calendar.rs)*
+- [x] Browser smoke verifies generate, regenerate, old URL revocation, disable, header values, scoped ICS body, mobile 200% text, and sandboxed/incognito Chromium launch. *(evidence: `.git-exclude/evidence/rfc053/rfc053-calendar-feed-privacy-smoke-results.json`)*
 
 ## Operational gates
 

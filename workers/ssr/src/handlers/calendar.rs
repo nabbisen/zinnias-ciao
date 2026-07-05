@@ -6,7 +6,7 @@
 //!   POST /c/:cid/me/calendar/revoke       — revoke (disable) feed
 //!   GET  /c/:cid/cal/:token               — unauthenticated ICS feed (bearer URL)
 
-use worker::{Env, Request, Response, Result};
+use worker::{D1Database, Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
@@ -54,31 +54,31 @@ pub async fn get_me_calendar(
     // Build the feed URL from the request URL origin.
     let origin = {
         let url = req.url()?;
-        format!(
-            "{}://{}",
-            url.scheme(),
-            url.host_str().unwrap_or("localhost")
-        )
+        let host = url.host_str().unwrap_or("localhost");
+        let host_with_port = match url.port() {
+            Some(port) => format!("{host}:{port}"),
+            None => host.to_owned(),
+        };
+        format!("{}://{}", url.scheme(), host_with_port)
     };
 
     let url = req.url()?;
-    let flash: Option<String> = url
+    let flash_code: Option<String> = url
         .query_pairs()
         .find(|(k, _)| k == "flash")
         .map(|(_, v)| v.to_string());
-    let flash_html = flash.map(|f| format!(
-        "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0\">{}</p>",
-        render::escape_html(&f)
-    )).unwrap_or_default();
+    let flash_html = calendar_flash_message(flash_code.as_deref())
+        .map(|message| {
+            format!(
+                "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0\">{}</p>",
+                render::escape_html(message)
+            )
+        })
+        .unwrap_or_default();
 
     let feed_section = if let Some(ref tok) = active {
-        // Show feed URL — the token ID is used as the bearer (not the HMAC).
-        // We need to recover the plaintext token by re-checking: actually we store
-        // the HMAC only. We use the token ID as the URL-visible value and verify
-        // it via HMAC(pepper, id) on the feed endpoint. This means the URL is
-        // HMAC(pepper, id) itself, which is unguessable without the pepper.
-        // We display the feed URL using the token ID as a stable human-readable handle;
-        // the actual bearer secret in the URL will be HMAC(pepper, id).
+        // The URL-visible bearer is HMAC(pepper, token id). The application
+        // stores and looks up only that HMAC; audit metadata never receives it.
         let feed_url = format!(
             "{origin}/c/{cid}/cal/{hmac}",
             cid = render::escape_html(community_id),
@@ -212,23 +212,16 @@ pub async fn post_regenerate_calendar(
     )
     .await?;
 
-    // Audit calendar token generation (security-relevant, RFC-045 P1-5).
-    // The token secret is never logged — only that a feed was (re)generated.
-    let _ = crate::audit::write(
+    let _ = write_calendar_token_audit(
         &db,
         rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        "calendar_feed",
-        None,
+        community_id,
+        &membership.membership_id,
         "calendar_token_generated",
-        None,
     )
     .await;
 
-    redirect(&format!(
-        "/c/{community_id}/me/calendar?flash=Feed+URL+generated"
-    ))
+    redirect(&format!("/c/{community_id}/me/calendar?flash=generated"))
 }
 
 // ── POST /c/:cid/me/calendar/revoke ──────────────────────────────────────
@@ -263,22 +256,16 @@ pub async fn post_revoke_calendar(
     let now = db::now_utc();
     cal_db::revoke_for_membership(&db, &membership.membership_id, community_id, &now).await?;
 
-    // Audit calendar token revocation (security-relevant, RFC-045 P1-5).
-    let _ = crate::audit::write(
+    let _ = write_calendar_token_audit(
         &db,
         rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        "calendar_feed",
-        None,
+        community_id,
+        &membership.membership_id,
         "calendar_token_revoked",
-        None,
     )
     .await;
 
-    redirect(&format!(
-        "/c/{community_id}/me/calendar?flash=Feed+disabled"
-    ))
+    redirect(&format!("/c/{community_id}/me/calendar?flash=disabled"))
 }
 
 // ── GET /c/:cid/cal/:token ────────────────────────────────────────────────
@@ -352,7 +339,34 @@ pub async fn get_ics_feed(
     // Prevent caching of private feed data.
     resp.headers_mut()
         .set("Cache-Control", "no-store, private")?;
+    resp.headers_mut().set("Referrer-Policy", "no-referrer")?;
+    resp.headers_mut()
+        .set("X-Content-Type-Options", "nosniff")?;
     Ok(resp)
+}
+
+async fn write_calendar_token_audit(
+    db: &D1Database,
+    rid: &str,
+    community_id: &str,
+    membership_id: &str,
+    action: &str,
+) -> Result<()> {
+    // Security-relevant audit event (RFC-045 P1-5). Keep token ids, HMACs,
+    // and bearer URLs out of both target_id and metadata.
+    let target_id: Option<&str> = None;
+    let metadata: Option<serde_json::Value> = None;
+    crate::audit::write(
+        db,
+        rid,
+        Some(community_id),
+        Some(membership_id),
+        "calendar_feed",
+        target_id,
+        action,
+        metadata,
+    )
+    .await
 }
 
 fn redirect(location: &str) -> Result<Response> {
@@ -361,4 +375,15 @@ fn redirect(location: &str) -> Result<Response> {
     Ok(resp.with_status(303))
 }
 
+fn calendar_flash_message(code: Option<&str>) -> Option<&'static str> {
+    match code {
+        Some("generated") => Some(i18n::JA_CALENDAR_GENERATED_FLASH),
+        Some("disabled") => Some(i18n::JA_CALENDAR_REVOKED_FLASH),
+        _ => None,
+    }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests;

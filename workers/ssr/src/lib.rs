@@ -106,7 +106,11 @@ fn attach_security_headers(resp: &mut Response, request_id: &str) -> Result<()> 
     )?;
     h.set("X-Content-Type-Options", "nosniff")?;
     h.set("X-Frame-Options", "DENY")?;
-    h.set("Referrer-Policy", "same-origin")?;
+    // Handlers may set a stricter policy before this hook runs, such as
+    // `no-referrer` for bearer URLs. Do not use this to loosen the default.
+    if h.get("Referrer-Policy").ok().flatten().is_none() {
+        h.set("Referrer-Policy", "same-origin")?;
+    }
     h.set(
         "Permissions-Policy",
         "camera=(), microphone=(), geolocation=()",

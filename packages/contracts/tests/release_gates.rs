@@ -358,6 +358,8 @@ fn i18n_en_ja_parity_count() {
         (EN_CALENDAR_DISABLE, JA_CALENDAR_DISABLE),
         (EN_CALENDAR_REGENERATE, JA_CALENDAR_REGENERATE),
         (EN_CALENDAR_PRIVACY_NOTE, JA_CALENDAR_PRIVACY_NOTE),
+        (EN_CALENDAR_GENERATED_FLASH, JA_CALENDAR_GENERATED_FLASH),
+        (EN_CALENDAR_REVOKED_FLASH, JA_CALENDAR_REVOKED_FLASH),
         (EN_EVENT_TITLE_HEADER, JA_EVENT_TITLE_HEADER),
         (EN_EVENT_ATTENDED_UNAVAILABLE, JA_EVENT_ATTENDED_UNAVAILABLE),
         (EN_EVENT_ATTENDED_ADMIN_ONLY, JA_EVENT_ATTENDED_ADMIN_ONLY),
@@ -420,6 +422,8 @@ fn rfc054_member_facing_japanese_copy_avoids_technical_jargon() {
         JA_CALENDAR_DISABLE,
         JA_CALENDAR_REGENERATE,
         JA_CALENDAR_PRIVACY_NOTE,
+        JA_CALENDAR_GENERATED_FLASH,
+        JA_CALENDAR_REVOKED_FLASH,
         JA_ME_CALENDAR_LABEL,
         JA_EXPORT_TITLE,
         JA_EXPORT_DESCRIPTION,
@@ -527,13 +531,16 @@ fn query_budgets_are_positive_and_ordered() {
 const HOME_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/home.rs");
 const EVENT_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/event.rs");
 const EXPORT_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/export.rs");
+const CALENDAR_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/calendar.rs");
 const COMMUNITY_CREATE_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/community_create.rs");
 const ME_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/me.rs");
 const LIB_SRC: &str = include_str!("../../../workers/ssr/src/lib.rs");
 const AUTHZ_SRC: &str = include_str!("../../../workers/ssr/src/authz.rs");
 const RATE_LIMIT_SRC: &str = include_str!("../../../workers/ssr/src/rate_limit.rs");
+const CALENDAR_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/calendar.rs");
 const COMMUNITY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/community.rs");
+const ICS_SRC: &str = include_str!("../../../packages/contracts/src/ics.rs");
 const WRANGLER_TOML_SRC: &str = include_str!("../../../wrangler.toml");
 
 /// Count non-comment lines containing `.await` in a source string.
@@ -885,8 +892,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.45.0-recreate-event")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.45.0-recreate-event"),
+        RENDER_SRC.contains("/static/app.js?v=0.46.0-calendar-privacy")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.46.0-calendar-privacy"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(
@@ -910,6 +917,95 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         COMMUNITIES_SRC.contains("grid-template-columns:repeat(7,minmax(0,1fr))"),
         "Calendar overview must keep a stable seven-column grid"
     );
+}
+
+#[test]
+fn rfc053_calendar_feed_privacy_and_revocation_ux_is_guarded() {
+    assert!(
+        CALENDAR_HANDLER_SRC.contains("JA_CALENDAR_PRIVACY_NOTE")
+            && CALENDAR_HANDLER_SRC.contains("JA_CALENDAR_GENERATED_FLASH")
+            && CALENDAR_HANDLER_SRC.contains("JA_CALENDAR_REVOKED_FLASH")
+            && CALENDAR_HANDLER_SRC.contains("calendar_flash_message")
+            && CALENDAR_HANDLER_SRC.contains("?flash=generated")
+            && CALENDAR_HANDLER_SRC.contains("?flash=disabled")
+            && CALENDAR_HANDLER_SRC.contains("url.port()"),
+        "RFC-053 calendar feed page must use reviewed fixed copy and fixed flash codes"
+    );
+    assert!(
+        !CALENDAR_HANDLER_SRC.contains("Feed+URL+generated")
+            && !CALENDAR_HANDLER_SRC.contains("Feed+disabled")
+            && !CALENDAR_HANDLER_SRC.contains("render::escape_html(&f)"),
+        "Calendar feed actions must not surface raw or English flash query text"
+    );
+    let calendar_audit_helper_src = CALENDAR_HANDLER_SRC
+        .split("async fn write_calendar_token_audit")
+        .nth(1)
+        .and_then(|s| s.split("fn redirect").next())
+        .expect("Calendar token audit helper must exist");
+    assert!(
+        CALENDAR_HANDLER_SRC.contains("\"calendar_token_generated\"")
+            && CALENDAR_HANDLER_SRC.contains("\"calendar_token_revoked\"")
+            && calendar_audit_helper_src.contains("crate::audit::write")
+            && calendar_audit_helper_src.contains("\"calendar_feed\"")
+            && calendar_audit_helper_src.contains("let target_id: Option<&str> = None;")
+            && calendar_audit_helper_src
+                .contains("let metadata: Option<serde_json::Value> = None;"),
+        "Calendar token generation/revocation must be audited without token-bearing target_id or metadata"
+    );
+    assert!(
+        CALENDAR_HANDLER_SRC.contains("Cache-Control")
+            && CALENDAR_HANDLER_SRC.contains("no-store, private")
+            && CALENDAR_HANDLER_SRC.contains("Referrer-Policy")
+            && CALENDAR_HANDLER_SRC.contains("no-referrer")
+            && CALENDAR_HANDLER_SRC.contains("X-Content-Type-Options")
+            && CALENDAR_HANDLER_SRC.contains("nosniff")
+            && LIB_SRC.contains("h.get(\"Referrer-Policy\")")
+            && LIB_SRC.contains("Handlers may set a stricter policy"),
+        "Bearer ICS responses must avoid caching, referrer leakage, and content sniffing"
+    );
+
+    assert!(
+        CALENDAR_DB_SRC.contains("pub async fn events_for_feed")
+            && CALENDAR_DB_SRC.contains("e.title")
+            && CALENDAR_DB_SRC.contains("e.location")
+            && CALENDAR_DB_SRC.contains("e.status")
+            && CALENDAR_DB_SRC.contains("ed.starts_at_utc")
+            && CALENDAR_DB_SRC.contains("ed.ends_at_utc")
+            && CALENDAR_DB_SRC.contains("WHERE ed.community_id = ?1"),
+        "ICS feed query must stay community-scoped and limited to event title/time/location/status"
+    );
+    let feed_query_src = CALENDAR_DB_SRC
+        .split("pub async fn events_for_feed")
+        .nth(1)
+        .expect("events_for_feed must exist");
+    for forbidden in [
+        "attendance",
+        "event_notes",
+        "invite_codes",
+        "community_memberships",
+        "display_name",
+        "description",
+    ] {
+        assert!(
+            !feed_query_src.contains(forbidden),
+            "ICS feed query must not expose {forbidden}"
+        );
+    }
+
+    assert!(
+        ICS_SRC.contains("SUMMARY:")
+            && ICS_SRC.contains("DTSTART:")
+            && ICS_SRC.contains("DTEND:")
+            && ICS_SRC.contains("LOCATION:")
+            && ICS_SRC.contains("STATUS:"),
+        "ICS builder must keep the reviewed title/time/location/status output"
+    );
+    for forbidden in ["ATTENDEE", "DESCRIPTION", "COMMENT", "ORGANIZER"] {
+        assert!(
+            !ICS_SRC.contains(forbidden),
+            "ICS output must not include participant, note, or admin fields: {forbidden}"
+        );
+    }
 }
 
 #[test]
