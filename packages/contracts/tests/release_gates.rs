@@ -162,6 +162,13 @@ fn i18n_en_ja_parity_count() {
         (EN_HOME_CALENDAR_EMPTY, JA_HOME_CALENDAR_EMPTY),
         (EN_HOME_CALENDAR_COUNT_SUFFIX, JA_HOME_CALENDAR_COUNT_SUFFIX),
         (EN_HOME_AGENDA_TITLE, JA_HOME_AGENDA_TITLE),
+        (EN_CALENDAR_MONTH_TITLE, JA_CALENDAR_MONTH_TITLE),
+        (EN_CALENDAR_PREV_MONTH, JA_CALENDAR_PREV_MONTH),
+        (EN_CALENDAR_NEXT_MONTH, JA_CALENDAR_NEXT_MONTH),
+        (EN_CALENDAR_THIS_MONTH, JA_CALENDAR_THIS_MONTH),
+        (EN_CALENDAR_ALL_DAYS, JA_CALENDAR_ALL_DAYS),
+        (EN_CALENDAR_EMPTY_MONTH, JA_CALENDAR_EMPTY_MONTH),
+        (EN_CALENDAR_EMPTY_DAY, JA_CALENDAR_EMPTY_DAY),
         (EN_STATUS_CLEAR, JA_STATUS_CLEAR),
         (EN_STATUS_CLEAR_LABEL, JA_STATUS_CLEAR_LABEL),
         (EN_NOTE_SECTION_LABEL, JA_NOTE_SECTION_LABEL),
@@ -616,9 +623,11 @@ fn sw_cache_version_matches_workspace_version() {
 // values, and HTTP header literals must remain unflagged).
 
 const COMMUNITIES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/communities.rs");
+const COMMUNITY_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/community.rs");
 const ADMIN_EVENTS_SRC: &str = include_str!("../../../workers/ssr/src/handlers/admin/events.rs");
 const APP_JS_SRC: &str = include_str!("../../../workers/ssr/static/app.js");
 const RENDER_SRC: &str = include_str!("../../../workers/ssr/src/render.rs");
+const STATIC_FILES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/static_files.rs");
 
 #[test]
 fn no_known_english_ui_leaks_in_rendered_text() {
@@ -773,7 +782,7 @@ fn rfc056_home_lists_communities_without_switcher() {
 #[test]
 fn rfc056_calendar_page_owns_calendar_and_switcher() {
     assert!(
-        COMMUNITIES_SRC.contains("render_month_calendar"),
+        COMMUNITIES_SRC.contains("render_calendar_month"),
         "The former Communities tab must render the active community calendar"
     );
     assert!(
@@ -800,15 +809,33 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Calendar page must keep the community switcher"
     );
     assert!(
-        COMMUNITIES_SRC.contains("\"communities\""),
-        "Calendar switcher must stay on the Calendar page after switching"
+        COMMUNITIES_SRC.contains("switcher_next")
+            && COMMUNITY_HANDLER_SRC.contains("communities:")
+            && COMMUNITY_HANDLER_SRC.contains("calendar_next_destination"),
+        "Calendar switcher must preserve the Calendar page, selected month, and selected day after switching communities"
+    );
+    assert!(
+        COMMUNITIES_SRC.contains("query_pairs()")
+            && COMMUNITIES_SRC.contains("\"month\"")
+            && COMMUNITIES_SRC.contains("\"day\"")
+            && COMMUNITIES_SRC.contains("JA_CALENDAR_PREV_MONTH")
+            && COMMUNITIES_SRC.contains("JA_CALENDAR_NEXT_MONTH")
+            && COMMUNITIES_SRC.contains("JA_CALENDAR_THIS_MONTH")
+            && COMMUNITIES_SRC.contains("JA_CALENDAR_ALL_DAYS"),
+        "Calendar page must support month navigation and a clearable selected-day agenda"
+    );
+    assert!(
+        COMMUNITIES_SRC.contains("?month={month_key}&amp;day={day_date}")
+            && COMMUNITIES_SRC.contains("aria-current=\\\"date\\\""),
+        "Calendar day cells must link to a day-filtered agenda with accessible current-day state"
     );
     assert!(
         !RENDER_SRC.contains("onchange='this.form.submit()'"),
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.41.0-switcher-2"),
+        RENDER_SRC.contains("/static/app.js?v=0.42.0-calendar-nav")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.42.0-calendar-nav"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(
@@ -829,17 +856,17 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Admin event creation switcher must keep users on the create-event page for the selected community"
     );
     assert!(
-        HOME_HANDLER_SRC.contains("grid-template-columns:repeat(7,minmax(0,1fr))"),
+        COMMUNITIES_SRC.contains("grid-template-columns:repeat(7,minmax(0,1fr))"),
         "Calendar overview must keep a stable seven-column grid"
     );
 }
 
 #[test]
 fn calendar_overview_contract_is_explicit() {
-    let calendar_src = HOME_HANDLER_SRC
-        .split("fn render_month_calendar")
+    let calendar_src = COMMUNITIES_SRC
+        .split("fn render_calendar_month")
         .nth(1)
-        .expect("Home must keep a dedicated calendar renderer");
+        .expect("Calendar page must keep a dedicated calendar renderer");
 
     assert!(
         calendar_src.contains("JA_HOME_CALENDAR_HELPER"),
@@ -853,12 +880,12 @@ fn calendar_overview_contract_is_explicit() {
         calendar_src.contains('●'),
         "Event presence must use a visible marker, not color alone"
     );
-    for forbidden in ["<a ", "<button", "tabindex"] {
-        assert!(
-            !calendar_src.contains(forbidden),
-            "Calendar day cells are non-interactive in v0.40.0 and must not contain {forbidden:?}"
-        );
-    }
+    assert!(
+        calendar_src.contains("<a href=")
+            && calendar_src.contains("aria-current=\\\"date\\\"")
+            && calendar_src.contains("JA_CALENDAR_ALL_DAYS"),
+        "Calendar day cells are interactive in v0.42.0 and must expose selected-day state plus a clear filter"
+    );
 }
 
 #[test]

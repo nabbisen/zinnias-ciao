@@ -28,7 +28,7 @@ The Calendar tab replaces the previous Communities page. It shows a month-shaped
 
 ## 3. Non-Goals
 
-- No month navigation in this release.
+- No month navigation in v0.40.0. This was added later by RFC-058.
 - No client-side filtering, drag/drop, or calendar editing.
 - No external calendar import or OAuth integration.
 - No change to Event Detail, attendance, notes, or admin event creation semantics.
@@ -126,8 +126,8 @@ Home uses `home_upcoming_for_communities` so it does not issue one event query p
 
 ## 10. Future Work
 
-- Month navigation.
-- Day tap/filter behavior.
+- Month navigation and day tap/filter behavior were implemented by RFC-058 in
+  v0.42.0.
 - Broader device QA beyond the sandboxed incognito Chromium smoke recorded for
   v0.40.0.
 - Product decision on whether a future true current-month history calendar is needed.

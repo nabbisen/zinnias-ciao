@@ -13,7 +13,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Session is issued, validated, and revoked on logout. *(session.rs, auth.rs post_logout)*
 - [x] Community membership enforced (non-members see generic 404). *(authz.rs require_membership: checks user_id AND community_id)*
 - [x] Home shows active communities one by one with nearby event links, without a header community switcher. *(home.rs: `home_upcoming_for_communities`, `render_home_communities`)*
-- [x] Calendar tab shows the active community's current-month overview and event links, and keeps the community switcher. *(communities.rs: `calendar_month_for_community`, `render_month_calendar`, `render_calendar_events`, `header_with_switcher_next`)*
+- [x] Calendar tab shows the active community's month overview and event links, supports route-backed month navigation and day filtering, and keeps the community switcher. *(communities.rs: `calendar_month_for_community`, `render_calendar_month`, `render_calendar_events`, `header_with_switcher_next` — RFC-058)*
 - [x] Community switcher auto-submit is implemented in external `app.js`, not inline `onchange`, and the shell cache-busts `app.js` with a visible submit fallback for stale/no JS. *(render.rs + app.js + release gate)*
 - [x] Event Detail shows status, participants, and notes. *(event.rs get_event_detail)*
 - [x] Member can set own status (Going / No Go / clear). *(event.rs post_my_status + validate_status_transition)*
@@ -63,6 +63,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Status chip shows icon + label + colour (grayscale test: still legible). *(render.rs `status_display()` always returns `(fg_color, icon, label)` tuple; AA-passing fg colors on white: Going 5.0:1, Not Going 5.9:1, Attended 4.7:1 — code-verified)*
 - [~] Event Detail usable at 200% text scaling. *(requires browser test)*
 - [x] Home multi-community nearby-events dashboard and Calendar overview usable at 360-428 px and 200% text scaling. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc056/rfc056-route-split-smoke-results.json`)*
+- [x] Calendar month navigation, selected-day agenda, and switcher month/day preservation usable at 360-428 px and 200% text scaling. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc058/rfc058-calendar-smoke-results.json`)*
 - [~] Community creation form usable at 360-428 px, 200% text scaling, and with JavaScript disabled. *(requires browser smoke for RFC-057)*
 - [x] Reduced-motion mode disables animations. *(app.css: `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }` — code-verified)*
 - [x] Error messages use plain language (no SQL/JWT/token/cookie). *(release_gates.rs `not_found_and_forbidden_same_message`; domain tests verify no 'sql'/'panic' in event/note error strings — automated)*
@@ -90,7 +91,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
 - [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
-- [x] i18n parity test covers all 164 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity test covers all 171 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
@@ -107,7 +108,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Release-gate hardening (v0.34.0 — RFC-044 partial)
 
-- [x] i18n parity gate covers all 164 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity gate covers all 171 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] Static query-count gates: home.rs, event.rs, export.rs `.await` counts verified within ceiling bounds. *(release_gates.rs `*_await_count_within_budget` — v0.34.0)*
 - [x] SW `CACHE_VERSION` matches workspace version. *(release_gates.rs `sw_cache_version_matches_workspace_version`)*
 
@@ -120,6 +121,13 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Production UI exposes Japan time only and rejects unsupported timezone submissions server-side. *(community_create.rs + release gate)*
 - [x] D1 writes are limited to `communities`, `community_memberships`, and `audit_log`; no members/events/templates/notes/invites are copied or generated. *(release_gates.rs `rfc057_creation_writes_only_community_membership_and_audit`)*
 - [~] Staging/local smoke verifies eligible admin success, anonymous denial, non-admin denial, token replay, rate limit, and audit rows. *(runtime evidence pending)*
+
+## Calendar workflow gates (v0.42.0 — RFC-058)
+
+- [x] Calendar supports route-backed previous/current/next month links and day agenda filters. *(release_gates.rs `rfc056_calendar_page_owns_calendar_and_switcher`)*
+- [x] Calendar event queries remain active-community and visible-month scoped. *(communities.rs `calendar_month_for_community`)*
+- [x] Calendar community switching preserves selected month/day with validated `communities:YYYY-MM[:YYYY-MM-DD]` next values. *(community.rs `calendar_next_destination`)*
+- [x] Browser smoke verifies month navigation, day filtering, clear filter, and community switching at mobile widths and with JavaScript disabled. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc058/rfc058-calendar-smoke-results.json`)*
 
 ## Operational gates
 

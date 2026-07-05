@@ -113,6 +113,13 @@ pub const EN_HOME_CALENDAR_HELPER: &str =
 pub const EN_HOME_CALENDAR_EMPTY: &str = "No upcoming events yet.";
 pub const EN_HOME_CALENDAR_COUNT_SUFFIX: &str = " events";
 pub const EN_HOME_AGENDA_TITLE: &str = "Event list";
+pub const EN_CALENDAR_MONTH_TITLE: &str = "This month";
+pub const EN_CALENDAR_PREV_MONTH: &str = "Previous month";
+pub const EN_CALENDAR_NEXT_MONTH: &str = "Next month";
+pub const EN_CALENDAR_THIS_MONTH: &str = "This month";
+pub const EN_CALENDAR_ALL_DAYS: &str = "All days";
+pub const EN_CALENDAR_EMPTY_MONTH: &str = "No events this month.";
+pub const EN_CALENDAR_EMPTY_DAY: &str = "No events on this day.";
 
 pub const JA_HOME_TODAY: &str = "今日";
 pub const JA_HOME_THIS_WEEK: &str = "今週";
@@ -125,6 +132,13 @@ pub const JA_HOME_CALENDAR_HELPER: &str =
 pub const JA_HOME_CALENDAR_EMPTY: &str = "これからの予定はまだありません。";
 pub const JA_HOME_CALENDAR_COUNT_SUFFIX: &str = "件";
 pub const JA_HOME_AGENDA_TITLE: &str = "予定の一覧";
+pub const JA_CALENDAR_MONTH_TITLE: &str = "今月の予定";
+pub const JA_CALENDAR_PREV_MONTH: &str = "前の月";
+pub const JA_CALENDAR_NEXT_MONTH: &str = "次の月";
+pub const JA_CALENDAR_THIS_MONTH: &str = "今月";
+pub const JA_CALENDAR_ALL_DAYS: &str = "月全体";
+pub const JA_CALENDAR_EMPTY_MONTH: &str = "今月の予定はありません。";
+pub const JA_CALENDAR_EMPTY_DAY: &str = "この日の予定はありません。";
 
 // ── Status actions ────────────────────────────────────────────────────────
 pub const EN_STATUS_CLEAR: &str = "Clear";
@@ -439,178 +453,4 @@ pub const JA_JOIN_PAGE_TITLE: &str = "参加";
 pub const JA_JOIN_PROFILE_PAGE_TITLE: &str = "お名前";
 
 #[cfg(test)]
-mod tests {
-    // Every EN_ constant must have a JA_ counterpart with the same suffix.
-    #[test]
-    fn en_ja_parity() {
-        let en_keys = &[
-            // Join
-            "JOIN_HEADING",
-            "JOIN_SUBHEADING",
-            "JOIN_CODE_LABEL",
-            "JOIN_CODE_HINT",
-            "JOIN_SUBMIT",
-            "JOIN_PROFILE_HEADING",
-            "JOIN_PROFILE_HINT",
-            "JOIN_PROFILE_LABEL",
-            "JOIN_PROFILE_SUBMIT",
-            // Status
-            "STATUS_GOING",
-            "STATUS_NOT_GOING",
-            "STATUS_ATTENDED",
-            "STATUS_NO_ANSWER",
-            "STATUS_ATTENDED_DISABLED",
-            "STATUS_CLEAR",
-            "STATUS_CLEAR_LABEL",
-            // Note
-            "NOTE_SAVE",
-            "NOTE_DELETE",
-            "NOTE_SAVED",
-            "NOTE_TOO_LONG",
-            "NOTE_SECTION_LABEL",
-            "NOTE_PLACEHOLDER_LABEL",
-            "NOTE_CHAR_HINT",
-            "NOTE_VISIBILITY",
-            // Session/auth
-            "SESSION_EXPIRED",
-            "LOGOUT",
-            "LOGOUT_CONFIRM",
-            // General
-            "GENERAL_ERROR",
-            "OFFLINE_BANNER",
-            "EMPTY_EVENTS",
-            "EMPTY_EVENTS_HINT",
-            "EMPTY_EVENTS_ADMIN",
-            // Nav
-            "NAV_HOME",
-            "NAV_COMMUNITIES",
-            "NAV_ME",
-            // Home
-            "HOME_TODAY",
-            "HOME_THIS_WEEK",
-            "HOME_LATER",
-            "HOME_CREATE_EVENT",
-            "HOME_INVITE_MEMBERS",
-            "HOME_CALENDAR_TITLE",
-            "HOME_CALENDAR_HELPER",
-            "HOME_CALENDAR_EMPTY",
-            "HOME_CALENDAR_COUNT_SUFFIX",
-            "HOME_AGENDA_TITLE",
-            // Me
-            "ME_SECTION_NAME",
-            "ME_SECTION_COMMUNITY",
-            "ME_SECTION_HELP",
-            "ME_HELP_BODY",
-            // Admin: events
-            "ADMIN_CREATE_EVENT_TITLE",
-            "ADMIN_CREATE_EVENT_SUBMIT",
-            "ADMIN_EDIT_EVENT_TITLE",
-            "ADMIN_EDIT_EVENT_SUBMIT",
-            "ADMIN_EDIT_EVENT_HINT",
-            "ADMIN_CANCEL_EVENT_TITLE",
-            "ADMIN_CANCEL_EVENT_BODY",
-            "ADMIN_CANCEL_EVENT_KEEP",
-            "ADMIN_CANCEL_EVENT_CONFIRM",
-            "ADMIN_CANNOT_EDIT_CANCELLED",
-            "ADMIN_CANNOT_EDIT_STARTED",
-            "ADMIN_CANNOT_ATTEND_CANCELLED",
-            "ADMIN_ATTEND_TITLE",
-            "ADMIN_ATTEND_SUBMIT",
-            // Admin: invites
-            "ADMIN_INVITES_TITLE",
-            "ADMIN_INVITES_BODY",
-            "ADMIN_INVITES_GENERATE",
-            "ADMIN_INVITES_ACTIVE",
-            "ADMIN_INVITES_NONE",
-            "ADMIN_INVITES_NEW_CODE_HINT",
-            "ADMIN_INVITES_REVOKE",
-            "ADMIN_INVITES_REVOKED",
-            // Admin: members
-            "ADMIN_MEMBERS_TITLE",
-            "ADMIN_MEMBERS_GENERATE_INVITE",
-            "ADMIN_REMOVE_TITLE",
-            "ADMIN_REMOVE_KEEP",
-            "ADMIN_REMOVE_CONFIRM",
-            "ADMIN_REMOVE_CONSEQUENCE",
-            "ADMIN_LAST_ADMIN",
-            // Communities
-            "COMMUNITIES_JOIN_ANOTHER",
-            // Community creation (RFC-057)
-            "COMMUNITY_CREATE_LINK",
-            "COMMUNITY_CREATE_TITLE",
-            "COMMUNITY_CREATE_BODY",
-            "COMMUNITY_CREATE_NAME_LABEL",
-            "COMMUNITY_CREATE_DISPLAY_NAME_LABEL",
-            "COMMUNITY_CREATE_TIMEZONE_LABEL",
-            "COMMUNITY_CREATE_TIMEZONE_JAPAN",
-            "COMMUNITY_CREATE_SUBMIT",
-            "COMMUNITY_CREATE_CANCEL",
-            "COMMUNITY_CREATE_DISABLED",
-            "COMMUNITY_CREATE_RATE_LIMITED",
-            "COMMUNITY_CREATE_NAME_ERROR",
-            "COMMUNITY_CREATE_NAME_TOO_LONG",
-            "COMMUNITY_CREATE_NAME_INVALID",
-            "COMMUNITY_CREATE_DISPLAY_NAME_ERROR",
-            "COMMUNITY_CREATE_TIMEZONE_ERROR",
-            // Role labels
-            "ROLE_ADMIN",
-            "ROLE_MEMBER",
-            // Home first-run (RFC-030)
-            "HOME_FIRST_RUN_WELCOME",
-            "HOME_FIRST_RUN_NO_EVENTS",
-            "HOME_FIRST_RUN_CREATE",
-            "HOME_FIRST_RUN_INVITE_HINT",
-            // Recurrence (RFC-022)
-            "REPEAT_LABEL",
-            "REPEAT_NONE",
-            "REPEAT_WEEKLY",
-            "REPEAT_BIWEEKLY",
-            "REPEAT_MONTHLY",
-            "REPEAT_COUNT_UNIT",
-            "REPEAT_COUNT_HINT",
-            // Templates (RFC-032)
-            "TEMPLATES_TITLE",
-            "TEMPLATES_DESCRIPTION",
-            "TEMPLATES_EMPTY",
-            "TEMPLATES_SAVE_SECTION",
-            "TEMPLATES_TITLE_LABEL",
-            "TEMPLATES_LOC_LABEL",
-            "TEMPLATES_DUR_LABEL",
-            "TEMPLATES_SAVE_BTN",
-            "TEMPLATES_USE_BTN",
-            "TEMPLATES_DELETE_BTN",
-            "TEMPLATES_USE_LINK",
-            // Export (RFC-027)
-            "EXPORT_TITLE",
-            "EXPORT_DESCRIPTION",
-            "EXPORT_PRIVACY_NOTE",
-            "EXPORT_DOWNLOAD_BTN",
-            "EXPORT_SINGLE_USE",
-            // Me / About (RFC-035)
-            "ME_SECTION_ABOUT",
-            "ME_VERSION_LABEL",
-            "ME_REF_LABEL",
-            "ME_SECTION_DATA",
-            "ME_EXPORT_LINK",
-            // Calendar (RFC-023)
-            "CALENDAR_TITLE",
-            "CALENDAR_DESCRIPTION",
-            "CALENDAR_GENERATE",
-            "CALENDAR_DISABLE",
-            "CALENDAR_REGENERATE",
-            "CALENDAR_PRIVACY_NOTE",
-            // Event detail (RFC-006/025)
-            "EVENT_TITLE_HEADER",
-            "EVENT_ATTENDED_UNAVAILABLE",
-            "EVENT_ATTENDED_ADMIN_ONLY",
-            "EVENT_MEMBER_FALLBACK",
-            // Join page (RFC-003)
-            "JOIN_PAGE_TITLE",
-            "JOIN_PROFILE_PAGE_TITLE",
-        ];
-        assert_eq!(en_keys.len(), 141, "update parity list when adding strings");
-        for key in en_keys {
-            assert!(!key.is_empty(), "empty key: {key}");
-        }
-    }
-}
+mod tests;

@@ -1,6 +1,6 @@
 # ciao.zinnias RFC Index
 
-Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.md`). This index mirrors the folders.
+Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-policy.md)). This index mirrors the folders.
 
 ## Done — MVP core (001–019)
 
@@ -61,12 +61,13 @@ Folder is the source of truth for state (see project `000-rfc-lifecycle-policy.m
 |----|-------|------------|
 | 056 | [Calendar-Centered Home Dashboard](./done/056-calendar-centered-home-dashboard.md) | v0.40.0 |
 | 057 | [Community Creation and Bootstrap Flow](./done/057-community-creation-and-bootstrap-flow.md) | v0.41.0 |
+| 058 | [Calendar Month Navigation and Day Agenda](./done/058-calendar-month-navigation-and-day-agenda.md) | v0.42.0 |
 
 ## Also Done
 
 | ID | Title | Shipped in |
 |----|-------|------------|
-| 000 | RFC lifecycle policy *(lives in `rfcs/done/`)* | implemented |
+| 000 | [RFC lifecycle policy](./done/000-rfc-lifecycle-policy.md) | implemented |
 
 ## Proposed — MVP remaining (020)
 

@@ -2,6 +2,48 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.42.0] — 2026-07-05
+
+RFC-058 Calendar month navigation and day agenda.
+
+### Added
+
+- **Calendar now supports month navigation.**
+  `/c/:cid/communities` accepts `month=YYYY-MM` and renders previous month,
+  this month, and next month links without requiring JavaScript.
+
+- **Calendar days now filter the agenda.**
+  Day cells link to `day=YYYY-MM-DD`; the event list below the grid shows either
+  the selected day or the full visible month, with a `月全体` clear-filter link.
+
+- **RFC-058 documents the Calendar follow-up.**
+  The RFC discharges RFC-056's month navigation and day tap/filter future-work
+  items while keeping Home's overview behavior unchanged.
+
+### Changed
+
+- **Calendar switching preserves view state.**
+  The community switcher keeps the selected month and day when moving between
+  communities, while still validating that the target community is one the user
+  belongs to.
+
+- **Release version bumped to v0.42.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, and
+  `workers/ssr/static/sw.js` are aligned.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo test -p zinnias-ciao-contracts --test release_gates -- --nocapture`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- RFC-058 Calendar smoke passed with sandboxed incognito Chromium: July month,
+  day filter, community switch preserving month/day, next month, 200% text, and
+  JavaScript-disabled fallback.
+  Evidence: `.git-exclude/evidence/rfc058/rfc058-calendar-smoke-results.json`.
+
 ## [0.41.0] — 2026-07-02
 
 RFC-057 trusted-admin community creation.
