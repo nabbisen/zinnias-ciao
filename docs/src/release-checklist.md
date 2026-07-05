@@ -22,6 +22,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Admin can create event (single and multi-day). *(admin.rs post_create_event + event_write::create_event)*
 - [x] Admin Create Event switcher stays on Create Event for the selected community, so new events bind to the selected community URL. *(admin/events.rs + `/switch?next=admin_events_new`)*
 - [x] Admin can cancel event (confirmation required). *(admin.rs get_cancel_event shows confirmation; post_cancel_event soft-cancels)*
+- [x] Admin can create a similar new event from a cancelled event without copying schedule, attendance, or memos. *(admin/events.rs `get_recreate_event`, `post_create_event` — RFC-060)*
 - [x] Admin can generate and revoke invite codes. *(admin/members.rs: rejection-sampling generator writes HMACs to `invite_codes`; `codlet::revoke_invite` delegates to `invite_db::revoke`)*
 - [x] Admin can remove member (last-admin guard active). *(admin.rs post_remove_member: count_admins guard)*
 - [x] Admin can mark Attended after event day ends. *(admin.rs get_attendance / post_attendance; classify_day gate)*
@@ -36,6 +37,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Session cookies have `HttpOnly; Secure; SameSite=Strict`. Host-only by default (no `Domain` attribute unless `SESSION_COOKIE_DOMAIN` var is set). *(session.rs build_session_cookie — RFC-038)*
 - [x] Form token absent/replayed → POST rejected. `codlet::consume_token` is the handler-facing compatibility wrapper; it delegates to `form_token.rs::consume`, which performs a conditional UPDATE on `form_tokens`. Subject is the authenticated `user_id`; replay returns `Ok(Some(...))`, invalid returns `Err`. *(codlet.rs, form_token.rs — RFC-037)*
 - [x] Community creation is authenticated, active-admin-only, feature-flagged, token-protected, idempotent, rate-limited by user/session/IP, audited, and does not auto-generate invite codes. *(release_gates.rs RFC-057 gates)*
+- [x] Cancel-and-recreate source IDs are revalidated on POST and rejected unless same-community and cancelled. *(release_gates.rs RFC-060 gate)*
 - [x] Script tag in note/title/name renders as text (not executed). *(render.rs escape_html used at every user-content insertion; test: escape_script_tag)*
 - [x] Private page cache cleared on logout. *(RFC-042: authenticated HTML is never cached; only static shell assets are stored. No private cache exists to clear — the property holds trivially. PURGE_PRIVATE is retained for defence-in-depth.)*
 
@@ -92,7 +94,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
 - [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
-- [x] i18n parity test covers all 184 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity test covers all 186 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
@@ -109,7 +111,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Release-gate hardening (v0.34.0 — RFC-044 partial)
 
-- [x] i18n parity gate covers all 184 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity gate covers all 186 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] Static query-count gates: home.rs, event.rs, export.rs `.await` counts verified within ceiling bounds. *(release_gates.rs `*_await_count_within_budget` — v0.34.0)*
 - [x] SW `CACHE_VERSION` matches workspace version. *(release_gates.rs `sw_cache_version_matches_workspace_version`)*
 
@@ -144,6 +146,15 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Details-only validation does not require schedule values and rejects direct schedule-field submissions. *(admin/events.rs `validate_event_details`, `edit_post_contains_schedule_fields`)*
 - [x] Whole-event cancellation copy states all dates are cancelled for multi-day/recurring events. *(admin/events.rs + i18n)*
 - [x] Browser smoke verifies single-day, multi-day, recurring edit screens and whole-event cancellation at mobile width and 200% text scaling. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc051/rfc051-event-edit-semantics-smoke-results.json`)*
+
+## Cancel-and-recreate assistance gates (v0.45.0 — RFC-060)
+
+- [x] Cancelled Event Detail renders `似た内容で新しいイベントを作成` only for active admins. *(release_gates.rs `rfc060_cancelled_event_recreate_is_admin_only_and_details_only`)*
+- [x] `/c/:cid/admin/events/:eid/recreate` requires same-community admin access and a cancelled source event. *(admin/events.rs `get_recreate_event`)*
+- [x] Replacement form pre-fills title, location, and description only, and leaves date/time/repeat controls blank/default. *(admin/events.rs `render_recreate_event_create_fields`)*
+- [x] Replacement POST revalidates `copy_source_event_id`; active, cross-community, or inaccessible sources are rejected. *(admin/events.rs `post_create_event`)*
+- [x] Replacement create records only safe source-event provenance when present. *(audit metadata `created_from_cancelled_event_id`)*
+- [x] Browser smoke verifies mobile-width admin/member cancelled Event Detail, 200% replacement form, no horizontal scroll, explicit schedule entry, helper copy readability, and old event remains cancelled. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc060/rfc060-cancel-recreate-smoke-results.json`)*
 
 ## Operational gates
 

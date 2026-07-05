@@ -199,6 +199,23 @@ pub async fn post_create_event(
             ends_at: body.get_field("ends_at").unwrap_or_default(),
         }],
     };
+    let copy_source_event_id = body
+        .get_field("copy_source_event_id")
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let copy_source_event_id = if let Some(source_id) = copy_source_event_id {
+        let Some(source_event) =
+            event_db::find_for_community(&db, &source_id, community_id).await?
+        else {
+            return render::not_found();
+        };
+        if !event_can_seed_recreate(&source_event) {
+            return render::not_found();
+        }
+        Some(source_event.id)
+    } else {
+        None
+    };
 
     // RFC-022: recurrence
     let freq_str = body.get_field("repeat_rule").unwrap_or_default();
@@ -279,11 +296,81 @@ pub async fn post_create_event(
         "event",
         Some(&event_id),
         "created",
-        Some(serde_json::json!({ "title": validated.title })),
+        Some(match copy_source_event_id {
+            Some(source_id) => serde_json::json!({
+                "created_from_cancelled_event_id": source_id
+            }),
+            None => serde_json::json!({ "title": validated.title }),
+        }),
     )
     .await;
 
     redirect(&format!("/c/{community_id}/events/{event_id}"))
+}
+
+// ── GET /c/:cid/admin/events/:eid/recreate ───────────────────────────────
+
+pub async fn get_recreate_event(
+    req: Request,
+    env: &Env,
+    _rid: &str,
+    community_id: &str,
+    event_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, env).await {
+        Ok(a) => a,
+        Err(_) => return render::session_expired(),
+    };
+    let _membership = require_admin(env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+
+    let source_event = match event_db::find_for_community(&db, event_id, community_id).await? {
+        Some(event) if event_can_seed_recreate(&event) => event,
+        _ => return render::not_found(),
+    };
+    let token =
+        crate::codlet::issue_token(env, &auth.user_id, token_purpose::CREATE_EVENT, None).await;
+
+    let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
+        .await
+        .unwrap_or_default();
+    let community_pairs: Vec<(String, String)> = communities_for_switcher
+        .iter()
+        .map(|c| (c.community_id.clone(), c.community_name.clone()))
+        .collect();
+    let nav = render::bottom_nav(community_id, "home");
+
+    let body = format!(
+        "{header}\
+         <main style=\"padding:1rem 1rem 5rem\">\
+         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{title}</h1>\
+         <form method=\"post\" action=\"/c/{cid}/admin/events\">\
+           <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
+           {fields}\
+           <button type=\"submit\" style=\"width:100%;padding:.875rem;background:#007AFF;\
+           color:#fff;border:none;border-radius:14px;font-size:1rem;font-weight:600;\
+           min-height:44px;cursor:pointer;margin-top:1rem\">{submit}</button>\
+         </form>\
+         <div style=\"margin-top:1.5rem\">\
+           <a href=\"/c/{cid}/events/{eid}\" style=\"color:#6E6E73;font-size:.875rem\">{back}</a>\
+         </div>\
+         </main>{nav}",
+        header = render::header_with_switcher_next(
+            i18n::JA_ADMIN_CREATE_EVENT_TITLE,
+            community_id,
+            &community_pairs,
+            "admin_events_new",
+        ),
+        title = i18n::JA_ADMIN_CREATE_EVENT_TITLE,
+        cid = render::escape_html(community_id),
+        eid = render::escape_html(event_id),
+        tok = render::escape_html(&token),
+        fields = render_recreate_event_create_fields(&source_event, None),
+        submit = i18n::JA_ADMIN_CREATE_EVENT_SUBMIT,
+        back = i18n::JA_NAV_BACK,
+        nav = nav,
+    );
+    render::page(i18n::JA_ADMIN_CREATE_EVENT_TITLE, &body)
 }
 
 // ── GET /c/:cid/admin/events/:eid/cancel ─────────────────────────────────
@@ -1135,6 +1222,26 @@ fn render_event_create_fields(
     )
 }
 
+fn render_recreate_event_create_fields(event: &event_db::EventRow, error: Option<&str>) -> String {
+    format!(
+        "<input type=\"hidden\" name=\"copy_source_event_id\" value=\"{eid}\">\
+         <p role=\"note\" style=\"font-size:.875rem;color:#6E6E73;line-height:1.5;\
+         margin:0 0 1rem\">{helper}</p>\
+         {fields}",
+        eid = render::escape_html(&event.id),
+        helper = i18n::JA_ADMIN_RECREATE_EVENT_HELPER,
+        fields = render_event_create_fields(
+            Some(&event.title),
+            event.location.as_deref(),
+            event.description.as_deref(),
+            error,
+            None,
+            None,
+            None,
+        ),
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 fn render_single_day_edit_fields(
     title: Option<&str>,
@@ -1284,18 +1391,18 @@ fn render_repeat_fields() -> String {
     format!(
         "<div style=\"margin-bottom:1rem\">\
          <label style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{repeat_lbl}</label>\
-         <div style=\"display:flex;gap:.75rem;align-items:center\">\
+         <div style=\"display:flex;gap:.75rem;align-items:center;flex-wrap:wrap\">\
            <select name=\"repeat_rule\" style=\"padding:.625rem;border:1px solid #e5e5ea;\
-             border-radius:12px;font-size:1rem;flex:1\">\
+             border-radius:12px;font-size:1rem;flex:1 1 10rem;min-width:0;max-width:100%\">\
              <option value=\"none\">{opt_none}</option>\
              <option value=\"weekly\">{opt_weekly}</option>\
              <option value=\"biweekly\">{opt_biweekly}</option>\
              <option value=\"monthly\">{opt_monthly}</option>\
            </select>\
            <input type=\"number\" name=\"repeat_count\" value=\"8\" min=\"1\" max=\"52\"\
-             style=\"width:5rem;padding:.625rem;border:1px solid #e5e5ea;\
+             style=\"width:5rem;max-width:100%;padding:.625rem;border:1px solid #e5e5ea;\
              border-radius:12px;font-size:1rem\">\
-           <span style=\"font-size:.875rem;color:#6e6e73\">{unit}</span>\
+           <span style=\"font-size:.875rem;color:#6e6e73;flex:0 0 auto\">{unit}</span>\
          </div>\
          <p style=\"font-size:.75rem;color:#6e6e73;margin:.25rem 0 0\">{hint}</p>\
          </div>",
@@ -1374,6 +1481,10 @@ fn event_is_recurring(event: &event_db::EventRow) -> bool {
 
 fn event_schedule_editable(event: &event_db::EventRow, days: &[event_db::EventDayRow]) -> bool {
     days.len() == 1 && !event_is_recurring(event)
+}
+
+fn event_can_seed_recreate(event: &event_db::EventRow) -> bool {
+    event.status == "cancelled"
 }
 
 fn edit_post_contains_schedule_fields(body: &worker::FormData) -> bool {

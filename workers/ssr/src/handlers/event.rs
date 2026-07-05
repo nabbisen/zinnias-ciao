@@ -264,6 +264,22 @@ pub async fn get_event_detail(
     } else {
         ""
     };
+    let recreate_action = if membership.is_admin() && event.status == "cancelled" {
+        format!(
+            "<div style=\"margin:0 0 1rem\">\
+               <a href=\"/c/{cid}/admin/events/{eid}/recreate\" \
+                  style=\"display:block;box-sizing:border-box;width:100%;padding:.875rem;\
+                  border:2px solid #007AFF;border-radius:14px;text-align:center;\
+                  text-decoration:none;color:#007AFF;font-weight:600;min-height:44px;\
+                  overflow-wrap:anywhere\">{label}</a>\
+             </div>",
+            cid = render::escape_html(community_id),
+            eid = render::escape_html(event_id),
+            label = i18n::JA_ADMIN_RECREATE_EVENT_ACTION,
+        )
+    } else {
+        String::new()
+    };
 
     let body = format!(
         "{header}\
@@ -273,6 +289,7 @@ pub async fn get_event_detail(
            <h1 style=\"font-size:1.25rem;font-weight:600;margin:1rem 0 .25rem\">{title}</h1>\
            {loc}{desc}\
            {cancelled}\
+           {recreate_action}\
            {days}\
            {note}\
            {notes_section}\
@@ -307,6 +324,7 @@ pub async fn get_event_detail(
             ))
             .unwrap_or_default(),
         cancelled = cancelled_banner,
+        recreate_action = recreate_action,
         days = days_html,
         note = note_html,
         notes_section = notes_section,

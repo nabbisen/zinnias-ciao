@@ -179,6 +179,8 @@ pub const JA_ME_HELP_BODY: &str =
 // ── Admin: event management ───────────────────────────────────────────────
 pub const EN_ADMIN_CREATE_EVENT_TITLE: &str = "Create Event";
 pub const EN_ADMIN_CREATE_EVENT_SUBMIT: &str = "Create Event";
+pub const EN_ADMIN_RECREATE_EVENT_ACTION: &str = "Create similar event";
+pub const EN_ADMIN_RECREATE_EVENT_HELPER: &str = "Only the title, place, and description are reused. Choose the date again. Attendance answers and memos are not carried over.";
 pub const EN_ADMIN_EDIT_EVENT_TITLE: &str = "Edit Event";
 pub const EN_ADMIN_EDIT_EVENT_SUBMIT: &str = "Save Changes";
 pub const EN_ADMIN_EDIT_EVENT_HINT: &str = "Members will see the updated event details.";
@@ -211,6 +213,8 @@ pub const EN_ADMIN_ATTEND_SUBMIT: &str = "Save Attendance";
 
 pub const JA_ADMIN_CREATE_EVENT_TITLE: &str = "イベントを作成";
 pub const JA_ADMIN_CREATE_EVENT_SUBMIT: &str = "イベントを作成";
+pub const JA_ADMIN_RECREATE_EVENT_ACTION: &str = "似た内容で新しいイベントを作成";
+pub const JA_ADMIN_RECREATE_EVENT_HELPER: &str = "タイトル・場所・説明だけを引き継ぎます。日程はもう一度選びます。参加の回答とメモは引き継ぎません。";
 pub const JA_ADMIN_EDIT_EVENT_TITLE: &str = "イベントを編集";
 pub const JA_ADMIN_EDIT_EVENT_SUBMIT: &str = "変更を保存";
 pub const JA_ADMIN_EDIT_EVENT_HINT: &str = "メンバーには更新されたイベント詳細が表示されます。";

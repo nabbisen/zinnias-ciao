@@ -64,6 +64,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 057 | [Community Creation and Bootstrap Flow](./done/057-community-creation-and-bootstrap-flow.md) | v0.41.0 |
 | 058 | [Calendar Month Navigation and Day Agenda](./done/058-calendar-month-navigation-and-day-agenda.md) | v0.42.0 |
 | 059 | [Calendar Create Event From Day](./done/059-calendar-create-event-from-day.md) | v0.43.0 |
+| 060 | [Cancel-and-Recreate Assistance](./done/060-cancel-and-recreate-assistance.md) | v0.45.0 |
 
 ## Also Done
 
@@ -87,7 +88,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 033 | Subgroups, Event Visibility, and Boundary Safety | [./proposed/033-subgroups-event-visibility-and-boundary-safety.md](./proposed/033-subgroups-event-visibility-and-boundary-safety.md) |
 | 034 | Notification-Free Quiet Mode and Attention Design | [./proposed/034-notification-free-quiet-mode-and-attention-design.md](./proposed/034-notification-free-quiet-mode-and-attention-design.md) |
 
-## Proposed — F7/F8 follow-ups (044–045)
+## Proposed — F7/F8 follow-ups (044–054)
 
 | ID | Title | File | Note |
 |----|-------|------|------|
@@ -96,6 +97,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 050 | [Staging Runtime Verification Evidence Pack](./proposed/050-staging-runtime-verification-evidence-pack.md) | Needs Cloudflare staging |
 | 053 | [ICS Feed Privacy and Revocation UX](./proposed/053-ics-feed-privacy-and-revocation-ux.md) | Copy review (RFC-054) |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
+
 ## Archive
 
 _None._

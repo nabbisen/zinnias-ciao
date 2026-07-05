@@ -201,6 +201,9 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
                     match sub {
                         "cancel" => super::admin::get_cancel_event(req, env, rid, cid, eid).await,
                         "edit" => super::admin::get_edit_event(req, env, rid, cid, eid).await,
+                        "recreate" => {
+                            super::admin::get_recreate_event(req, env, rid, cid, eid).await
+                        }
                         "attendance" => super::admin::get_attendance(req, env, rid, cid, eid).await,
                         s if s.starts_with("notes/") => {
                             let (mid, action) = split_once(&s[6..], '/');

@@ -182,6 +182,14 @@ fn i18n_en_ja_parity_count() {
         (EN_ME_HELP_BODY, JA_ME_HELP_BODY),
         (EN_ADMIN_CREATE_EVENT_TITLE, JA_ADMIN_CREATE_EVENT_TITLE),
         (EN_ADMIN_CREATE_EVENT_SUBMIT, JA_ADMIN_CREATE_EVENT_SUBMIT),
+        (
+            EN_ADMIN_RECREATE_EVENT_ACTION,
+            JA_ADMIN_RECREATE_EVENT_ACTION,
+        ),
+        (
+            EN_ADMIN_RECREATE_EVENT_HELPER,
+            JA_ADMIN_RECREATE_EVENT_HELPER,
+        ),
         (EN_ADMIN_EDIT_EVENT_TITLE, JA_ADMIN_EDIT_EVENT_TITLE),
         (EN_ADMIN_EDIT_EVENT_SUBMIT, JA_ADMIN_EDIT_EVENT_SUBMIT),
         (EN_ADMIN_EDIT_EVENT_HINT, JA_ADMIN_EDIT_EVENT_HINT),
@@ -877,8 +885,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.44.0-edit-semantics")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.44.0-edit-semantics"),
+        RENDER_SRC.contains("/static/app.js?v=0.45.0-recreate-event")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.45.0-recreate-event"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(
@@ -1017,6 +1025,59 @@ fn rfc051_event_edit_semantics_are_details_only_for_multi_day() {
             && ADMIN_EVENTS_SRC.contains("JA_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS"),
         "Cancellation confirmation must state whole-event scope for multi-day/recurring events"
     );
+}
+
+#[test]
+fn rfc060_cancelled_event_recreate_is_admin_only_and_details_only() {
+    assert!(
+        COMMUNITY_HANDLER_SRC.contains("\"recreate\"")
+            && COMMUNITY_HANDLER_SRC.contains("get_recreate_event"),
+        "RFC-060 must route GET /c/:cid/admin/events/:eid/recreate"
+    );
+    assert!(
+        ADMIN_EVENTS_SRC.contains("pub async fn get_recreate_event")
+            && ADMIN_EVENTS_SRC.contains("require_admin")
+            && ADMIN_EVENTS_SRC.contains("event_can_seed_recreate(&event)")
+            && ADMIN_EVENTS_SRC.contains("token_purpose::CREATE_EVENT"),
+        "Recreate GET must require an active same-community admin, a cancelled source, and a create token"
+    );
+    assert!(
+        EVENT_HANDLER_SRC.contains("membership.is_admin() && event.status == \"cancelled\"")
+            && EVENT_HANDLER_SRC.contains("JA_ADMIN_RECREATE_EVENT_ACTION")
+            && EVENT_HANDLER_SRC.contains("/admin/events/{eid}/recreate"),
+        "Event Detail must show the recreate action only to admins on cancelled events"
+    );
+    assert!(
+        ADMIN_EVENTS_SRC.contains("copy_source_event_id")
+            && ADMIN_EVENTS_SRC
+                .contains("event_db::find_for_community(&db, &source_id, community_id)")
+            && ADMIN_EVENTS_SRC.contains("return render::not_found()")
+            && ADMIN_EVENTS_SRC.contains("created_from_cancelled_event_id"),
+        "Create POST must re-check source event community/status and record safe provenance"
+    );
+    let recreate_fields_src = ADMIN_EVENTS_SRC
+        .split("fn render_recreate_event_create_fields")
+        .nth(1)
+        .and_then(|s| s.split("fn render_single_day_edit_fields").next())
+        .expect("recreate form renderer must exist");
+    assert!(
+        recreate_fields_src.contains("JA_ADMIN_RECREATE_EVENT_HELPER")
+            && recreate_fields_src.contains("event.location.as_deref()")
+            && recreate_fields_src.contains("event.description.as_deref()"),
+        "Recreate form must explain the boundary and prefill only title/location/description"
+    );
+    for copied_schedule in [
+        "event.repeat_rule",
+        "event.repeat_count",
+        "day_date: Some",
+        "starts_at: Some",
+        "ends_at: Some",
+    ] {
+        assert!(
+            !recreate_fields_src.contains(copied_schedule),
+            "Recreate form must not copy schedule/recurrence field {copied_schedule}"
+        );
+    }
 }
 
 #[test]

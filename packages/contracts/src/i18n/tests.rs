@@ -70,6 +70,8 @@ fn en_ja_parity() {
         // Admin: events
         "ADMIN_CREATE_EVENT_TITLE",
         "ADMIN_CREATE_EVENT_SUBMIT",
+        "ADMIN_RECREATE_EVENT_ACTION",
+        "ADMIN_RECREATE_EVENT_HELPER",
         "ADMIN_EDIT_EVENT_TITLE",
         "ADMIN_EDIT_EVENT_SUBMIT",
         "ADMIN_EDIT_EVENT_HINT",
@@ -186,7 +188,7 @@ fn en_ja_parity() {
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
     ];
-    assert_eq!(en_keys.len(), 161, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 163, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

@@ -40,6 +40,15 @@ fn event_row(repeat_rule: &str, repeat_count: Option<u32>) -> event_db::EventRow
     }
 }
 
+fn cancelled_event_row() -> event_db::EventRow {
+    let mut event = event_row("weekly", Some(4));
+    event.status = "cancelled".to_string();
+    event.title = "Cancelled title".to_string();
+    event.location = Some("Cancelled room".to_string());
+    event.description = Some("Cancelled description".to_string());
+    event
+}
+
 fn day(seq: u32, date: &str) -> event_db::EventDayRow {
     event_db::EventDayRow {
         id: format!("day-{seq}"),
@@ -82,6 +91,29 @@ fn details_only_edit_form_hides_schedule_controls() {
     assert!(!html.contains("name=\"starts_at\""));
     assert!(!html.contains("name=\"ends_at\""));
     assert!(!html.contains("name=\"repeat_rule\""));
+}
+
+#[test]
+fn recreate_form_prefills_details_only_and_warns_about_memos() {
+    let html = render_recreate_event_create_fields(&cancelled_event_row(), None);
+    assert!(html.contains("name=\"copy_source_event_id\""));
+    assert!(html.contains("Cancelled title"));
+    assert!(html.contains("Cancelled room"));
+    assert!(html.contains("Cancelled description"));
+    assert!(html.contains(i18n::JA_ADMIN_RECREATE_EVENT_HELPER));
+    assert!(html.contains("メモ"));
+    assert!(html.contains("name=\"day_date\" value=\"\""));
+    assert!(html.contains("name=\"starts_at\" value=\"\""));
+    assert!(html.contains("name=\"ends_at\" value=\"\""));
+    assert!(html.contains("<option value=\"none\">"));
+    assert!(!html.contains("value=\"weekly\" selected"));
+    assert!(!html.contains("name=\"repeat_count\" value=\"4\""));
+}
+
+#[test]
+fn recreate_source_requires_cancelled_event() {
+    assert!(event_can_seed_recreate(&cancelled_event_row()));
+    assert!(!event_can_seed_recreate(&event_row("none", None)));
 }
 
 #[test]

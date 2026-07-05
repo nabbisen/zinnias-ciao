@@ -2,6 +2,52 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.45.0] — 2026-07-05
+
+RFC-060 Cancel-and-recreate assistance.
+
+### Added
+
+- **Cancelled events can seed a similar new event.**
+  Active admins now see `似た内容で新しいイベントを作成` on cancelled Event Detail
+  pages. The replacement flow reuses only title, place, and description.
+
+- **Recreate provenance is audited safely.**
+  Replacement creates can record only the source cancelled event ID in audit
+  metadata, without event text, attendance, notes, or hidden form data.
+
+### Changed
+
+- **Schedule and response data stay explicit.**
+  Dates, start/end times, repeat settings, attendance answers, member memos,
+  cancellation state, and old event days are not carried over. The replacement
+  form tells admins that the schedule must be chosen again.
+
+- **Release version bumped to v0.45.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, and
+  `workers/ssr/static/sw.js` are aligned.
+
+### Fixed
+
+- **Tampered recreate sources are rejected.**
+  `copy_source_event_id` is rechecked on POST and must point to a same-community
+  cancelled event; cross-community, inaccessible, or active sources return the
+  generic not-found path.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo test -p zinnias-ciao-contracts --test release_gates -- --nocapture`
+- `cargo test -p zinnias-ciao-ssr`
+- `cargo test -p zinnias-ciao-contracts`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `mdbook build docs`
+- `node .git-exclude/tmp/rfc060-smoke.mjs` *(sandboxed incognito Chromium; evidence:
+  `.git-exclude/evidence/rfc060/rfc060-cancel-recreate-smoke-results.json`)*
+
 ## [0.44.0] — 2026-07-05
 
 RFC-051 Multi-day and recurring event edit semantics.
