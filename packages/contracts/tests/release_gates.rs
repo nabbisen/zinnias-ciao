@@ -542,6 +542,60 @@ const CALENDAR_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/calendar
 const COMMUNITY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/community.rs");
 const ICS_SRC: &str = include_str!("../../../packages/contracts/src/ics.rs");
 const WRANGLER_TOML_SRC: &str = include_str!("../../../wrangler.toml");
+const GITIGNORE_SRC: &str = include_str!("../../../.gitignore");
+
+#[test]
+fn tracked_wrangler_template_contains_only_placeholder_resource_ids() {
+    let mut checked = 0usize;
+
+    for (idx, line) in WRANGLER_TOML_SRC.lines().enumerate() {
+        let content = line.split('#').next().unwrap_or("").trim();
+        let key = if content.starts_with("database_id") {
+            Some("D1 database_id")
+        } else if content.starts_with("id") && content.contains('=') {
+            Some("KV namespace id")
+        } else {
+            None
+        };
+
+        let Some(key) = key else {
+            continue;
+        };
+        let value = content
+            .split_once('=')
+            .map(|(_, value)| value.trim().trim_matches('"'))
+            .expect("wrangler resource id line must use key = value syntax");
+        checked += 1;
+
+        assert!(
+            value == "local" || value.starts_with("REPLACE_WITH_"),
+            "tracked wrangler.toml line {} contains a real {key} value ({value:?}); \
+             keep real hosted D1/KV IDs in ignored wrangler*.local.toml files",
+            idx + 1
+        );
+    }
+
+    assert!(
+        checked >= 6,
+        "release gate expected to inspect top-level, dev, staging, and production D1/KV ids"
+    );
+}
+
+#[test]
+fn local_wrangler_configs_remain_ignored() {
+    let required_patterns = [
+        "wrangler.staging.local.toml",
+        "wrangler.production.local.toml",
+        "wrangler.*.local.toml",
+    ];
+
+    for pattern in required_patterns {
+        assert!(
+            GITIGNORE_SRC.lines().any(|line| line.trim() == pattern),
+            ".gitignore must keep {pattern:?} so real hosted D1/KV IDs stay out of Git"
+        );
+    }
+}
 
 /// Count non-comment lines containing `.await` in a source string.
 fn count_awaits(src: &str) -> usize {
@@ -892,8 +946,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.46.0-calendar-privacy")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.46.0-calendar-privacy"),
+        RENDER_SRC.contains("/static/app.js?v=0.47.0-staging-smoke")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.47.0-staging-smoke"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(

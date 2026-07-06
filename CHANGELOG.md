@@ -2,6 +2,89 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.47.0] — 2026-07-06
+
+RFC-050/RFC-045 runtime evidence collector prototype.
+
+### Added
+
+- **Runtime evidence collector prototype.**
+  `bun run smoke:runtime -- <url>` now runs route/header and browser smoke
+  against an already-running Worker URL. Wrangler remains the only tool that
+  starts local dev or deploys staging.
+
+- **RFC-050 evidence template.**
+  Documentation now separates prototype-supported checks from manual
+  staging/operator evidence such as seeded auth flows, race checks, Logpush,
+  real-phone text scaling, and Cloudflare CPU review.
+
+- **Runtime smoke prerequisites and version-check caveat.**
+  The staging prototype docs now state the Node 22+ requirement and explain
+  that release-candidate evidence should use a candidate-specific
+  `BUILD_VERSION` with matching `EXPECTED_VERSION`. The runtime collector
+  defaults `/version` checks to `dev` for localhost and `staging` for hosted
+  URLs.
+
+- **Hosted staging exposure policy.**
+  RFC-050 and deployment docs now state that hosted staging is public while
+  published, must use non-production data and separate resources/secrets, and
+  should be protected or removed after evidence collection.
+
+- **Runtime smoke diagnostics.**
+  The RFC-050 collector now reports a targeted diagnostic when `/join` returns
+  500 after health/version/static routes pass, pointing operators to staging D1
+  binding and migration checks.
+
+- **Secret setup command clarified.**
+  Launch and deployment docs now generate `HMAC_PEPPER` with
+  `openssl rand -hex 32` and pipe it directly into `wrangler secret put`.
+
+- **Remote D1 operations made explicit.**
+  Staging/production migration scripts and operator SQL examples now pass
+  Wrangler's `--remote` flag so hosted smoke checks target the same D1 database
+  used by the deployed Worker. Hosted troubleshooting now includes remote D1
+  migration-ledger checks and a `wrangler tail` fallback when `/join` still
+  returns 500 after schema verification.
+
+- **Hosted environment bootstrap commands.**
+  `bun run bootstrap:staging` and `bun run bootstrap:production` create the
+  first community/admin seed for their Cloudflare environment, rotate that
+  environment's `HMAC_PEPPER` without printing it, and print the admin invite
+  code needed for authenticated checks.
+
+- **Staging teardown documented.**
+  Deployment docs now include the exact `wrangler delete --env staging`
+  dry-run and deletion commands for closing the temporary hosted staging Worker
+  after evidence collection, plus the separate full-disposal commands for
+  staging D1, KV, and `HMAC_PEPPER`.
+
+- **Hosted config commit guard.**
+  Production hosted commands now use ignored `wrangler.production.local.toml`
+  while staging hosted commands use ignored `wrangler.staging.local.toml`, and
+  the release gates fail if tracked `wrangler.toml` contains real D1/KV IDs or
+  required local-config ignore rules are removed.
+
+### Changed
+
+- **Release version bumped to v0.47.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+### Testing
+
+- `node --check scripts/runtime-smoke.mjs`
+- `cargo test -p zinnias-ciao-contracts --test release_gates -- --nocapture`
+- `cargo fmt --all -- --check`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo build --workspace`
+- `mdbook build docs`
+- `git diff --check`
+
+Cloudflare-hosted smoke was not run in this working tree because no hosted
+staging URL was provided as an operator target.
+
 ## [0.46.0] — 2026-07-05
 
 RFC-053 ICS feed privacy and revocation UX.

@@ -10,4 +10,10 @@ dist
 style/tailwindcss/bin
 
 # custom
+/docs/book/
 /.git-exclude/
+
+# local operator configuration (real hosted D1/KV IDs - never commit)
+wrangler.*.local.toml
+# retired ambiguous staging filename, kept ignored defensively
+wrangler.local.toml

@@ -90,7 +90,7 @@ at write time and back to local at display time.
 To revoke a compromised session immediately:
 
 ```sh
-bunx wrangler d1 execute zinnias-ciao --env production --command \
+bunx wrangler d1 execute zinnias-ciao --remote --env production --command \
   "UPDATE sessions SET revoked_at = datetime('now') WHERE id = '<session_id>'"
 ```
 
@@ -101,7 +101,7 @@ Via the admin UI: Communities → Invite Members → Revoke button on the active
 Via SQL (emergency):
 
 ```sh
-bunx wrangler d1 execute zinnias-ciao --env production --command \
+bunx wrangler d1 execute zinnias-ciao --remote --env production --command \
   "UPDATE invite_codes SET revoked_at = datetime('now') WHERE id = '<invite_id>'"
 ```
 

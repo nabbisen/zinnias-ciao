@@ -1,18 +1,21 @@
 {
   "name": "zinnias-ciao",
-  "version": "0.46.0",
+  "version": "0.47.0",
   "private": true,
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "dev": "bunx wrangler dev --env dev --local",
     "build": "worker-build --release",
     "migrate:dev": "bunx wrangler d1 migrations apply zinnias-ciao-dev --local --env dev",
-    "migrate:staging": "bunx wrangler d1 migrations apply zinnias-ciao-staging --env staging",
-    "migrate:prod": "bunx wrangler d1 migrations apply zinnias-ciao --env production",
+    "migrate:staging": "bunx wrangler d1 migrations apply zinnias-ciao-staging --remote --env staging --config wrangler.staging.local.toml",
+    "migrate:prod": "bunx wrangler d1 migrations apply zinnias-ciao --remote --env production --config wrangler.production.local.toml",
+    "bootstrap:staging": "node scripts/bootstrap-cloudflare.mjs --target staging --config wrangler.staging.local.toml",
+    "bootstrap:production": "node scripts/bootstrap-cloudflare.mjs --target production --config wrangler.production.local.toml",
     "test": "cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr",
     "lint": "cargo clippy -p zinnias-ciao-domain -p zinnias-ciao-contracts -- -D warnings",
     "fmt": "cargo fmt --all -- --check",
-    "reset:dev": "node scripts/setup.mjs --reset"
+    "reset:dev": "node scripts/setup.mjs --reset",
+    "smoke:runtime": "node scripts/runtime-smoke.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

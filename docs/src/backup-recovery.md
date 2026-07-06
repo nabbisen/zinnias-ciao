@@ -58,12 +58,12 @@ If a migration must be reversed and D1's point-in-time restore is unavailable:
 bunx wrangler d1 create zinnias-ciao-restored
 
 # 2. Import the backup
-bunx wrangler d1 execute zinnias-ciao-restored --env production \
+bunx wrangler d1 execute zinnias-ciao-restored --remote --env production \
   --file backup-YYYYMMDD-HHMMSS.sql
 
-# 3. Update wrangler.toml to point to the new database ID, then deploy
-#    wrangler.toml [[env.production.d1_databases]] database_id = "<new id>"
-bunx wrangler deploy --env production
+# 3. Update ignored wrangler.production.local.toml to point to the new database ID, then deploy
+#    wrangler.production.local.toml [[env.production.d1_databases]] database_id = "<new id>"
+bunx wrangler deploy --env production --config wrangler.production.local.toml
 
 # 4. Verify, then delete the old broken database when confident
 ```

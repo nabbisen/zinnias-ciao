@@ -51,7 +51,7 @@ const ICON_NO_ANSWER: &str = "<svg aria-hidden='true' width='1em' height='1em' v
 // ── Static asset paths ────────────────────────────────────────────────────
 const MANIFEST: &str = "/manifest.webmanifest";
 const CSS: &str = "/static/app.css";
-const JS: &str = "/static/app.js?v=0.46.0-calendar-privacy";
+const JS: &str = "/static/app.js?v=0.47.0-staging-smoke";
 const THEME: &str = "#007AFF";
 
 // ── Shell ─────────────────────────────────────────────────────────────────

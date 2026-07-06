@@ -43,8 +43,8 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Auth storage gates (v0.38.6)
 
-- [ ] `HMAC_PEPPER` secret is set in the target environment (`wrangler secret put HMAC_PEPPER`).
-- [ ] `RATE_LIMIT` KV namespace is created and bound in `wrangler.toml` for the target environment.
+- [ ] `HMAC_PEPPER` secret is set in the target environment, either by bootstrap seeding or by `wrangler secret put` with the target environment's ignored local config.
+- [ ] `RATE_LIMIT` KV namespace is created and bound in ignored local Wrangler config for the target environment.
 - [ ] New invite code generation writes to `invite_codes` only (verify: `SELECT COUNT(*) FROM invite_codes` increases after admin generates a code).
 - [ ] New session issuance writes to `sessions` (verify: `SELECT COUNT(*) FROM sessions` increases after a successful join).
 - [ ] Form tokens write to `form_tokens` (verify: `SELECT COUNT(*) FROM form_tokens` increases after rendering/submitting forms).
@@ -166,13 +166,27 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] ICS feed responses send `Cache-Control: no-store, private`, `Referrer-Policy: no-referrer`, and `X-Content-Type-Options: nosniff`. *(calendar.rs)*
 - [x] Browser smoke verifies generate, regenerate, old URL revocation, disable, header values, scoped ICS body, mobile 200% text, and sandboxed/incognito Chromium launch. *(evidence: `.git-exclude/evidence/rfc053/rfc053-calendar-feed-privacy-smoke-results.json`)*
 
+## Runtime evidence collector prototype (v0.47.0 — RFC-050/RFC-045)
+
+- [x] `bun run smoke:runtime -- <url>` collects evidence from an already-running Worker URL; Wrangler remains the owner of local start/deploy. *(scripts/runtime-smoke.mjs)*
+- [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
+- [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
+- [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/staging-runtime-prototype.md)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging explicitly, then `EXPECTED_VERSION=v0.47.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
+- [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
+- [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
+
 ## Operational gates
 
 - [x] `GET /healthz` returns `{"ok":true}`. *(health.rs get_health)*
 - [x] `GET /version` returns build version. *(health.rs get_version reads BUILD_VERSION var)*
 - [x] Rollback procedure documented and understood. *(docs/src/deployment.md §Rollback: `wrangler rollback --env production`)*
 - [x] Log persistence approach documented. *(docs/src/deployment.md §Log persistence: Cloudflare Logpush to R2/S3)*
-- [ ] D1 migration applied to staging and rehearsed. *(operator task: `bun run migrate:prod` against staging env)*
-- [ ] Secrets (`HMAC_PEPPER`) set in production via `wrangler secret put`. `SESSION_COOKIE_DOMAIN` is a **`[vars]` binding** (not a secret) — set it per environment in `wrangler.toml`; leave unset for a host-only cookie. *(operator task — RFC-038)*
+- [x] Tracked `wrangler.toml` is release-gated to contain only placeholder D1/KV IDs. *(release_gates.rs: `tracked_wrangler_template_contains_only_placeholder_resource_ids`)*
+- [ ] D1 migration applied to remote staging and rehearsed. *(operator task: `bun run migrate:staging`, which uses `wrangler d1 migrations apply --remote`)*
+- [ ] Production commands use ignored `wrangler.production.local.toml`; staging commands use ignored `wrangler.staging.local.toml`. *(operator task — hosted config isolation)*
+- [ ] Production bootstrap invite generated for initial release. *(operator task: `bun run bootstrap:production -- --community "Production Community" --admin "Admin"`; this sets production `HMAC_PEPPER`; keep the printed invite code private)*
+- [ ] `SESSION_COOKIE_DOMAIN` is configured as a **`[vars]` binding** in the target environment's ignored local Wrangler config if needed; leave unset for a host-only cookie. *(operator task — RFC-038)*
 - [ ] Logpush configured for production. *(operator task: Cloudflare dashboard)*
 - [ ] No critical open security issues. *(final security review before go-live)*

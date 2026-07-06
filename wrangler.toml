@@ -11,7 +11,7 @@ command = "worker-build --release workers/ssr"
 [[d1_databases]]
 binding       = "DB"
 database_name = "zinnias-ciao"
-database_id   = "local"          # replaced by real ID on deploy
+database_id   = "local"          # tracked template value; hosted IDs live in ignored wrangler*.local.toml
 
 # KV namespace for rate-limiting (RFC-012)
 [[kv_namespaces]]
@@ -47,6 +47,15 @@ database_id   = "local"
 binding = "RATE_LIMIT"
 id      = "local"
 
+# Hosted staging uses the same config shape with real Cloudflare IDs in an
+# ignored local copy:
+#   cp wrangler.toml wrangler.staging.local.toml
+#   git check-ignore -v wrangler.staging.local.toml
+# Staging management docs:
+#   docs/src/deployment.md#staging-exposure
+#   docs/src/deployment.md#staging-teardown
+#   docs/src/staging-runtime-prototype.md#hosted-staging-smoke
+# Then replace only the staging D1 database_id and RATE_LIMIT KV id below.
 [env.staging]
 name = "zinnias-ciao-ssr-stg"
 [env.staging.vars]
@@ -61,7 +70,7 @@ database_id   = "REPLACE_WITH_STAGING_D1_ID"   # create with: wrangler d1 create
 
 [[env.staging.kv_namespaces]]
 binding = "RATE_LIMIT"
-id      = "REPLACE_WITH_STAGING_KV_ID"         # create with: wrangler kv:namespace create RATE_LIMIT --env staging
+id      = "REPLACE_WITH_STAGING_KV_ID"         # create with: wrangler kv namespace create RATE_LIMIT --env staging
 
 [env.production]
 name = "zinnias-ciao-ssr-prd"
@@ -77,4 +86,4 @@ database_id   = "REPLACE_WITH_PRODUCTION_D1_ID"   # create with: wrangler d1 cre
 
 [[env.production.kv_namespaces]]
 binding = "RATE_LIMIT"
-id      = "REPLACE_WITH_PRODUCTION_KV_ID"         # create with: wrangler kv:namespace create RATE_LIMIT --env production
+id      = "REPLACE_WITH_PRODUCTION_KV_ID"         # create with: wrangler kv namespace create RATE_LIMIT --env production

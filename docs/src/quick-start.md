@@ -25,6 +25,21 @@ bun run dev
 
 Opens the worker locally on `http://localhost:8787`.
 
+Local development uses tracked `wrangler.toml` with local D1/KV bindings. Do
+not create hosted config files for ordinary local work.
+
+For hosted Cloudflare staging or production, copy the tracked template to
+ignored local config files and put real D1/KV IDs there:
+
+```sh
+cp wrangler.toml wrangler.staging.local.toml
+cp wrangler.toml wrangler.production.local.toml
+git check-ignore -v wrangler.staging.local.toml wrangler.production.local.toml
+```
+
+See `docs/src/deployment.md` before running hosted deploy, migration, bootstrap,
+or teardown commands.
+
 ## Tests
 
 ```sh

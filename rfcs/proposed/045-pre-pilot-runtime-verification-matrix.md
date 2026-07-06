@@ -64,7 +64,8 @@ the unpublished/deprecated codlet-worker integration. Items 7–11 unchanged.
 ## 6. Staging-Runtime Verification — PENDING (requires deployed environment)
 
 These cannot be executed in the repository. They require a Cloudflare staging
-deployment (`worker-build` + `wrangler deploy --env staging` + a staging D1).
+deployment (`worker-build` + `wrangler deploy --env staging --config
+wrangler.staging.local.toml` + a staging D1).
 Each maps to a review P0.
 
 | # | Test (review ref) | Expected result | Blocks |

@@ -4,7 +4,7 @@ This document is the step-by-step operator guide for taking ciao.zinnias from a
 clean tarball to a running production deployment. It is intended to be followed
 exactly, in order, by one operator. Tick each step as you complete it.
 
-**Version this runbook was written for:** v0.38.6  
+**Version this runbook was written for:** v0.47.0
 **Estimated time:** 60–90 minutes for a first deployment.
 
 ---
@@ -18,12 +18,46 @@ Before starting, confirm you have:
 - [ ] Rust stable + `wasm32-unknown-unknown` target + `worker-build` installed
   (see `docs/src/quick-start.md`).
 - [ ] `bun` installed.
-- [ ] The v0.38.6 source tarball extracted to a working directory.
+- [ ] The v0.47.0 source tarball extracted to a working directory.
 - [ ] A domain or workers.dev subdomain decided for the production deployment.
 
 ---
 
 ## Phase 1 — Provision cloud resources
+
+### 1.0 Create local Wrangler config
+
+Keep tracked `wrangler.toml` as the canonical config shape with placeholder
+Cloudflare resource IDs. Create ignored local copies for real hosted IDs:
+
+```sh
+cp wrangler.toml wrangler.staging.local.toml
+cp wrangler.toml wrangler.production.local.toml
+git check-ignore -v wrangler.staging.local.toml wrangler.production.local.toml
+```
+
+Edit only ignored local config files in the steps below:
+
+- `wrangler.staging.local.toml` for staging;
+- `wrangler.production.local.toml` for production.
+
+For hosted staging, replace the placeholders in `[[env.staging.d1_databases]]`
+and `[[env.staging.kv_namespaces]]`:
+
+```toml
+[[env.staging.d1_databases]]
+binding       = "DB"
+database_name = "zinnias-ciao-staging"
+database_id   = "PASTE_STAGING_D1_DATABASE_ID_HERE"
+
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT"
+id      = "PASTE_STAGING_RATE_LIMIT_KV_ID_HERE"
+```
+
+Do not introduce another hosted deployment configuration layer.
+
+- [ ] Done.
 
 ### 1.1 Create production D1 database
 
@@ -31,8 +65,9 @@ Before starting, confirm you have:
 bunx wrangler d1 create zinnias-ciao
 ```
 
-Note the `database_id` in the output. Edit `wrangler.toml` — find the production
-`[[d1_databases]]` block and replace `"local"` with the real ID:
+Note the `database_id` in the output. Edit `wrangler.production.local.toml` —
+find the production `[[env.production.d1_databases]]` block and replace the
+placeholder with the real ID:
 
 ```toml
 [env.production]
@@ -51,17 +86,19 @@ database_id   = "PASTE_REAL_ID_HERE"
 bunx wrangler d1 create zinnias-ciao-staging
 ```
 
-Replace `REPLACE_WITH_STAGING_D1_ID` in `wrangler.toml` with the real ID.
+Replace `REPLACE_WITH_STAGING_D1_ID` in `wrangler.staging.local.toml` with the real ID.
 
 - [ ] Done.
 
 ### 1.3 Create production KV namespace for rate limiting
 
 ```sh
-bunx wrangler kv:namespace create RATE_LIMIT --env production
+bunx wrangler kv namespace create RATE_LIMIT --env production \
+  --config wrangler.production.local.toml
 ```
 
-Note the `id`. Add a `[[env.production.kv_namespaces]]` block in `wrangler.toml`:
+Note the `id`. Replace the production `RATE_LIMIT` placeholder in
+`wrangler.production.local.toml`:
 
 ```toml
 [[env.production.kv_namespaces]]
@@ -74,10 +111,11 @@ id      = "PASTE_REAL_KV_ID_HERE"
 ### 1.4 Create staging KV namespace
 
 ```sh
-bunx wrangler kv:namespace create RATE_LIMIT --env staging
+bunx wrangler kv namespace create RATE_LIMIT --env staging \
+  --config wrangler.staging.local.toml
 ```
 
-Replace `REPLACE_WITH_STAGING_KV_ID` in `wrangler.toml`.
+Replace `REPLACE_WITH_STAGING_KV_ID` in `wrangler.staging.local.toml`.
 
 - [ ] Done.
 
@@ -89,24 +127,31 @@ Secrets are never committed to source. Set them once per environment.
 
 ### 2.1 Generate the HMAC pepper
 
-The pepper is a cryptographically random 32-byte value. Generate it securely:
+The pepper is a cryptographically random 32-byte value. Generate a different
+pepper per environment. Do not reuse staging's pepper in production.
 
-```sh
-# macOS / Linux
-openssl rand -hex 32
-```
-
-Copy the output — you will not see it again after setting it.
+The commands below generate the pepper and send it directly to Wrangler without
+printing it or storing it in shell history.
 
 ### 2.2 Set secrets for staging
 
+For hosted staging with bootstrap login testing, `bun run bootstrap:staging`
+will generate and set a fresh staging `HMAC_PEPPER` later in §4.3. Use the
+standalone command below only when running unauthenticated staging checks without
+bootstrap seeding.
+
 ```sh
-bunx wrangler secret put HMAC_PEPPER --env staging
-# paste the pepper value when prompted
+openssl rand -hex 32 | bunx wrangler secret put HMAC_PEPPER --env staging \
+  --config wrangler.staging.local.toml
 ```
 
+This rotates staging HMAC material. On an existing staging database, old
+sessions, invite codes, and form tokens issued with the previous pepper will no
+longer validate. That is acceptable for fresh staging setup; plan rotation if
+staging already has test users.
+
 `SESSION_COOKIE_DOMAIN` is **not a secret** — it is a plain `[vars]` binding (RFC-038).
-Set it in `wrangler.toml` under `[env.staging]`:
+Set it in `wrangler.staging.local.toml` under `[env.staging]`:
 
 ```toml
 [env.staging]
@@ -120,17 +165,21 @@ exact deployment host. Only set it if you need cross-subdomain cookie sharing.
 
 ### 2.3 Set secrets for production
 
-Use a **different** pepper value from staging.
+For initial production release with first-admin bootstrap, `bun run
+bootstrap:production` will generate and set a fresh production `HMAC_PEPPER`
+later in §4.7. Use the standalone command below only when production bootstrap
+seeding is not being run, or during a planned key rotation:
 
 ```sh
-openssl rand -hex 32   # generate a new pepper — different from staging
-
-bunx wrangler secret put HMAC_PEPPER --env production
-# paste the new pepper
+openssl rand -hex 32 | bunx wrangler secret put HMAC_PEPPER --env production \
+  --config wrangler.production.local.toml
 ```
 
-Set `SESSION_COOKIE_DOMAIN` in `wrangler.toml` under `[env.production]` (same as
-staging — it is a var, not a secret):
+Rotating production `HMAC_PEPPER` invalidates existing sessions, invite codes,
+and form tokens.
+
+Set `SESSION_COOKIE_DOMAIN` in `wrangler.production.local.toml` under
+`[env.production]` (same as staging — it is a var, not a secret):
 
 ```toml
 [env.production]
@@ -152,6 +201,16 @@ bun run migrate:staging
 ```
 
 Confirm output shows all migrations applied (`0001` through `0007`).
+Then verify the D1-backed form-token table exists:
+
+```sh
+bunx wrangler d1 migrations list zinnias-ciao-staging --remote --env staging \
+  --config wrangler.staging.local.toml
+
+bunx wrangler d1 execute zinnias-ciao-staging --remote --env staging --command \
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='form_tokens'" \
+  --config wrangler.staging.local.toml
+```
 
 - [ ] Done.
 
@@ -180,12 +239,27 @@ bun install
 ### 4.2 Deploy to staging
 
 ```sh
-bunx wrangler deploy --env staging
+bunx wrangler deploy --env staging --config wrangler.staging.local.toml
 ```
 
 - [ ] Done.
 
-### 4.3 Smoke-test staging
+### 4.3 Bootstrap the first staging community and admin invite
+
+`wrangler deploy` only publishes the Worker. It does not seed D1 and does not
+print an admin invite code. Bootstrap staging explicitly:
+
+```sh
+bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"
+```
+
+This command applies remote staging migrations, rotates staging `HMAC_PEPPER`,
+inserts one staging community and seed admin, and prints the admin invite code
+for `/join`. Keep the printed code private; it is a staging login credential.
+
+- [ ] Staging community and admin invite seeded.
+
+### 4.4 Smoke-test staging
 
 ```sh
 STAGING_URL="https://zinnias-ciao-ssr-stg.<account>.workers.dev"
@@ -199,48 +273,21 @@ curl "$STAGING_URL/version"
 
 Open `$STAGING_URL/join` in a browser. Confirm the join form loads.
 
+The RFC-050 prototype smoke can collect repeatable route/header and browser
+evidence against the hosted staging Worker. Use the staging URL printed by
+Wrangler after deploy:
+
+```sh
+bun run smoke:runtime -- "$STAGING_URL"
+```
+
+See `docs/src/staging-runtime-prototype.md` for the output files and the manual
+evidence that still remains outside the prototype.
+
 - [ ] Health check passes.
 - [ ] Version check passes.
 - [ ] Join form loads without error.
-
-### 4.4 Seed the first community and admin on staging
-
-Use `bun run setup` against the staging D1 via a temporary local proxy, or insert
-directly using `wrangler d1 execute`:
-
-```sh
-# Generate a random community ID and membership ID (any unique strings)
-COMMUNITY_ID="com_$(openssl rand -hex 8)"
-USER_ID="usr_$(openssl rand -hex 8)"
-MEMBERSHIP_ID="mem_$(openssl rand -hex 8)"
-INVITE_ID="inv_$(openssl rand -hex 8)"
-NOW=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
-EXPIRES="2099-12-31T23:59:59.000Z"
-
-# Community
-bunx wrangler d1 execute zinnias-ciao-staging --env staging --command \
-  "INSERT INTO communities (id, name, timezone, is_active, created_at) VALUES ('$COMMUNITY_ID', 'Staging Community', 'Asia/Tokyo', 1, '$NOW')"
-
-# User
-bunx wrangler d1 execute zinnias-ciao-staging --env staging --command \
-  "INSERT INTO users (id, created_at) VALUES ('$USER_ID', '$NOW')"
-
-# Membership (admin)
-bunx wrangler d1 execute zinnias-ciao-staging --env staging --command \
-  "INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('$MEMBERSHIP_ID', '$COMMUNITY_ID', '$USER_ID', 'admin', 'Admin', '$NOW')"
-```
-
-Then generate the bootstrap invite code. The code HMAC requires the staging pepper.
-Use the setup script against a local wrangler instance pointed at staging D1, or
-run a one-time seeding script. The simplest approach for staging is to use
-`bun run setup` locally after pointing the D1 binding at the remote staging DB by
-temporarily editing `wrangler.toml` — or seed it via `wrangler d1 execute` after
-computing the HMAC externally.
-
-**Practical shortcut for staging:** run `bun run setup -y --reset` against the
-local dev DB, confirm the flow works, then replay the same SQL against staging.
-
-- [ ] Staging community and admin seeded.
+- [ ] RFC-050 prototype smoke passes.
 
 ### 4.5 Run the full QA checklist against staging
 
@@ -262,12 +309,30 @@ Work through all `[~]` items in `docs/src/release-checklist.md`:
 Only after staging QA passes:
 
 ```sh
-bunx wrangler deploy --env production
+bunx wrangler deploy --env production --config wrangler.production.local.toml
 ```
 
 - [ ] Done.
 
-### 4.7 Smoke-test production
+### 4.7 Bootstrap the first production community and admin invite
+
+`wrangler deploy --env production --config wrangler.production.local.toml` only
+publishes the Worker. It does not seed D1 and does not print an admin invite
+code. Bootstrap production explicitly:
+
+```sh
+bun run bootstrap:production -- --community "Production Community" --admin "Admin"
+```
+
+This command applies remote production migrations, rotates production
+`HMAC_PEPPER`, inserts one production community and seed admin, and prints the
+admin invite code for `/join`. Use it for initial production release setup only,
+or for a planned production credential rotation. Keep the printed code private;
+it is a production login credential.
+
+- [ ] Production community and admin invite seeded.
+
+### 4.8 Smoke-test production
 
 ```sh
 PROD_URL="https://your-production-domain.com"
@@ -282,18 +347,8 @@ curl "$PROD_URL/version"
 
 ---
 
-## Phase 5 — Seed production community
+## Phase 5 — Verify production first admin
 
-Use `wrangler d1 execute` against the production D1 as in §4.4, but with the
-production community name and a fresh bootstrap invite. The invite code HMAC must
-use the **production** pepper.
-
-**Recommended procedure:** compute the HMAC locally using the same algorithm as the
-server (`HMAC-SHA256(pepper, uppercase(code))`), or temporarily use `bun run setup`
-against a local wrangler instance with the production D1 ID bound. Clear the local
-state afterward.
-
-- [ ] Production community and admin seeded.
 - [ ] First admin can sign in via the bootstrap invite code.
 - [ ] Admin confirms they can create an event and generate a new invite code.
 
@@ -325,10 +380,11 @@ bunx wrangler tail --env production
 
 Before sharing the service with real users, confirm:
 
-- [ ] Production secrets are not in source control, `.env` files, or Slack history.
-- [ ] `wrangler.toml` contains no hardcoded D1 database IDs that shouldn't be public
-  (IDs in `wrangler.toml` are semi-public via the Cloudflare dashboard; the actual
-  protection is the secret pepper — confirm it is set and not shared).
+- [ ] Production secrets are not in source control, notes, shell history, or chat.
+- [ ] Tracked `wrangler.toml` still contains placeholder D1/KV IDs; real IDs are
+  only in ignored `wrangler.staging.local.toml` / `wrangler.production.local.toml`.
+- [ ] Hosted deployment uses ignored local Wrangler config files plus
+  Wrangler-managed remote secrets.
 - [ ] Rate limiting is active: attempt 11 failed invite codes from a single IP and
   confirm the 12th is rejected with the rate-limit message.
 - [ ] Cross-community isolation: sign in as a member of community A; attempt to
