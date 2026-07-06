@@ -66,6 +66,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 058 | [Calendar Month Navigation and Day Agenda](./done/058-calendar-month-navigation-and-day-agenda.md) | v0.42.0 |
 | 059 | [Calendar Create Event From Day](./done/059-calendar-create-event-from-day.md) | v0.43.0 |
 | 060 | [Cancel-and-Recreate Assistance](./done/060-cancel-and-recreate-assistance.md) | v0.45.0 |
+| 061 | [Community Admin Member Management Navigation](./done/061-community-admin-member-management-navigation.md) | v0.48.0 |
 
 ## Also Done
 
@@ -97,7 +98,6 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 045 | Pre-Pilot Runtime Verification Matrix | [./proposed/045-pre-pilot-runtime-verification-matrix.md](./proposed/045-pre-pilot-runtime-verification-matrix.md) | Source verification discharged; staging-runtime matrix pending environment |
 | 050 | [Staging Runtime Verification Evidence Pack](./proposed/050-staging-runtime-verification-evidence-pack.md) | Runtime evidence collector prototype added in v0.47.0; full Cloudflare evidence pending |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
-| 061 | [Community Admin Member Management Navigation](./proposed/061-community-admin-member-management-navigation.md) | Makes member management discoverable and treats invite generation as a sub-action |
 | 062 | [Admin Role Transfer and Promotion](./proposed/062-admin-role-transfer-and-promotion.md) | Defines safe admin promotion/demotion without recovery or granular permissions |
 | 063 | [Member Removal, Re-add, and Suspension Policy](./proposed/063-member-removal-readd-and-suspension-policy.md) | Decides removal-only vs reactivation/suspension before adding more member lifecycle UI |
 

@@ -989,8 +989,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.47.0-staging-smoke")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.47.0-staging-smoke"),
+        RENDER_SRC.contains("/static/app.js?v=0.48.0-member-management")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.48.0-member-management"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(

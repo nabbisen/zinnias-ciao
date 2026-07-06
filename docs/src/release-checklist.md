@@ -25,6 +25,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Admin can create a similar new event from a cancelled event without copying schedule, attendance, or memos. *(admin/events.rs `get_recreate_event`, `post_create_event` — RFC-060)*
 - [x] Admin can generate and revoke invite codes. *(admin/members.rs: rejection-sampling generator writes HMACs to `invite_codes`; `codlet::revoke_invite` delegates to `invite_db::revoke`)*
 - [x] Admin can remove member (last-admin guard active). *(admin.rs post_remove_member: count_admins guard)*
+- [x] Admin member management is discoverable from Home and My Page, and invite generation is reachable as a child action. *(home.rs, me.rs, admin/members.rs — RFC-061)*
 - [x] Admin can mark Attended after event day ends. *(admin.rs get_attendance / post_attendance; classify_day gate)*
 - [x] Existing active admins can create an additional community when `COMMUNITY_CREATION_ENABLED=true`; creator becomes first admin and redirects to the new Home. *(community_create.rs, community.rs DB helper — RFC-057)*
 
@@ -38,6 +39,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Form token absent/replayed → POST rejected. `codlet::consume_token` is the handler-facing compatibility wrapper; it delegates to `form_token.rs::consume`, which performs a conditional UPDATE on `form_tokens`. Subject is the authenticated `user_id`; replay returns `Ok(Some(...))`, invalid returns `Err`. *(codlet.rs, form_token.rs — RFC-037)*
 - [x] Community creation is authenticated, active-admin-only, feature-flagged, token-protected, idempotent, rate-limited by user/session/IP, audited, and does not auto-generate invite codes. *(release_gates.rs RFC-057 gates)*
 - [x] Cancel-and-recreate source IDs are revalidated on POST and rejected unless same-community and cancelled. *(release_gates.rs RFC-060 gate)*
+- [x] Community switcher admin-member targets require an active admin role in the destination community; member-only destinations fall back to Home. *(community.rs + release gate — RFC-061)*
 - [x] Script tag in note/title/name renders as text (not executed). *(render.rs escape_html used at every user-content insertion; test: escape_script_tag)*
 - [x] Private page cache cleared on logout. *(RFC-042: authenticated HTML is never cached; only static shell assets are stored. No private cache exists to clear — the property holds trivially. PURGE_PRIVATE is retained for defence-in-depth.)*
 
@@ -68,6 +70,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Home multi-community nearby-events dashboard and Calendar overview usable at 360-428 px and 200% text scaling. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc056/rfc056-route-split-smoke-results.json`)*
 - [x] Calendar month navigation, selected-day agenda, and switcher month/day preservation usable at 360-428 px and 200% text scaling. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc058/rfc058-calendar-smoke-results.json`)*
 - [~] Community creation form usable at 360-428 px, 200% text scaling, and with JavaScript disabled. *(requires browser smoke for RFC-057)*
+- [x] Member management navigation, role visibility, invite child navigation, and removal confirmation copy are usable at mobile width and 200% text scaling. *(sandboxed incognito Chromium smoke: `.git-exclude/evidence/rfc061/rfc061-member-management-smoke-results.json`)*
 - [x] Reduced-motion mode disables animations. *(app.css: `@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }` — code-verified)*
 - [x] Error messages use plain language (no SQL/JWT/token/cookie). *(release_gates.rs `not_found_and_forbidden_same_message`; domain tests verify no 'sql'/'panic' in event/note error strings — automated)*
 
@@ -94,7 +97,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
 - [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
-- [x] i18n parity test covers all 188 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity test covers all 170 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
@@ -111,7 +114,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Release-gate hardening (v0.34.0 — RFC-044 partial)
 
-- [x] i18n parity gate covers all 188 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity gate covers all 170 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] Static query-count gates: home.rs, event.rs, export.rs `.await` counts verified within ceiling bounds. *(release_gates.rs `*_await_count_within_budget` — v0.34.0)*
 - [x] SW `CACHE_VERSION` matches workspace version. *(release_gates.rs `sw_cache_version_matches_workspace_version`)*
 
@@ -172,10 +175,19 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging explicitly, then `EXPECTED_VERSION=v0.47.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging explicitly, then `EXPECTED_VERSION=v0.48.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
+
+## Member management navigation gates (v0.48.0 — RFC-061)
+
+- [x] Admin Home exposes member management when the active user is an admin, and member Home does not. *(release_gates.rs `rfc061_member_management_is_discoverable_from_admin_workflows`)*
+- [x] My Page shows a dedicated admin section with member-management and export links only for active admins. *(me.rs + release gate)*
+- [x] Member management shows role labels, marks the current user, hides self-removal, and keeps the invite action as a child link. *(admin/members.rs + smoke evidence)*
+- [x] Invite generation links back to member management. *(admin/members.rs + smoke evidence)*
+- [x] Community switcher preserves member-management and invite pages only for destination communities where the current user is an admin. *(community.rs + release gate + smoke evidence)*
+- [x] Committed browser smoke verifies the RFC-061 workflow with local Wrangler D1/dev and sandboxed/incognito Chromium without `--no-sandbox`. *(scripts/smoke/member-management.mjs; evidence `.git-exclude/evidence/rfc061/`)*
 
 ## Operational gates
 

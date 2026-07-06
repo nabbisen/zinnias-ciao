@@ -2,6 +2,62 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.48.0] — 2026-07-06
+
+RFC-061 community admin member-management navigation.
+
+### Changed
+
+- **Member management is now reachable from admin workflows.**
+  Community admins can open member management directly from Home and My Page,
+  reducing the old reliance on knowing the hidden `/admin/members` URL.
+
+- **Invite generation is treated as a child action of member management.**
+  The member management page now links to invite-code generation, and the
+  invite page links back to member management.
+
+- **Community switching preserves admin member-management context safely.**
+  Switching from member management or invite generation lands on the same admin
+  page only when the selected community also has an active admin membership;
+  otherwise it falls back to that community's Home.
+
+- **Release version bumped to v0.48.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+### Added
+
+- **RFC-061 release gates.**
+  Source gates cover admin workflow discoverability, invite child navigation,
+  role-aware community switch targets, and Japanese UI-copy coverage.
+
+- **Committed member-management browser smoke.**
+  `scripts/smoke/member-management.mjs` seeds local D1, starts local Wrangler
+  dev, launches sandboxed/incognito Chromium without `--no-sandbox`, and writes
+  RFC-061 evidence to `.git-exclude/evidence/rfc061/`.
+
+- **Member-management roadmap RFCs.**
+  RFC-062 and RFC-063 capture the next policy decisions for admin role transfer
+  and member removal/re-add/suspension behavior.
+
+### Fixed
+
+- **Member removal confirmation copy.**
+  Japanese destructive-action copy now distinguishes removing a member from
+  deleting records and remains readable at 200% text scaling.
+
+### Testing
+
+- `node --check scripts/smoke/member-management.mjs`
+- `node scripts/smoke/member-management.mjs`
+- `cargo test -p zinnias-ciao-contracts --test release_gates -- --nocapture`
+- `cargo test -p zinnias-ciao-contracts --test release_gates local_wrangler_configs_remain_ignored -- --nocapture`
+- `cargo fmt --all -- --check`
+- `git diff --check`
+
+Full workspace tests, Clippy, build, and docs build are still release-candidate
+gates to run before publishing.
+
 ## [0.47.0] — 2026-07-06
 
 RFC-050/RFC-045 runtime evidence collector prototype.
