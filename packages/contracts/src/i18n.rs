@@ -107,6 +107,7 @@ pub const EN_HOME_THIS_WEEK: &str = "This Week";
 pub const EN_HOME_LATER: &str = "Later";
 pub const EN_HOME_CREATE_EVENT: &str = "+ Create event";
 pub const EN_HOME_INVITE_MEMBERS: &str = "Invite members";
+pub const EN_HOME_MANAGE_MEMBERS: &str = "Manage members";
 pub const EN_HOME_CALENDAR_TITLE: &str = "Upcoming this month";
 pub const EN_HOME_CALENDAR_HELPER: &str =
     "Marked days have upcoming events. See the list below for details.";
@@ -127,6 +128,7 @@ pub const JA_HOME_THIS_WEEK: &str = "今週";
 pub const JA_HOME_LATER: &str = "それ以降";
 pub const JA_HOME_CREATE_EVENT: &str = "+ イベントを作成";
 pub const JA_HOME_INVITE_MEMBERS: &str = "メンバーを招待";
+pub const JA_HOME_MANAGE_MEMBERS: &str = "メンバーを管理";
 pub const JA_HOME_CALENDAR_TITLE: &str = "今月のこれからの予定";
 pub const JA_HOME_CALENDAR_HELPER: &str =
     "予定がある日に印をつけています。詳しくは下の一覧をご覧ください。";
@@ -255,6 +257,7 @@ pub const EN_ADMIN_INVITES_NEW_CODE_HINT: &str =
     "Share with one person only — expires in 24 hours.";
 pub const EN_ADMIN_INVITES_REVOKE: &str = "Revoke";
 pub const EN_ADMIN_INVITES_REVOKED: &str = "Code revoked";
+pub const EN_ADMIN_INVITES_BACK_TO_MEMBERS: &str = "Back to member management";
 
 pub const JA_ADMIN_INVITES_TITLE: &str = "メンバーを招待";
 pub const JA_ADMIN_INVITES_BODY: &str = "一人のために一回限りのコードを生成します。";
@@ -265,10 +268,12 @@ pub const JA_ADMIN_INVITES_NEW_CODE_HINT: &str =
     "一人だけに共有してください — 24時間で失効します。";
 pub const JA_ADMIN_INVITES_REVOKE: &str = "無効化";
 pub const JA_ADMIN_INVITES_REVOKED: &str = "コードを無効化しました";
+pub const JA_ADMIN_INVITES_BACK_TO_MEMBERS: &str = "メンバー管理へ戻る";
 
 // ── Admin: member management ──────────────────────────────────────────────
 pub const EN_ADMIN_MEMBERS_TITLE: &str = "Members";
 pub const EN_ADMIN_MEMBERS_GENERATE_INVITE: &str = "Generate invite code";
+pub const EN_ADMIN_MEMBERS_CURRENT_USER: &str = "You";
 pub const EN_ADMIN_REMOVE_TITLE: &str = "Remove member?";
 pub const EN_ADMIN_REMOVE_KEEP: &str = "Keep Member";
 pub const EN_ADMIN_REMOVE_CONFIRM: &str = "Remove";
@@ -278,13 +283,14 @@ pub const EN_ADMIN_LAST_ADMIN: &str =
 
 pub const JA_ADMIN_MEMBERS_TITLE: &str = "メンバー";
 pub const JA_ADMIN_MEMBERS_GENERATE_INVITE: &str = "招待コードを生成";
-pub const JA_ADMIN_REMOVE_TITLE: &str = "メンバーを削除しますか？";
-pub const JA_ADMIN_REMOVE_KEEP: &str = "メンバーを保持";
-pub const JA_ADMIN_REMOVE_CONFIRM: &str = "削除";
+pub const JA_ADMIN_MEMBERS_CURRENT_USER: &str = "あなた";
+pub const JA_ADMIN_REMOVE_TITLE: &str = "メンバーから外しますか？";
+pub const JA_ADMIN_REMOVE_KEEP: &str = "やめる";
+pub const JA_ADMIN_REMOVE_CONFIRM: &str = "メンバーから外す";
 pub const JA_ADMIN_REMOVE_CONSEQUENCE: &str =
-    "このメンバーはイベントやメモを見ることができなくなります。";
+    "このメンバーはイベントやメモを見ることができなくなります。過去の参加状況やメモは残ります。";
 pub const JA_ADMIN_LAST_ADMIN: &str =
-    "最後の管理者は削除できません。先に管理者権限を移譲してください。";
+    "最後の管理者はメンバーから外せません。先に管理者権限を移譲してください。";
 
 // ── Communities ───────────────────────────────────────────────────────────
 pub const EN_COMMUNITIES_JOIN_ANOTHER: &str = "Join another community";
@@ -431,12 +437,16 @@ pub const EN_ME_VERSION_LABEL: &str = "Version";
 pub const EN_ME_REF_LABEL: &str = "Ref";
 pub const EN_ME_SECTION_DATA: &str = "Data";
 pub const EN_ME_EXPORT_LINK: &str = "Export community data";
+pub const EN_ME_SECTION_ADMIN: &str = "Admin";
+pub const EN_ME_MANAGE_MEMBERS: &str = "Manage members";
 
 pub const JA_ME_SECTION_ABOUT: &str = "このアプリについて";
 pub const JA_ME_VERSION_LABEL: &str = "バージョン";
 pub const JA_ME_REF_LABEL: &str = "参照コード";
 pub const JA_ME_SECTION_DATA: &str = "データ";
 pub const JA_ME_EXPORT_LINK: &str = "記録をダウンロード";
+pub const JA_ME_SECTION_ADMIN: &str = "管理";
+pub const JA_ME_MANAGE_MEMBERS: &str = "メンバーを管理";
 
 // ── Calendar feed (RFC-023) ───────────────────────────────────────────────
 pub const EN_CALENDAR_TITLE: &str = "Calendar feed";

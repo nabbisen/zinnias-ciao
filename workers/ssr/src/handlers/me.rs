@@ -47,11 +47,12 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
     // Short community reference (first 8 chars of community_id) for support context.
     let support_ref = community_id.get(..8).unwrap_or(community_id);
 
-    let admin_export_html: String = if membership.is_admin() {
+    let admin_tools_html: String = if membership.is_admin() {
         format!(
-            "<section style=\"margin-top:1.5rem\"><h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{data_section}</h2><a href=\"/c/{cid}/admin/export\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{export_lbl}</a></section>",
+            "<section style=\"margin-top:1.5rem\"><h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{admin_section}</h2><a href=\"/c/{cid}/admin/members\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{members_lbl}</a><a href=\"/c/{cid}/admin/export\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{export_lbl}</a></section>",
             cid = render::escape_html(community_id),
-            data_section = i18n::JA_ME_SECTION_DATA,
+            admin_section = i18n::JA_ME_SECTION_ADMIN,
+            members_lbl = i18n::JA_ME_MANAGE_MEMBERS,
             export_lbl = i18n::JA_ME_DATA_EXPORT,
         )
     } else {
@@ -95,7 +96,7 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
                style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;\
                min-height:44px;line-height:44px\">{cal_feed_lbl}</a>\
            </section>\
-           {admin_export}\
+           {admin_tools}\
            <section style=\"margin-top:1.5rem\">\
              <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
                text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{lbl_about}</h2>\
@@ -129,7 +130,7 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
         lbl_ref = i18n::JA_ME_REF_LABEL,
         version = render::escape_html(&app_version),
         ref_code = render::escape_html(support_ref),
-        admin_export = admin_export_html,
+        admin_tools = admin_tools_html,
         tok = render::escape_html(&logout_token),
         nav = nav,
     );

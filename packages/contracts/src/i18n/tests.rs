@@ -49,6 +49,7 @@ fn en_ja_parity() {
         "HOME_LATER",
         "HOME_CREATE_EVENT",
         "HOME_INVITE_MEMBERS",
+        "HOME_MANAGE_MEMBERS",
         "HOME_CALENDAR_TITLE",
         "HOME_CALENDAR_HELPER",
         "HOME_CALENDAR_EMPTY",
@@ -105,9 +106,11 @@ fn en_ja_parity() {
         "ADMIN_INVITES_NEW_CODE_HINT",
         "ADMIN_INVITES_REVOKE",
         "ADMIN_INVITES_REVOKED",
+        "ADMIN_INVITES_BACK_TO_MEMBERS",
         // Admin: members
         "ADMIN_MEMBERS_TITLE",
         "ADMIN_MEMBERS_GENERATE_INVITE",
+        "ADMIN_MEMBERS_CURRENT_USER",
         "ADMIN_REMOVE_TITLE",
         "ADMIN_REMOVE_KEEP",
         "ADMIN_REMOVE_CONFIRM",
@@ -172,6 +175,8 @@ fn en_ja_parity() {
         "ME_REF_LABEL",
         "ME_SECTION_DATA",
         "ME_EXPORT_LINK",
+        "ME_SECTION_ADMIN",
+        "ME_MANAGE_MEMBERS",
         // Calendar (RFC-023)
         "CALENDAR_TITLE",
         "CALENDAR_DESCRIPTION",
@@ -190,7 +195,7 @@ fn en_ja_parity() {
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
     ];
-    assert_eq!(en_keys.len(), 165, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 170, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

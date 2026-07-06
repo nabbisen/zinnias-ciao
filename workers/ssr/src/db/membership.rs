@@ -186,12 +186,13 @@ pub async fn count_active(db: &D1Database, community_id: &str) -> Result<u32> {
 pub struct MemberSummary {
     pub id: String,
     pub display_name: String,
+    pub role: String,
 }
 
 pub async fn list_all_active(db: &D1Database, community_id: &str) -> Result<Vec<MemberSummary>> {
     let rows = db
         .prepare(
-            "SELECT id, display_name FROM community_memberships \
+            "SELECT id, display_name, role FROM community_memberships \
              WHERE community_id = ?1 AND removed_at IS NULL \
              ORDER BY display_name ASC",
         )
@@ -206,6 +207,7 @@ pub async fn list_all_active(db: &D1Database, community_id: &str) -> Result<Vec<
             Some(MemberSummary {
                 id: v.get("id")?.as_str()?.to_owned(),
                 display_name: v.get("display_name")?.as_str()?.to_owned(),
+                role: v.get("role")?.as_str()?.to_owned(),
             })
         })
         .collect())
@@ -264,6 +266,7 @@ pub struct CommunitySummary {
     pub community_id: String,
     pub community_name: String,
     pub timezone: String,
+    pub role: String,
 }
 
 /// All communities a user is an active member of, with display metadata,
@@ -274,7 +277,7 @@ pub async fn list_communities_for_user(
 ) -> Result<Vec<CommunitySummary>> {
     let rows = db
         .prepare(
-            "SELECT m.community_id, c.name AS community_name, c.timezone \
+            "SELECT m.community_id, c.name AS community_name, c.timezone, m.role \
              FROM community_memberships m \
              JOIN communities c ON c.id = m.community_id \
              WHERE m.user_id = ?1 AND m.removed_at IS NULL \
@@ -296,6 +299,7 @@ pub async fn list_communities_for_user(
                     .and_then(|value| value.as_str())
                     .unwrap_or("UTC")
                     .to_owned(),
+                role: v.get("role")?.as_str()?.to_owned(),
             })
         })
         .collect())

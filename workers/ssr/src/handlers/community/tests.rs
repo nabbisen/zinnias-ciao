@@ -47,3 +47,25 @@ fn admin_events_new_destination_rejects_bad_dates() {
         None
     );
 }
+
+#[test]
+fn admin_switch_target_requires_admin_role() {
+    let memberships = vec![
+        membership_db::CommunitySummary {
+            community_id: "community-a".to_string(),
+            community_name: "A".to_string(),
+            timezone: "Asia/Tokyo".to_string(),
+            role: "admin".to_string(),
+        },
+        membership_db::CommunitySummary {
+            community_id: "community-b".to_string(),
+            community_name: "B".to_string(),
+            timezone: "Asia/Tokyo".to_string(),
+            role: "member".to_string(),
+        },
+    ];
+
+    assert!(is_admin_target(&memberships, "community-a"));
+    assert!(!is_admin_target(&memberships, "community-b"));
+    assert!(!is_admin_target(&memberships, "community-c"));
+}

@@ -157,6 +157,7 @@ fn i18n_en_ja_parity_count() {
         (EN_HOME_LATER, JA_HOME_LATER),
         (EN_HOME_CREATE_EVENT, JA_HOME_CREATE_EVENT),
         (EN_HOME_INVITE_MEMBERS, JA_HOME_INVITE_MEMBERS),
+        (EN_HOME_MANAGE_MEMBERS, JA_HOME_MANAGE_MEMBERS),
         (EN_HOME_CALENDAR_TITLE, JA_HOME_CALENDAR_TITLE),
         (EN_HOME_CALENDAR_HELPER, JA_HOME_CALENDAR_HELPER),
         (EN_HOME_CALENDAR_EMPTY, JA_HOME_CALENDAR_EMPTY),
@@ -261,11 +262,16 @@ fn i18n_en_ja_parity_count() {
         ),
         (EN_ADMIN_INVITES_REVOKE, JA_ADMIN_INVITES_REVOKE),
         (EN_ADMIN_INVITES_REVOKED, JA_ADMIN_INVITES_REVOKED),
+        (
+            EN_ADMIN_INVITES_BACK_TO_MEMBERS,
+            JA_ADMIN_INVITES_BACK_TO_MEMBERS,
+        ),
         (EN_ADMIN_MEMBERS_TITLE, JA_ADMIN_MEMBERS_TITLE),
         (
             EN_ADMIN_MEMBERS_GENERATE_INVITE,
             JA_ADMIN_MEMBERS_GENERATE_INVITE,
         ),
+        (EN_ADMIN_MEMBERS_CURRENT_USER, JA_ADMIN_MEMBERS_CURRENT_USER),
         (EN_ADMIN_REMOVE_TITLE, JA_ADMIN_REMOVE_TITLE),
         (EN_ADMIN_REMOVE_KEEP, JA_ADMIN_REMOVE_KEEP),
         (EN_ADMIN_REMOVE_CONFIRM, JA_ADMIN_REMOVE_CONFIRM),
@@ -352,6 +358,8 @@ fn i18n_en_ja_parity_count() {
         (EN_ME_REF_LABEL, JA_ME_REF_LABEL),
         (EN_ME_SECTION_DATA, JA_ME_SECTION_DATA),
         (EN_ME_EXPORT_LINK, JA_ME_EXPORT_LINK),
+        (EN_ME_SECTION_ADMIN, JA_ME_SECTION_ADMIN),
+        (EN_ME_MANAGE_MEMBERS, JA_ME_MANAGE_MEMBERS),
         (EN_CALENDAR_TITLE, JA_CALENDAR_TITLE),
         (EN_CALENDAR_DESCRIPTION, JA_CALENDAR_DESCRIPTION),
         (EN_CALENDAR_GENERATE, JA_CALENDAR_GENERATE),
@@ -583,11 +591,7 @@ fn tracked_wrangler_template_contains_only_placeholder_resource_ids() {
 
 #[test]
 fn local_wrangler_configs_remain_ignored() {
-    let required_patterns = [
-        "wrangler.staging.local.toml",
-        "wrangler.production.local.toml",
-        "wrangler.*.local.toml",
-    ];
+    let required_patterns = ["wrangler.*.local.toml", "wrangler.local.toml"];
 
     for pattern in required_patterns {
         assert!(
@@ -758,6 +762,7 @@ fn no_known_english_ui_leaks_in_rendered_text() {
         RENDER_SRC,
         HOME_HANDLER_SRC,
         COMMUNITY_CREATE_HANDLER_SRC,
+        MEMBERS_HANDLER_SRC,
     ] {
         for needle in forbidden {
             assert!(
@@ -767,6 +772,44 @@ fn no_known_english_ui_leaks_in_rendered_text() {
             );
         }
     }
+}
+
+#[test]
+fn rfc061_member_management_is_discoverable_from_admin_workflows() {
+    assert!(
+        HOME_HANDLER_SRC.contains("/c/{cid}/admin/members")
+            && HOME_HANDLER_SRC.contains("JA_HOME_MANAGE_MEMBERS")
+            && !HOME_HANDLER_SRC.contains("invite_label = i18n::JA_HOME_INVITE_MEMBERS"),
+        "RFC-061 Home admin shortcut must lead to member management, not directly to invite codes"
+    );
+    assert!(
+        ME_HANDLER_SRC.contains("JA_ME_SECTION_ADMIN")
+            && ME_HANDLER_SRC.contains("JA_ME_MANAGE_MEMBERS")
+            && ME_HANDLER_SRC.contains("/c/{cid}/admin/members")
+            && ME_HANDLER_SRC.contains("/c/{cid}/admin/export"),
+        "RFC-061 Me page must expose admin tools with member management and export"
+    );
+    assert!(
+        MEMBERS_HANDLER_SRC.contains("JA_ADMIN_INVITES_BACK_TO_MEMBERS")
+            && MEMBERS_HANDLER_SRC.contains("JA_ADMIN_MEMBERS_GENERATE_INVITE")
+            && MEMBERS_HANDLER_SRC.contains("JA_ADMIN_MEMBERS_CURRENT_USER")
+            && !MEMBERS_HANDLER_SRC.contains("Generate invite code</a>"),
+        "RFC-061 members/invites pages must use reviewed JA copy and link invites back to members"
+    );
+}
+
+#[test]
+fn rfc061_admin_switch_targets_require_admin_role() {
+    assert!(
+        COMMUNITY_HANDLER_SRC.contains("fn is_admin_target")
+            && COMMUNITY_HANDLER_SRC.contains("m.role == \"admin\"")
+            && COMMUNITY_HANDLER_SRC.contains("Some(\"admin_members\") if is_admin_target")
+            && COMMUNITY_HANDLER_SRC.contains("Some(\"admin_invites\") if is_admin_target")
+            && COMMUNITY_HANDLER_SRC.contains("Some(\"admin_events_new\") if is_admin_target")
+            && MEMBERS_HANDLER_SRC.contains("\"admin_members\"")
+            && MEMBERS_HANDLER_SRC.contains("\"admin_invites\""),
+        "RFC-061 admin switch targets must preserve admin pages only for target communities where the user is admin"
+    );
 }
 
 #[test]

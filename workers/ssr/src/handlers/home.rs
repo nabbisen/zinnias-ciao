@@ -82,7 +82,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
                   border-radius:14px;font-size:1rem;font-weight:600;\
                   text-align:center;text-decoration:none;min-height:44px\">\
                   {create_label}</a>\
-               <a href=\"/c/{cid}/admin/invites\" \
+               <a href=\"/c/{cid}/admin/members\" \
                   style=\"display:flex;align-items:center;justify-content:center;\
                   padding:.875rem;background:#fff;color:#007AFF;\
                   border:2px solid #007AFF;border-radius:14px;font-size:1rem;font-weight:600;\
@@ -94,7 +94,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
                 intro = intro,
                 cid = render::escape_html(community_id),
                 create_label = i18n::JA_HOME_FIRST_RUN_CREATE,
-                invite_label = i18n::JA_HOME_INVITE_MEMBERS,
+                invite_label = i18n::JA_HOME_MANAGE_MEMBERS,
                 hint = invite_hint,
             );
             (card, String::new())
@@ -116,7 +116,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
                       text-align:center;text-decoration:none;min-height:44px;\
                       display:flex;align-items:center;justify-content:center\">\
                       {create_label}</a>\
-                   <a href=\"/c/{cid}/admin/invites\" \
+                   <a href=\"/c/{cid}/admin/members\" \
                       style=\"flex:1;padding:.75rem;background:#F5F5F7;color:#1D1D1F;\
                       border-radius:14px;font-size:.9375rem;font-weight:600;\
                       text-align:center;text-decoration:none;min-height:44px;\
@@ -125,7 +125,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
                  </div>",
                     cid = render::escape_html(community_id),
                     create_label = i18n::JA_HOME_CREATE_EVENT,
-                    invite_label = i18n::JA_HOME_INVITE_MEMBERS,
+                    invite_label = i18n::JA_HOME_MANAGE_MEMBERS,
                 )
             } else {
                 String::new()

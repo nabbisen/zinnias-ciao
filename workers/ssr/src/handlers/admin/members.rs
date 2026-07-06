@@ -121,6 +121,9 @@ pub async fn get_invites(
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
+         <p style=\"margin:0 0 1rem\"><a href=\"/c/{cid}/admin/members\" \
+            style=\"font-size:.875rem;color:#007AFF;text-decoration:none\">\
+            {back_to_members}</a></p>\
          <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{title}</h1>\
          <p style=\"font-size:.875rem;color:#6e6e73\">{ib}</p>\
          {flash}{new_code}\
@@ -137,10 +140,11 @@ pub async fn get_invites(
            {codes}\
          </section>\
          </main>{nav}",
-        header = render::header_with_switcher(
+        header = render::header_with_switcher_next(
             i18n::JA_ADMIN_INVITES_TITLE,
             community_id,
-            &community_pairs
+            &community_pairs,
+            "admin_invites"
         ),
         cid = render::escape_html(community_id),
         tok = render::escape_html(&gen_token),
@@ -152,6 +156,7 @@ pub async fn get_invites(
         ib = i18n::JA_ADMIN_INVITES_BODY,
         ig = i18n::JA_ADMIN_INVITES_GENERATE,
         active_lbl = i18n::JA_ADMIN_INVITES_ACTIVE,
+        back_to_members = i18n::JA_ADMIN_INVITES_BACK_TO_MEMBERS,
     );
     render::page(i18n::JA_ADMIN_INVITES_TITLE, &body)
 }
@@ -316,13 +321,28 @@ pub async fn get_members(
                     rc = i18n::JA_ADMIN_REMOVE_CONFIRM,
                 )
             };
+            let role_label = if m.role == "admin" {
+                i18n::JA_ROLE_ADMIN
+            } else {
+                i18n::JA_ROLE_MEMBER
+            };
+            let self_label = if is_self {
+                format!(" · {}", i18n::JA_ADMIN_MEMBERS_CURRENT_USER)
+            } else {
+                String::new()
+            };
             format!(
                 "<li style=\"display:flex;align-items:center;justify-content:space-between;\
-             padding:.75rem 0;border-bottom:1px solid #f5f5f7\">\
-             <span style=\"font-size:.9375rem\">{name}</span>\
+             padding:.75rem 0;border-bottom:1px solid #f5f5f7;gap:.75rem\">\
+             <span style=\"min-width:0\">\
+             <span style=\"display:block;font-size:.9375rem;overflow-wrap:anywhere\">{name}</span>\
+             <span style=\"display:block;font-size:.8125rem;color:#6e6e73;margin-top:.125rem\">{role}{self_label}</span>\
+             </span>\
              {remove}\
              </li>",
                 name = render::escape_html(&m.display_name),
+                role = role_label,
+                self_label = self_label,
                 remove = remove_btn,
             )
         })
@@ -338,17 +358,19 @@ pub async fn get_members(
             style=\"display:block;margin-top:1.5rem;text-align:center;\
             padding:.875rem;border:2px solid #007AFF;border-radius:14px;\
             color:#007AFF;text-decoration:none;font-weight:600\">\
-            Generate invite code</a>\
+            {invite_label}</a>\
          </main>{nav}",
-        header = render::header_with_switcher(
+        header = render::header_with_switcher_next(
             i18n::JA_ADMIN_MEMBERS_TITLE,
             community_id,
-            &_community_pairs
+            &_community_pairs,
+            "admin_members"
         ),
         rows = member_rows,
         cid = render::escape_html(community_id),
         nav = nav,
         members_h1 = i18n::JA_ADMIN_MEMBERS_TITLE,
+        invite_label = i18n::JA_ADMIN_MEMBERS_GENERATE_INVITE,
     );
     render::page(i18n::JA_ADMIN_MEMBERS_TITLE, &body)
 }

@@ -39,10 +39,22 @@ pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response>
                     calendar_next_destination(cid, next)
                         .unwrap_or_else(|| format!("/c/{cid}/communities"))
                 }
-                Some("admin_events_new") => format!("/c/{cid}/admin/events/new"),
+                Some("admin_events_new") if is_admin_target(&memberships, cid) => {
+                    format!("/c/{cid}/admin/events/new")
+                }
                 Some(next) if next.starts_with("admin_events_new:") => {
-                    admin_events_new_destination(cid, next)
-                        .unwrap_or_else(|| format!("/c/{cid}/admin/events/new"))
+                    if is_admin_target(&memberships, cid) {
+                        admin_events_new_destination(cid, next)
+                            .unwrap_or_else(|| format!("/c/{cid}/admin/events/new"))
+                    } else {
+                        format!("/c/{cid}/home")
+                    }
+                }
+                Some("admin_members") if is_admin_target(&memberships, cid) => {
+                    format!("/c/{cid}/admin/members")
+                }
+                Some("admin_invites") if is_admin_target(&memberships, cid) => {
+                    format!("/c/{cid}/admin/invites")
                 }
                 _ => format!("/c/{cid}/home"),
             }
@@ -57,6 +69,12 @@ pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response>
     let mut resp = Response::from_html("")?;
     resp.headers_mut().set("Location", &dest)?;
     Ok(resp.with_status(303))
+}
+
+fn is_admin_target(memberships: &[membership_db::CommunitySummary], cid: &str) -> bool {
+    memberships
+        .iter()
+        .any(|m| m.community_id == cid && m.role == "admin")
 }
 
 fn calendar_next_destination(cid: &str, next: &str) -> Option<String> {
