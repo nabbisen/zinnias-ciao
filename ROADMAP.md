@@ -1,129 +1,91 @@
-# ciao.zinnias — Roadmap
+# ciao.zinnias Roadmap
 
 ## Status
 
-**v0.38.1** — 43 of 55 RFCs implemented (12 proposed). 223 passing unit tests. Zero warnings.
+**Current release:** v0.51.0.
 
-**codlet integration complete (Phase 1 + 2).** All auth primitives now route through
-codlet v0.15.1 on wasm32 (production Workers):
-- Invite code issuance, listing, and revocation
-- Session issuance, validation, and logout (parallel legacy lookup for 30-day grace period)
-- Form tokens (all handlers: join, event, notes, admin, calendar, export, templates)
+The RFC folder is the source of truth for implementation state:
 
-Native tests use legacy fallback paths throughout. Operator must set `CODLET_HMAC_KEY_V1`
-and create `CODLET_RL` KV namespace before deploying (see `docs/src/launch-runbook.md`).
+- Detailed RFC index: [rfcs/README.md](./rfcs/README.md)
+- Implemented RFCs: [rfcs/done/](./rfcs/done/)
+- Proposed RFCs: [rfcs/proposed/](./rfcs/proposed/)
 
-**One time-gated task remains:** remove the legacy session lookup from `session.rs`
-once `SELECT COUNT(*) FROM sessions WHERE revoked_at IS NULL AND expires_at > unixepoch()`
-returns 0 (approximately 30 days after first codlet deploy).
+Recent workflow releases focused on calendar-centered use, community bootstrap,
+member administration, admin role transfer, member lifecycle policy, and
+admin-mediated help sign-in.
 
-**Pre-pilot hardening complete.** All in-repo code work for the pilot is done:
-- All user-visible strings are Japanese (RFC-049, v0.30.0–v0.33.1).
-- Offline read-only contract enforced: submit buttons disabled offline (RFC-055, v0.31.0).
-- i18n parity gate covers all 141 EN/JA pairs; static query-count gates added (v0.34.0).
-- ICS feed verified in source: title and times only, no participant data (RFC-053).
-- Launch runbook and release checklist are current.
+## Proposed Work
 
-All remaining pilot gates require a live Cloudflare environment, human review,
-or explicit product/operator decisions — none can be progressed in-repo:
-- **RFC-050:** staging deployment and runtime evidence pack
-- **RFC-051:** multi-day edit semantics (product decision needed from nabbisen)
-- **RFC-053:** ICS privacy UX copy (needs RFC-054)
-- **RFC-054:** Japanese copy review (native-speaker reviewer)
-- **RFC-044:** live-D1 integration harness (gates beta, not pilot)
-- **Operator:** secrets, migrations, Logpush (launch-runbook §2–§6)
+The active proposed backlog is:
 
----
+| RFC | Theme | Current note |
+|-----|-------|--------------|
+| 020 | Design assets, prototype, and handoff | Non-code design deliverable remains. |
+| 021 | Notification strategy and reminder digests | Requires product and infrastructure design before implementation. |
+| 031 | Consentful contact channels and privacy-safe messaging | Depends on consent and notification policy decisions. |
+| 033 | Subgroups, event visibility, and boundary safety | High-impact authorization and privacy design work. |
+| 034 | Notification-free quiet mode and attention design | Should be considered with RFC-021. |
+| 044 | D1 query-budget gate and integration test harness | Runtime/integration hardening candidate. |
+| 045 | Pre-pilot runtime verification matrix | Runtime evidence and operator verification candidate. |
+| 050 | Staging runtime verification evidence pack | Prototype exists; full evidence workflow remains. |
+| 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
 
-## Implemented (done/)
+## Near-Term Candidates
 
-| RFC | Feature | Shipped |
-|-----|---------|---------|
-| 001 | Project bootstrap: Cloudflare Workers, D1, SSR | v0.1.0 |
-| 002 | Data model and D1 migrations | v0.1.0 |
-| 003 | Invite redemption and session auth | v0.2.0 |
-| 004 | Community isolation and authorization | v0.2.0 |
-| 005 | Member home and event detail UI | v0.3.0 |
-| 006 | Participation status lifecycle | v0.3.0 |
-| 007 | Notes and comment safety | v0.3.0 |
-| 008 | Offline cache and mutation queue | v0.4.0 |
-| 009 | Admin event management | v0.4.0 |
-| 010 | Admin invite and member management | v0.4.0 |
-| 011 | Accessibility and design system | v0.4.0 |
-| 012 | Security hardening and abuse controls | v0.5.0 |
-| 013 | API contracts, error model, idempotency | v0.5.0 |
-| 014 | Observability, audit, privacy logging | v0.5.0 |
-| 015 | Testing, QA, and release gates | v0.6.0 |
-| 016 | Deployment environments and operations | v0.6.0 |
-| 017 | PWA installability and service worker | v0.6.0 |
-| 018 | Timezone and event cutoff policy | v0.7.0 |
-| 019 | Retention, soft-delete, data lifecycle | v0.7.0 |
-| 022 | Recurring events (bounded materialization) | v0.17.0 |
-| 023 | Calendar export and ICS interop | v0.10.0 |
-| 025 | Community moderation, abuse response | v0.13.0 |
-| 026 | Multi-language and plain-language localisation | v0.10.0 |
-| 027 | Import/export, data portability | v0.15.0 |
-| 028 | Backup, restore, disaster recovery | v0.14.0 |
-| 029 | Scalability and query performance | v0.12.0 |
-| 030 | Admin onboarding and first-run experience | v0.14.0 |
-| 032 | Event templates and quick-create | v0.16.0 |
-| 035 | Support diagnostics and user help | v0.15.0 |
-| 036 | Public release readiness | v0.15.0 |
-| 037 | Token subject normalization and form-token atomicity | v0.23.0 |
-| 038 | Session and secret binding hardening | v0.23.0 |
-| 039 | Timezone-correct event write path | v0.23.0 |
-| 040 | Event edit contract | v0.23.0 |
-| 041 | Atomic invite redemption | v0.23.0 |
-| 042 | Pilot offline and private cache contract | v0.23.0 |
+Recommended next candidates, in practical order:
 
----
+1. **RFC-054: Japanese UX Copy Review**
+   Recent releases added sensitive recovery and member-management flows. Copy
+   quality is now part of usability and safety.
 
-## Backlog (proposed/) — blocked
+2. **RFC-021 and RFC-034: Notifications and Quiet Mode**
+   These should be designed together to avoid adding reminders without a clear
+   attention and opt-out policy.
 
-| RFC | Feature | Blocker |
-|-----|---------|---------|
-| 020 | Design assets and prototype handoff | Design team deliverable; not code |
-| 021 | Post-MVP notification strategy | Notification infrastructure not yet set up |
-| 024 | Display name recovery and account relinking | Self-healing once OIDC (AD-2) lands; defer |
-| 031 | Consentful contact channels | Requires notification infrastructure (RFC-021 first) |
-| 033 | Subgroups and event visibility | Needs explicit product decision on scope |
-| 034 | Notification-free quiet mode | Depends on RFC-021 notification system |
-| 043 | Pilot UX acceptance and error feedback | Error banners (v0.23.0) + no-JS confirmations (v0.24.0) done; device QA pending |
-| 044 | D1 query-budget gate and integration test harness | CI tooling; gates beta (not first pilot) |
+3. **RFC-031: Consentful Contact Channels**
+   Useful after notification policy is clear. This should remain privacy-first
+   and consent-bound.
 
----
+4. **RFC-033: Subgroups and Event Visibility**
+   Large feature area touching authorization, event visibility, and community
+   boundaries. It should start with design review, not direct implementation.
 
-## Before first pilot deployment
+5. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
+   These are good candidates when the project priority shifts from product
+   workflow to deployment confidence and Cloudflare-hosted evidence.
 
-These are the remaining gates before the first real community can use the service.
+## Before First Pilot Deployment
 
-### Operator tasks (not in code)
+These are the remaining gates before the first real community can use the
+service.
 
-- [ ] Apply all 6 D1 migrations to staging; rehearse rollback.
-- [ ] Set `HMAC_PEPPER` secret via `wrangler secret put` (one per environment, different values).
-- [ ] Set `SESSION_COOKIE_DOMAIN` as a **`[vars]` binding** in `wrangler.toml` (not a secret — see RFC-038; leave unset for host-only cookie).
-- [ ] Configure Logpush for production (Cloudflare dashboard → R2 or S3).
+### Operator Tasks
+
+- [ ] Apply all D1 migrations through `0008_membership_relink_codes.sql` to the target environment; rehearse rollback.
+- [ ] Set required secrets per environment without printing or committing real values.
+- [ ] Configure required KV/D1 bindings per environment.
+- [ ] Configure `SESSION_COOKIE_DOMAIN` as a non-secret variable only when a shared cookie domain is required.
+- [ ] Configure Logpush for production if production audit retention requires it.
 - [ ] Run security review against the release checklist.
 
-### Browser / device QA (not automatable in CI)
+### Browser and Device QA
 
 - [ ] Core join-and-mark-attendance flow under 2 minutes on a real phone.
-- [ ] Event Detail readable and usable at 200% system text scaling.
-- [ ] No-JS destructive confirmations work without scripting (cancel event, remove member, delete own note, admin remove note). *(implementation ships with v0.23.x; verify on a browser with scripting disabled)*
+- [ ] Calendar, event detail, and admin member flows remain usable at 200% system text scaling.
+- [ ] No-JS destructive confirmations work without scripting.
+- [ ] Recovery/help-signin flow works on the target hosted environment.
 
-### Release gate (process)
+### Release Gate
 
-- **Do not deploy to production** (or tag v1.0.0) without explicit confirmation from nabbisen.
+- **Do not deploy to production** or tag a public pilot release without explicit confirmation from nabbisen.
 
----
-
-## After first pilot
+## After First Pilot
 
 Once a pilot community has been running for at least 4 weeks, revisit:
 
-1. **RFC-033 (Subgroups)** — only if privacy needs emerge from real usage.
-2. **RFC-021 (Notifications)** — only if sync-based checking proves insufficient.
-3. **RFC-024 (Account relinking)** — superseded if OIDC is added first; useful if not.
+1. **RFC-033: Subgroups** if privacy or visibility boundaries emerge from real usage.
+2. **RFC-021: Notifications** if sync-based checking proves insufficient.
+3. **RFC-031: Contact channels** if admins need direct member communication and consent rules are clear.
 
-The guiding principle remains: add only what is needed. Every feature added
-is a feature that must be maintained, explained, and trusted.
+The guiding principle remains: add only what is needed. Every feature added is a
+feature that must be maintained, explained, and trusted.
