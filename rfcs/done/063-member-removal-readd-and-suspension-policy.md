@@ -1,12 +1,13 @@
 # RFC 063 — Member Removal, Re-add, and Suspension Policy
 
-**Status.** Proposed
+**Status.** Implemented
 **Phase:** F8 / Community administration workflow
 **Project:** ciao.zinnias
 **Date:** 2026-07-06
 **Relationship:** Follows RFC-010 admin invite/member management, RFC-024
 account relinking, RFC-025 moderation/member safety, RFC-052 audit retention,
 and RFC-061 community admin member-management navigation.
+**Design review:** `.git-exclude/reviewed/zinnias-ciao-v0.50.0-rfc063-member-lifecycle-policy-design-review.md`
 
 ---
 
@@ -24,10 +25,15 @@ But the broader policy is still incomplete:
 - What should admins see about former members?
 - How should attendance, notes, audit, and exports represent former members?
 
-RFC-063 defines the future policy boundary for removal, re-add, and possible
+RFC-063 defines the policy boundary for removal, re-add, and possible
 suspension. It is intentionally separate from RFC-062 role transfer and RFC-024
 account relinking because it concerns membership lifecycle state, not role
 power or identity recovery.
+
+The accepted v0.50.0 direction is **Option A: removal only, re-add creates a
+new membership**. This codifies existing behavior. The current invite join flow
+mints a fresh random `user_id` and a fresh membership on redemption, and it does
+not look up or merge memberships by display name.
 
 ## 2. Current State
 
@@ -135,15 +141,17 @@ Cons:
 - higher risk of confusing non-technical admins;
 - needs clear treatment in event visibility and exports.
 
-## 7. Recommended First Direction
+## 7. Accepted First Direction
 
-For the next implementation slice, prefer **Option A** unless review finds a
-strong pilot need for reactivation.
+For the next implementation slice, accept **Option A**.
 
 Reasoning:
 
 - the current product already behaves like removal-only;
 - RFC-061 copy now avoids implying reversibility;
+- the join/profile flow creates a fresh random `user_id` and membership for
+  every invite redemption;
+- display names are not unique and are not used to find or merge memberships;
 - adding reactivation risks becoming hidden account recovery;
 - RFC-024 should decide identity recovery before old membership reactivation is
   exposed.
@@ -154,6 +162,9 @@ Option A still needs documentation and UI clarity:
 - removed people lose access;
 - returning people use a new invite;
 - old and new memberships are not automatically merged.
+
+The v0.50.0 implementation slice is therefore policy-preserving: no schema
+change, no new membership lifecycle state, and no restore/reactivate/suspend UI.
 
 ## 8. External Behavior for Option A
 
@@ -201,12 +212,22 @@ The returning person receives a normal invite code and joins through the normal
 invite redemption flow. This creates a new active membership. The app must not
 merge old and new memberships by display name.
 
+This is already how the current identity model works. A join/profile POST mints
+a fresh random `user_id`, inserts a fresh user, inserts a fresh membership, and
+then binds the session to that new user. There is no persistent account lookup
+and no display-name-based membership lookup.
+
 If the project later wants "return as the same membership", that is either:
 
 - Option B reactivation; or
 - RFC-024 account relinking.
 
 Those require separate design before implementation.
+
+In particular, clearing `removed_at` on an old membership would not by itself
+restore access for a returning person using a new browser, because they would
+not hold a session for the old `user_id`. Binding a new session to the old
+`user_id` is account relinking and belongs to RFC-024.
 
 ## 11. Data Model
 
@@ -216,6 +237,11 @@ Existing `removed_at` remains the removal marker.
 
 Do not add `suspended_at`, `reactivated_at`, or `removed_reason` in the first
 slice unless this RFC is revised after review.
+
+The existing `UNIQUE(community_id, user_id)` constraint is inert for Option A
+under normal joins because every invite redemption creates a fresh random
+`user_id`. Any future reactivation or relinking design must account for this
+constraint explicitly.
 
 If Option B or C is accepted later, likely schema additions include:
 
@@ -277,8 +303,12 @@ reactivation and relinking share UI or remain separate.
 
 - Source gates:
   - removal copy uses `メンバーから外す`;
-  - confirmation copy states past records remain;
-  - no restore/reactivate/suspend links are present.
+  - JA and EN confirmation consequence copy states past records remain;
+  - no restore/reactivate/suspend links, routes, handlers, or i18n keys are
+    present in the member-management lifecycle surface;
+  - join/profile mints a fresh random `user_id` and does not query memberships
+    by `display_name`;
+  - active-member queries filter `removed_at IS NULL`.
 - Existing removal tests:
   - member is soft-removed;
   - removed member loses access;
@@ -293,10 +323,13 @@ reactivation and relinking share UI or remain separate.
 
 ## 17. Open Questions
 
-- Is Option A acceptable for pilot, or does mistaken removal require
-  reactivation before launch?
-- Should the docs explicitly say "invite again" for returning former members?
-- Should former-member visibility be completely deferred, or should admins get
-  a minimal audit-only view later?
-- Should removal reason codes be added, or would they create unnecessary
-  sensitivity for small communities?
+- Resolved: Option A is accepted for pilot; mistaken removal does not require
+  reactivation before launch.
+- Resolved: docs should explicitly say "invite again" for returning removed
+  members.
+- Resolved: former-member visibility is deferred.
+- Resolved: removal reason codes are deferred because they create avoidable
+  sensitive data and drift toward RFC-025 moderation scope.
+
+Future RFCs may revisit reactivation, former-member visibility, suspension, or
+reason codes, but those are not part of the v0.50.0 slice.

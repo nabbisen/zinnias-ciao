@@ -175,7 +175,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.49.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.50.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -199,6 +199,16 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Successful role changes audit direction-specific action names without metadata. *(role_transfer.rs + release gate)*
 - [x] Admin invite generation remains member-role only; admin-granting invite UI is not part of this slice. *(admin/members.rs + release gate)*
 - [x] Committed browser smoke verifies the RFC-062 workflow with local Wrangler D1/dev and sandboxed/incognito Chromium without `--no-sandbox`. *(scripts/smoke/admin-role-transfer.mjs; evidence `.git-exclude/evidence/rfc062/`)*
+
+## Member lifecycle policy gates (v0.50.0 — RFC-063)
+
+- [x] RFC-063 accepts removal-only policy: re-add means sending a new invite and creating a new membership, not reactivating the old membership. *(RFC-063)*
+- [x] Removal copy states access ends and past attendance/notes remain in both EN and JA. *(i18n + release gate)*
+- [x] Member-management surfaces expose no restore, reactivate, or suspension controls in this slice. *(release_gates.rs `rfc063_removal_only_policy_is_locked`)*
+- [x] Invite redemption creates a fresh random user and membership and does not merge by display name. *(join.rs + release gate)*
+- [x] Active member lists and authorization queries continue to exclude removed memberships. *(membership.rs + release gate)*
+- [x] Operations docs explain that returning removed members receive a new invite and that past records stay on the old membership. *(docs/src/operations.md)*
+- [x] Committed browser smoke verifies removal confirmation copy at 200% text, removal submit, disappearance from the active member list, and absence of restore/suspend controls. *(scripts/smoke/member-management.mjs; evidence `.git-exclude/evidence/rfc063/`)*
 
 ## Operational gates
 

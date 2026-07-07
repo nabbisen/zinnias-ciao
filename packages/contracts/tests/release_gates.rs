@@ -902,6 +902,81 @@ fn rfc062_admin_invites_remain_member_role_only() {
 }
 
 #[test]
+fn rfc063_removal_only_policy_is_locked() {
+    use zinnias_ciao_contracts::i18n::*;
+
+    assert_eq!(JA_ADMIN_REMOVE_CONFIRM, "メンバーから外す");
+    assert!(
+        JA_ADMIN_REMOVE_CONSEQUENCE.contains("残ります")
+            && EN_ADMIN_REMOVE_CONSEQUENCE
+                .to_ascii_lowercase()
+                .contains("remain"),
+        "RFC-063 removal copy must say access ends and past records remain in both locales"
+    );
+
+    for (label, src) in [
+        ("members handler", MEMBERS_HANDLER_SRC),
+        ("member remove handler", MEMBER_REMOVE_HANDLER_SRC),
+        ("role transfer handler", ROLE_TRANSFER_HANDLER_SRC),
+        ("community router", COMMUNITY_HANDLER_SRC),
+    ] {
+        let lowered = src.to_ascii_lowercase();
+        for forbidden in ["reactivate", "suspend", "restore"] {
+            assert!(
+                !lowered.contains(forbidden),
+                "RFC-063 Option A must not expose {forbidden:?} in {label}"
+            );
+        }
+    }
+}
+
+#[test]
+fn rfc063_readd_uses_new_identity_without_display_name_merge() {
+    assert!(
+        JOIN_HANDLER_SRC.contains("let user_id = crate::crypto::random_token();")
+            && JOIN_HANDLER_SRC.contains("let membership_id = crate::crypto::random_token();")
+            && JOIN_HANDLER_SRC.contains("membership_db::insert_user(&db, &user_id)")
+            && JOIN_HANDLER_SRC.contains("membership_db::insert_membership("),
+        "RFC-063 Option A requires invite redemption to create a fresh user and membership"
+    );
+    assert!(
+        !JOIN_HANDLER_SRC.contains("WHERE display_name")
+            && !JOIN_HANDLER_SRC.contains("display_name = ?")
+            && !JOIN_HANDLER_SRC.contains("find_by_display_name"),
+        "RFC-063 must not re-add or merge memberships by display name"
+    );
+}
+
+#[test]
+fn rfc063_active_member_queries_exclude_removed_members() {
+    let list_start = MEMBERSHIP_DB_SRC
+        .find("pub async fn list_all_active")
+        .expect("list_all_active should exist");
+    let list_end = MEMBERSHIP_DB_SRC[list_start..]
+        .find("pub async fn find_active_summary")
+        .map(|offset| list_start + offset)
+        .expect("find_active_summary should follow list_all_active");
+    let list_all_active = &MEMBERSHIP_DB_SRC[list_start..list_end];
+    assert!(
+        list_all_active.contains("removed_at IS NULL"),
+        "RFC-063 active member list must exclude removed memberships"
+    );
+
+    let find_start = MEMBERSHIP_DB_SRC
+        .find("pub async fn find_active(")
+        .expect("find_active should exist");
+    let find_end = MEMBERSHIP_DB_SRC[find_start..]
+        .find("pub async fn find_active_by_id")
+        .map(|offset| find_start + offset)
+        .expect("find_active_by_id should follow find_active");
+    let find_active = &MEMBERSHIP_DB_SRC[find_start..find_end];
+    assert!(
+        find_active.contains("removed_at IS NULL"),
+        "RFC-063 active authorization lookup must exclude removed memberships"
+    );
+}
+
+#[test]
 fn rfc057_community_creation_is_guarded_active_admin_only() {
     assert!(
         LIB_SRC.contains("(Method::Get, \"/communities/new\")")
@@ -1078,8 +1153,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.49.0-role-transfer")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.49.0-role-transfer"),
+        RENDER_SRC.contains("/static/app.js?v=0.50.0-member-lifecycle")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.50.0-member-lifecycle"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(

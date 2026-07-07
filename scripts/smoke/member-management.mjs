@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Scenario smoke for RFC-061 (v0.48.0). Local wrangler dev only.
+// Scenario smoke for member-management workflows. Local wrangler dev only.
 
 import { createHmac } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
@@ -9,6 +9,7 @@ const port = Number(process.env.SMOKE_PORT ?? 8794);
 const remotePort = Number(process.env.CHROME_REMOTE_PORT ?? 9246);
 const baseUrl = `http://127.0.0.1:${port}`;
 const outDir = process.env.EVIDENCE_DIR ?? '.git-exclude/evidence/rfc061';
+const reportName = process.env.REPORT_NAME ?? 'rfc061-member-management-smoke-results.json';
 const userDataDir = `.git-exclude/tmp/chrome-member-management-sandboxed-${Date.now()}`;
 const chromium = process.env.CHROMIUM ?? '/usr/bin/chromium';
 const pepper = 'dev-pepper-change-in-production';
@@ -23,6 +24,7 @@ const adminPrimaryMembershipId = 'mem_rfc061_admin_primary';
 const adminSecondMembershipId = 'mem_rfc061_admin_second';
 const adminMemberOnlyMembershipId = 'mem_rfc061_admin_member_only';
 const memberMembershipId = 'mem_rfc061_member_primary';
+const memberDisplayName = 'RFC061 Removal Target';
 const adminSessionSecret = 'rfc061-smoke-admin-session';
 const memberSessionSecret = 'rfc061-smoke-member-session';
 const adminSessionHmac = createHmac('sha256', pepper).update(adminSessionSecret).digest('hex');
@@ -91,11 +93,11 @@ function seed() {
     `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${adminPrimaryMembershipId}', '${primaryCommunityId}', '${adminUserId}', 'admin', 'RFC061 Admin', '${now}')`,
     `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${adminSecondMembershipId}', '${secondAdminCommunityId}', '${adminUserId}', 'admin', 'RFC061 Admin Second', '${now}')`,
     `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${adminMemberOnlyMembershipId}', '${memberOnlyCommunityId}', '${adminUserId}', 'member', 'RFC061 Admin As Member', '${now}')`,
-    `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${memberMembershipId}', '${primaryCommunityId}', '${memberUserId}', 'member', 'RFC061 Member', '${now}')`,
+    `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${memberMembershipId}', '${primaryCommunityId}', '${memberUserId}', 'member', '${esc(memberDisplayName)}', '${now}')`,
     `UPDATE community_memberships SET role='admin', display_name='RFC061 Admin', removed_at=NULL WHERE id='${adminPrimaryMembershipId}'`,
     `UPDATE community_memberships SET role='admin', display_name='RFC061 Admin Second', removed_at=NULL WHERE id='${adminSecondMembershipId}'`,
     `UPDATE community_memberships SET role='member', display_name='RFC061 Admin As Member', removed_at=NULL WHERE id='${adminMemberOnlyMembershipId}'`,
-    `UPDATE community_memberships SET role='member', display_name='RFC061 Member', removed_at=NULL WHERE id='${memberMembershipId}'`,
+    `UPDATE community_memberships SET role='member', display_name='${esc(memberDisplayName)}', removed_at=NULL WHERE id='${memberMembershipId}'`,
     `DELETE FROM sessions WHERE id IN ('sess_rfc061_admin', 'sess_rfc061_member') OR session_hmac IN ('${adminSessionHmac}', '${memberSessionHmac}')`,
     `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc061_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
     `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc061_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
@@ -319,6 +321,21 @@ async function clickLinkByHref(cdp, href) {
   await withTimeout(loaded, `click navigation to ${href}`);
 }
 
+async function submitFormByAction(cdp, action) {
+  const loaded = cdp.once('Page.loadEventFired');
+  const submitted = await evalExpr(
+    cdp,
+    `(() => {
+      const form = [...document.querySelectorAll('form[action]')].find((item) => item.getAttribute('action') === ${JSON.stringify(action)});
+      if (!form) return false;
+      form.requestSubmit();
+      return true;
+    })()`,
+  );
+  if (!submitted) throw new Error(`Form not found: ${action}`);
+  await withTimeout(loaded, `submit form to ${action}`);
+}
+
 let dev;
 let chrome;
 let devStderr = '';
@@ -525,6 +542,30 @@ try {
       removeCopyVisible: removeConfirm.text.includes('メンバーから外しますか')
         && removeConfirm.text.includes('メンバーから外す'),
       recordsRemainCopyVisible: removeConfirm.text.includes('過去の参加状況やメモは残ります'),
+      noRestoreSuspendControls: !removeConfirm.text.includes('復元')
+        && !removeConfirm.text.includes('一時停止')
+        && !removeConfirm.text.toLowerCase().includes('restore')
+        && !removeConfirm.text.toLowerCase().includes('suspend'),
+    },
+  });
+
+  logStep('checking removal submit hides member without restore controls');
+  await submitFormByAction(page, `/c/${primaryCommunityId}/admin/members/${memberMembershipId}/remove`);
+  const afterRemove = await collect(page);
+  results.push({
+    name: 'removed-member-disappears-without-restore-suspend-controls',
+    screenshotPath: await screenshot(page, 'removed-member-disappears-without-restore-suspend-controls'),
+    observed: afterRemove,
+    checks: {
+      noHorizontalScroll: afterRemove.noHorizontalScroll,
+      returnedToMembers: afterRemove.path === `/c/${primaryCommunityId}/admin/members`,
+      removedMemberHidden: !afterRemove.text.includes(memberDisplayName),
+      noRemoveLinkForRemovedMember: !afterRemove.hrefs.includes(`/c/${primaryCommunityId}/admin/members/${memberMembershipId}/remove`),
+      noRestoreSuspendControls: !afterRemove.text.includes('復元')
+        && !afterRemove.text.includes('一時停止')
+        && !afterRemove.text.toLowerCase().includes('restore')
+        && !afterRemove.text.toLowerCase().includes('suspend')
+        && !afterRemove.hrefs.some((href) => /reactivate|restore|suspend/.test(href)),
     },
   });
 
@@ -547,7 +588,7 @@ try {
   };
 
   await writeFile(
-    `${outDir}/rfc061-member-management-smoke-results.json`,
+    `${outDir}/${reportName}`,
     JSON.stringify(report, null, 2),
   );
   console.log(

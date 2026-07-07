@@ -105,6 +105,13 @@ bunx wrangler d1 execute zinnias-ciao --remote --env production --command \
   "UPDATE invite_codes SET revoked_at = datetime('now') WHERE id = '<invite_id>'"
 ```
 
+## Returning removed members
+
+Member removal stops access but preserves past attendance, notes, and audit
+records on the old membership. To bring someone back, send a new invite. The
+returning person joins as a new membership; past records stay on the old
+membership and are not merged by display name.
+
 ## Incident response
 
 1. Identify the affected community and actor from the `audit_log` table:

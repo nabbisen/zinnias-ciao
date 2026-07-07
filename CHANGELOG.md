@@ -2,6 +2,58 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.50.0] — 2026-07-07
+
+RFC-063 member removal, re-add, and suspension policy.
+
+### Changed
+
+- **Member lifecycle policy is now explicit.**
+  RFC-063 accepts removal-only behavior for the pilot: re-add means sending a
+  new invite and creating a new membership, not reactivating or merging the old
+  membership.
+
+- **Release version bumped to v0.50.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+### Added
+
+- **RFC-063 release gates.**
+  Source gates lock the removal-only policy, absence of restore/reactivate/
+  suspend controls, no display-name merge during invite redemption, and active
+  member queries excluding removed memberships.
+
+- **Returning removed members guidance.**
+  Operations docs now state that admins should send a new invite to bring a
+  removed person back, and that past records stay on the old membership.
+
+- **Member-removal browser smoke coverage.**
+  The committed member-management smoke now verifies removal confirmation copy
+  at 200% text scaling, removal submit, disappearance from the active member
+  list, and absence of restore/suspend controls.
+
+### Fixed
+
+- **English removal consequence copy.**
+  The EN string now matches the JA policy by stating that past attendance and
+  notes remain after removal.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo build --workspace`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `node --check scripts/smoke/member-management.mjs`
+- `EVIDENCE_DIR=.git-exclude/evidence/rfc063 REPORT_NAME=rfc063-removal-policy-smoke-results.json node scripts/smoke/member-management.mjs`
+- `mdbook build docs`
+- `git diff --check`
+
+Hosted Cloudflare smoke was not run in this working tree because no hosted
+staging or production URL was provided as an operator target.
+
 ## [0.49.0] — 2026-07-07
 
 RFC-062 admin role transfer and promotion.

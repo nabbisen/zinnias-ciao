@@ -285,7 +285,8 @@ pub const EN_ADMIN_LAST_ADMIN_DEMOTE: &str = "Cannot make the last admin a membe
 pub const EN_ADMIN_REMOVE_TITLE: &str = "Remove member?";
 pub const EN_ADMIN_REMOVE_KEEP: &str = "Keep Member";
 pub const EN_ADMIN_REMOVE_CONFIRM: &str = "Remove";
-pub const EN_ADMIN_REMOVE_CONSEQUENCE: &str = "They will no longer be able to see events or notes.";
+pub const EN_ADMIN_REMOVE_CONSEQUENCE: &str =
+    "They will no longer be able to see events or notes. Past attendance and notes remain.";
 pub const EN_ADMIN_LAST_ADMIN: &str =
     "Cannot remove the last admin. Transfer the admin role first.";
 
