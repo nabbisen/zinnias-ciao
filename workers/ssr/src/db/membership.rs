@@ -189,6 +189,21 @@ pub struct MemberSummary {
     pub role: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoleUpdateResult {
+    Changed,
+    AlreadyApplied,
+    LastAdminBlocked,
+    InvalidTarget,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RemoveMemberResult {
+    Removed,
+    LastAdminBlocked,
+    InvalidTarget,
+}
+
 pub async fn list_all_active(db: &D1Database, community_id: &str) -> Result<Vec<MemberSummary>> {
     let rows = db
         .prepare(
@@ -211,6 +226,30 @@ pub async fn list_all_active(db: &D1Database, community_id: &str) -> Result<Vec<
             })
         })
         .collect())
+}
+
+pub async fn find_active_summary(
+    db: &D1Database,
+    membership_id: &str,
+    community_id: &str,
+) -> Result<Option<MemberSummary>> {
+    let row = db
+        .prepare(
+            "SELECT id, display_name, role FROM community_memberships \
+             WHERE id = ?1 AND community_id = ?2 AND removed_at IS NULL \
+             LIMIT 1",
+        )
+        .bind(&[membership_id.into(), community_id.into()])?
+        .first::<serde_json::Value>(None)
+        .await?;
+
+    Ok(row.and_then(|v| {
+        Some(MemberSummary {
+            id: v.get("id")?.as_str()?.to_owned(),
+            display_name: v.get("display_name")?.as_str()?.to_owned(),
+            role: v.get("role")?.as_str()?.to_owned(),
+        })
+    }))
 }
 
 /// Count active admins in a community (for last-admin guard).
@@ -243,22 +282,118 @@ pub async fn get_role(
     Ok(row.and_then(|v| v.get("role")?.as_str().map(|s| s.to_owned())))
 }
 
-/// Soft-remove a member (sets removed_at, preserves history — RFC-010 §5).
-/// Scoped to community_id to prevent cross-community removal.
-pub async fn soft_remove(db: &D1Database, membership_id: &str, community_id: &str) -> Result<()> {
+pub async fn promote_to_admin(
+    db: &D1Database,
+    membership_id: &str,
+    community_id: &str,
+) -> Result<RoleUpdateResult> {
+    let res = db
+        .prepare(
+            "UPDATE community_memberships \
+             SET role = 'admin' \
+             WHERE id = ?1 \
+               AND community_id = ?2 \
+               AND removed_at IS NULL \
+               AND role = 'member'",
+        )
+        .bind(&[membership_id.into(), community_id.into()])?
+        .run()
+        .await?;
+    let changed = res
+        .meta()
+        .ok()
+        .flatten()
+        .and_then(|m| m.changes)
+        .unwrap_or(0);
+    if changed == 1 {
+        return Ok(RoleUpdateResult::Changed);
+    }
+
+    match get_role(db, membership_id, community_id).await?.as_deref() {
+        Some("admin") => Ok(RoleUpdateResult::AlreadyApplied),
+        _ => Ok(RoleUpdateResult::InvalidTarget),
+    }
+}
+
+pub async fn demote_to_member(
+    db: &D1Database,
+    membership_id: &str,
+    community_id: &str,
+) -> Result<RoleUpdateResult> {
+    let res = db
+        .prepare(
+            "UPDATE community_memberships \
+             SET role = 'member' \
+             WHERE id = ?1 \
+               AND community_id = ?2 \
+               AND removed_at IS NULL \
+               AND role = 'admin' \
+               AND (SELECT COUNT(*) FROM community_memberships \
+                    WHERE community_id = ?2 AND role = 'admin' AND removed_at IS NULL) > 1",
+        )
+        .bind(&[membership_id.into(), community_id.into()])?
+        .run()
+        .await?;
+    let changed = res
+        .meta()
+        .ok()
+        .flatten()
+        .and_then(|m| m.changes)
+        .unwrap_or(0);
+    if changed == 1 {
+        return Ok(RoleUpdateResult::Changed);
+    }
+
+    match get_role(db, membership_id, community_id).await?.as_deref() {
+        Some("member") => Ok(RoleUpdateResult::AlreadyApplied),
+        Some("admin") if count_admins(db, community_id).await? <= 1 => {
+            Ok(RoleUpdateResult::LastAdminBlocked)
+        }
+        _ => Ok(RoleUpdateResult::InvalidTarget),
+    }
+}
+
+/// Soft-remove a member while preserving the at-least-one-admin invariant.
+pub async fn soft_remove_guarded(
+    db: &D1Database,
+    membership_id: &str,
+    community_id: &str,
+) -> Result<RemoveMemberResult> {
     let now = crate::db::now_utc();
-    db.prepare(
-        "UPDATE community_memberships SET removed_at = ?1 \
-         WHERE id = ?2 AND community_id = ?3 AND removed_at IS NULL",
-    )
-    .bind(&[
-        now.as_str().into(),
-        membership_id.into(),
-        community_id.into(),
-    ])?
-    .run()
-    .await?;
-    Ok(())
+    let res = db
+        .prepare(
+            "UPDATE community_memberships \
+             SET removed_at = ?1 \
+             WHERE id = ?2 \
+               AND community_id = ?3 \
+               AND removed_at IS NULL \
+               AND (role != 'admin' OR \
+                    (SELECT COUNT(*) FROM community_memberships \
+                     WHERE community_id = ?3 AND role = 'admin' AND removed_at IS NULL) > 1)",
+        )
+        .bind(&[
+            now.as_str().into(),
+            membership_id.into(),
+            community_id.into(),
+        ])?
+        .run()
+        .await?;
+    let changed = res
+        .meta()
+        .ok()
+        .flatten()
+        .and_then(|m| m.changes)
+        .unwrap_or(0);
+    if changed == 1 {
+        return Ok(RemoveMemberResult::Removed);
+    }
+
+    match get_role(db, membership_id, community_id).await?.as_deref() {
+        Some("admin") if count_admins(db, community_id).await? <= 1 => {
+            Ok(RemoveMemberResult::LastAdminBlocked)
+        }
+        _ => Ok(RemoveMemberResult::InvalidTarget),
+    }
 }
 
 /// One community entry for user-scoped navigation and summaries.

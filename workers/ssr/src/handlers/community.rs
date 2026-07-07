@@ -244,10 +244,13 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
                 "templates" => super::templates::get_templates(req, env, rid, cid).await,
                 t if t.starts_with("members/") => {
                     let (mid, sub) = split_once(&t[8..], '/');
-                    if sub == "remove" {
-                        super::admin::get_remove_member(req, env, rid, cid, mid).await
-                    } else {
-                        render::not_found()
+                    match sub {
+                        "remove" => super::admin::get_remove_member(req, env, rid, cid, mid).await,
+                        "promote" => {
+                            super::admin::get_promote_member(req, env, rid, cid, mid).await
+                        }
+                        "demote" => super::admin::get_demote_member(req, env, rid, cid, mid).await,
+                        _ => render::not_found(),
                     }
                 }
                 _ => render::not_found(),
@@ -318,10 +321,13 @@ pub async fn dispatch_post(req: Request, env: &Env, rid: &str, path: &str) -> Re
                 }
                 t if t.starts_with("members/") => {
                     let (mid, sub) = split_once(&t[8..], '/');
-                    if sub == "remove" {
-                        super::admin::post_remove_member(req, env, rid, cid, mid).await
-                    } else {
-                        render::not_found()
+                    match sub {
+                        "remove" => super::admin::post_remove_member(req, env, rid, cid, mid).await,
+                        "promote" => {
+                            super::admin::post_promote_member(req, env, rid, cid, mid).await
+                        }
+                        "demote" => super::admin::post_demote_member(req, env, rid, cid, mid).await,
+                        _ => render::not_found(),
                     }
                 }
                 _ => render::not_found(),

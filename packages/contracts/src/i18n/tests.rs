@@ -111,6 +111,13 @@ fn en_ja_parity() {
         "ADMIN_MEMBERS_TITLE",
         "ADMIN_MEMBERS_GENERATE_INVITE",
         "ADMIN_MEMBERS_CURRENT_USER",
+        "ADMIN_PROMOTE_ACTION",
+        "ADMIN_DEMOTE_ACTION",
+        "ADMIN_PROMOTE_TITLE",
+        "ADMIN_PROMOTE_CONSEQUENCE",
+        "ADMIN_DEMOTE_TITLE",
+        "ADMIN_DEMOTE_CONSEQUENCE",
+        "ADMIN_LAST_ADMIN_DEMOTE",
         "ADMIN_REMOVE_TITLE",
         "ADMIN_REMOVE_KEEP",
         "ADMIN_REMOVE_CONFIRM",
@@ -195,7 +202,7 @@ fn en_ja_parity() {
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
     ];
-    assert_eq!(en_keys.len(), 170, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 177, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

@@ -145,6 +145,8 @@ fn all_token_purposes_are_unique() {
         token_purpose::CREATE_TEMPLATE,
         token_purpose::DELETE_TEMPLATE,
         token_purpose::REMOVE_MEMBER,
+        token_purpose::PROMOTE_MEMBER,
+        token_purpose::DEMOTE_MEMBER,
         token_purpose::GENERATE_INVITE,
         token_purpose::REDEEM_INVITE,
         token_purpose::JOIN_PROFILE,

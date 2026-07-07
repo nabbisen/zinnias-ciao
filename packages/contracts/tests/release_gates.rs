@@ -98,6 +98,8 @@ fn all_state_changing_routes_have_token_purpose() {
         token_purpose::CREATE_TEMPLATE,
         token_purpose::DELETE_TEMPLATE,
         token_purpose::REMOVE_MEMBER,
+        token_purpose::PROMOTE_MEMBER,
+        token_purpose::DEMOTE_MEMBER,
         token_purpose::GENERATE_INVITE,
         token_purpose::REDEEM_INVITE,
         token_purpose::JOIN_PROFILE,
@@ -272,6 +274,13 @@ fn i18n_en_ja_parity_count() {
             JA_ADMIN_MEMBERS_GENERATE_INVITE,
         ),
         (EN_ADMIN_MEMBERS_CURRENT_USER, JA_ADMIN_MEMBERS_CURRENT_USER),
+        (EN_ADMIN_PROMOTE_ACTION, JA_ADMIN_PROMOTE_ACTION),
+        (EN_ADMIN_DEMOTE_ACTION, JA_ADMIN_DEMOTE_ACTION),
+        (EN_ADMIN_PROMOTE_TITLE, JA_ADMIN_PROMOTE_TITLE),
+        (EN_ADMIN_PROMOTE_CONSEQUENCE, JA_ADMIN_PROMOTE_CONSEQUENCE),
+        (EN_ADMIN_DEMOTE_TITLE, JA_ADMIN_DEMOTE_TITLE),
+        (EN_ADMIN_DEMOTE_CONSEQUENCE, JA_ADMIN_DEMOTE_CONSEQUENCE),
+        (EN_ADMIN_LAST_ADMIN_DEMOTE, JA_ADMIN_LAST_ADMIN_DEMOTE),
         (EN_ADMIN_REMOVE_TITLE, JA_ADMIN_REMOVE_TITLE),
         (EN_ADMIN_REMOVE_KEEP, JA_ADMIN_REMOVE_KEEP),
         (EN_ADMIN_REMOVE_CONFIRM, JA_ADMIN_REMOVE_CONFIRM),
@@ -741,6 +750,11 @@ fn sw_cache_version_matches_workspace_version() {
 const COMMUNITIES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/communities.rs");
 const COMMUNITY_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/community.rs");
 const ADMIN_EVENTS_SRC: &str = include_str!("../../../workers/ssr/src/handlers/admin/events.rs");
+const ROLE_TRANSFER_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/admin/role_transfer.rs");
+const MEMBER_REMOVE_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/admin/member_remove.rs");
+const MEMBERSHIP_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/membership.rs");
 const APP_JS_SRC: &str = include_str!("../../../workers/ssr/static/app.js");
 const RENDER_SRC: &str = include_str!("../../../workers/ssr/src/render.rs");
 const STATIC_FILES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/static_files.rs");
@@ -763,6 +777,8 @@ fn no_known_english_ui_leaks_in_rendered_text() {
         HOME_HANDLER_SRC,
         COMMUNITY_CREATE_HANDLER_SRC,
         MEMBERS_HANDLER_SRC,
+        ROLE_TRANSFER_HANDLER_SRC,
+        MEMBER_REMOVE_HANDLER_SRC,
     ] {
         for needle in forbidden {
             assert!(
@@ -809,6 +825,79 @@ fn rfc061_admin_switch_targets_require_admin_role() {
             && MEMBERS_HANDLER_SRC.contains("\"admin_members\"")
             && MEMBERS_HANDLER_SRC.contains("\"admin_invites\""),
         "RFC-061 admin switch targets must preserve admin pages only for target communities where the user is admin"
+    );
+}
+
+#[test]
+fn rfc062_role_transfer_uses_guarded_member_management_flow() {
+    assert!(
+        COMMUNITY_HANDLER_SRC.contains("\"promote\"")
+            && COMMUNITY_HANDLER_SRC.contains("get_promote_member")
+            && COMMUNITY_HANDLER_SRC.contains("post_promote_member")
+            && COMMUNITY_HANDLER_SRC.contains("\"demote\"")
+            && COMMUNITY_HANDLER_SRC.contains("get_demote_member")
+            && COMMUNITY_HANDLER_SRC.contains("post_demote_member"),
+        "RFC-062 promote/demote routes must be registered explicitly"
+    );
+    assert!(
+        ROLE_TRANSFER_HANDLER_SRC.contains("token_purpose::PROMOTE_MEMBER")
+            && ROLE_TRANSFER_HANDLER_SRC.contains("token_purpose::DEMOTE_MEMBER")
+            && ROLE_TRANSFER_HANDLER_SRC.contains("JA_ADMIN_PROMOTE_ACTION")
+            && ROLE_TRANSFER_HANDLER_SRC.contains("JA_ADMIN_DEMOTE_ACTION")
+            && ROLE_TRANSFER_HANDLER_SRC
+                .contains("target_membership_id == membership.membership_id"),
+        "RFC-062 handlers must use dedicated token purposes, reviewed copy, and server-side self-target denial"
+    );
+    assert!(
+        ROLE_TRANSFER_HANDLER_SRC.contains("membership.promoted_to_admin")
+            && ROLE_TRANSFER_HANDLER_SRC.contains("membership.demoted_to_member")
+            && ROLE_TRANSFER_HANDLER_SRC.contains("None,"),
+        "RFC-062 role changes must audit direction by action name without extra metadata"
+    );
+}
+
+#[test]
+fn rfc062_role_transfer_writes_are_scoped_and_guarded() {
+    assert!(
+        MEMBERSHIP_DB_SRC.contains("pub async fn promote_to_admin")
+            && MEMBERSHIP_DB_SRC.contains("SET role = 'admin'")
+            && MEMBERSHIP_DB_SRC.contains("id = ?1")
+            && MEMBERSHIP_DB_SRC.contains("community_id = ?2")
+            && MEMBERSHIP_DB_SRC.contains("removed_at IS NULL")
+            && MEMBERSHIP_DB_SRC.contains("role = 'member'"),
+        "RFC-062 promote update must be scoped by membership id, community id, active membership, and current role"
+    );
+    assert!(
+        MEMBERSHIP_DB_SRC.contains("pub async fn demote_to_member")
+            && MEMBERSHIP_DB_SRC.contains("SET role = 'member'")
+            && MEMBERSHIP_DB_SRC.contains("role = 'admin'")
+            && MEMBERSHIP_DB_SRC.contains("SELECT COUNT(*) FROM community_memberships")
+            && MEMBERSHIP_DB_SRC.contains("> 1"),
+        "RFC-062 demote update must re-check active admin count in the conditional write"
+    );
+    assert!(
+        MEMBERSHIP_DB_SRC.contains("pub async fn soft_remove_guarded")
+            && MEMBERSHIP_DB_SRC.contains("role != 'admin'")
+            && MEMBERSHIP_DB_SRC.contains("SELECT COUNT(*) FROM community_memberships")
+            && MEMBER_REMOVE_HANDLER_SRC.contains("soft_remove_guarded")
+            && !MEMBER_REMOVE_HANDLER_SRC.contains("soft_remove(&db, target_membership_id"),
+        "RFC-062 must retrofit member removal to use the guarded admin-count-preserving update"
+    );
+}
+
+#[test]
+fn rfc062_admin_invites_remain_member_role_only() {
+    let insert_start = MEMBERS_HANDLER_SRC
+        .find("invite_db::insert(")
+        .expect("invite insert call should exist");
+    let insert_end = MEMBERS_HANDLER_SRC[insert_start..]
+        .find(".await?;")
+        .map(|offset| insert_start + offset)
+        .expect("invite insert await should exist");
+    let invite_insert = &MEMBERS_HANDLER_SRC[insert_start..insert_end];
+    assert!(
+        invite_insert.contains("\"member\",") && !invite_insert.contains("\"admin\","),
+        "RFC-062 keeps admin-granting invite codes out of the UI; generated invites must grant member role"
     );
 }
 

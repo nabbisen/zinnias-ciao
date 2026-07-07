@@ -30,6 +30,8 @@ pub mod token_purpose {
     pub const CREATE_TEMPLATE: &str = "create_template";
     pub const DELETE_TEMPLATE: &str = "delete_template";
     pub const REMOVE_MEMBER: &str = "remove_member";
+    pub const PROMOTE_MEMBER: &str = "promote_member";
+    pub const DEMOTE_MEMBER: &str = "demote_member";
     pub const GENERATE_INVITE: &str = "generate_invite";
     pub const CALENDAR_REVOKE: &str = "calendar_revoke";
     pub const REDEEM_INVITE: &str = "redeem_invite";
