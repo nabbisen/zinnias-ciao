@@ -9,7 +9,9 @@ pub mod ics;
 pub mod tz;
 pub mod views;
 
-pub use auth::{FORM_TOKEN_TTL_SECONDS, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS};
+pub use auth::{
+    FORM_TOKEN_TTL_SECONDS, RELINK_CODE_TTL_SECONDS, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS,
+};
 pub use error::{AppError, ErrorCode};
 pub use html::escape_html;
 

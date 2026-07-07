@@ -27,6 +27,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 019 | [Retention, Soft Delete, and Data Lifecycle](./done/019-retention-soft-delete-and-data-lifecycle.md) | v0.4.0 |
 | 022 | [Recurring Events and Event Series](./done/022-recurring-events-and-event-series.md) | v0.17.0 |
 | 023 | [Optional Calendar Export and ICS Interop](./done/023-optional-calendar-export-and-ics-interop.md) | v0.10.0 |
+| 024 | [Display Name Recovery and Admin-Mediated Account Relinking](./done/024-display-name-recovery-and-admin-mediated-account-relinking.md) | v0.51.0 |
 | 027 | [Import, Export, Human-Readable Backup, and Data Portability](./done/027-import-export-human-readable-backup-and-data-portability.md) | v0.15.0 |
 | 028 | [Backup, Restore, and Disaster Recovery Operations](./done/028-backup-restore-and-disaster-recovery-operations.md) | v0.14.0 |
 | 035 | [Support, Diagnostics, and User Help Without Data Leakage](./done/035-support-diagnostics-and-user-help-without-data-leakage.md) | v0.15.0 |
@@ -87,7 +88,6 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | ID | Title | File |
 |----|-------|------|
 | 021 | Post-MVP Notification Strategy and Reminder Digests | [./proposed/021-post-mvp-notification-strategy-and-reminder-digests.md](./proposed/021-post-mvp-notification-strategy-and-reminder-digests.md) |
-| 024 | Display Name Recovery and Admin-Mediated Account Relinking | [./proposed/024-display-name-recovery-and-admin-mediated-account-relinking.md](./proposed/024-display-name-recovery-and-admin-mediated-account-relinking.md) |
 | 031 | Consentful Contact Channels and Privacy-Safe Messaging | [./proposed/031-consentful-contact-channels-and-privacy-safe-messaging.md](./proposed/031-consentful-contact-channels-and-privacy-safe-messaging.md) |
 | 033 | Subgroups, Event Visibility, and Boundary Safety | [./proposed/033-subgroups-event-visibility-and-boundary-safety.md](./proposed/033-subgroups-event-visibility-and-boundary-safety.md) |
 | 034 | Notification-Free Quiet Mode and Attention Design | [./proposed/034-notification-free-quiet-mode-and-attention-design.md](./proposed/034-notification-free-quiet-mode-and-attention-design.md) |

@@ -175,7 +175,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.50.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.51.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -209,6 +209,17 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Active member lists and authorization queries continue to exclude removed memberships. *(membership.rs + release gate)*
 - [x] Operations docs explain that returning removed members receive a new invite and that past records stay on the old membership. *(docs/src/operations.md)*
 - [x] Committed browser smoke verifies removal confirmation copy at 200% text, removal submit, disappearance from the active member list, and absence of restore/suspend controls. *(scripts/smoke/member-management.mjs; evidence `.git-exclude/evidence/rfc063/`)*
+
+## Active-member help-signin gates (v0.51.0 — RFC-024)
+
+- [x] Help-signin codes target active memberships, not display names or bare user ids. *(db/relink.rs + release gate)*
+- [x] Redemption re-checks target membership activity and community before minting a session. *(db/relink.rs + release gate)*
+- [x] Codes are HMAC-only at rest, short-lived, and single-use. *(migration 0008 + db/relink.rs + release gate)*
+- [x] Successful redemption creates a new session and revokes other active sessions for the target `user_id`. *(handlers/relink.rs + db/session.rs + release gate)*
+- [x] Failed redemption uses one generic invalid/expired error and is rate-limited without membership audit rows. *(handlers/relink.rs + release gate)*
+- [x] Removed-member reactivation, former-member UI, and display-name merge remain out of scope. *(RFC-024/RFC-063 + release gate)*
+- [x] Operations docs explain that help-signin is only for active members who lost browser/session access. *(docs/src/operations.md)*
+- [x] Committed browser smoke verifies active-only row action, 200% text confirmation copy, code shown once, fresh-context redemption, reused-code generic error, and cross-community non-authorization. *(scripts/smoke/help-signin.mjs; evidence `.git-exclude/evidence/rfc024/`)*
 
 ## Operational gates
 

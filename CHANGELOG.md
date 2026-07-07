@@ -2,6 +2,66 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.51.0] — 2026-07-07
+
+RFC-024 active-member help-signin for lost browser/session access.
+
+### Changed
+
+- **Release version bumped to v0.51.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+### Added
+
+- **Active-member help-signin flow.**
+  Community admins can create a short-lived one-time code from member
+  management so an active member who lost browser/session access can sign in
+  again without creating a duplicate membership.
+
+- **Dedicated `/relink` redemption route.**
+  The recovery path is separate from `/join`; redemption creates a new session
+  for the target membership's existing invite-era `user_id` and revokes other
+  active sessions for that `user_id`.
+
+- **RFC-024 persistence and gates.**
+  `membership_relink_codes` stores HMAC-only codes with active membership and
+  community scope. Release gates lock the 15-minute TTL, active-membership
+  targeting, community re-check, no display-name lookup, generic failure copy,
+  single-use behavior, and session revocation.
+
+- **Help-signin documentation and audit events.**
+  Operations docs explain the active-member-only workflow, and audit policy
+  documents `membership.relink_code_created` and
+  `membership.relink_redeemed`.
+
+- **Committed help-signin browser smoke.**
+  `scripts/smoke/help-signin.mjs` verifies active-only row action, 200% text
+  confirmation copy, one-time code display, fresh-context redemption, reused
+  code generic error, and cross-community non-authorization.
+
+### Fixed
+
+- **RFC-024 moved from backlog stub to implemented design record.**
+  The RFC now records the reviewed Option A/C design, the invite-era
+  `user_id`/membership isolation dependency, generic denial behavior, and
+  fixed session-revocation timing.
+
+### Testing
+
+- `cargo fmt`
+- `cargo test`
+- `cargo clippy`
+- `cargo build`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `cargo test -p zinnias-ciao-contracts --test release_gates`
+- `node scripts/smoke/help-signin.mjs`
+- `mdbook build docs`
+- `git diff --check`
+
+Hosted Cloudflare smoke was not run in this working tree because no hosted
+staging or production URL was provided as an operator target.
+
 ## [0.50.0] — 2026-07-07
 
 RFC-063 member removal, re-add, and suspension policy.

@@ -66,6 +66,9 @@ permitted:
 |---|---|---|---|
 | `title` | string | `"お花見 2026"` | Event title at time of action |
 | `role_granted` | string | `"admin"` or `"member"` | On invite redemption |
+| `membership_id` | string | `"mem_xxx"` | Help-signin target membership |
+| `created_by_membership_id` | string | `"mem_admin"` | Admin membership that created a help-signin code |
+| `community_id` | string | `"com_xxx"` | Community scope for help-signin audit |
 
 The following fields are **explicitly forbidden** from metadata:
 
@@ -90,6 +93,8 @@ All events currently written. Format: `target_kind.action`.
 | `invite_code.redeemed` | User redeems a valid invite code (join succeeds) | New member |
 | `invite_code.revoked` | Admin revokes an unused invite code | Admin |
 | `membership.removed` | Admin removes a member | Admin |
+| `membership.relink_code_created` | Admin creates an active-member help-signin code | Admin |
+| `membership.relink_redeemed` | Member redeems a help-signin code | Member |
 | `event.created` | Admin creates a new event | Admin |
 | `event.edited` | Admin edits an event's fields | Admin |
 | `event.cancelled` | Admin cancels an event | Admin |

@@ -105,6 +105,21 @@ bunx wrangler d1 execute zinnias-ciao --remote --env production --command \
   "UPDATE invite_codes SET revoked_at = datetime('now') WHERE id = '<invite_id>'"
 ```
 
+## Helping an active member sign in again
+
+Use this only for an active member who lost browser or device access. In the
+member-management page, choose `サインインを手伝う` for the intended active member
+and share the generated code only with that person.
+
+The code is a bearer credential: anyone with it can sign in as that member. It
+is shown once, expires after 15 minutes, and can be used once. After successful
+redemption, the app creates a new session for the member and revokes other
+active sessions for that same invite-era user identity.
+
+This is not a removed-member return flow. Removed members still receive a new
+invite and join as a new membership; old and new memberships are not merged by
+display name.
+
 ## Returning removed members
 
 Member removal stops access but preserves past attendance, notes, and audit

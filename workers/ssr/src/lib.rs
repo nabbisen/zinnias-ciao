@@ -42,6 +42,8 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         (Method::Post, "/join/profile") => {
             handlers::join::post_profile(req, &env, &request_id).await
         }
+        (Method::Get, "/relink") => handlers::relink::get_relink(req, &env, &request_id).await,
+        (Method::Post, "/relink") => handlers::relink::post_relink(req, &env, &request_id).await,
 
         // ── Member area ───────────────────────────────────────────────────
         (Method::Get, "/") | (Method::Get, "/c") => {

@@ -47,6 +47,19 @@ pub async fn clear_failures(env: &Env, ip: &str) {
     let _ = kv.delete(&key).await;
 }
 
+pub async fn is_relink_rate_limited(env: &Env, ip: &str) -> bool {
+    is_failure_limited(env, &format!("relink_fail:{ip}")).await
+}
+
+pub async fn record_relink_failure(env: &Env, ip: &str) {
+    record_failure_for_key(env, &format!("relink_fail:{ip}")).await;
+}
+
+pub async fn clear_relink_failures(env: &Env, ip: &str) {
+    let Ok(kv) = env.kv("RATE_LIMIT") else { return };
+    let _ = kv.delete(&format!("relink_fail:{ip}")).await;
+}
+
 pub async fn is_community_creation_limited(
     env: &Env,
     user_id: &str,
@@ -68,6 +81,28 @@ pub async fn is_community_creation_limited(
         }
     }
     false
+}
+
+async fn is_failure_limited(env: &Env, key: &str) -> bool {
+    let Ok(kv) = env.kv("RATE_LIMIT") else {
+        return false;
+    };
+    match kv.get(key).text().await {
+        Ok(Some(val)) => val.trim().parse::<u32>().unwrap_or(0) >= MAX_FAILURES,
+        _ => false,
+    }
+}
+
+async fn record_failure_for_key(env: &Env, key: &str) {
+    let Ok(kv) = env.kv("RATE_LIMIT") else { return };
+    let current = match kv.get(key).text().await {
+        Ok(Some(v)) => v.trim().parse::<u32>().unwrap_or(0),
+        _ => 0,
+    };
+    let Ok(put) = kv.put(key, (current + 1).to_string()) else {
+        return;
+    };
+    let _ = put.expiration_ttl(WINDOW_SECONDS).execute().await;
 }
 
 pub async fn record_community_creation(env: &Env, user_id: &str, session_id: &str, ip: &str) {

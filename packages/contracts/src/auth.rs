@@ -10,6 +10,10 @@ pub const SESSION_TTL_SECONDS: u64 = 30 * 86_400; // 30 days
 /// Short enough to be safe; long enough to survive a slow mobile form fill.
 pub const FORM_TOKEN_TTL_SECONDS: u64 = 3_600; // 1 hour
 
+/// Lifetime of an admin-issued active-member help-signin code (RFC-024).
+/// This is intentionally short because the code is a bearer credential.
+pub const RELINK_CODE_TTL_SECONDS: u64 = 15 * 60; // 15 minutes
+
 /// Cookie name. Changing this after deployment is a breaking change
 /// (all existing sessions become unreadable).
 pub const SESSION_COOKIE_NAME: &str = "ciao_sid";
@@ -32,6 +36,8 @@ pub mod token_purpose {
     pub const REMOVE_MEMBER: &str = "remove_member";
     pub const PROMOTE_MEMBER: &str = "promote_member";
     pub const DEMOTE_MEMBER: &str = "demote_member";
+    pub const HELP_SIGNIN: &str = "help_signin";
+    pub const REDEEM_RELINK: &str = "redeem_relink";
     pub const GENERATE_INVITE: &str = "generate_invite";
     pub const CALENDAR_REVOKE: &str = "calendar_revoke";
     pub const REDEEM_INVITE: &str = "redeem_invite";

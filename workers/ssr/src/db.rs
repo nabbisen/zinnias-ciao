@@ -10,6 +10,7 @@ pub mod event_template;
 pub mod event_write;
 pub mod invite;
 pub mod membership;
+pub mod relink;
 pub mod session;
 
 use worker::D1Database;

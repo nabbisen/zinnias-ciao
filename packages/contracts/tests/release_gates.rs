@@ -4,7 +4,9 @@
 #![allow(clippy::assertions_on_constants)]
 
 use zinnias_ciao_contracts::auth::token_purpose;
-use zinnias_ciao_contracts::{AppError, FORM_TOKEN_TTL_SECONDS, SESSION_TTL_SECONDS};
+use zinnias_ciao_contracts::{
+    AppError, FORM_TOKEN_TTL_SECONDS, RELINK_CODE_TTL_SECONDS, SESSION_TTL_SECONDS,
+};
 
 // ── Session / auth gates ──────────────────────────────────────────────────
 
@@ -100,6 +102,8 @@ fn all_state_changing_routes_have_token_purpose() {
         token_purpose::REMOVE_MEMBER,
         token_purpose::PROMOTE_MEMBER,
         token_purpose::DEMOTE_MEMBER,
+        token_purpose::HELP_SIGNIN,
+        token_purpose::REDEEM_RELINK,
         token_purpose::GENERATE_INVITE,
         token_purpose::REDEEM_INVITE,
         token_purpose::JOIN_PROFILE,
@@ -286,6 +290,22 @@ fn i18n_en_ja_parity_count() {
         (EN_ADMIN_REMOVE_CONFIRM, JA_ADMIN_REMOVE_CONFIRM),
         (EN_ADMIN_REMOVE_CONSEQUENCE, JA_ADMIN_REMOVE_CONSEQUENCE),
         (EN_ADMIN_LAST_ADMIN, JA_ADMIN_LAST_ADMIN),
+        (EN_ADMIN_HELP_SIGNIN_ACTION, JA_ADMIN_HELP_SIGNIN_ACTION),
+        (EN_ADMIN_HELP_SIGNIN_TITLE, JA_ADMIN_HELP_SIGNIN_TITLE),
+        (
+            EN_ADMIN_HELP_SIGNIN_CONSEQUENCE,
+            JA_ADMIN_HELP_SIGNIN_CONSEQUENCE,
+        ),
+        (EN_ADMIN_HELP_SIGNIN_CREATE, JA_ADMIN_HELP_SIGNIN_CREATE),
+        (
+            EN_ADMIN_HELP_SIGNIN_CODE_HINT,
+            JA_ADMIN_HELP_SIGNIN_CODE_HINT,
+        ),
+        (EN_RELINK_TITLE, JA_RELINK_TITLE),
+        (EN_RELINK_BODY, JA_RELINK_BODY),
+        (EN_RELINK_CODE_LABEL, JA_RELINK_CODE_LABEL),
+        (EN_RELINK_SUBMIT, JA_RELINK_SUBMIT),
+        (EN_RELINK_INVALID, JA_RELINK_INVALID),
         (EN_COMMUNITIES_JOIN_ANOTHER, JA_COMMUNITIES_JOIN_ANOTHER),
         (EN_COMMUNITY_CREATE_LINK, JA_COMMUNITY_CREATE_LINK),
         (EN_COMMUNITY_CREATE_TITLE, JA_COMMUNITY_CREATE_TITLE),
@@ -754,7 +774,12 @@ const ROLE_TRANSFER_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/admin/role_transfer.rs");
 const MEMBER_REMOVE_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/admin/member_remove.rs");
+const HELP_SIGNIN_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/admin/help_signin.rs");
+const RELINK_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/relink.rs");
 const MEMBERSHIP_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/membership.rs");
+const RELINK_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/relink.rs");
+const SESSION_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/session.rs");
 const APP_JS_SRC: &str = include_str!("../../../workers/ssr/static/app.js");
 const RENDER_SRC: &str = include_str!("../../../workers/ssr/src/render.rs");
 const STATIC_FILES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/static_files.rs");
@@ -977,6 +1002,111 @@ fn rfc063_active_member_queries_exclude_removed_members() {
 }
 
 #[test]
+fn rfc024_help_signin_copy_and_ttl_are_locked() {
+    use zinnias_ciao_contracts::i18n::*;
+
+    assert_eq!(RELINK_CODE_TTL_SECONDS, 15 * 60);
+    assert_eq!(JA_ADMIN_HELP_SIGNIN_ACTION, "サインインを手伝う");
+    assert_eq!(EN_ADMIN_HELP_SIGNIN_ACTION, "Help sign in again");
+    assert_eq!(
+        JA_RELINK_INVALID,
+        "このコードは無効か、有効期限が切れています。"
+    );
+    assert_eq!(EN_RELINK_INVALID, "This code is invalid or has expired.");
+
+    for (label, src) in [
+        ("help-signin handler", HELP_SIGNIN_HANDLER_SRC),
+        ("relink handler", RELINK_HANDLER_SRC),
+        ("community router", COMMUNITY_HANDLER_SRC),
+    ] {
+        let lowered = src.to_ascii_lowercase();
+        for forbidden in ["reactivate", "suspend", "restore"] {
+            assert!(
+                !lowered.contains(forbidden),
+                "RFC-024 help-signin surface must not expose {forbidden:?} in {label}"
+            );
+        }
+    }
+}
+
+#[test]
+fn rfc024_relink_codes_are_membership_scoped_hmacs() {
+    assert!(
+        RELINK_DB_SRC.contains("membership_relink_codes")
+            && RELINK_DB_SRC.contains("code_hmac")
+            && RELINK_DB_SRC.contains("community_id")
+            && RELINK_DB_SRC.contains("membership_id")
+            && RELINK_DB_SRC.contains("created_by_membership_id"),
+        "RFC-024 relink code table access must keep HMAC code, community, target membership, and creator membership fields"
+    );
+    assert!(
+        RELINK_DB_SRC.contains("HMAC")
+            || HELP_SIGNIN_HANDLER_SRC.contains("hmac_hex(&crate::crypto::pepper(env)")
+            || HELP_SIGNIN_HANDLER_SRC.contains("hmac_hex(&pepper"),
+        "RFC-024 codes must be HMAC hashed before storage"
+    );
+    assert!(
+        RELINK_DB_SRC.contains("revoke_unused_for_membership")
+            && RELINK_DB_SRC.contains("revoked_at = ?1")
+            && HELP_SIGNIN_HANDLER_SRC.contains("revoke_unused_for_membership"),
+        "RFC-024 must revoke prior unused codes when creating a new code for the same membership"
+    );
+}
+
+#[test]
+fn rfc024_redemption_rechecks_active_membership_and_community() {
+    assert!(
+        RELINK_DB_SRC.contains("JOIN community_memberships m ON m.id = r.membership_id")
+            && RELINK_DB_SRC.contains("m.removed_at IS NULL")
+            && RELINK_DB_SRC.contains("m.community_id = r.community_id")
+            && RELINK_DB_SRC.contains("m.user_id"),
+        "RFC-024 redemption must resolve membership_id to user_id and re-check active community membership"
+    );
+    assert!(
+        !RELINK_DB_SRC.contains("display_name")
+            && !RELINK_HANDLER_SRC.contains("display_name")
+            && !HELP_SIGNIN_HANDLER_SRC.contains("WHERE display_name"),
+        "RFC-024 must not recover or merge by display name"
+    );
+    assert!(
+        JOIN_HANDLER_SRC.contains("let user_id = crate::crypto::random_token();")
+            && JOIN_HANDLER_SRC.contains("let membership_id = crate::crypto::random_token();")
+            && JOIN_HANDLER_SRC.contains("membership_db::insert_membership("),
+        "RFC-024 invite-era help-signin relies on join minting a fresh user_id and membership per invite redemption"
+    );
+}
+
+#[test]
+fn rfc024_redemption_is_single_use_generic_and_revokes_old_sessions() {
+    assert!(
+        RELINK_DB_SRC.contains("pub async fn mark_used")
+            && RELINK_DB_SRC.contains("used_at IS NULL")
+            && RELINK_HANDLER_SRC.contains("mark_used"),
+        "RFC-024 redemption must mark codes used with a conditional single-use update"
+    );
+    assert!(
+        RELINK_HANDLER_SRC.contains("JA_RELINK_INVALID")
+            && !RELINK_HANDLER_SRC.contains("already used")
+            && !RELINK_HANDLER_SRC.contains("wrong community"),
+        "RFC-024 redemption failures must use one generic error"
+    );
+    assert!(
+        SESSION_DB_SRC.contains("pub async fn revoke_others_for_user")
+            && RELINK_HANDLER_SRC.contains("revoke_others_for_user")
+            && SESSION_DB_SRC.contains("id != ?3"),
+        "RFC-024 redemption must revoke other active sessions for the target user after inserting the new session"
+    );
+    let audit_write_count = RELINK_HANDLER_SRC.matches("audit::write(").count();
+    assert!(
+        RELINK_HANDLER_SRC.contains("rate_limit::is_relink_rate_limited")
+            && RELINK_HANDLER_SRC.contains("record_relink_failure")
+            && audit_write_count == 1
+            && RELINK_HANDLER_SRC.contains("\"membership.relink_redeemed\""),
+        "RFC-024 failed redemption should be rate-limited, not audited as a membership event"
+    );
+}
+
+#[test]
 fn rfc057_community_creation_is_guarded_active_admin_only() {
     assert!(
         LIB_SRC.contains("(Method::Get, \"/communities/new\")")
@@ -1153,8 +1283,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.50.0-member-lifecycle")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.50.0-member-lifecycle"),
+        RENDER_SRC.contains("/static/app.js?v=0.51.0-help-signin")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.51.0-help-signin"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(

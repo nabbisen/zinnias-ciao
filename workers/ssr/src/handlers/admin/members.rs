@@ -331,6 +331,14 @@ pub async fn get_members(
                     label = i18n::JA_ADMIN_PROMOTE_ACTION,
                 )
             };
+            let help_action = format!(
+                "<a href=\"/c/{cid}/admin/members/{mid}/help-signin\" \
+                 style=\"display:block;color:#007AFF;font-size:.875rem;min-height:44px;\
+                 line-height:44px;text-align:right\">{label}</a>",
+                cid = render::escape_html(community_id),
+                mid = render::escape_html(&m.id),
+                label = i18n::JA_ADMIN_HELP_SIGNIN_ACTION,
+            );
             let remove_action = if is_self {
                 String::new()
             } else {
@@ -360,12 +368,13 @@ pub async fn get_members(
              <span style=\"display:block;font-size:.9375rem;overflow-wrap:anywhere\">{name}</span>\
              <span style=\"display:block;font-size:.8125rem;color:#6e6e73;margin-top:.125rem\">{role}{self_label}</span>\
              </span>\
-             <span style=\"flex:0 0 auto\">{role_action}{remove_action}</span>\
+             <span style=\"flex:0 0 auto\">{role_action}{help_action}{remove_action}</span>\
              </li>",
                 name = render::escape_html(&m.display_name),
                 role = role_label,
                 self_label = self_label,
                 role_action = role_action,
+                help_action = help_action,
                 remove_action = remove_action,
             )
         })

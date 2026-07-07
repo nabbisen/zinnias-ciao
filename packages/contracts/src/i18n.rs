@@ -289,6 +289,17 @@ pub const EN_ADMIN_REMOVE_CONSEQUENCE: &str =
     "They will no longer be able to see events or notes. Past attendance and notes remain.";
 pub const EN_ADMIN_LAST_ADMIN: &str =
     "Cannot remove the last admin. Transfer the admin role first.";
+pub const EN_ADMIN_HELP_SIGNIN_ACTION: &str = "Help sign in again";
+pub const EN_ADMIN_HELP_SIGNIN_TITLE: &str = "Help sign in again?";
+pub const EN_ADMIN_HELP_SIGNIN_CONSEQUENCE: &str = "This code lets someone sign in as this member. Share it only with the intended person. It expires in 15 minutes and can be used once.";
+pub const EN_ADMIN_HELP_SIGNIN_CREATE: &str = "Create code";
+pub const EN_ADMIN_HELP_SIGNIN_CODE_HINT: &str =
+    "Share this code only with the intended member. It is shown once.";
+pub const EN_RELINK_TITLE: &str = "Sign in again";
+pub const EN_RELINK_BODY: &str = "Enter the code from your community admin.";
+pub const EN_RELINK_CODE_LABEL: &str = "Code";
+pub const EN_RELINK_SUBMIT: &str = "Sign in";
+pub const EN_RELINK_INVALID: &str = "This code is invalid or has expired.";
 
 pub const JA_ADMIN_MEMBERS_TITLE: &str = "メンバー";
 pub const JA_ADMIN_MEMBERS_GENERATE_INVITE: &str = "招待コードを生成";
@@ -308,6 +319,17 @@ pub const JA_ADMIN_REMOVE_CONSEQUENCE: &str =
     "このメンバーはイベントやメモを見ることができなくなります。過去の参加状況やメモは残ります。";
 pub const JA_ADMIN_LAST_ADMIN: &str =
     "最後の管理者はメンバーから外せません。先に管理者権限を移譲してください。";
+pub const JA_ADMIN_HELP_SIGNIN_ACTION: &str = "サインインを手伝う";
+pub const JA_ADMIN_HELP_SIGNIN_TITLE: &str = "サインインし直すお手伝いをしますか？";
+pub const JA_ADMIN_HELP_SIGNIN_CONSEQUENCE: &str = "このコードを使うと、このメンバーとしてサインインできます。本人にだけ渡してください。コードは15分で使えなくなり、1回だけ使えます。";
+pub const JA_ADMIN_HELP_SIGNIN_CREATE: &str = "コードを作成";
+pub const JA_ADMIN_HELP_SIGNIN_CODE_HINT: &str =
+    "このコードは本人にだけ渡してください。ここで一度だけ表示されます。";
+pub const JA_RELINK_TITLE: &str = "サインインし直す";
+pub const JA_RELINK_BODY: &str = "コミュニティの管理者から受け取ったコードを入力してください。";
+pub const JA_RELINK_CODE_LABEL: &str = "コード";
+pub const JA_RELINK_SUBMIT: &str = "サインイン";
+pub const JA_RELINK_INVALID: &str = "このコードは無効か、有効期限が切れています。";
 
 // ── Communities ───────────────────────────────────────────────────────────
 pub const EN_COMMUNITIES_JOIN_ANOTHER: &str = "Join another community";

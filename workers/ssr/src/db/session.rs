@@ -75,6 +75,27 @@ pub async fn revoke(db: &D1Database, session_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Revoke every other active session for a user after successful help-signin.
+pub async fn revoke_others_for_user(
+    db: &D1Database,
+    user_id: &str,
+    keep_session_id: &str,
+) -> Result<()> {
+    let now = now_utc();
+    db.prepare(
+        "UPDATE sessions \
+         SET revoked_at = ?1 \
+         WHERE user_id = ?2 \
+           AND id != ?3 \
+           AND revoked_at IS NULL \
+           AND expires_at > ?1",
+    )
+    .bind(&[now.as_str().into(), user_id.into(), keep_session_id.into()])?
+    .run()
+    .await?;
+    Ok(())
+}
+
 /// Touch `last_seen_at` (periodic, not on every request — guards privacy).
 pub async fn touch(db: &D1Database, session_id: &str) -> Result<()> {
     let now = now_utc();

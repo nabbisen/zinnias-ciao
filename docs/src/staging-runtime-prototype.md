@@ -99,7 +99,7 @@ candidate evidence, set staging `BUILD_VERSION` to the candidate tag during
 deploy and run with a matching value, for example:
 
 ```sh
-EXPECTED_VERSION="v0.50.0" \
+EXPECTED_VERSION="v0.51.0" \
   bun run smoke:runtime -- https://<deployed-worker-url>
 ```
 

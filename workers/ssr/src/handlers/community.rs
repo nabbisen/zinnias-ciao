@@ -250,6 +250,9 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
                             super::admin::get_promote_member(req, env, rid, cid, mid).await
                         }
                         "demote" => super::admin::get_demote_member(req, env, rid, cid, mid).await,
+                        "help-signin" => {
+                            super::admin::get_help_signin(req, env, rid, cid, mid).await
+                        }
                         _ => render::not_found(),
                     }
                 }
@@ -327,6 +330,9 @@ pub async fn dispatch_post(req: Request, env: &Env, rid: &str, path: &str) -> Re
                             super::admin::post_promote_member(req, env, rid, cid, mid).await
                         }
                         "demote" => super::admin::post_demote_member(req, env, rid, cid, mid).await,
+                        "help-signin" => {
+                            super::admin::post_help_signin(req, env, rid, cid, mid).await
+                        }
                         _ => render::not_found(),
                     }
                 }
