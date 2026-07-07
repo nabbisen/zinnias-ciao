@@ -1,6 +1,6 @@
 # RFC 062 — Admin Role Transfer and Promotion
 
-**Status.** Proposed
+**Status.** Implemented
 **Phase:** F8 / Community administration workflow
 **Project:** ciao.zinnias
 **Date:** 2026-07-06

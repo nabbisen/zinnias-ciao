@@ -2,6 +2,63 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.49.0] — 2026-07-07
+
+RFC-062 admin role transfer and promotion.
+
+### Changed
+
+- **Member management now supports admin role changes.**
+  Community admins can promote an active member to admin or demote another
+  admin back to member from `/c/:cid/admin/members`.
+
+- **Admin removal now uses the same last-admin write discipline as demotion.**
+  Removing an admin is guarded by a conditional write that re-checks active
+  admin count inside the update, preventing concurrent remove/demote requests
+  from leaving a community with zero admins.
+
+- **Release version bumped to v0.49.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+### Added
+
+- **RFC-062 release gates.**
+  Source gates cover role-transfer route registration, dedicated form-token
+  purposes, scoped guarded writes, self-target denial, audit shape,
+  member-role-only invite generation, and Japanese UI-copy coverage.
+
+- **Committed admin role-transfer browser smoke.**
+  `scripts/smoke/admin-role-transfer.mjs` seeds local D1, starts local Wrangler
+  dev, launches sandboxed/incognito Chromium without `--no-sandbox`, and writes
+  RFC-062 evidence to `.git-exclude/evidence/rfc062/`.
+
+### Fixed
+
+- **Dead unguarded member removal helper removed.**
+  The old unguarded `soft_remove` helper was deleted after the guarded removal
+  path replaced it.
+
+- **Role-transfer confirmation action escaping.**
+  Promote/demote confirmation form actions are escaped once in the render
+  context, avoiding double-encoding.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo test -p zinnias-ciao-contracts --test release_gates`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo build --workspace`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `node --check scripts/smoke/admin-role-transfer.mjs`
+- `node scripts/smoke/admin-role-transfer.mjs`
+- `mdbook build docs`
+- `git diff --check`
+
+Hosted Cloudflare smoke was not run in this working tree because no hosted
+staging or production URL was provided as an operator target.
+
 ## [0.48.0] — 2026-07-06
 
 RFC-061 community admin member-management navigation.

@@ -175,7 +175,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging explicitly, then `EXPECTED_VERSION=v0.48.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.49.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -188,6 +188,17 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Invite generation links back to member management. *(admin/members.rs + smoke evidence)*
 - [x] Community switcher preserves member-management and invite pages only for destination communities where the current user is an admin. *(community.rs + release gate + smoke evidence)*
 - [x] Committed browser smoke verifies the RFC-061 workflow with local Wrangler D1/dev and sandboxed/incognito Chromium without `--no-sandbox`. *(scripts/smoke/member-management.mjs; evidence `.git-exclude/evidence/rfc061/`)*
+
+## Admin role transfer gates (v0.49.0 — RFC-062)
+
+- [x] Member management shows one role-change action per non-self row: promote for members and demote for admins. *(admin/members.rs + smoke evidence)*
+- [x] Promote and demote use separate confirmation routes with dedicated form-token purposes; requested role is not accepted from form data. *(community.rs + role_transfer.rs + release gate)*
+- [x] Role changes are scoped by membership id, community id, active membership, and current role. *(membership.rs + release gate)*
+- [x] Last-admin demotion and admin removal are guarded by conditional SQL writes that re-check active admin count inside the update. *(membership.rs + release gate)*
+- [x] Self-demotion direct URLs, non-admin admin routes, and invalid target memberships use generic safe denial. *(role_transfer.rs + smoke evidence)*
+- [x] Successful role changes audit direction-specific action names without metadata. *(role_transfer.rs + release gate)*
+- [x] Admin invite generation remains member-role only; admin-granting invite UI is not part of this slice. *(admin/members.rs + release gate)*
+- [x] Committed browser smoke verifies the RFC-062 workflow with local Wrangler D1/dev and sandboxed/incognito Chromium without `--no-sandbox`. *(scripts/smoke/admin-role-transfer.mjs; evidence `.git-exclude/evidence/rfc062/`)*
 
 ## Operational gates
 

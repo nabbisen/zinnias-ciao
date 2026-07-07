@@ -1,6 +1,6 @@
 # RFC 061 — Community Admin Member Management Navigation
 
-**Status.** Proposed
+**Status.** Implemented
 **Phase:** F8 / Community and Calendar workflow improvement
 **Project:** ciao.zinnias
 **Date:** 2026-07-06

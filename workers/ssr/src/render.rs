@@ -51,7 +51,7 @@ const ICON_NO_ANSWER: &str = "<svg aria-hidden='true' width='1em' height='1em' v
 // ── Static asset paths ────────────────────────────────────────────────────
 const MANIFEST: &str = "/manifest.webmanifest";
 const CSS: &str = "/static/app.css";
-const JS: &str = "/static/app.js?v=0.48.0-member-management";
+const JS: &str = "/static/app.js?v=0.49.0-role-transfer";
 const THEME: &str = "#007AFF";
 
 // ── Shell ─────────────────────────────────────────────────────────────────
