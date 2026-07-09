@@ -1,7 +1,7 @@
 # RFC 066 - Event Copy From Existing Event
 
-**Status.** Proposed  
-**Target release.** v0.55.0 candidate  
+**Status.** Implemented in v0.55.0  
+**Target release.** v0.55.0  
 **Tracks.** Admin event workflow, event creation convenience, Calendar
 workflow.  
 **Touches.** `workers/ssr/src/handlers/admin/events`, Event Detail rendering,

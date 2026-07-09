@@ -71,6 +71,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 062 | [Admin Role Transfer and Promotion](./done/062-admin-role-transfer-and-promotion.md) | v0.49.0 |
 | 063 | [Member Removal, Re-add, and Suspension Policy](./done/063-member-removal-readd-and-suspension-policy.md) | v0.50.0 |
 | 065 | [Recurrence v2 and Occurrence Exceptions](./done/065-recurrence-v2-and-occurrence-exceptions.md) | v0.54.0 |
+| 066 | [Event Copy From Existing Event](./done/066-event-copy-from-existing-event.md) | v0.55.0 |
 
 ## Also Done
 
@@ -107,12 +108,6 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | ID | Title | File | Note |
 |----|-------|------|------|
 | 064 | Rust Module and Crate Boundary Cleanup | [./proposed/064-rust-module-and-crate-boundary-cleanup.md](./proposed/064-rust-module-and-crate-boundary-cleanup.md) | Phase 1 admin-events split ships in v0.52.0; Phase 2 render split ships in v0.53.0; Phase 3+ remains proposed |
-
-## Proposed — workflow follow-ups (066)
-
-| ID | Title | File | Note |
-|----|-------|------|------|
-| 066 | Event Copy From Existing Event | [./proposed/066-event-copy-from-existing-event.md](./proposed/066-event-copy-from-existing-event.md) | Candidate v0.55.0 admin convenience workflow; design review pending |
 
 ## Archive
 

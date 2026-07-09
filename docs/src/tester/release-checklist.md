@@ -175,7 +175,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/tester/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.54.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.55.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -261,6 +261,18 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Occurrence-only cancellation preserves `event_day_id`, writes an exception row, and blocks further status changes for that date. *(occurrence.rs + event_write.rs + event.rs + smoke evidence)*
 - [x] Exception rows database-check skip/cancel shape. *(migration 0009 + release gate `rfc065_exception_shape_is_checked_by_database`)*
 - [x] Committed browser smoke verifies recurrence creation, Calendar materialization, far-future no-write behavior, and occurrence cancellation with local Wrangler D1/dev and sandboxed/incognito Chromium without `--no-sandbox`. *(scripts/smoke/recurrence-v2.mjs; evidence `.git-exclude/evidence/rfc065/`)*
+
+## Event copy gates (v0.55.0 — RFC-066)
+
+- [x] Event Detail exposes `このイベントをコピー` only to active admins. *(event.rs + browser smoke)*
+- [x] Non-admin users do not see the copy action, and direct copy URL access does not reveal source state. *(copy.rs auth + browser smoke)*
+- [x] Single-day source copy pre-fills title, location, description, date, start time, end time, and `copy_mode=event_copy`. *(copy.rs/forms.rs + browser smoke)*
+- [x] Multi-day non-recurring source copy leaves schedule fields blank and shows the multi-day helper. *(copy.rs + browser smoke)*
+- [x] Past recurring source copy copies recurrence frequency and local times but leaves `day_date`, occurrence count, and until date blank. *(copy.rs + browser smoke)*
+- [x] Successful copied create produces a new event without copied attendance answers, notes, occurrence exceptions, cancellation state, source event/day/series IDs, or copied audit history. *(create.rs + browser smoke/D1 checks)*
+- [x] RFC-060 cancelled-event recreate provenance remains separate from RFC-066 event-copy provenance. *(create.rs + release gate `rfc066_event_copy_is_admin_reviewed_prefill_not_clone`)*
+- [x] Community switcher from the copy form lands on normal Create Event without hidden source-copy state. *(copy.rs + browser smoke)*
+- [x] Mobile 390px viewport at 200% text scaling keeps helper text, controls, and submit action usable without horizontal overflow. *(scripts/smoke/event-copy.mjs; evidence `.git-exclude/evidence/rfc066/`)*
 
 ## Operational gates
 

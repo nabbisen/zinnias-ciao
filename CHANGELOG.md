@@ -2,6 +2,77 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.55.0] — 2026-07-09
+
+RFC-066 event copy workflow for admin-reviewed Create Event prefill.
+
+### Changed
+
+- **Release version bumped to v0.55.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+- **Event Detail now exposes admin event copy.**
+  Active community admins can open a copy-prefilled Create Event form from
+  scheduled, past, or cancelled source events.
+
+- **Create Event repeat controls are reusable for copy prefill.**
+  Normal Create Event defaults remain unchanged while copied recurring sources
+  can prefill reviewed recurrence controls.
+
+### Added
+
+- **RFC-066 copy route and source-prefill workflow.**
+  `GET /c/:community_id/admin/events/:event_id/copy` loads scoped source event,
+  day, and recurrence-series data, then renders the normal Create Event form
+  with safe prefilled values.
+
+- **Recurring source normalization.**
+  Past or out-of-window recurring source events copy useful template details,
+  frequency, and local times without opening an immediately invalid Create Event
+  form. Invalid `until_date` controls reset to the normal Create Event default.
+
+- **RFC-066 browser smoke coverage.**
+  `scripts/smoke/event-copy.mjs` verifies admin visibility, non-admin denial,
+  single-day copy creation, no copied attendance/notes/exceptions/source IDs,
+  multi-day details-only copy, past recurring normalization, switcher behavior,
+  and mobile 200% text scaling in sandboxed/incognito Chromium.
+
+### Fixed
+
+- **RFC-060 recreate and RFC-066 copy provenance are separated.**
+  Cancelled-event recreate keeps `created_from_cancelled_event_id`, while event
+  copy records minimal `copy_source_event_id` / `copy_mode=event_copy` audit
+  metadata.
+
+- **Future attendance matrix numbering drift removed.**
+  RFC-065 now refers to a future admin monthly attendance matrix RFC without
+  reserving RFC-066 for that future work.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `git diff --check`
+- `node --check scripts/smoke/event-copy.mjs`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo build --workspace`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `mdbook build docs`
+- `bun run smoke:event-copy`
+
+Browser smoke evidence:
+
+- `.git-exclude/evidence/rfc066/rfc066-event-copy-smoke-results.json`
+- `.git-exclude/evidence/rfc066/admin-sees-copy-action-for-cancelled.png`
+- `.git-exclude/evidence/rfc066/non-admin-copy-direct-url-denied.png`
+- `.git-exclude/evidence/rfc066/single-day-copy-created-event.png`
+- `.git-exclude/evidence/rfc066/past-recurring-copy-form.png`
+- `.git-exclude/evidence/rfc066/switcher-drops-copy-state.png`
+
+Hosted Cloudflare staging smoke was not run in this working tree because no
+hosted staging or production URL was provided as an operator target.
+
 ## [0.54.0] — 2026-07-09
 
 RFC-065 recurrence v2 and occurrence exceptions for Calendar workflows.
