@@ -15,7 +15,8 @@
     "lint": "cargo clippy -p zinnias-ciao-domain -p zinnias-ciao-contracts -- -D warnings",
     "fmt": "cargo fmt --all -- --check",
     "reset:dev": "node scripts/setup.mjs --reset",
-    "smoke:runtime": "node scripts/runtime-smoke.mjs"
+    "smoke:runtime": "node scripts/runtime-smoke.mjs",
+    "smoke:recurrence": "node scripts/smoke/recurrence-v2.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
