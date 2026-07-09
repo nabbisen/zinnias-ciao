@@ -2,6 +2,83 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.54.0] — 2026-07-09
+
+RFC-065 recurrence v2 and occurrence exceptions for Calendar workflows.
+
+### Changed
+
+- **Release version bumped to v0.54.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+- **Recurring event creation no longer defaults to 8 occurrences.**
+  Admins now choose no end date, an until date, or a bounded occurrence count.
+  Compatibility summaries remain on `events.repeat_rule` / `repeat_count`,
+  while `event_series` is the recurrence source of truth.
+
+- **Calendar renders recurring events through bounded rolling materialization.**
+  Calendar requests materialize recurrence only inside the six-month forward
+  window and show plain copy when a requested month is outside that window.
+
+### Added
+
+- **Recurrence-series and occurrence-exception storage.**
+  Migration `0009_recurrence_v2.sql` adds `event_series`,
+  `event_series_exceptions`, occurrence status, and stable
+  `(series_id, series_occurrence_date)` identity on `event_days`.
+
+- **Open-ended and until-date recurrence support.**
+  RFC-065 adds recurrence end modes while preserving `event_day_id` as the
+  attendance anchor.
+
+- **Occurrence-only cancellation for materialized recurring dates.**
+  Active admins can cancel one visible recurring date without cancelling the
+  whole event. Attendance rows stay attached to the existing `event_day_id`.
+
+- **RFC-065 smoke coverage.**
+  `scripts/smoke/recurrence-v2.mjs` verifies recurrence creation, blank repeat
+  count default, Calendar-triggered materialization, far-future no-write
+  behavior, and occurrence-only cancellation in sandboxed/incognito Chromium.
+
+### Fixed
+
+- **Legacy recurrence migration avoids unsafe UTC-as-local backfill.**
+  Migrated legacy series keep existing `event_days` intact but do not generate
+  future rows when local template times cannot be safely recovered.
+
+- **Long-lived open-ended series continue after the existing materialized
+  range.**
+  Rolling materialization now generates after `materialized_through_day_date`
+  instead of replaying only the first capped historical batch.
+
+- **The 64-row materialization cap is enforced per Calendar request.**
+  The shared budget is no longer reset for every active series in a community.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `git diff --check`
+- `cargo check -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts`
+- `cargo test -p zinnias-ciao-ssr`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo build --workspace`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `node --check scripts/smoke/recurrence-v2.mjs`
+- `bun run smoke:recurrence`
+
+Browser smoke evidence:
+
+- `.git-exclude/evidence/rfc065/rfc065-recurrence-v2-smoke-results.json`
+- `.git-exclude/evidence/rfc065/admin-ui-creates-open-ended-weekly-recurrence.png`
+- `.git-exclude/evidence/rfc065/calendar-materializes-rolling-open-ended-series.png`
+- `.git-exclude/evidence/rfc065/far-future-calendar-month-does-not-materialize.png`
+- `.git-exclude/evidence/rfc065/admin-cancels-one-recurring-occurrence.png`
+
+Hosted Cloudflare staging smoke was not run in this working tree because no
+hosted staging or production URL was provided as an operator target.
+
 ## [0.53.1] — 2026-07-09
 
 Documentation role-structure patch release.

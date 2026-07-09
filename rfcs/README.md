@@ -70,6 +70,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 061 | [Community Admin Member Management Navigation](./done/061-community-admin-member-management-navigation.md) | v0.48.0 |
 | 062 | [Admin Role Transfer and Promotion](./done/062-admin-role-transfer-and-promotion.md) | v0.49.0 |
 | 063 | [Member Removal, Re-add, and Suspension Policy](./done/063-member-removal-readd-and-suspension-policy.md) | v0.50.0 |
+| 065 | [Recurrence v2 and Occurrence Exceptions](./done/065-recurrence-v2-and-occurrence-exceptions.md) | v0.54.0 |
 
 ## Also Done
 
@@ -106,12 +107,6 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | ID | Title | File | Note |
 |----|-------|------|------|
 | 064 | Rust Module and Crate Boundary Cleanup | [./proposed/064-rust-module-and-crate-boundary-cleanup.md](./proposed/064-rust-module-and-crate-boundary-cleanup.md) | Phase 1 admin-events split ships in v0.52.0; Phase 2 render split ships in v0.53.0; Phase 3+ remains proposed |
-
-## Proposed — Calendar advancement (065)
-
-| ID | Title | File | Note |
-|----|-------|------|------|
-| 065 | Recurrence v2 and Occurrence Exceptions | [./proposed/065-recurrence-v2-and-occurrence-exceptions.md](./proposed/065-recurrence-v2-and-occurrence-exceptions.md) | Candidate v0.54.0 design; supersedes RFC-022 recurrence semantics while preserving `event_day` attendance anchors |
 
 ## Archive
 

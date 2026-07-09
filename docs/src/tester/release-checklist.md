@@ -175,7 +175,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/tester/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.53.1 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.54.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -249,6 +249,18 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] README and tracked operational comments point to the new role/shared documentation paths. *(README.md, wrangler.toml, workers/ssr/static/sw.js)*
 - [x] Active documentation and RFC references no longer point to the removed flat docs paths. *(path scan + mdbook build)*
 - [x] Browser smoke is not required for this slice because no route, form field, rendered-copy, or intended browser behavior changed beyond version/cache-buster alignment. *(documentation restructure)*
+
+## Recurrence v2 gates (v0.54.0 — RFC-065)
+
+- [x] Recurrence source of truth is `event_series`; `events.repeat_rule` and `events.repeat_count` remain compatibility summaries. *(migration 0009 + event_write.rs + RFC-065)*
+- [x] Legacy migrated series do not derive local recurrence times from UTC clock text. *(migration 0009 + release gate `rfc065_legacy_migration_does_not_treat_utc_clock_as_local_time`)*
+- [x] Existing `event_days.id` rows remain the attendance anchor during migration. *(migration 0009 + RFC-065 implementation review)*
+- [x] Calendar materialization is bounded to the six-month forward window and far-future month requests do not write rows. *(communities.rs + smoke evidence)*
+- [x] Rolling materialization continues after `materialized_through_day_date` and enforces one shared 64-row request budget. *(event_series.rs + domain tests + release gate)*
+- [x] The Create Event form has no arbitrary repeat-count default of 8 and supports open-ended, until-date, and count end modes. *(forms.rs + smoke evidence)*
+- [x] Occurrence-only cancellation preserves `event_day_id`, writes an exception row, and blocks further status changes for that date. *(occurrence.rs + event_write.rs + event.rs + smoke evidence)*
+- [x] Exception rows database-check skip/cancel shape. *(migration 0009 + release gate `rfc065_exception_shape_is_checked_by_database`)*
+- [x] Committed browser smoke verifies recurrence creation, Calendar materialization, far-future no-write behavior, and occurrence cancellation with local Wrangler D1/dev and sandboxed/incognito Chromium without `--no-sandbox`. *(scripts/smoke/recurrence-v2.mjs; evidence `.git-exclude/evidence/rfc065/`)*
 
 ## Operational gates
 

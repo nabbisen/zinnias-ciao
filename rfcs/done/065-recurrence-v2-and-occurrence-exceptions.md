@@ -1,6 +1,6 @@
 # RFC 065 - Recurrence v2 and Occurrence Exceptions
 
-**Status.** Proposed  
+**Status.** Implemented in v0.54.0  
 **Target release.** v0.54.0  
 **Tracks.** Calendar workflow, admin event creation, recurrence data model,
 event-day attendance preservation.  
