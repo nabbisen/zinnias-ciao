@@ -197,6 +197,19 @@ pub const EN_CALENDAR_OUT_OF_RANGE: &str =
 pub const EN_CALENDAR_MATERIALIZATION_LIMIT: &str = "Some recurring dates are still being prepared. Please try again later or ask an admin to review.";
 pub const EN_ADMIN_RECREATE_EVENT_ACTION: &str = "Create similar event";
 pub const EN_ADMIN_RECREATE_EVENT_HELPER: &str = "Only the title, place, and description are reused. Choose the date again. Attendance answers and memos are not carried over.";
+pub const EN_ADMIN_COPY_EVENT_ACTION: &str = "Copy this event";
+pub const EN_ADMIN_COPY_EVENT_TITLE: &str = "Create from copied event";
+pub const EN_ADMIN_COPY_EVENT_HELPER: &str =
+    "Create a new event from this event. Attendance answers and memos are not copied.";
+pub const EN_ADMIN_COPY_EVENT_DATE_WARNING: &str = "The date is copied too. Change it if needed.";
+pub const EN_ADMIN_COPY_EVENT_MULTI_DAY_HELPER: &str =
+    "This source event has multiple dates. Choose the new schedule again.";
+pub const EN_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE: &str =
+    "The schedule cannot be copied. Choose a new schedule.";
+pub const EN_ADMIN_COPY_EVENT_RECURRING_PAST: &str =
+    "The recurrence starts in the past. Choose a new start date.";
+pub const EN_ADMIN_COPY_EVENT_RECURRING_WINDOW: &str =
+    "The recurrence starts outside the current create window. Choose a new start date.";
 pub const EN_ADMIN_EDIT_EVENT_TITLE: &str = "Edit Event";
 pub const EN_ADMIN_EDIT_EVENT_SUBMIT: &str = "Save Changes";
 pub const EN_ADMIN_EDIT_EVENT_HINT: &str = "Members will see the updated event details.";
@@ -246,6 +259,20 @@ pub const JA_CALENDAR_MATERIALIZATION_LIMIT: &str =
     "一部の繰り返し予定はまだ準備中です。時間をおいて再度確認するか、管理者に確認してください。";
 pub const JA_ADMIN_RECREATE_EVENT_ACTION: &str = "似た内容で新しいイベントを作成";
 pub const JA_ADMIN_RECREATE_EVENT_HELPER: &str = "タイトル・場所・説明だけを引き継ぎます。日程はもう一度選びます。参加の回答とメモは引き継ぎません。";
+pub const JA_ADMIN_COPY_EVENT_ACTION: &str = "このイベントをコピー";
+pub const JA_ADMIN_COPY_EVENT_TITLE: &str = "イベントをコピーして作成";
+pub const JA_ADMIN_COPY_EVENT_HELPER: &str =
+    "内容をコピーして新しいイベントを作成します。参加の回答とメモはコピーされません。";
+pub const JA_ADMIN_COPY_EVENT_DATE_WARNING: &str =
+    "日付もコピーされています。必要に応じて変更してください。";
+pub const JA_ADMIN_COPY_EVENT_MULTI_DAY_HELPER: &str =
+    "複数日の予定です。日程は新しく選び直してください。";
+pub const JA_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE: &str =
+    "日程はコピーできません。新しく選び直してください。";
+pub const JA_ADMIN_COPY_EVENT_RECURRING_PAST: &str =
+    "繰り返しの開始日が過去のため、開始日を新しく選び直してください。";
+pub const JA_ADMIN_COPY_EVENT_RECURRING_WINDOW: &str =
+    "繰り返しの開始日が作成できる範囲外のため、開始日を新しく選び直してください。";
 pub const JA_ADMIN_EDIT_EVENT_TITLE: &str = "イベントを編集";
 pub const JA_ADMIN_EDIT_EVENT_SUBMIT: &str = "変更を保存";
 pub const JA_ADMIN_EDIT_EVENT_HINT: &str = "メンバーには更新されたイベント詳細が表示されます。";

@@ -31,6 +31,27 @@ pub struct MaterializationReport {
     pub cap_reached: bool,
 }
 
+pub async fn find_for_event(
+    db: &D1Database,
+    event_id: &str,
+    community_id: &str,
+) -> Result<Option<EventSeriesRow>> {
+    let row = db
+        .prepare(
+            "SELECT id, event_id, community_id, frequency, start_day_date, \
+                    starts_at_local, ends_at_local, timezone, end_mode, \
+                    occurrence_count, until_day_date, materialized_through_day_date \
+             FROM event_series \
+             WHERE event_id = ?1 AND community_id = ?2 \
+             LIMIT 1",
+        )
+        .bind(&[event_id.into(), community_id.into()])?
+        .first::<serde_json::Value>(None)
+        .await?;
+
+    Ok(row.and_then(parse_series_row))
+}
+
 pub async fn materialize_for_community_through(
     db: &D1Database,
     community_id: &str,

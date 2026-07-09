@@ -212,6 +212,29 @@ fn i18n_en_ja_parity_count() {
             EN_ADMIN_RECREATE_EVENT_HELPER,
             JA_ADMIN_RECREATE_EVENT_HELPER,
         ),
+        (EN_ADMIN_COPY_EVENT_ACTION, JA_ADMIN_COPY_EVENT_ACTION),
+        (EN_ADMIN_COPY_EVENT_TITLE, JA_ADMIN_COPY_EVENT_TITLE),
+        (EN_ADMIN_COPY_EVENT_HELPER, JA_ADMIN_COPY_EVENT_HELPER),
+        (
+            EN_ADMIN_COPY_EVENT_DATE_WARNING,
+            JA_ADMIN_COPY_EVENT_DATE_WARNING,
+        ),
+        (
+            EN_ADMIN_COPY_EVENT_MULTI_DAY_HELPER,
+            JA_ADMIN_COPY_EVENT_MULTI_DAY_HELPER,
+        ),
+        (
+            EN_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE,
+            JA_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE,
+        ),
+        (
+            EN_ADMIN_COPY_EVENT_RECURRING_PAST,
+            JA_ADMIN_COPY_EVENT_RECURRING_PAST,
+        ),
+        (
+            EN_ADMIN_COPY_EVENT_RECURRING_WINDOW,
+            JA_ADMIN_COPY_EVENT_RECURRING_WINDOW,
+        ),
         (EN_ADMIN_EDIT_EVENT_TITLE, JA_ADMIN_EDIT_EVENT_TITLE),
         (EN_ADMIN_EDIT_EVENT_SUBMIT, JA_ADMIN_EDIT_EVENT_SUBMIT),
         (EN_ADMIN_EDIT_EVENT_HINT, JA_ADMIN_EDIT_EVENT_HINT),
@@ -836,6 +859,7 @@ const ADMIN_EVENTS_SRC: &str = concat!(
     include_str!("../../../workers/ssr/src/handlers/admin/events.rs"),
     include_str!("../../../workers/ssr/src/handlers/admin/events/attendance.rs"),
     include_str!("../../../workers/ssr/src/handlers/admin/events/cancel.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/copy.rs"),
     include_str!("../../../workers/ssr/src/handlers/admin/events/create.rs"),
     include_str!("../../../workers/ssr/src/handlers/admin/events/edit.rs"),
     include_str!("../../../workers/ssr/src/handlers/admin/events/forms.rs"),
@@ -845,6 +869,8 @@ const ADMIN_EVENTS_SRC: &str = concat!(
     include_str!("../../../workers/ssr/src/handlers/admin/events/summary.rs"),
     include_str!("../../../workers/ssr/src/handlers/admin/events/support.rs"),
 );
+const ADMIN_EVENTS_COPY_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/admin/events/copy.rs");
 const ROLE_TRANSFER_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/admin/role_transfer.rs");
 const MEMBER_REMOVE_HANDLER_SRC: &str =
@@ -1650,6 +1676,58 @@ fn rfc060_cancelled_event_recreate_is_admin_only_and_details_only() {
             "Recreate form must not copy schedule/recurrence field {copied_schedule}"
         );
     }
+}
+
+#[test]
+fn rfc066_event_copy_is_admin_reviewed_prefill_not_clone() {
+    assert!(
+        COMMUNITY_HANDLER_SRC.contains("\"copy\"")
+            && COMMUNITY_HANDLER_SRC.contains("get_copy_event"),
+        "RFC-066 must route GET /c/:cid/admin/events/:eid/copy"
+    );
+    assert!(
+        ADMIN_EVENTS_COPY_SRC.contains("pub async fn get_copy_event")
+            && ADMIN_EVENTS_COPY_SRC.contains("require_admin")
+            && ADMIN_EVENTS_COPY_SRC.contains("event_db::find_for_community")
+            && ADMIN_EVENTS_COPY_SRC.contains("event_db::days_for_event")
+            && ADMIN_EVENTS_COPY_SRC.contains("series_db::find_for_event")
+            && ADMIN_EVENTS_COPY_SRC.contains("token_purpose::CREATE_EVENT"),
+        "Copy GET must require an active same-community admin and load only scoped event/day/series source data"
+    );
+    for forbidden_source in [
+        "attendance",
+        "event_note",
+        "invite",
+        "audit::",
+        "form_token",
+    ] {
+        assert!(
+            !ADMIN_EVENTS_COPY_SRC.contains(forbidden_source),
+            "Copy source prefill must not load {forbidden_source}"
+        );
+    }
+    assert!(
+        EVENT_HANDLER_SRC.contains("membership.is_admin()")
+            && EVENT_HANDLER_SRC.contains("JA_ADMIN_COPY_EVENT_ACTION")
+            && EVENT_HANDLER_SRC.contains("/admin/events/{eid}/copy"),
+        "Event Detail must expose the copy action to active admins"
+    );
+    assert!(
+        ADMIN_EVENTS_SRC.contains("copy_mode")
+            && ADMIN_EVENTS_SRC.contains("\"event_copy\"")
+            && ADMIN_EVENTS_SRC.contains("event_can_seed_copy")
+            && ADMIN_EVENTS_SRC.contains("event_can_seed_recreate")
+            && ADMIN_EVENTS_SRC.contains("created_from_cancelled_event_id")
+            && ADMIN_EVENTS_SRC.contains("\"copy_source_event_id\""),
+        "Create POST must separate RFC-066 event-copy provenance from RFC-060 cancelled-event recreate"
+    );
+    assert!(
+        ADMIN_EVENTS_COPY_SRC.contains("JA_ADMIN_COPY_EVENT_RECURRING_PAST")
+            && ADMIN_EVENTS_COPY_SRC.contains("JA_ADMIN_COPY_EVENT_RECURRING_WINDOW")
+            && ADMIN_EVENTS_COPY_SRC.contains("normal_create_default")
+            && ADMIN_EVENTS_COPY_SRC.contains("until >= series.start_day_date.as_str()"),
+        "Copy prefill must implement reviewed recurring normalization rules"
+    );
 }
 
 #[test]

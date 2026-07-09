@@ -231,6 +231,7 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
                             }
                         }
                         "edit" => super::admin::get_edit_event(req, env, rid, cid, eid).await,
+                        "copy" => super::admin::get_copy_event(req, env, rid, cid, eid).await,
                         "recreate" => {
                             super::admin::get_recreate_event(req, env, rid, cid, eid).await
                         }

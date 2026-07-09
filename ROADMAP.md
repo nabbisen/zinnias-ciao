@@ -31,47 +31,42 @@ The active proposed backlog is:
 | 050 | Staging runtime verification evidence pack | Prototype exists; full evidence workflow remains. |
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
 | 064 | Rust module and crate boundary cleanup | Phase 1 admin-events split ships in v0.52.0; Phase 2 render split ships in v0.53.0; Phase 3+ remains proposed. |
-
-Candidate themes that still need RFC numbers:
-
-| Theme | Current note |
-|-------|--------------|
-| Event copy / duplicate from self | Let an admin create a new event by copying an existing scheduled or past event. Needs design around which fields copy, whether schedules/repeats copy, attendance/note exclusion, authorization, and how it differs from RFC-060 cancelled-event recreate. |
+| 066 | Event copy from existing event | Candidate admin convenience workflow; design review pending. |
 
 ## Near-Term Candidates
 
 Recommended next candidates, in practical order:
 
-1. **RFC-064: Rust Module and Crate Boundary Cleanup**
+1. **RFC-066: Event Copy From Existing Event**
+   Candidate admin convenience workflow for creating a new event from an
+   existing scheduled, past, or cancelled event. It should clarify copied fields,
+   schedule/recurrence prefill, attendance/note exclusion, authorization, and
+   its relationship to RFC-060 cancelled-event recreate.
+
+2. **RFC-064: Rust Module and Crate Boundary Cleanup**
    Phase 1 and Phase 2 have split admin event handlers and shared render
    helpers. Next steps should decide whether to continue with contracts/i18n
    structure or explicitly defer crate extraction.
 
-2. **RFC-054: Japanese UX Copy Review**
+3. **RFC-054: Japanese UX Copy Review**
    Recent releases added sensitive recovery and member-management flows. Copy
    quality is now part of usability and safety.
 
-3. **RFC-021 and RFC-034: Notifications and Quiet Mode**
+4. **RFC-021 and RFC-034: Notifications and Quiet Mode**
    These should be designed together to avoid adding reminders without a clear
    attention and opt-out policy.
 
-4. **RFC-031: Consentful Contact Channels**
+5. **RFC-031: Consentful Contact Channels**
    Useful after notification policy is clear. This should remain privacy-first
    and consent-bound.
 
-5. **RFC-033: Subgroups and Event Visibility**
+6. **RFC-033: Subgroups and Event Visibility**
    Large feature area touching authorization, event visibility, and community
    boundaries. It should start with design review, not direct implementation.
 
-6. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
+7. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
    These are good candidates when the project priority shifts from product
    workflow to deployment confidence and Cloudflare-hosted evidence.
-
-7. **Unnumbered: Event Copy / Duplicate From Self**
-   Candidate admin convenience workflow. It should start with an RFC because it
-   overlaps with RFC-060 recreate assistance but has a broader source-event
-   scope and must explicitly exclude copying attendance, notes, and audit
-   history.
 
 ## Before First Pilot Deployment
 

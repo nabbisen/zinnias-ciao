@@ -9,8 +9,8 @@
 
 pub use events::{
     get_admin_hide_note_confirm, get_attendance, get_cancel_event, get_cancel_occurrence,
-    get_create_event, get_edit_event, get_recreate_event, post_admin_hide_note, post_attendance,
-    post_cancel_event, post_cancel_occurrence, post_create_event, post_edit_event,
+    get_copy_event, get_create_event, get_edit_event, get_recreate_event, post_admin_hide_note,
+    post_attendance, post_cancel_event, post_cancel_occurrence, post_create_event, post_edit_event,
 };
 pub use help_signin::{get_help_signin, post_help_signin};
 pub use member_remove::{get_remove_member, post_remove_member};

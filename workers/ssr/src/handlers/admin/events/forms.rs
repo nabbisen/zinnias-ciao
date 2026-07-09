@@ -5,6 +5,25 @@ use zinnias_ciao_contracts::i18n;
 use super::policy::event_is_recurring;
 use super::summary::render_schedule_summary;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct RepeatFieldPrefill {
+    pub(super) repeat_rule: String,
+    pub(super) repeat_end_mode: String,
+    pub(super) repeat_count: Option<u32>,
+    pub(super) repeat_until: Option<String>,
+}
+
+impl RepeatFieldPrefill {
+    pub(super) fn normal_create_default() -> Self {
+        Self {
+            repeat_rule: "none".to_string(),
+            repeat_end_mode: "open_ended".to_string(),
+            repeat_count: None,
+            repeat_until: None,
+        }
+    }
+}
+
 pub(super) fn render_event_create_fields(
     title: Option<&str>,
     location: Option<&str>,
@@ -13,6 +32,29 @@ pub(super) fn render_event_create_fields(
     day_date: Option<&str>,
     starts_at: Option<&str>,
     ends_at: Option<&str>,
+) -> String {
+    render_event_create_fields_with_repeat(
+        title,
+        location,
+        description,
+        error,
+        day_date,
+        starts_at,
+        ends_at,
+        &RepeatFieldPrefill::normal_create_default(),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn render_event_create_fields_with_repeat(
+    title: Option<&str>,
+    location: Option<&str>,
+    description: Option<&str>,
+    error: Option<&str>,
+    day_date: Option<&str>,
+    starts_at: Option<&str>,
+    ends_at: Option<&str>,
+    repeat: &RepeatFieldPrefill,
 ) -> String {
     format!(
         "{err}\
@@ -59,7 +101,7 @@ pub(super) fn render_event_create_fields(
             location.unwrap_or(""),
             false
         ),
-        repeat = render_repeat_fields(),
+        repeat = render_repeat_fields(repeat),
         desc = description_field(description),
     )
 }
@@ -70,6 +112,7 @@ pub(super) fn render_recreate_event_create_fields(
 ) -> String {
     format!(
         "<input type=\"hidden\" name=\"copy_source_event_id\" value=\"{eid}\">\
+         <input type=\"hidden\" name=\"copy_mode\" value=\"cancelled_recreate\">\
          <p role=\"note\" style=\"font-size:.875rem;color:#6E6E73;line-height:1.5;\
          margin:0 0 1rem\">{helper}</p>\
          {fields}",
@@ -232,45 +275,80 @@ fn description_field(description: Option<&str>) -> String {
     )
 }
 
-fn render_repeat_fields() -> String {
+fn render_repeat_fields(repeat: &RepeatFieldPrefill) -> String {
     format!(
         "<div style=\"margin-bottom:1rem\">\
          <label style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{repeat_lbl}</label>\
          <div style=\"display:flex;gap:.75rem;align-items:center;flex-wrap:wrap\">\
            <select name=\"repeat_rule\" style=\"padding:.625rem;border:1px solid #e5e5ea;\
              border-radius:12px;font-size:1rem;flex:1 1 10rem;min-width:0;max-width:100%\">\
-             <option value=\"none\">{opt_none}</option>\
-             <option value=\"weekly\">{opt_weekly}</option>\
-             <option value=\"biweekly\">{opt_biweekly}</option>\
-             <option value=\"monthly\">{opt_monthly}</option>\
+             {opt_none}\
+             {opt_weekly}\
+             {opt_biweekly}\
+             {opt_monthly}\
            </select>\
            <select name=\"repeat_end_mode\" style=\"padding:.625rem;border:1px solid #e5e5ea;\
              border-radius:12px;font-size:1rem;flex:1 1 10rem;min-width:0;max-width:100%\">\
-             <option value=\"open_ended\">{end_open}</option>\
-             <option value=\"until_date\">{end_until}</option>\
-             <option value=\"after_count\">{end_count}</option>\
+             {end_open}\
+             {end_until}\
+             {end_count}\
            </select>\
-           <input type=\"number\" name=\"repeat_count\" value=\"\" min=\"1\" max=\"52\"\
+           <input type=\"number\" name=\"repeat_count\" value=\"{repeat_count}\" min=\"1\" max=\"52\"\
              placeholder=\"{count_ph}\" aria-label=\"{count_lbl}\"\
              style=\"width:6rem;max-width:100%;padding:.625rem;border:1px solid #e5e5ea;\
              border-radius:12px;font-size:1rem\">\
-           <input type=\"date\" name=\"repeat_until\" aria-label=\"{until_lbl}\"\
+           <input type=\"date\" name=\"repeat_until\" value=\"{repeat_until}\" aria-label=\"{until_lbl}\"\
              style=\"width:10rem;max-width:100%;padding:.625rem;border:1px solid #e5e5ea;\
              border-radius:12px;font-size:1rem\">\
          </div>\
          <p style=\"font-size:.75rem;color:#6e6e73;margin:.25rem 0 0\">{hint}</p>\
          </div>",
         repeat_lbl = i18n::JA_REPEAT_LABEL,
-        opt_none = i18n::JA_REPEAT_NONE,
-        opt_weekly = i18n::JA_REPEAT_WEEKLY,
-        opt_biweekly = i18n::JA_REPEAT_BIWEEKLY,
-        opt_monthly = i18n::JA_REPEAT_MONTHLY,
-        end_open = i18n::JA_REPEAT_END_OPEN,
-        end_until = i18n::JA_REPEAT_END_UNTIL,
-        end_count = i18n::JA_REPEAT_END_COUNT,
+        opt_none = option_html("none", i18n::JA_REPEAT_NONE, &repeat.repeat_rule),
+        opt_weekly = option_html("weekly", i18n::JA_REPEAT_WEEKLY, &repeat.repeat_rule),
+        opt_biweekly = option_html("biweekly", i18n::JA_REPEAT_BIWEEKLY, &repeat.repeat_rule),
+        opt_monthly = option_html("monthly", i18n::JA_REPEAT_MONTHLY, &repeat.repeat_rule),
+        end_open = option_html(
+            "open_ended",
+            i18n::JA_REPEAT_END_OPEN,
+            &repeat.repeat_end_mode
+        ),
+        end_until = option_html(
+            "until_date",
+            i18n::JA_REPEAT_END_UNTIL,
+            &repeat.repeat_end_mode
+        ),
+        end_count = option_html(
+            "after_count",
+            i18n::JA_REPEAT_END_COUNT,
+            &repeat.repeat_end_mode
+        ),
+        repeat_count = repeat
+            .repeat_count
+            .map(|n| n.to_string())
+            .unwrap_or_default(),
+        repeat_until = repeat
+            .repeat_until
+            .as_deref()
+            .map(render::escape_html)
+            .unwrap_or_default(),
         count_ph = i18n::JA_REPEAT_COUNT_UNIT,
         count_lbl = i18n::JA_REPEAT_COUNT_LABEL,
         until_lbl = i18n::JA_REPEAT_UNTIL_LABEL,
         hint = i18n::JA_REPEAT_COUNT_HINT,
+    )
+}
+
+fn option_html(value: &str, label: &str, selected_value: &str) -> String {
+    let selected = if value == selected_value {
+        " selected"
+    } else {
+        ""
+    };
+    format!(
+        "<option value=\"{}\"{}>{}</option>",
+        render::escape_html(value),
+        selected,
+        render::escape_html(label)
     )
 }

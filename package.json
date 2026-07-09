@@ -16,7 +16,8 @@
     "fmt": "cargo fmt --all -- --check",
     "reset:dev": "node scripts/setup.mjs --reset",
     "smoke:runtime": "node scripts/runtime-smoke.mjs",
-    "smoke:recurrence": "node scripts/smoke/recurrence-v2.mjs"
+    "smoke:recurrence": "node scripts/smoke/recurrence-v2.mjs",
+    "smoke:event-copy": "node scripts/smoke/event-copy.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

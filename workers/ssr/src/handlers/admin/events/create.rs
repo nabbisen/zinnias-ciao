@@ -14,8 +14,16 @@ use crate::render;
 use crate::session::require_auth;
 
 use super::forms::render_event_create_fields;
-use super::policy::{admin_events_new_next, event_can_seed_recreate, valid_prefill_day};
+use super::policy::{
+    admin_events_new_next, event_can_seed_copy, event_can_seed_recreate, valid_prefill_day,
+};
 use super::support::{query_escape, redirect};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum CreateEventProvenance {
+    CancelledRecreate(String),
+    EventCopy(String),
+}
 
 pub async fn get_create_event(
     req: Request,
@@ -158,16 +166,30 @@ pub async fn post_create_event(
         .get_field("copy_source_event_id")
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
-    let copy_source_event_id = if let Some(source_id) = copy_source_event_id {
+    let copy_mode = body
+        .get_field("copy_mode")
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
+    let provenance = if let Some(source_id) = copy_source_event_id {
         let Some(source_event) =
             event_db::find_for_community(&db, &source_id, community_id).await?
         else {
             return render::not_found();
         };
-        if !event_can_seed_recreate(&source_event) {
-            return render::not_found();
+        match copy_mode.as_str() {
+            "event_copy" => {
+                if !event_can_seed_copy(&source_event) {
+                    return render::not_found();
+                }
+                Some(CreateEventProvenance::EventCopy(source_event.id))
+            }
+            _ => {
+                if !event_can_seed_recreate(&source_event) {
+                    return render::not_found();
+                }
+                Some(CreateEventProvenance::CancelledRecreate(source_event.id))
+            }
         }
-        Some(source_event.id)
     } else {
         None
     };
@@ -343,14 +365,28 @@ pub async fn post_create_event(
         "event",
         Some(&event_id),
         "created",
-        Some(match copy_source_event_id {
-            Some(source_id) => serde_json::json!({
-                "created_from_cancelled_event_id": source_id
-            }),
-            None => serde_json::json!({ "title": validated.title }),
-        }),
+        Some(create_event_audit_metadata(
+            provenance.as_ref(),
+            &validated.title,
+        )),
     )
     .await;
 
     redirect(&format!("/c/{community_id}/events/{event_id}"))
+}
+
+pub(super) fn create_event_audit_metadata(
+    provenance: Option<&CreateEventProvenance>,
+    title: &str,
+) -> serde_json::Value {
+    match provenance {
+        Some(CreateEventProvenance::CancelledRecreate(source_id)) => serde_json::json!({
+            "created_from_cancelled_event_id": source_id
+        }),
+        Some(CreateEventProvenance::EventCopy(source_id)) => serde_json::json!({
+            "copy_source_event_id": source_id,
+            "copy_mode": "event_copy"
+        }),
+        None => serde_json::json!({ "title": title }),
+    }
 }

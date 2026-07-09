@@ -34,6 +34,10 @@ pub(super) fn event_can_seed_recreate(event: &event_db::EventRow) -> bool {
     event.status == "cancelled"
 }
 
+pub(super) fn event_can_seed_copy(event: &event_db::EventRow) -> bool {
+    matches!(event.status.as_str(), "scheduled" | "cancelled")
+}
+
 pub(super) fn edit_post_contains_schedule_fields(body: &worker::FormData) -> bool {
     [
         "day_date",

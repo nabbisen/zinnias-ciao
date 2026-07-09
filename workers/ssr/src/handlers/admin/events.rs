@@ -2,6 +2,7 @@
 
 pub use attendance::{get_attendance, post_attendance};
 pub use cancel::{get_cancel_event, post_cancel_event};
+pub use copy::get_copy_event;
 pub use create::{get_create_event, post_create_event};
 pub use edit::{get_edit_event, post_edit_event};
 pub use notes::{get_admin_hide_note_confirm, post_admin_hide_note};
@@ -12,6 +13,8 @@ pub use recreate::get_recreate_event;
 mod attendance;
 #[path = "events/cancel.rs"]
 mod cancel;
+#[path = "events/copy.rs"]
+mod copy;
 #[path = "events/create.rs"]
 mod create;
 #[path = "events/edit.rs"]

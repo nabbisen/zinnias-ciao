@@ -311,6 +311,22 @@ pub async fn get_event_detail(
     } else {
         String::new()
     };
+    let copy_action = if membership.is_admin() {
+        format!(
+            "<div style=\"margin:0 0 1rem\">\
+               <a href=\"/c/{cid}/admin/events/{eid}/copy\" \
+                  style=\"display:block;box-sizing:border-box;width:100%;padding:.875rem;\
+                  border:1px solid #007AFF;border-radius:14px;text-align:center;\
+                  text-decoration:none;color:#007AFF;font-weight:600;min-height:44px;\
+                  overflow-wrap:anywhere\">{label}</a>\
+             </div>",
+            cid = render::escape_html(community_id),
+            eid = render::escape_html(event_id),
+            label = i18n::JA_ADMIN_COPY_EVENT_ACTION,
+        )
+    } else {
+        String::new()
+    };
 
     let body = format!(
         "{header}\
@@ -321,6 +337,7 @@ pub async fn get_event_detail(
            {loc}{desc}\
            {cancelled}\
            {recreate_action}\
+           {copy_action}\
            {days}\
            {note}\
            {notes_section}\
@@ -356,6 +373,7 @@ pub async fn get_event_detail(
             .unwrap_or_default(),
         cancelled = cancelled_banner,
         recreate_action = recreate_action,
+        copy_action = copy_action,
         days = days_html,
         note = note_html,
         notes_section = notes_section,

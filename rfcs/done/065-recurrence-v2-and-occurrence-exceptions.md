@@ -70,8 +70,8 @@ data model can preserve existing attendance anchors.
 - Migrate existing bounded recurring events without changing their visible
   occurrences.
 - Keep recurrence queries bounded for Cloudflare Workers and D1.
-- Provide a stable visible-month occurrence contract for the future RFC-066
-  admin monthly attendance matrix.
+- Provide a stable visible-month occurrence contract for a future admin monthly
+  attendance matrix RFC.
 
 ## Non-Goals
 
@@ -502,7 +502,7 @@ visible dates as needed.
 
 ## Matrix Dependency Contract
 
-RFC-066 may rely on this contract:
+A future admin monthly attendance matrix RFC may rely on this contract:
 
 - Calendar/month queries can request a visible month and receive concrete
   `event_days` rows for active series occurrences in that month when the month
@@ -514,8 +514,8 @@ RFC-066 may rely on this contract:
   future dates. Future months outside the materialization window are out of
   scope for matrix export until materialized through an approved path.
 
-RFC-066 should not reopen recurrence source-of-truth design unless RFC-065
-implementation deviates from this contract.
+That matrix RFC should not reopen recurrence source-of-truth design unless
+RFC-065 implementation deviates from this contract.
 
 ## Query and Runtime Constraints
 

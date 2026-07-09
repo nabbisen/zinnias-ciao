@@ -108,6 +108,12 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 |----|-------|------|------|
 | 064 | Rust Module and Crate Boundary Cleanup | [./proposed/064-rust-module-and-crate-boundary-cleanup.md](./proposed/064-rust-module-and-crate-boundary-cleanup.md) | Phase 1 admin-events split ships in v0.52.0; Phase 2 render split ships in v0.53.0; Phase 3+ remains proposed |
 
+## Proposed — workflow follow-ups (066)
+
+| ID | Title | File | Note |
+|----|-------|------|------|
+| 066 | Event Copy From Existing Event | [./proposed/066-event-copy-from-existing-event.md](./proposed/066-event-copy-from-existing-event.md) | Candidate v0.55.0 admin convenience workflow; design review pending |
+
 ## Archive
 
 _None._
