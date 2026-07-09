@@ -32,6 +32,12 @@ The active proposed backlog is:
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
 | 064 | Rust module and crate boundary cleanup | Phase 1 admin-events split ships in v0.52.0; Phase 2 render split ships in v0.53.0; Phase 3+ remains proposed. |
 
+Candidate themes that still need RFC numbers:
+
+| Theme | Current note |
+|-------|--------------|
+| Event copy / duplicate from self | Let an admin create a new event by copying an existing scheduled or past event. Needs design around which fields copy, whether schedules/repeats copy, attendance/note exclusion, authorization, and how it differs from RFC-060 cancelled-event recreate. |
+
 ## Near-Term Candidates
 
 Recommended next candidates, in practical order:
@@ -60,6 +66,12 @@ Recommended next candidates, in practical order:
 6. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
    These are good candidates when the project priority shifts from product
    workflow to deployment confidence and Cloudflare-hosted evidence.
+
+7. **Unnumbered: Event Copy / Duplicate From Self**
+   Candidate admin convenience workflow. It should start with an RFC because it
+   overlaps with RFC-060 recreate assistance but has a broader source-event
+   scope and must explicitly exclude copying attendance, notes, and audit
+   history.
 
 ## Before First Pilot Deployment
 
