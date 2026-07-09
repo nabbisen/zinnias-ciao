@@ -52,9 +52,9 @@ id      = "local"
 #   cp wrangler.toml wrangler.staging.local.toml
 #   git check-ignore -v wrangler.staging.local.toml
 # Staging management docs:
-#   docs/src/deployment.md#staging-exposure
-#   docs/src/deployment.md#staging-teardown
-#   docs/src/staging-runtime-prototype.md#hosted-staging-smoke
+#   docs/src/shared/deployment.md#staging-exposure
+#   docs/src/shared/deployment.md#staging-teardown
+#   docs/src/tester/staging-runtime-prototype.md#hosted-staging-smoke
 # Then replace only the staging D1 database_id and RATE_LIMIT KV id below.
 [env.staging]
 name = "zinnias-ciao-ssr-stg"

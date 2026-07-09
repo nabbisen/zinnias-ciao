@@ -37,7 +37,7 @@ cp wrangler.toml wrangler.production.local.toml
 git check-ignore -v wrangler.staging.local.toml wrangler.production.local.toml
 ```
 
-See `docs/src/deployment.md` before running hosted deploy, migration, bootstrap,
+See `docs/src/shared/deployment.md` before running hosted deploy, migration, bootstrap,
 or teardown commands.
 
 ## Tests

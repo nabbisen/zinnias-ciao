@@ -2,6 +2,39 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.53.1] — 2026-07-09
+
+Documentation role-structure patch release.
+
+### Changed
+
+- **Release version bumped to v0.53.1.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+- **mdBook documentation reorganized by audience role.**
+  `docs/src/` now has role paths for User, Developer, Maintainer, and Tester,
+  plus a Shared section for deployment and historical reference material used
+  by multiple roles.
+
+- **Documentation links updated to the new paths.**
+  README, Wrangler comments, release checklist references, maintainer docs,
+  tester docs, service-worker comments, and RFC-052 now point to the new
+  role/shared documentation paths.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo build --workspace`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `mdbook build docs`
+- `git diff --check`
+
+Browser smoke was not run because this patch release changes documentation
+structure and release version/cache-buster strings only.
+
 ## [0.53.0] — 2026-07-09
 
 RFC-064 Phase 2 Rust module boundary cleanup for shared render helpers.

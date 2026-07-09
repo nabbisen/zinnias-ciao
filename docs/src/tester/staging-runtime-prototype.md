@@ -99,7 +99,7 @@ candidate evidence, set staging `BUILD_VERSION` to the candidate tag during
 deploy and run with a matching value, for example:
 
 ```sh
-EXPECTED_VERSION="v0.53.0" \
+EXPECTED_VERSION="v0.53.1" \
   bun run smoke:runtime -- https://<deployed-worker-url>
 ```
 
@@ -200,7 +200,7 @@ bunx wrangler delete --env staging --config wrangler.staging.local.toml
 ```
 
 For full staging disposal, including D1, KV, and secret deletion, follow
-[Staging Teardown](deployment.md#staging-teardown).
+[Staging Teardown](../shared/deployment.md#staging-teardown).
 
 ## Evidence
 

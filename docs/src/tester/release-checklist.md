@@ -95,7 +95,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] `SET_STATUS` token issued once per Event Detail render, bound to `event_id`; day validated via days_for_event lookup (RFC-046).
 - [x] Day labels render in Japanese convention (`6月14日（土）`); no English month abbreviation (RFC-047).
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
-- [x] DST scope limitation documented in `docs/src/operations.md` (review P1-2).
+- [x] DST scope limitation documented in `docs/src/maintainer/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
 - [x] i18n parity test covers all 170 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
@@ -174,8 +174,8 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] `bun run smoke:runtime -- <url>` collects evidence from an already-running Worker URL; Wrangler remains the owner of local start/deploy. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
-- [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.53.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/tester/staging-runtime-prototype.md)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.53.1 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -207,7 +207,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Member-management surfaces expose no restore, reactivate, or suspension controls in this slice. *(release_gates.rs `rfc063_removal_only_policy_is_locked`)*
 - [x] Invite redemption creates a fresh random user and membership and does not merge by display name. *(join.rs + release gate)*
 - [x] Active member lists and authorization queries continue to exclude removed memberships. *(membership.rs + release gate)*
-- [x] Operations docs explain that returning removed members receive a new invite and that past records stay on the old membership. *(docs/src/operations.md)*
+- [x] Operations docs explain that returning removed members receive a new invite and that past records stay on the old membership. *(docs/src/maintainer/operations.md)*
 - [x] Committed browser smoke verifies removal confirmation copy at 200% text, removal submit, disappearance from the active member list, and absence of restore/suspend controls. *(scripts/smoke/member-management.mjs; evidence `.git-exclude/evidence/rfc063/`)*
 
 ## Active-member help-signin gates (v0.51.0 — RFC-024)
@@ -218,7 +218,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Successful redemption creates a new session and revokes other active sessions for the target `user_id`. *(handlers/relink.rs + db/session.rs + release gate)*
 - [x] Failed redemption uses one generic invalid/expired error and is rate-limited without membership audit rows. *(handlers/relink.rs + release gate)*
 - [x] Removed-member reactivation, former-member UI, and display-name merge remain out of scope. *(RFC-024/RFC-063 + release gate)*
-- [x] Operations docs explain that help-signin is only for active members who lost browser/session access. *(docs/src/operations.md)*
+- [x] Operations docs explain that help-signin is only for active members who lost browser/session access. *(docs/src/maintainer/operations.md)*
 - [x] Committed browser smoke verifies active-only row action, 200% text confirmation copy, code shown once, fresh-context redemption, reused-code generic error, and cross-community non-authorization. *(scripts/smoke/help-signin.mjs; evidence `.git-exclude/evidence/rfc024/`)*
 
 ## Rust module boundary cleanup gates (v0.52.0 — RFC-064 Phase 1)
@@ -242,12 +242,20 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] All render child modules are below the 300-line guideline. *(implementation review line-count evidence)*
 - [x] Browser smoke is not required for this slice because no route, form field, rendered-copy, or intended browser behavior changed beyond version/cache-buster alignment. *(RFC-064 + implementation review)*
 
+## Documentation role-structure gates (v0.53.1)
+
+- [x] mdBook navigation is organized by User, Developer, Maintainer, Tester, and Shared sections. *(docs/src/SUMMARY.md)*
+- [x] Shared deployment and historical reference material lives under `docs/src/shared/` and is linked from role pages instead of duplicated. *(docs/src/shared/index.md)*
+- [x] README and tracked operational comments point to the new role/shared documentation paths. *(README.md, wrangler.toml, workers/ssr/static/sw.js)*
+- [x] Active documentation and RFC references no longer point to the removed flat docs paths. *(path scan + mdbook build)*
+- [x] Browser smoke is not required for this slice because no route, form field, rendered-copy, or intended browser behavior changed beyond version/cache-buster alignment. *(documentation restructure)*
+
 ## Operational gates
 
 - [x] `GET /healthz` returns `{"ok":true}`. *(health.rs get_health)*
 - [x] `GET /version` returns build version. *(health.rs get_version reads BUILD_VERSION var)*
-- [x] Rollback procedure documented and understood. *(docs/src/deployment.md §Rollback: `wrangler rollback --env production`)*
-- [x] Log persistence approach documented. *(docs/src/deployment.md §Log persistence: Cloudflare Logpush to R2/S3)*
+- [x] Rollback procedure documented and understood. *(docs/src/shared/deployment.md §Rollback: `wrangler rollback --env production`)*
+- [x] Log persistence approach documented. *(docs/src/shared/deployment.md §Log persistence: Cloudflare Logpush to R2/S3)*
 - [x] Tracked `wrangler.toml` is release-gated to contain only placeholder D1/KV IDs. *(release_gates.rs: `tracked_wrangler_template_contains_only_placeholder_resource_ids`)*
 - [ ] D1 migration applied to remote staging and rehearsed. *(operator task: `bun run migrate:staging`, which uses `wrangler d1 migrations apply --remote`)*
 - [ ] Production commands use ignored `wrangler.production.local.toml`; staging commands use ignored `wrangler.staging.local.toml`. *(operator task — hosted config isolation)*

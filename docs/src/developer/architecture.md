@@ -69,7 +69,7 @@ rfcs/
 
 ## Key architecture decisions
 
-The four locked decisions are in `docs/src/ref/roadmap-and-rfcs-v1/ARCHITECTURE-DECISIONS.md`.
+The four locked decisions are in `docs/src/shared/ref/roadmap-and-rfcs-v1/ARCHITECTURE-DECISIONS.md`.
 Summary:
 
 - **AD-1** SSR + progressive enhancement. Forms are `<form method="post">` + 303 redirect.

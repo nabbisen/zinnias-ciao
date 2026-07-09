@@ -21,7 +21,7 @@ and one bootstrap invite code with `grants_role = 'admin'`. The invite code is
 printed at the end. Visit `/join` and enter it — the first sign-in creates an
 admin membership.
 
-**Production:** follow `docs/src/launch-runbook.md` §4.4 and §5 for the full
+**Production:** follow `docs/src/maintainer/launch-runbook.md` §4.4 and §5 for the full
 procedure. The key point is that the bootstrap invite must be inserted with
 `grants_role = 'admin'` (migration 0003 column) so the first sign-in creates an
 admin rather than a member.
@@ -147,6 +147,6 @@ V8 isolates have no filesystem. Logs are accessible via:
 bunx wrangler tail --env production
 ```
 
-For persistent log storage, configure Logpush (see `docs/src/launch-runbook.md` §6).
+For persistent log storage, configure Logpush (see `docs/src/maintainer/launch-runbook.md` §6).
 Logs should never contain plaintext invite codes, session tokens, or note content —
 this is enforced by the audit writer (RFC-014).

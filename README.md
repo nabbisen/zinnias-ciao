@@ -50,7 +50,7 @@ cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown
 
 The setup script prints an invite code. Open `http://localhost:8787/join` and paste it to join the seeded community.
 
-Full setup and deployment instructions are in [`docs/src/quick-start.md`](docs/src/quick-start.md) and [`docs/src/deployment.md`](docs/src/deployment.md).
+Full setup and deployment instructions are in [`docs/src/developer/quick-start.md`](docs/src/developer/quick-start.md) and [`docs/src/shared/deployment.md`](docs/src/shared/deployment.md).
 
 ---
 
@@ -74,14 +74,14 @@ Full setup and deployment instructions are in [`docs/src/quick-start.md`](docs/s
 
 | Resource | Contents |
 |---|---|
-| [`docs/src/overview.md`](docs/src/overview.md) | Product summary and key properties |
-| [`docs/src/architecture.md`](docs/src/architecture.md) | File tree, architecture decisions, data grain, security model |
-| [`docs/src/quick-start.md`](docs/src/quick-start.md) | Full local setup instructions |
-| [`docs/src/deployment.md`](docs/src/deployment.md) | Cloudflare Workers deployment |
-| [`docs/src/backup-recovery.md`](docs/src/backup-recovery.md) | D1 backup, restore, incident response |
-| [`docs/src/operations.md`](docs/src/operations.md) | Operator reference |
-| [`docs/src/launch-runbook.md`](docs/src/launch-runbook.md) | Pre-launch checklist and bootstrap sequence |
-| [`docs/src/release-checklist.md`](docs/src/release-checklist.md) | Release gate status |
+| [`docs/src/user/overview.md`](docs/src/user/overview.md) | Product summary and key properties |
+| [`docs/src/developer/architecture.md`](docs/src/developer/architecture.md) | File tree, architecture decisions, data grain, security model |
+| [`docs/src/developer/quick-start.md`](docs/src/developer/quick-start.md) | Full local setup instructions |
+| [`docs/src/shared/deployment.md`](docs/src/shared/deployment.md) | Cloudflare Workers deployment |
+| [`docs/src/maintainer/backup-recovery.md`](docs/src/maintainer/backup-recovery.md) | D1 backup, restore, incident response |
+| [`docs/src/maintainer/operations.md`](docs/src/maintainer/operations.md) | Operator reference |
+| [`docs/src/maintainer/launch-runbook.md`](docs/src/maintainer/launch-runbook.md) | Pre-launch checklist and bootstrap sequence |
+| [`docs/src/tester/release-checklist.md`](docs/src/tester/release-checklist.md) | Release gate status |
 | [`ROADMAP.md`](ROADMAP.md) | Implemented RFCs, backlog, and pilot deployment gates |
 | [`CHANGELOG.md`](CHANGELOG.md) | Version history |
 | [`rfcs/README.md`](rfcs/README.md) | RFC index |

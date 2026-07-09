@@ -4,7 +4,7 @@ This document is the step-by-step operator guide for taking ciao.zinnias from a
 clean tarball to a running production deployment. It is intended to be followed
 exactly, in order, by one operator. Tick each step as you complete it.
 
-**Version this runbook was written for:** v0.53.0
+**Version this runbook was written for:** v0.53.1
 **Estimated time:** 60–90 minutes for a first deployment.
 
 ---
@@ -16,9 +16,9 @@ Before starting, confirm you have:
 - [ ] A Cloudflare account with Workers, D1, and KV enabled.
 - [ ] `wrangler` CLI authenticated: `bunx wrangler whoami` shows your account.
 - [ ] Rust stable + `wasm32-unknown-unknown` target + `worker-build` installed
-  (see `docs/src/quick-start.md`).
+  (see `docs/src/developer/quick-start.md`).
 - [ ] `bun` installed.
-- [ ] The v0.53.0 source tarball extracted to a working directory.
+- [ ] The v0.53.1 source tarball extracted to a working directory.
 - [ ] A domain or workers.dev subdomain decided for the production deployment.
 
 ---
@@ -281,7 +281,7 @@ Wrangler after deploy:
 bun run smoke:runtime -- "$STAGING_URL"
 ```
 
-See `docs/src/staging-runtime-prototype.md` for the output files and the manual
+See `docs/src/tester/staging-runtime-prototype.md` for the output files and the manual
 evidence that still remains outside the prototype.
 
 - [ ] Health check passes.
@@ -291,7 +291,7 @@ evidence that still remains outside the prototype.
 
 ### 4.5 Run the full QA checklist against staging
 
-Work through all `[~]` items in `docs/src/release-checklist.md`:
+Work through all `[~]` items in `docs/src/tester/release-checklist.md`:
 
 - Join with the staging invite code on a real phone.
 - Mark Going on an event.

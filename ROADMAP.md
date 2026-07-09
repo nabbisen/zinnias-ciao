@@ -2,7 +2,7 @@
 
 ## Status
 
-**Current release:** 0.53.0.
+**Current release:** 0.53.1.
 
 The RFC folder is the source of truth for implementation state:
 
@@ -12,9 +12,9 @@ The RFC folder is the source of truth for implementation state:
 
 Recent workflow releases focused on calendar-centered use, community bootstrap,
 member administration, admin role transfer, member lifecycle policy, and
-admin-mediated help sign-in. The current structural release is RFC-064 Phase 2,
-which splits shared render helpers into focused modules while deferring crate
-extraction.
+admin-mediated help sign-in, and Rust module boundary cleanup. The current
+documentation release restructures mdBook content by audience role while
+keeping shared deployment and reference material linked from multiple paths.
 
 ## Proposed Work
 

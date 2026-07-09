@@ -188,5 +188,5 @@ The following are **not** audit-logged and are by design:
 
 - RFC-014 — Audit system implementation
 - RFC-052 — This policy RFC
-- `docs/src/operations.md` — D1 direct access commands
-- `docs/src/backup-recovery.md` — D1 backup and restore
+- `docs/src/maintainer/operations.md` — D1 direct access commands
+- `docs/src/maintainer/backup-recovery.md` — D1 backup and restore
