@@ -4,7 +4,7 @@ This document is the step-by-step operator guide for taking ciao.zinnias from a
 clean tarball to a running production deployment. It is intended to be followed
 exactly, in order, by one operator. Tick each step as you complete it.
 
-**Version this runbook was written for:** v0.52.0
+**Version this runbook was written for:** v0.53.0
 **Estimated time:** 60–90 minutes for a first deployment.
 
 ---
@@ -18,7 +18,7 @@ Before starting, confirm you have:
 - [ ] Rust stable + `wasm32-unknown-unknown` target + `worker-build` installed
   (see `docs/src/quick-start.md`).
 - [ ] `bun` installed.
-- [ ] The v0.52.0 source tarball extracted to a working directory.
+- [ ] The v0.53.0 source tarball extracted to a working directory.
 - [ ] A domain or workers.dev subdomain decided for the production deployment.
 
 ---

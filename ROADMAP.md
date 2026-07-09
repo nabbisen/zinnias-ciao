@@ -2,7 +2,7 @@
 
 ## Status
 
-**Current release:** 0.52.0.
+**Current release:** 0.53.0.
 
 The RFC folder is the source of truth for implementation state:
 
@@ -12,8 +12,8 @@ The RFC folder is the source of truth for implementation state:
 
 Recent workflow releases focused on calendar-centered use, community bootstrap,
 member administration, admin role transfer, member lifecycle policy, and
-admin-mediated help sign-in. The current structural release is RFC-064 Phase 1,
-which splits admin event handlers into focused modules while deferring crate
+admin-mediated help sign-in. The current structural release is RFC-064 Phase 2,
+which splits shared render helpers into focused modules while deferring crate
 extraction.
 
 ## Proposed Work
@@ -31,16 +31,16 @@ The active proposed backlog is:
 | 045 | Pre-pilot runtime verification matrix | Runtime evidence and operator verification candidate. |
 | 050 | Staging runtime verification evidence pack | Prototype exists; full evidence workflow remains. |
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
-| 064 | Rust module and crate boundary cleanup | Phase 1 admin-events split ships in v0.52.0; Phase 2+ remains proposed. |
+| 064 | Rust module and crate boundary cleanup | Phase 1 admin-events split ships in v0.52.0; Phase 2 render split ships in v0.53.0; Phase 3+ remains proposed. |
 
 ## Near-Term Candidates
 
 Recommended next candidates, in practical order:
 
 1. **RFC-064: Rust Module and Crate Boundary Cleanup**
-   The SSR crate has several oversized files and mixed responsibilities. Start
-   with internal module splits, then reconsider internal crates after boundaries
-   are clearer.
+   Phase 1 and Phase 2 have split admin event handlers and shared render
+   helpers. Next steps should decide whether to continue with contracts/i18n
+   structure or explicitly defer crate extraction.
 
 2. **RFC-054: Japanese UX Copy Review**
    Recent releases added sensitive recovery and member-management flows. Copy

@@ -1,7 +1,7 @@
 # RFC 064 - Rust Module and Crate Boundary Cleanup
 
 **Status.** Proposed
-**Target release.** v0.52.0 Phase 1 candidate
+**Target release.** v0.52.0 Phase 1 shipped; v0.53.0 Phase 2 shipped
 **Tracks.** Maintainability, Rust workspace structure, SSR Worker internals.
 **Touches.** `workers/ssr`, `packages/domain`, `packages/contracts`,
 `Cargo.toml`, release gates, project documentation.
@@ -32,20 +32,22 @@ This RFC proposes a staged cleanup:
 4. Introduce internal crates only after module boundaries are stable and the
    value is clear.
 
-v0.52.0 is scoped to Phase 1 only. Completing the first admin event module
-split does not complete all of RFC-064. It establishes the first reviewed
-pattern for behavior-preserving structural cleanup.
+v0.52.0 shipped Phase 1 only. Completing the first admin event module split
+does not complete all of RFC-064. It establishes the first reviewed pattern for
+behavior-preserving structural cleanup. v0.53.0 ships Phase 2 rendering
+boundary cleanup. The Phase 2 design review accepted
+`workers/ssr/src/render.rs` as the target and requested a facade-preserving
+internal module split.
 
 ## Background
 
 The project guidelines require design-first development and recommend splitting
 Rust files above 300 effective lines of code, with a strong recommendation
-above 500 effective lines. Current source size evidence shows several files
-above that threshold:
+above 500 effective lines. After the v0.52.0 Phase 1 split, current source size
+evidence still shows several files above that threshold:
 
 | File | Lines observed |
 |------|----------------|
-| `workers/ssr/src/handlers/admin/events.rs` | 1570 |
 | `workers/ssr/src/render.rs` | 723 |
 | `workers/ssr/src/handlers/event.rs` | 636 |
 | `packages/contracts/src/i18n.rs` | 544 |
@@ -60,10 +62,16 @@ above that threshold:
 | `workers/ssr/src/handlers/join.rs` | 315 |
 
 This size alone is not the whole problem. The larger design issue is that some
-files cross too many boundaries. For example, admin event handling currently
-contains route entry points, form parsing, recurrence/edit semantics,
-authorization checks, persistence orchestration, HTML builders, and helper
-validation in one implementation file.
+files cross too many boundaries. Before v0.52.0, admin event handling contained
+route entry points, form parsing, recurrence/edit semantics, authorization
+checks, persistence orchestration, HTML builders, and helper validation in one
+implementation file.
+
+The admin events example was addressed in v0.52.0 by splitting
+`workers/ssr/src/handlers/admin/events.rs` into a facade plus focused child
+modules. That result should be treated as the pattern for later slices: public
+handler exports stay stable, cross-module helpers remain narrow, and no new
+crate is introduced before the dependency shape is clear.
 
 ## Goals
 
@@ -186,13 +194,16 @@ Split `workers/ssr/src/render.rs` into smaller modules. The first goal is not
 to make a new crate. The first goal is to separate concerns:
 
 ```text
-workers/ssr/src/render.rs
-workers/ssr/src/render/layout.rs
-workers/ssr/src/render/nav.rs
-workers/ssr/src/render/event.rs
-workers/ssr/src/render/forms.rs
-workers/ssr/src/render/errors.rs
-workers/ssr/src/render/tests.rs
+workers/ssr/src/render.rs              facade module and public re-exports
+workers/ssr/src/render/shell.rs        HTML document shell and page adapter
+workers/ssr/src/render/nav.rs          headers, community switcher, bottom nav
+workers/ssr/src/render/status.rs       status colors, icons, chips, forms
+workers/ssr/src/render/notes.rs        member/admin note forms
+workers/ssr/src/render/event_card.rs   home/calendar event card helpers
+workers/ssr/src/render/time.rs         timezone display helpers
+workers/ssr/src/render/participants.rs participant list and initials
+workers/ssr/src/render/errors.rs       placeholder and error pages
+workers/ssr/src/render/tests.rs        focused render tests
 ```
 
 Preferred direction:
@@ -201,6 +212,37 @@ Preferred direction:
 - Only a small adapter layer creates `worker::Response`.
 - Existing callers can continue using `render::page`, `render::not_found`, and
   similar helpers until a later cleanup migrates them.
+
+Ownership rules:
+
+- `render.rs` is a facade: module declarations plus `pub use` of the existing
+  public render helpers needed by handlers.
+- `shell.rs` owns `shell` and `page`; `page` is the primary `worker::Response`
+  adapter for normal pages.
+- `errors.rs` may construct `worker::Response` because error helpers currently
+  encode HTTP status codes. Other render child modules should return `String`
+  or pure data.
+- `event_card.rs`, `notes.rs`, `participants.rs`, `status.rs`, and `nav.rs`
+  must not call D1, auth, audit, form-token, or session helpers.
+- `time.rs` should remain Worker-free and delegate timezone rules to
+  `zinnias_ciao_contracts::tz`.
+- Tests should import the specific modules or helpers they exercise instead of
+  relying on blanket `use super::*`.
+
+v0.53.0 Phase 2 acceptance criteria:
+
+- Public `crate::render::*` caller surface remains stable from handler
+  perspective.
+- Route behavior and rendered output are intended to remain unchanged.
+- `worker::Response` construction is limited to `shell.rs`/`errors.rs` or an
+  explicitly documented equivalent.
+- No child render module exceeds the project 300-line guideline without a
+  documented reason.
+- No new Cargo crate is introduced.
+- Existing render tests remain split from implementation and are adjusted to
+  avoid blanket imports where practical.
+- Source-contract release gates concatenate the render facade and all render
+  child modules so moved literals remain covered.
 
 Acceptance criteria:
 
@@ -292,23 +334,21 @@ run the relevant smoke script or request a targeted smoke plan.
 
 ## Review Questions
 
-- Is the first target correctly chosen as `handlers/admin/events.rs`, or should
-  `render.rs` be split first?
-- Should `packages/contracts/src/i18n.rs` be treated as a structural problem
-  in this RFC, or left to RFC-054 Japanese UX copy review?
-- What threshold should trigger a new internal crate instead of another module
-  split?
-- Should persistence remain inside `workers/ssr` while it depends directly on
-  `worker::D1Database`?
-- Are there boundary names the project should reserve now to avoid confusing
-  future developers?
+- Phase 2 design review accepted `workers/ssr/src/render.rs` as the v0.53.0
+  target after the v0.52.0 admin-events split.
+- Phase 2 design review accepted the proposed module map as appropriate for a
+  behavior-preserving module move.
+- Phase 2 design review accepted `errors.rs` constructing `worker::Response`
+  for status-coded pages.
+- Phase 2 design review required preserving the existing public `render::*`
+  caller surface for this slice.
+- Should `packages/contracts/src/i18n.rs` be treated as a structural problem in
+  this RFC, or left to RFC-054 Japanese UX copy review?
+- Do the crate-extraction trigger criteria remain sufficient after Phase 2, or
+  should a follow-up RFC define a narrower first crate candidate?
 
 ## Open Decisions
 
-- Whether Phase 1 implementation reveals a better filename split than the
-  target shape above. Any deviation should be documented before release.
-- Whether Phase 2 should split `render.rs` in v0.53.0 or wait for another
-  product slice.
 - Whether crate extraction remains deferred after Phase 2 or needs a follow-up
   RFC with a narrower target.
 

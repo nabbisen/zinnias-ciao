@@ -175,7 +175,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.52.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.53.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -229,6 +229,17 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] No new Cargo crate is introduced in Phase 1; crate extraction remains deferred by RFC-064 trigger criteria. *(Cargo.toml + RFC-064)*
 - [x] Admin event source-contract release gates follow the facade plus child modules. *(release_gates.rs `ADMIN_EVENTS_SRC`)*
 - [x] All admin event child modules are below the 300 effective-line guideline. *(implementation review line-count evidence)*
+- [x] Browser smoke is not required for this slice because no route, form field, rendered-copy, or intended browser behavior changed beyond version/cache-buster alignment. *(RFC-064 + implementation review)*
+
+## Render boundary cleanup gates (v0.53.0 — RFC-064 Phase 2)
+
+- [x] `workers/ssr/src/render.rs` is a facade that preserves the existing `crate::render::*` caller surface. *(render.rs + implementation review)*
+- [x] Shared render helpers are split into focused shell, nav, status, notes, event-card, time, participants, and errors modules. *(workers/ssr/src/render/*.rs)*
+- [x] `shell.rs` owns normal page construction, and `errors.rs` owns status-coded error response helpers. *(implementation review boundary checks)*
+- [x] Non-error render modules remain free of D1, auth, audit, form-token, session, database, `Request`, and `Env` usage. *(implementation review static search)*
+- [x] Render source-contract release gates follow the facade plus child modules. *(release_gates.rs `RENDER_SRC`)*
+- [x] Render tests remain split from implementation and use explicit imports instead of `use super::*`. *(workers/ssr/src/render/tests.rs)*
+- [x] All render child modules are below the 300-line guideline. *(implementation review line-count evidence)*
 - [x] Browser smoke is not required for this slice because no route, form field, rendered-copy, or intended browser behavior changed beyond version/cache-buster alignment. *(RFC-064 + implementation review)*
 
 ## Operational gates

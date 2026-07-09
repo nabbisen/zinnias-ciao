@@ -105,7 +105,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 
 | ID | Title | File | Note |
 |----|-------|------|------|
-| 064 | Rust Module and Crate Boundary Cleanup | [./proposed/064-rust-module-and-crate-boundary-cleanup.md](./proposed/064-rust-module-and-crate-boundary-cleanup.md) | Phase 1 admin-events split ships in v0.52.0; Phase 2+ remains proposed |
+| 064 | Rust Module and Crate Boundary Cleanup | [./proposed/064-rust-module-and-crate-boundary-cleanup.md](./proposed/064-rust-module-and-crate-boundary-cleanup.md) | Phase 1 admin-events split ships in v0.52.0; Phase 2 render split ships in v0.53.0; Phase 3+ remains proposed |
 
 ## Archive
 

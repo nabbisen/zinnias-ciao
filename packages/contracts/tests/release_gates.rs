@@ -793,7 +793,17 @@ const MEMBERSHIP_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/member
 const RELINK_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/relink.rs");
 const SESSION_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/session.rs");
 const APP_JS_SRC: &str = include_str!("../../../workers/ssr/static/app.js");
-const RENDER_SRC: &str = include_str!("../../../workers/ssr/src/render.rs");
+const RENDER_SRC: &str = concat!(
+    include_str!("../../../workers/ssr/src/render.rs"),
+    include_str!("../../../workers/ssr/src/render/errors.rs"),
+    include_str!("../../../workers/ssr/src/render/event_card.rs"),
+    include_str!("../../../workers/ssr/src/render/nav.rs"),
+    include_str!("../../../workers/ssr/src/render/notes.rs"),
+    include_str!("../../../workers/ssr/src/render/participants.rs"),
+    include_str!("../../../workers/ssr/src/render/shell.rs"),
+    include_str!("../../../workers/ssr/src/render/status.rs"),
+    include_str!("../../../workers/ssr/src/render/time.rs"),
+);
 const STATIC_FILES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/static_files.rs");
 
 #[test]
@@ -1295,8 +1305,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.52.0-admin-events-split")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.52.0-admin-events-split"),
+        RENDER_SRC.contains("/static/app.js?v=0.53.0-render-split")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.53.0-render-split"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(
