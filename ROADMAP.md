@@ -2,7 +2,7 @@
 
 ## Status
 
-**Current release:** v0.51.0.
+**Current release:** 0.52.0.
 
 The RFC folder is the source of truth for implementation state:
 
@@ -12,7 +12,9 @@ The RFC folder is the source of truth for implementation state:
 
 Recent workflow releases focused on calendar-centered use, community bootstrap,
 member administration, admin role transfer, member lifecycle policy, and
-admin-mediated help sign-in.
+admin-mediated help sign-in. The current structural release is RFC-064 Phase 1,
+which splits admin event handlers into focused modules while deferring crate
+extraction.
 
 ## Proposed Work
 
@@ -29,28 +31,34 @@ The active proposed backlog is:
 | 045 | Pre-pilot runtime verification matrix | Runtime evidence and operator verification candidate. |
 | 050 | Staging runtime verification evidence pack | Prototype exists; full evidence workflow remains. |
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
+| 064 | Rust module and crate boundary cleanup | Phase 1 admin-events split ships in v0.52.0; Phase 2+ remains proposed. |
 
 ## Near-Term Candidates
 
 Recommended next candidates, in practical order:
 
-1. **RFC-054: Japanese UX Copy Review**
+1. **RFC-064: Rust Module and Crate Boundary Cleanup**
+   The SSR crate has several oversized files and mixed responsibilities. Start
+   with internal module splits, then reconsider internal crates after boundaries
+   are clearer.
+
+2. **RFC-054: Japanese UX Copy Review**
    Recent releases added sensitive recovery and member-management flows. Copy
    quality is now part of usability and safety.
 
-2. **RFC-021 and RFC-034: Notifications and Quiet Mode**
+3. **RFC-021 and RFC-034: Notifications and Quiet Mode**
    These should be designed together to avoid adding reminders without a clear
    attention and opt-out policy.
 
-3. **RFC-031: Consentful Contact Channels**
+4. **RFC-031: Consentful Contact Channels**
    Useful after notification policy is clear. This should remain privacy-first
    and consent-bound.
 
-4. **RFC-033: Subgroups and Event Visibility**
+5. **RFC-033: Subgroups and Event Visibility**
    Large feature area touching authorization, event visibility, and community
    boundaries. It should start with design review, not direct implementation.
 
-5. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
+6. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
    These are good candidates when the project priority shifts from product
    workflow to deployment confidence and Cloudflare-hosted evidence.
 

@@ -769,7 +769,19 @@ fn sw_cache_version_matches_workspace_version() {
 
 const COMMUNITIES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/communities.rs");
 const COMMUNITY_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/community.rs");
-const ADMIN_EVENTS_SRC: &str = include_str!("../../../workers/ssr/src/handlers/admin/events.rs");
+const ADMIN_EVENTS_SRC: &str = concat!(
+    include_str!("../../../workers/ssr/src/handlers/admin/events.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/attendance.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/cancel.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/create.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/edit.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/forms.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/notes.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/policy.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/recreate.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/summary.rs"),
+    include_str!("../../../workers/ssr/src/handlers/admin/events/support.rs"),
+);
 const ROLE_TRANSFER_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/admin/role_transfer.rs");
 const MEMBER_REMOVE_HANDLER_SRC: &str =
@@ -1283,8 +1295,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.51.0-help-signin")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.51.0-help-signin"),
+        RENDER_SRC.contains("/static/app.js?v=0.52.0-admin-events-split")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.52.0-admin-events-split"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(

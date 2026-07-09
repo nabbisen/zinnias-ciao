@@ -101,6 +101,12 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 050 | [Staging Runtime Verification Evidence Pack](./proposed/050-staging-runtime-verification-evidence-pack.md) | Runtime evidence collector prototype added in v0.47.0; full Cloudflare evidence pending |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
 
+## Proposed — maintainability follow-ups (064)
+
+| ID | Title | File | Note |
+|----|-------|------|------|
+| 064 | Rust Module and Crate Boundary Cleanup | [./proposed/064-rust-module-and-crate-boundary-cleanup.md](./proposed/064-rust-module-and-crate-boundary-cleanup.md) | Phase 1 admin-events split ships in v0.52.0; Phase 2+ remains proposed |
+
 ## Archive
 
 _None._

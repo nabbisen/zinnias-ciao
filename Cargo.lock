@@ -1301,7 +1301,7 @@ dependencies = [
 
 [[package]]
 name = "zinnias-ciao-contracts"
-version = "0.51.0"
+version = "0.52.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1311,7 +1311,7 @@ dependencies = [
 
 [[package]]
 name = "zinnias-ciao-domain"
-version = "0.51.0"
+version = "0.52.0"
 dependencies = [
  "serde",
  "thiserror",
@@ -1320,7 +1320,7 @@ dependencies = [
 
 [[package]]
 name = "zinnias-ciao-ssr"
-version = "0.51.0"
+version = "0.52.0"
 dependencies = [
  "codlet",
  "getrandom",

@@ -2,6 +2,54 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.52.0] — 2026-07-09
+
+RFC-064 Phase 1 Rust module boundary cleanup for admin event handlers.
+
+### Changed
+
+- **Release version bumped to v0.52.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+- **Admin event handlers split into focused modules.**
+  `workers/ssr/src/handlers/admin/events.rs` is now a facade that re-exports
+  route handlers from focused child modules for create, recreate, edit, cancel,
+  attendance, note hiding, forms, schedule summary, policy, and support helpers.
+
+- **Source-contract gates follow the split modules.**
+  Release gates now concatenate the admin-events facade and child module files
+  so existing RFC-051/RFC-056/RFC-059/RFC-060 source checks continue to cover
+  the moved implementation.
+
+### Added
+
+- **RFC-064 design record.**
+  The RFC records the staged module/crate boundary cleanup plan, v0.52.0 Phase
+  1 scope, ownership rules, crate-extraction trigger criteria, and remaining
+  Phase 2+ decisions.
+
+### Fixed
+
+- **Oversized admin event implementation reduced.**
+  The former monolithic `admin/events.rs` implementation was split without
+  adding crates or changing routes, form names, database schema, or intended
+  UI behavior.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo build --workspace`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `mdbook build docs`
+- `git diff --check`
+
+Browser smoke was not run because this release is a source-structure-only
+module split with no intended route, form field, rendered-copy, or static asset
+behavior change beyond cache-buster/version alignment.
+
 ## [0.51.0] — 2026-07-07
 
 RFC-024 active-member help-signin for lost browser/session access.
