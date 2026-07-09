@@ -2,7 +2,9 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::{
-    DayInput, EventInput, RecurrenceFreq, expand_recurrence, validate_event,
+    DayInput, EventInput, EventValidationError, RecurrenceEnd, RecurrenceFreq,
+    generate_recurrence_occurrences, recurrence_materialization_window, validate_event,
+    validate_recurrence_end,
 };
 
 use crate::audit;
@@ -170,14 +172,25 @@ pub async fn post_create_event(
         None
     };
 
-    // RFC-022: recurrence
+    // RFC-065: recurrence v2
     let freq_str = body.get_field("repeat_rule").unwrap_or_default();
     let freq = RecurrenceFreq::parse_form_value(&freq_str);
     let rep_count = body
         .get_field("repeat_count")
         .and_then(|s| s.trim().parse::<u32>().ok())
-        .unwrap_or(1)
-        .max(1);
+        .filter(|n| *n > 0);
+    let repeat_end_mode = body
+        .get_field("repeat_end_mode")
+        .unwrap_or_else(|| "open_ended".to_string());
+    let repeat_until = body.get_field("repeat_until");
+    let recurrence_end =
+        match validate_recurrence_end(freq, &repeat_end_mode, rep_count, repeat_until.as_deref()) {
+            Ok(v) => v,
+            Err(e) => {
+                let msg = query_escape(&e.to_string());
+                return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
+            }
+        };
 
     let validated = match validate_event(input) {
         Ok(v) => v,
@@ -187,15 +200,7 @@ pub async fn post_create_event(
         }
     };
 
-    // Expand recurrence from the single validated base day.
     let base_day = validated.days[0].clone();
-    let expanded = match expand_recurrence(&base_day, freq, rep_count) {
-        Ok(v) => v,
-        Err(e) => {
-            let msg = query_escape(&e.to_string());
-            return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
-        }
-    };
 
     // Convert community-local "HH:MM" on day_date to true UTC (RFC-018).
     // The community timezone determines the offset for local->UTC conversion.
@@ -214,20 +219,108 @@ pub async fn post_create_event(
             );
         }
     };
-    let days_utc: Vec<(String, String, String)> = expanded
+    let (today_local, _) = zinnias_ciao_contracts::tz::to_local_parts(&db::now_utc(), off);
+    let window = match recurrence_materialization_window(&today_local) {
+        Some(w) => w,
+        None => return render::internal_error(),
+    };
+
+    let occurrences = if let Some(ref end) = recurrence_end {
+        if matches!(end, RecurrenceEnd::OpenEnded) && base_day.day_date < today_local {
+            let msg = query_escape(&EventValidationError::RepeatStartTooFarPast.to_string());
+            return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
+        }
+        if base_day.day_date > window.through_day_date {
+            let msg = query_escape(&EventValidationError::RepeatStartTooFarPast.to_string());
+            return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
+        }
+        match generate_recurrence_occurrences(&base_day, freq, end, &window.through_day_date, &[]) {
+            Ok(v) if !v.is_empty() => v,
+            Ok(_) => {
+                let msg = query_escape(&EventValidationError::RepeatStartTooFarPast.to_string());
+                return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
+            }
+            Err(e) => {
+                let msg = query_escape(&e.to_string());
+                return redirect(&format!("/c/{community_id}/admin/events/new?err={msg}"));
+            }
+        }
+    } else {
+        vec![zinnias_ciao_domain::RecurrenceOccurrence {
+            ordinal: 1,
+            day: base_day.clone(),
+        }]
+    };
+
+    struct OwnedDay {
+        seq: u32,
+        day_date: String,
+        starts_at_utc: String,
+        ends_at_utc: String,
+        series_occurrence_date: Option<String>,
+    }
+    let series_id = recurrence_end
+        .as_ref()
+        .map(|_| format!("ser_{}", crate::crypto::random_token()[..20].to_owned()));
+    let owned_days: Vec<OwnedDay> = occurrences
         .iter()
-        .map(|d| {
-            let starts = zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.starts_at, off);
-            let ends = zinnias_ciao_contracts::tz::local_to_utc(&d.day_date, &d.ends_at, off);
-            (d.day_date.clone(), starts, ends)
+        .map(|occurrence| {
+            let starts = zinnias_ciao_contracts::tz::local_to_utc(
+                &occurrence.day.day_date,
+                &occurrence.day.starts_at,
+                off,
+            );
+            let ends = zinnias_ciao_contracts::tz::local_to_utc(
+                &occurrence.day.day_date,
+                &occurrence.day.ends_at,
+                off,
+            );
+            OwnedDay {
+                seq: occurrence.ordinal,
+                day_date: occurrence.day.day_date.clone(),
+                starts_at_utc: starts,
+                ends_at_utc: ends,
+                series_occurrence_date: series_id.as_ref().map(|_| occurrence.day.day_date.clone()),
+            }
+        })
+        .collect();
+    let days_utc: Vec<event_write::EventDayInsert<'_>> = owned_days
+        .iter()
+        .map(|day| event_write::EventDayInsert {
+            seq: day.seq,
+            day_date: &day.day_date,
+            starts_at_utc: &day.starts_at_utc,
+            ends_at_utc: &day.ends_at_utc,
+            series_id: series_id.as_deref(),
+            series_occurrence_date: day.series_occurrence_date.as_deref(),
         })
         .collect();
 
-    let repeat_count_stored = if freq.is_recurring() {
-        Some(expanded.len() as u32)
-    } else {
-        None
+    let repeat_count_stored = match recurrence_end.as_ref() {
+        Some(RecurrenceEnd::AfterCount(count)) => Some(*count),
+        Some(_) | None => None,
     };
+    let series_insert = recurrence_end.as_ref().and_then(|end| {
+        let series_id = series_id.as_deref()?;
+        let materialized_through = owned_days.last().map(|d| d.day_date.as_str());
+        let (end_mode, occurrence_count, until_day_date) = match end {
+            RecurrenceEnd::AfterCount(count) => ("after_count", Some(*count), None),
+            RecurrenceEnd::UntilDate(date) => ("until_date", None, Some(date.as_str())),
+            RecurrenceEnd::OpenEnded => ("open_ended", None, None),
+        };
+        Some(event_write::EventSeriesInsert {
+            id: series_id,
+            frequency: freq.as_str(),
+            start_day_date: &base_day.day_date,
+            starts_at_local: &base_day.starts_at,
+            ends_at_local: &base_day.ends_at,
+            timezone: &community_tz,
+            end_mode,
+            occurrence_count,
+            until_day_date,
+            materialized_through_day_date: materialized_through,
+        })
+    });
     let event_id = event_write::create_event(
         &db,
         community_id,
@@ -238,6 +331,7 @@ pub async fn post_create_event(
         &days_utc,
         freq.as_str(),
         repeat_count_stored,
+        series_insert,
     )
     .await?;
 

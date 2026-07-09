@@ -244,10 +244,19 @@ fn render_repeat_fields() -> String {
              <option value=\"biweekly\">{opt_biweekly}</option>\
              <option value=\"monthly\">{opt_monthly}</option>\
            </select>\
-           <input type=\"number\" name=\"repeat_count\" value=\"8\" min=\"1\" max=\"52\"\
-             style=\"width:5rem;max-width:100%;padding:.625rem;border:1px solid #e5e5ea;\
+           <select name=\"repeat_end_mode\" style=\"padding:.625rem;border:1px solid #e5e5ea;\
+             border-radius:12px;font-size:1rem;flex:1 1 10rem;min-width:0;max-width:100%\">\
+             <option value=\"open_ended\">{end_open}</option>\
+             <option value=\"until_date\">{end_until}</option>\
+             <option value=\"after_count\">{end_count}</option>\
+           </select>\
+           <input type=\"number\" name=\"repeat_count\" value=\"\" min=\"1\" max=\"52\"\
+             placeholder=\"{count_ph}\" aria-label=\"{count_lbl}\"\
+             style=\"width:6rem;max-width:100%;padding:.625rem;border:1px solid #e5e5ea;\
              border-radius:12px;font-size:1rem\">\
-           <span style=\"font-size:.875rem;color:#6e6e73;flex:0 0 auto\">{unit}</span>\
+           <input type=\"date\" name=\"repeat_until\" aria-label=\"{until_lbl}\"\
+             style=\"width:10rem;max-width:100%;padding:.625rem;border:1px solid #e5e5ea;\
+             border-radius:12px;font-size:1rem\">\
          </div>\
          <p style=\"font-size:.75rem;color:#6e6e73;margin:.25rem 0 0\">{hint}</p>\
          </div>",
@@ -256,7 +265,12 @@ fn render_repeat_fields() -> String {
         opt_weekly = i18n::JA_REPEAT_WEEKLY,
         opt_biweekly = i18n::JA_REPEAT_BIWEEKLY,
         opt_monthly = i18n::JA_REPEAT_MONTHLY,
-        unit = i18n::JA_REPEAT_COUNT_UNIT,
+        end_open = i18n::JA_REPEAT_END_OPEN,
+        end_until = i18n::JA_REPEAT_END_UNTIL,
+        end_count = i18n::JA_REPEAT_END_COUNT,
+        count_ph = i18n::JA_REPEAT_COUNT_UNIT,
+        count_lbl = i18n::JA_REPEAT_COUNT_LABEL,
+        until_lbl = i18n::JA_REPEAT_UNTIL_LABEL,
         hint = i18n::JA_REPEAT_COUNT_HINT,
     )
 }

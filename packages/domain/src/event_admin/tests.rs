@@ -195,3 +195,130 @@ fn freq_round_trip() {
     assert_eq!(RecurrenceFreq::parse_form_value("none").as_str(), "none");
     assert_eq!(RecurrenceFreq::parse_form_value("unknown").as_str(), "none");
 }
+
+#[test]
+fn materialization_window_ends_six_months_ahead() {
+    let window = recurrence_materialization_window("2026-07-09").unwrap();
+    assert_eq!(window.from_day_date, "2026-07-09");
+    assert_eq!(window.through_day_date, "2027-01-31");
+}
+
+#[test]
+fn month_intersection_rejects_far_future() {
+    let window = recurrence_materialization_window("2026-07-09").unwrap();
+    assert!(month_intersects_materialization_window(
+        "2027-01-01",
+        "2027-02-01",
+        &window
+    ));
+    assert!(!month_intersects_materialization_window(
+        "2027-02-01",
+        "2027-03-01",
+        &window
+    ));
+}
+
+#[test]
+fn open_ended_occurrences_stop_at_window() {
+    let days = generate_recurrence_occurrences(
+        &base_day(),
+        RecurrenceFreq::Weekly,
+        &RecurrenceEnd::OpenEnded,
+        "2026-06-27",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(days.len(), 4);
+    assert_eq!(days[3].ordinal, 4);
+    assert_eq!(days[3].day.day_date, "2026-06-27");
+}
+
+#[test]
+fn skip_exception_creates_ordinal_gap() {
+    let days = generate_recurrence_occurrences(
+        &base_day(),
+        RecurrenceFreq::Weekly,
+        &RecurrenceEnd::AfterCount(4),
+        "2026-06-27",
+        &[String::from("2026-06-13")],
+    )
+    .unwrap();
+    assert_eq!(days.len(), 3);
+    assert_eq!(days[0].ordinal, 1);
+    assert_eq!(days[1].ordinal, 3);
+    assert_eq!(days[1].day.day_date, "2026-06-20");
+}
+
+#[test]
+fn generated_occurrences_are_capped_per_operation() {
+    let days = generate_recurrence_occurrences(
+        &base_day(),
+        RecurrenceFreq::Weekly,
+        &RecurrenceEnd::OpenEnded,
+        "2030-01-01",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(days.len(), RECURRENCE_MATERIALIZATION_INSERT_CAP);
+}
+
+#[test]
+fn materialization_generation_continues_after_existing_window() {
+    let days = generate_recurrence_occurrences_after(
+        &base_day(),
+        RecurrenceFreq::Weekly,
+        &RecurrenceEnd::OpenEnded,
+        Some("2027-08-21"),
+        "2027-09-18",
+        &[],
+        RECURRENCE_MATERIALIZATION_INSERT_CAP,
+    )
+    .unwrap();
+    assert_eq!(days[0].ordinal, 65);
+    assert_eq!(days[0].day.day_date, "2027-08-28");
+    assert_eq!(days[3].ordinal, 68);
+    assert_eq!(days[3].day.day_date, "2027-09-18");
+}
+
+#[test]
+fn materialization_generation_caps_current_run_after_existing_window() {
+    let days = generate_recurrence_occurrences_after(
+        &base_day(),
+        RecurrenceFreq::Weekly,
+        &RecurrenceEnd::OpenEnded,
+        Some("2027-08-21"),
+        "2027-12-31",
+        &[],
+        2,
+    )
+    .unwrap();
+    assert_eq!(
+        days.iter()
+            .map(|occurrence| occurrence.day.day_date.as_str())
+            .collect::<Vec<_>>(),
+        vec!["2027-08-28", "2027-09-04"]
+    );
+}
+
+#[test]
+fn materialization_generation_preserves_skip_after_existing_window() {
+    let days = generate_recurrence_occurrences_after(
+        &base_day(),
+        RecurrenceFreq::Weekly,
+        &RecurrenceEnd::OpenEnded,
+        Some("2027-08-21"),
+        "2027-09-11",
+        &[String::from("2027-08-28")],
+        RECURRENCE_MATERIALIZATION_INSERT_CAP,
+    )
+    .unwrap();
+    assert_eq!(days.len(), 2);
+    assert_eq!(days[0].ordinal, 66);
+    assert_eq!(days[0].day.day_date, "2027-09-04");
+}
+
+#[test]
+fn validate_recurrence_end_open_ended() {
+    let end = validate_recurrence_end(RecurrenceFreq::Weekly, "open_ended", None, None).unwrap();
+    assert_eq!(end, Some(RecurrenceEnd::OpenEnded));
+}

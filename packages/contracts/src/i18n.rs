@@ -181,6 +181,20 @@ pub const JA_ME_HELP_BODY: &str =
 // ── Admin: event management ───────────────────────────────────────────────
 pub const EN_ADMIN_CREATE_EVENT_TITLE: &str = "Create Event";
 pub const EN_ADMIN_CREATE_EVENT_SUBMIT: &str = "Create Event";
+pub const EN_REPEAT_END_OPEN: &str = "No end date";
+pub const EN_REPEAT_END_UNTIL: &str = "Until date";
+pub const EN_REPEAT_END_COUNT: &str = "Number of times";
+pub const EN_REPEAT_COUNT_LABEL: &str = "Repeat count";
+pub const EN_REPEAT_UNTIL_LABEL: &str = "Repeat until date";
+pub const EN_OCCURRENCE_CANCEL_ACTION: &str = "Cancel this date only";
+pub const EN_OCCURRENCE_CANCEL_TITLE: &str = "Cancel this date";
+pub const EN_OCCURRENCE_CANCEL_HELPER: &str =
+    "Only this date will be cancelled. Other dates in the series stay scheduled.";
+pub const EN_OCCURRENCE_CANCEL_SUBMIT: &str = "Cancel this date";
+pub const EN_OCCURRENCE_CANCELLED_BADGE: &str = "This date is cancelled";
+pub const EN_CALENDAR_OUT_OF_RANGE: &str =
+    "Recurring dates are prepared only for the next several months.";
+pub const EN_CALENDAR_MATERIALIZATION_LIMIT: &str = "Some recurring dates are still being prepared. Please try again later or ask an admin to review.";
 pub const EN_ADMIN_RECREATE_EVENT_ACTION: &str = "Create similar event";
 pub const EN_ADMIN_RECREATE_EVENT_HELPER: &str = "Only the title, place, and description are reused. Choose the date again. Attendance answers and memos are not carried over.";
 pub const EN_ADMIN_EDIT_EVENT_TITLE: &str = "Edit Event";
@@ -215,6 +229,21 @@ pub const EN_ADMIN_ATTEND_SUBMIT: &str = "Save Attendance";
 
 pub const JA_ADMIN_CREATE_EVENT_TITLE: &str = "イベントを作成";
 pub const JA_ADMIN_CREATE_EVENT_SUBMIT: &str = "イベントを作成";
+pub const JA_REPEAT_END_OPEN: &str = "終了日を決めない";
+pub const JA_REPEAT_END_UNTIL: &str = "この日まで";
+pub const JA_REPEAT_END_COUNT: &str = "回数を指定";
+pub const JA_REPEAT_COUNT_LABEL: &str = "繰り返し回数";
+pub const JA_REPEAT_UNTIL_LABEL: &str = "繰り返し終了日";
+pub const JA_OCCURRENCE_CANCEL_ACTION: &str = "この日だけ中止する";
+pub const JA_OCCURRENCE_CANCEL_TITLE: &str = "この日だけ中止";
+pub const JA_OCCURRENCE_CANCEL_HELPER: &str =
+    "この日だけを中止します。同じ繰り返し予定の他の日はそのまま残ります。";
+pub const JA_OCCURRENCE_CANCEL_SUBMIT: &str = "この日だけ中止する";
+pub const JA_OCCURRENCE_CANCELLED_BADGE: &str = "この日は中止です";
+pub const JA_CALENDAR_OUT_OF_RANGE: &str =
+    "繰り返し予定は、近い月から順に表示できるように準備します。";
+pub const JA_CALENDAR_MATERIALIZATION_LIMIT: &str =
+    "一部の繰り返し予定はまだ準備中です。時間をおいて再度確認するか、管理者に確認してください。";
 pub const JA_ADMIN_RECREATE_EVENT_ACTION: &str = "似た内容で新しいイベントを作成";
 pub const JA_ADMIN_RECREATE_EVENT_HELPER: &str = "タイトル・場所・説明だけを引き継ぎます。日程はもう一度選びます。参加の回答とメモは引き継ぎません。";
 pub const JA_ADMIN_EDIT_EVENT_TITLE: &str = "イベントを編集";

@@ -8,6 +8,10 @@ pub const EVENT_LOCATION_MAX: usize = 120;
 pub const EVENT_DESC_MAX: usize = 500;
 /// Maximum number of occurrences an admin can generate in one operation (RFC-022).
 pub const RECURRENCE_MAX_COUNT: u32 = 52;
+/// RFC-065 global forward materialization window.
+pub const RECURRENCE_MATERIALIZATION_MONTHS_AHEAD: u32 = 6;
+/// RFC-065 hard cap for one materialization operation.
+pub const RECURRENCE_MATERIALIZATION_INSERT_CAP: usize = 64;
 
 /// Recurrence frequency for event creation (RFC-022).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,6 +20,25 @@ pub enum RecurrenceFreq {
     Weekly,
     Biweekly,
     Monthly,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RecurrenceEnd {
+    AfterCount(u32),
+    UntilDate(String),
+    OpenEnded,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecurrenceOccurrence {
+    pub ordinal: u32,
+    pub day: DayInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MaterializationWindow {
+    pub from_day_date: String,
+    pub through_day_date: String,
 }
 
 impl RecurrenceFreq {
@@ -53,6 +76,14 @@ pub enum EventValidationError {
     LocationTooLong,
     #[error("Description must be 500 characters or fewer.")]
     DescriptionTooLong,
+    #[error("Repeat count is required.")]
+    RepeatCountMissing,
+    #[error("Repeat count must be 1 or greater.")]
+    RepeatCountInvalid,
+    #[error("Repeat end date is invalid.")]
+    RepeatUntilInvalid,
+    #[error("Repeat start is too far in the past.")]
+    RepeatStartTooFarPast,
     #[error("At least one day is required.")]
     NoDays,
     #[error("Day {0}: date is required.")]
@@ -193,6 +224,155 @@ pub fn expand_recurrence(
     Ok(days)
 }
 
+pub fn recurrence_materialization_window(today_day_date: &str) -> Option<MaterializationWindow> {
+    let today = parse_day_date(today_day_date)?;
+    let (year, month) = add_months_to_year_month(
+        today.year(),
+        today.month() as u8,
+        RECURRENCE_MATERIALIZATION_MONTHS_AHEAD,
+    );
+    let month_enum = time::Month::try_from(month).ok()?;
+    let last_day = days_in_month(year, month_enum);
+    let through = time::Date::from_calendar_date(year, month_enum, last_day).ok()?;
+    Some(MaterializationWindow {
+        from_day_date: today_day_date.to_string(),
+        through_day_date: format_date(through),
+    })
+}
+
+pub fn month_intersects_materialization_window(
+    month_start: &str,
+    next_month_start: &str,
+    window: &MaterializationWindow,
+) -> bool {
+    month_start <= window.through_day_date.as_str()
+        && next_month_start > window.from_day_date.as_str()
+}
+
+pub fn validate_recurrence_end(
+    freq: RecurrenceFreq,
+    mode: &str,
+    count: Option<u32>,
+    until_day_date: Option<&str>,
+) -> Result<Option<RecurrenceEnd>, EventValidationError> {
+    if !freq.is_recurring() {
+        return Ok(None);
+    }
+    match mode.trim() {
+        "open_ended" => Ok(Some(RecurrenceEnd::OpenEnded)),
+        "until_date" => {
+            let until = until_day_date
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or(EventValidationError::RepeatUntilInvalid)?;
+            if parse_day_date(until).is_none() {
+                return Err(EventValidationError::RepeatUntilInvalid);
+            }
+            Ok(Some(RecurrenceEnd::UntilDate(until.to_string())))
+        }
+        "after_count" | "" => {
+            let count = count.ok_or(EventValidationError::RepeatCountMissing)?;
+            if count == 0 {
+                return Err(EventValidationError::RepeatCountInvalid);
+            }
+            Ok(Some(RecurrenceEnd::AfterCount(
+                count.min(RECURRENCE_MAX_COUNT),
+            )))
+        }
+        _ => Err(EventValidationError::RepeatCountInvalid),
+    }
+}
+
+pub fn generate_recurrence_occurrences(
+    base: &DayInput,
+    freq: RecurrenceFreq,
+    end: &RecurrenceEnd,
+    through_day_date: &str,
+    skip_day_dates: &[String],
+) -> Result<Vec<RecurrenceOccurrence>, EventValidationError> {
+    generate_recurrence_occurrences_after(
+        base,
+        freq,
+        end,
+        None,
+        through_day_date,
+        skip_day_dates,
+        RECURRENCE_MATERIALIZATION_INSERT_CAP,
+    )
+}
+
+pub fn generate_recurrence_occurrences_after(
+    base: &DayInput,
+    freq: RecurrenceFreq,
+    end: &RecurrenceEnd,
+    after_day_date: Option<&str>,
+    through_day_date: &str,
+    skip_day_dates: &[String],
+    max_results: usize,
+) -> Result<Vec<RecurrenceOccurrence>, EventValidationError> {
+    if max_results == 0 {
+        return Ok(Vec::new());
+    }
+    let base_date =
+        parse_day_date(&base.day_date).ok_or(EventValidationError::DayDateMissing(1))?;
+    let through =
+        parse_day_date(through_day_date).ok_or(EventValidationError::RepeatUntilInvalid)?;
+    let after = after_day_date
+        .map(|date| parse_day_date(date).ok_or(EventValidationError::RepeatUntilInvalid))
+        .transpose()?;
+    if through < base_date {
+        return Ok(Vec::new());
+    }
+
+    let until = match end {
+        RecurrenceEnd::AfterCount(count) => RecurrenceStop::Count(*count),
+        RecurrenceEnd::UntilDate(date) => RecurrenceStop::Date(
+            parse_day_date(date).ok_or(EventValidationError::RepeatUntilInvalid)?,
+        ),
+        RecurrenceEnd::OpenEnded => RecurrenceStop::Date(through),
+    };
+
+    let mut out = Vec::new();
+    let mut ordinal = 1u32;
+    loop {
+        if matches!(until, RecurrenceStop::Count(count) if ordinal > count) {
+            break;
+        }
+        let next_date = advance_date(base_date, freq, ordinal - 1);
+        if next_date > through {
+            break;
+        }
+        if matches!(until, RecurrenceStop::Date(stop_date) if next_date > stop_date) {
+            break;
+        }
+        let day_date = format_date(next_date);
+        let after_cutoff_reached = match after {
+            Some(after) => next_date > after,
+            None => true,
+        };
+        if after_cutoff_reached && !skip_day_dates.iter().any(|skip| skip == &day_date) {
+            out.push(RecurrenceOccurrence {
+                ordinal,
+                day: DayInput {
+                    day_date,
+                    starts_at: base.starts_at.clone(),
+                    ends_at: base.ends_at.clone(),
+                },
+            });
+        }
+        if out.len() >= max_results {
+            break;
+        }
+        ordinal += 1;
+    }
+    Ok(out)
+}
+
+enum RecurrenceStop {
+    Count(u32),
+    Date(time::Date),
+}
+
 fn parse_day_date(s: &str) -> Option<time::Date> {
     let parts: Vec<&str> = s.split('-').collect();
     if parts.len() != 3 {
@@ -222,6 +402,14 @@ fn advance_date(base: time::Date, freq: RecurrenceFreq, steps: u32) -> time::Dat
             time::Date::from_calendar_date(year, month_enum, day).unwrap_or(base)
         }
     }
+}
+
+fn add_months_to_year_month(year: i32, month: u8, delta: u32) -> (i32, u8) {
+    let zero_based = year * 12 + (month as i32 - 1) + delta as i32;
+    (
+        zero_based.div_euclid(12),
+        (zero_based.rem_euclid(12) + 1) as u8,
+    )
 }
 
 fn days_in_month(year: i32, month: time::Month) -> u8 {

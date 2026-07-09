@@ -66,6 +66,9 @@ fn day(seq: u32, date: &str) -> event_db::EventDayRow {
         day_date: date.to_string(),
         starts_at_utc: format!("{date}T01:00:00.000Z"),
         ends_at_utc: format!("{date}T02:00:00.000Z"),
+        occurrence_status: "scheduled".to_string(),
+        series_id: None,
+        series_occurrence_date: None,
     }
 }
 

@@ -102,8 +102,12 @@ pub async fn get_event_detail(
         };
         let counts = day_counts.get(&day.id).unwrap_or(&empty_counts);
 
-        let can_set_attended = membership.is_admin() && time_state == DayTimeState::Ended;
-        let attended_reason = if time_state != DayTimeState::Ended {
+        let occurrence_cancelled = day.occurrence_status == "cancelled";
+        let can_set_attended =
+            membership.is_admin() && time_state == DayTimeState::Ended && !occurrence_cancelled;
+        let attended_reason = if occurrence_cancelled {
+            i18n::JA_OCCURRENCE_CANCELLED_BADGE
+        } else if time_state != DayTimeState::Ended {
             i18n::JA_EVENT_ATTENDED_UNAVAILABLE
         } else if !membership.is_admin() {
             i18n::JA_EVENT_ATTENDED_ADMIN_ONLY
@@ -121,15 +125,41 @@ pub async fn get_event_detail(
             community_tz_early,
         );
 
-        let status_form = render::status_form(
-            community_id,
-            event_id,
-            &day.id,
-            &status_token,
-            current_status,
-            can_set_attended,
-            attended_reason,
-        );
+        let status_form = if occurrence_cancelled || event.status == "cancelled" {
+            format!(
+                "<p role=\"status\" style=\"font-size:.875rem;color:#B42318;\
+                 background:#FFF0EF;border-radius:10px;padding:.625rem;margin:.5rem 0\">{}</p>",
+                i18n::JA_OCCURRENCE_CANCELLED_BADGE
+            )
+        } else {
+            render::status_form(
+                community_id,
+                event_id,
+                &day.id,
+                &status_token,
+                current_status,
+                can_set_attended,
+                attended_reason,
+            )
+        };
+        let cancel_occurrence_action = if membership.is_admin()
+            && event.status != "cancelled"
+            && !occurrence_cancelled
+            && day.series_id.is_some()
+        {
+            format!(
+                "<a href=\"/c/{cid}/admin/events/{eid}/days/{did}/cancel\" \
+                     style=\"display:inline-flex;align-items:center;min-height:44px;\
+                     color:#B42318;text-decoration:none;font-size:.875rem;font-weight:600;\
+                     margin:.25rem 0 .5rem\">{label}</a>",
+                cid = render::escape_html(community_id),
+                eid = render::escape_html(event_id),
+                did = render::escape_html(&day.id),
+                label = i18n::JA_OCCURRENCE_CANCEL_ACTION,
+            )
+        } else {
+            String::new()
+        };
 
         let (cg, cng, cna) = (counts.going, counts.not_going, counts.no_answer);
         let counts_html = format!(
@@ -166,7 +196,7 @@ pub async fn get_event_detail(
         days_html.push_str(&format!(
             "<div style=\"border:1px solid #e5e5ea;border-radius:16px;padding:1rem;margin-bottom:1rem\">\
              <h3 style=\"font-size:.9375rem;font-weight:600;margin-bottom:.5rem\">{label}</h3>\
-             {status_form}{counts_html}\
+             {status_form}{cancel_occurrence_action}{counts_html}\
              <details style=\"margin-top:.75rem\">\
                <summary style=\"font-size:.875rem;color:#007AFF;cursor:pointer\">{whos_going}</summary>\
                <div style=\"margin-top:.5rem\">{plist}</div>\
@@ -174,6 +204,7 @@ pub async fn get_event_detail(
              </div>",
             label       = render::escape_html(&label),
             status_form = status_form,
+            cancel_occurrence_action = cancel_occurrence_action,
             counts_html = counts_html,
             plist       = plist,
             whos_going  = i18n::JA_EVENT_WHOS_GOING,
@@ -389,7 +420,7 @@ pub async fn post_my_status(
     } else {
         Role::Member
     };
-    let is_cancelled = event.status == "cancelled";
+    let is_cancelled = event.status == "cancelled" || day.occurrence_status == "cancelled";
 
     // Parse requested status ("clear" means None = No answer)
     let requested: Option<AttendanceStatus> = match raw_status.as_str() {

@@ -189,6 +189,21 @@ fn i18n_en_ja_parity_count() {
         (EN_ME_HELP_BODY, JA_ME_HELP_BODY),
         (EN_ADMIN_CREATE_EVENT_TITLE, JA_ADMIN_CREATE_EVENT_TITLE),
         (EN_ADMIN_CREATE_EVENT_SUBMIT, JA_ADMIN_CREATE_EVENT_SUBMIT),
+        (EN_REPEAT_END_OPEN, JA_REPEAT_END_OPEN),
+        (EN_REPEAT_END_UNTIL, JA_REPEAT_END_UNTIL),
+        (EN_REPEAT_END_COUNT, JA_REPEAT_END_COUNT),
+        (EN_REPEAT_COUNT_LABEL, JA_REPEAT_COUNT_LABEL),
+        (EN_REPEAT_UNTIL_LABEL, JA_REPEAT_UNTIL_LABEL),
+        (EN_OCCURRENCE_CANCEL_ACTION, JA_OCCURRENCE_CANCEL_ACTION),
+        (EN_OCCURRENCE_CANCEL_TITLE, JA_OCCURRENCE_CANCEL_TITLE),
+        (EN_OCCURRENCE_CANCEL_HELPER, JA_OCCURRENCE_CANCEL_HELPER),
+        (EN_OCCURRENCE_CANCEL_SUBMIT, JA_OCCURRENCE_CANCEL_SUBMIT),
+        (EN_OCCURRENCE_CANCELLED_BADGE, JA_OCCURRENCE_CANCELLED_BADGE),
+        (EN_CALENDAR_OUT_OF_RANGE, JA_CALENDAR_OUT_OF_RANGE),
+        (
+            EN_CALENDAR_MATERIALIZATION_LIMIT,
+            JA_CALENDAR_MATERIALIZATION_LIMIT,
+        ),
         (
             EN_ADMIN_RECREATE_EVENT_ACTION,
             JA_ADMIN_RECREATE_EVENT_ACTION,
@@ -580,6 +595,9 @@ const COMMUNITY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/communi
 const ICS_SRC: &str = include_str!("../../../packages/contracts/src/ics.rs");
 const WRANGLER_TOML_SRC: &str = include_str!("../../../wrangler.toml");
 const GITIGNORE_SRC: &str = include_str!("../../../.gitignore");
+const MIGRATION_0009_SRC: &str = include_str!("../../../migrations/0009_recurrence_v2.sql");
+const EVENT_SERIES_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event_series.rs");
+const EVENT_ADMIN_DOMAIN_SRC: &str = include_str!("../../../packages/domain/src/event_admin.rs");
 
 #[test]
 fn tracked_wrangler_template_contains_only_placeholder_resource_ids() {
@@ -628,6 +646,51 @@ fn local_wrangler_configs_remain_ignored() {
             ".gitignore must keep {pattern:?} so real hosted D1/KV IDs stay out of Git"
         );
     }
+}
+
+#[test]
+fn rfc065_legacy_migration_does_not_treat_utc_clock_as_local_time() {
+    assert!(
+        !MIGRATION_0009_SRC.contains("substr(first_day.starts_at_utc")
+            && !MIGRATION_0009_SRC.contains("substr(first_day.ends_at_utc"),
+        "RFC-065 migration must not backfill local recurrence times from UTC clock text"
+    );
+    assert!(
+        MIGRATION_0009_SRC.contains("future materialization is disabled")
+            && MIGRATION_0009_SRC.contains("NULL,\n    NULL,"),
+        "RFC-065 legacy series must use explicit null local times when safe local clocks are unavailable"
+    );
+}
+
+#[test]
+fn rfc065_exception_shape_is_checked_by_database() {
+    assert!(
+        MIGRATION_0009_SRC.contains("action = 'skip' AND event_day_id IS NULL")
+            && MIGRATION_0009_SRC.contains("action = 'cancel' AND event_day_id IS NOT NULL"),
+        "RFC-065 exception table must enforce skip/cancel event_day_id shape"
+    );
+}
+
+#[test]
+fn rfc065_materialization_uses_after_date_and_shared_request_budget() {
+    assert!(
+        EVENT_ADMIN_DOMAIN_SRC.contains("generate_recurrence_occurrences_after")
+            && EVENT_ADMIN_DOMAIN_SRC.contains("after_day_date"),
+        "RFC-065 domain generator must support rolling materialization after existing dates"
+    );
+    assert!(
+        EVENT_SERIES_DB_SRC.contains("let mut remaining = RECURRENCE_MATERIALIZATION_INSERT_CAP")
+            && EVENT_SERIES_DB_SRC
+                .contains("materialize_series(db, &row, through_day_date, remaining)")
+            && EVENT_SERIES_DB_SRC
+                .contains("remaining = remaining.saturating_sub(report.inserted)"),
+        "RFC-065 community materialization must enforce one shared insert budget per request"
+    );
+    assert!(
+        EVENT_SERIES_DB_SRC.contains("generate_recurrence_occurrences_after")
+            && EVENT_SERIES_DB_SRC.contains("previous_materialized"),
+        "RFC-065 materializer must generate after materialized_through instead of replaying the first capped batch"
+    );
 }
 
 /// Count non-comment lines containing `.await` in a source string.

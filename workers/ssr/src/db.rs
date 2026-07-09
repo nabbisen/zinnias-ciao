@@ -6,6 +6,7 @@ pub mod calendar;
 pub mod community;
 pub mod event;
 pub mod event_note;
+pub mod event_series;
 pub mod event_template;
 pub mod event_write;
 pub mod invite;

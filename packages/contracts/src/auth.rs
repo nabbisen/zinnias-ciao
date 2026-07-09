@@ -26,6 +26,7 @@ pub mod token_purpose {
     pub const CREATE_EVENT: &str = "create_event";
     pub const EDIT_EVENT: &str = "edit_event";
     pub const CANCEL_EVENT: &str = "cancel_event";
+    pub const CANCEL_OCCURRENCE: &str = "cancel_occurrence";
     pub const ATTENDANCE_OVERRIDE: &str = "attendance_override";
     pub const ADMIN_HIDE_NOTE: &str = "admin_hide_note";
     pub const REVOKE_INVITE: &str = "revoke_invite";

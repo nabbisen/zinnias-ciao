@@ -5,6 +5,28 @@ use crate::crypto::random_token;
 use crate::db::now_utc;
 use worker::{D1Database, Result};
 
+pub struct EventDayInsert<'a> {
+    pub seq: u32,
+    pub day_date: &'a str,
+    pub starts_at_utc: &'a str,
+    pub ends_at_utc: &'a str,
+    pub series_id: Option<&'a str>,
+    pub series_occurrence_date: Option<&'a str>,
+}
+
+pub struct EventSeriesInsert<'a> {
+    pub id: &'a str,
+    pub frequency: &'a str,
+    pub start_day_date: &'a str,
+    pub starts_at_local: &'a str,
+    pub ends_at_local: &'a str,
+    pub timezone: &'a str,
+    pub end_mode: &'a str,
+    pub occurrence_count: Option<u32>,
+    pub until_day_date: Option<&'a str>,
+    pub materialized_through_day_date: Option<&'a str>,
+}
+
 /// Create an event and its day rows in one logical batch.
 /// `repeat_rule` and `repeat_count` are stored for reference; the actual
 /// day rows in `days` are already the fully-expanded occurrences.
@@ -16,9 +38,10 @@ pub async fn create_event(
     title: &str,
     location: Option<&str>,
     description: Option<&str>,
-    days: &[(String, String, String)], // (day_date, starts_at_utc, ends_at_utc)
+    days: &[EventDayInsert<'_>],
     repeat_rule: &str,
     repeat_count: Option<u32>,
+    series: Option<EventSeriesInsert<'_>>,
 ) -> Result<String> {
     let event_id = random_token()[..24].to_owned();
     let now = now_utc();
@@ -45,27 +68,115 @@ pub async fn create_event(
     .run()
     .await?;
 
-    for (seq, (day_date, starts_utc, ends_utc)) in days.iter().enumerate() {
-        let day_id = random_token()[..24].to_owned();
+    if let Some(series) = series {
+        let occurrence_count_js: worker::wasm_bindgen::JsValue = series
+            .occurrence_count
+            .map(|n| worker::wasm_bindgen::JsValue::from_f64(n as f64))
+            .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
+        let until_day_date_js = series
+            .until_day_date
+            .map(worker::wasm_bindgen::JsValue::from_str)
+            .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
+        let materialized_through_js = series
+            .materialized_through_day_date
+            .map(worker::wasm_bindgen::JsValue::from_str)
+            .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
         db.prepare(
-            "INSERT INTO event_days \
-             (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+            "INSERT INTO event_series \
+             (id, event_id, community_id, frequency, start_day_date, starts_at_local, \
+              ends_at_local, timezone, end_mode, occurrence_count, until_day_date, \
+              materialized_through_day_date, created_at, updated_at) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?13)",
         )
         .bind(&[
-            day_id.as_str().into(),
+            series.id.into(),
             event_id.as_str().into(),
             community_id.into(),
-            ((seq + 1) as u32).into(),
-            day_date.as_str().into(),
-            starts_utc.as_str().into(),
-            ends_utc.as_str().into(),
+            series.frequency.into(),
+            series.start_day_date.into(),
+            series.starts_at_local.into(),
+            series.ends_at_local.into(),
+            series.timezone.into(),
+            series.end_mode.into(),
+            occurrence_count_js,
+            until_day_date_js,
+            materialized_through_js,
             now.as_str().into(),
         ])?
         .run()
         .await?;
     }
+
+    for day in days {
+        let day_id = random_token()[..24].to_owned();
+        let series_id = day
+            .series_id
+            .map(worker::wasm_bindgen::JsValue::from_str)
+            .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
+        let series_occurrence_date = day
+            .series_occurrence_date
+            .map(worker::wasm_bindgen::JsValue::from_str)
+            .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
+        db.prepare(
+            "INSERT INTO event_days \
+             (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at, \
+              series_id, series_occurrence_date) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+        )
+        .bind(&[
+            day_id.as_str().into(),
+            event_id.as_str().into(),
+            community_id.into(),
+            day.seq.into(),
+            day.day_date.into(),
+            day.starts_at_utc.into(),
+            day.ends_at_utc.into(),
+            now.as_str().into(),
+            series_id,
+            series_occurrence_date,
+        ])?
+        .run()
+        .await?;
+    }
     Ok(event_id)
+}
+
+pub async fn cancel_occurrence(
+    db: &D1Database,
+    event_day_id: &str,
+    membership_id: &str,
+    series_id: &str,
+    community_id: &str,
+    exception_day_date: &str,
+) -> Result<()> {
+    let now = now_utc();
+    db.prepare("UPDATE event_days SET occurrence_status='cancelled' WHERE id=?1")
+        .bind(&[event_day_id.into()])?
+        .run()
+        .await?;
+
+    db.prepare(
+        "INSERT INTO event_series_exceptions \
+         (id, series_id, community_id, exception_day_date, action, event_day_id, \
+          created_by_membership_id, created_at) \
+         VALUES (?1,?2,?3,?4,'cancel',?5,?6,?7) \
+         ON CONFLICT(series_id, exception_day_date) DO UPDATE SET \
+           action='cancel', event_day_id=excluded.event_day_id, \
+           created_by_membership_id=excluded.created_by_membership_id, \
+           created_at=excluded.created_at",
+    )
+    .bind(&[
+        random_token()[..24].to_owned().into(),
+        series_id.into(),
+        community_id.into(),
+        exception_day_date.into(),
+        event_day_id.into(),
+        membership_id.into(),
+        now.as_str().into(),
+    ])?
+    .run()
+    .await?;
+    Ok(())
 }
 
 /// Edit title/location/description on a scheduled event (before first day start).

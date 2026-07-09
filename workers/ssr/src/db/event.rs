@@ -21,6 +21,9 @@ pub struct EventDayRow {
     pub day_date: String,
     pub starts_at_utc: String,
     pub ends_at_utc: String,
+    pub occurrence_status: String,
+    pub series_id: Option<String>,
+    pub series_occurrence_date: Option<String>,
 }
 
 /// Fetch a single active event by id, scoped to community (RFC-004).
@@ -73,6 +76,8 @@ pub async fn days_for_event(db: &D1Database, event_id: &str) -> Result<Vec<Event
     let rows = db
         .prepare(
             "SELECT id, event_id, seq, day_date, starts_at_utc, ends_at_utc \
+                    , COALESCE(occurrence_status, 'scheduled') AS occurrence_status, \
+                    series_id, series_occurrence_date \
              FROM event_days \
              WHERE event_id = ?1 \
              ORDER BY seq ASC",
@@ -92,6 +97,19 @@ pub async fn days_for_event(db: &D1Database, event_id: &str) -> Result<Vec<Event
                 day_date: v.get("day_date")?.as_str()?.to_owned(),
                 starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
                 ends_at_utc: v.get("ends_at_utc")?.as_str()?.to_owned(),
+                occurrence_status: v
+                    .get("occurrence_status")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("scheduled")
+                    .to_owned(),
+                series_id: v
+                    .get("series_id")
+                    .and_then(|x| x.as_str())
+                    .map(str::to_owned),
+                series_occurrence_date: v
+                    .get("series_occurrence_date")
+                    .and_then(|x| x.as_str())
+                    .map(str::to_owned),
             })
         })
         .collect())
@@ -109,6 +127,8 @@ pub struct HomeEventRow {
     pub day_date: String,
     pub starts_at_utc: String,
     pub ends_at_utc: String,
+    pub occurrence_status: String,
+    pub series_id: Option<String>,
     pub seq: u32,
     pub total_days: u32,
 }
@@ -124,7 +144,9 @@ pub async fn home_upcoming(
             "SELECT \
                e.id AS event_id, e.title AS event_title, \
                e.location AS event_location, e.status AS event_status, \
-               d.id AS day_id, d.day_date, d.starts_at_utc, d.ends_at_utc, d.seq, \
+               d.id AS day_id, d.day_date, d.starts_at_utc, d.ends_at_utc, \
+               COALESCE(d.occurrence_status, 'scheduled') AS occurrence_status, \
+               d.series_id, d.seq, \
                (SELECT COUNT(*) FROM event_days d2 WHERE d2.event_id = e.id) AS total_days \
              FROM event_days d \
              JOIN events e ON e.id = d.event_id \
@@ -155,6 +177,15 @@ pub async fn home_upcoming(
                 day_date: v.get("day_date")?.as_str()?.to_owned(),
                 starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
                 ends_at_utc: v.get("ends_at_utc")?.as_str()?.to_owned(),
+                occurrence_status: v
+                    .get("occurrence_status")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("scheduled")
+                    .to_owned(),
+                series_id: v
+                    .get("series_id")
+                    .and_then(|x| x.as_str())
+                    .map(str::to_owned),
                 seq: v.get("seq")?.as_u64()? as u32,
                 total_days: v.get("total_days")?.as_u64()? as u32,
             })
@@ -174,7 +205,9 @@ pub async fn calendar_month_for_community(
                e.community_id AS community_id, \
                e.id AS event_id, e.title AS event_title, \
                e.location AS event_location, e.status AS event_status, \
-               d.id AS day_id, d.day_date, d.starts_at_utc, d.ends_at_utc, d.seq, \
+               d.id AS day_id, d.day_date, d.starts_at_utc, d.ends_at_utc, \
+               COALESCE(d.occurrence_status, 'scheduled') AS occurrence_status, \
+               d.series_id, d.seq, \
                (SELECT COUNT(*) FROM event_days d2 WHERE d2.event_id = e.id) AS total_days \
              FROM event_days d \
              JOIN events e ON e.id = d.event_id \
@@ -209,6 +242,15 @@ pub async fn calendar_month_for_community(
                 day_date: v.get("day_date")?.as_str()?.to_owned(),
                 starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
                 ends_at_utc: v.get("ends_at_utc")?.as_str()?.to_owned(),
+                occurrence_status: v
+                    .get("occurrence_status")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("scheduled")
+                    .to_owned(),
+                series_id: v
+                    .get("series_id")
+                    .and_then(|x| x.as_str())
+                    .map(str::to_owned),
                 seq: v.get("seq")?.as_u64()? as u32,
                 total_days: v.get("total_days")?.as_u64()? as u32,
             })
@@ -234,7 +276,9 @@ pub async fn home_upcoming_for_communities(
            e.community_id AS community_id, \
            e.id AS event_id, e.title AS event_title, \
            e.location AS event_location, e.status AS event_status, \
-           d.id AS day_id, d.day_date, d.starts_at_utc, d.ends_at_utc, d.seq, \
+           d.id AS day_id, d.day_date, d.starts_at_utc, d.ends_at_utc, \
+           COALESCE(d.occurrence_status, 'scheduled') AS occurrence_status, \
+           d.series_id, d.seq, \
            (SELECT COUNT(*) FROM event_days d2 WHERE d2.event_id = e.id) AS total_days \
          FROM event_days d \
          JOIN events e ON e.id = d.event_id \
@@ -274,6 +318,15 @@ pub async fn home_upcoming_for_communities(
                 day_date: v.get("day_date")?.as_str()?.to_owned(),
                 starts_at_utc: v.get("starts_at_utc")?.as_str()?.to_owned(),
                 ends_at_utc: v.get("ends_at_utc")?.as_str()?.to_owned(),
+                occurrence_status: v
+                    .get("occurrence_status")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("scheduled")
+                    .to_owned(),
+                series_id: v
+                    .get("series_id")
+                    .and_then(|x| x.as_str())
+                    .map(str::to_owned),
                 seq: v.get("seq")?.as_u64()? as u32,
                 total_days: v.get("total_days")?.as_u64()? as u32,
             })

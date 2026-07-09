@@ -172,10 +172,14 @@ fn render_home_communities(
                     },
                     &community.timezone,
                 );
-                let cancelled = if r.event_status == "cancelled" {
+                let cancelled = if r.event_status == "cancelled" || r.occurrence_status == "cancelled" {
                     format!(
                         "<span style=\"font-size:.75rem;color:#B42318;margin-left:.35rem\">{}</span>",
-                        i18n::JA_EVENT_CANCELLED_BADGE
+                        if r.occurrence_status == "cancelled" {
+                            i18n::JA_OCCURRENCE_CANCELLED_BADGE
+                        } else {
+                            i18n::JA_EVENT_CANCELLED_BADGE
+                        }
                     )
                 } else {
                     String::new()

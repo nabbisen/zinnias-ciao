@@ -107,6 +107,12 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 |----|-------|------|------|
 | 064 | Rust Module and Crate Boundary Cleanup | [./proposed/064-rust-module-and-crate-boundary-cleanup.md](./proposed/064-rust-module-and-crate-boundary-cleanup.md) | Phase 1 admin-events split ships in v0.52.0; Phase 2 render split ships in v0.53.0; Phase 3+ remains proposed |
 
+## Proposed — Calendar advancement (065)
+
+| ID | Title | File | Note |
+|----|-------|------|------|
+| 065 | Recurrence v2 and Occurrence Exceptions | [./proposed/065-recurrence-v2-and-occurrence-exceptions.md](./proposed/065-recurrence-v2-and-occurrence-exceptions.md) | Candidate v0.54.0 design; supersedes RFC-022 recurrence semantics while preserving `event_day` attendance anchors |
+
 ## Archive
 
 _None._

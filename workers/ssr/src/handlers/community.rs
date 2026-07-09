@@ -218,6 +218,18 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
                     let (eid, sub) = split_once(&t[7..], '/');
                     match sub {
                         "cancel" => super::admin::get_cancel_event(req, env, rid, cid, eid).await,
+                        t if t.starts_with("days/") => {
+                            let (day_id, action) = split_once(&t[5..], '/');
+                            match action {
+                                "cancel" => {
+                                    super::admin::get_cancel_occurrence(
+                                        req, env, rid, cid, eid, day_id,
+                                    )
+                                    .await
+                                }
+                                _ => render::not_found(),
+                            }
+                        }
                         "edit" => super::admin::get_edit_event(req, env, rid, cid, eid).await,
                         "recreate" => {
                             super::admin::get_recreate_event(req, env, rid, cid, eid).await
@@ -297,6 +309,18 @@ pub async fn dispatch_post(req: Request, env: &Env, rid: &str, path: &str) -> Re
                     let (eid, sub) = split_once(&t[7..], '/');
                     match sub {
                         "cancel" => super::admin::post_cancel_event(req, env, rid, cid, eid).await,
+                        t if t.starts_with("days/") => {
+                            let (day_id, action) = split_once(&t[5..], '/');
+                            match action {
+                                "cancel" => {
+                                    super::admin::post_cancel_occurrence(
+                                        req, env, rid, cid, eid, day_id,
+                                    )
+                                    .await
+                                }
+                                _ => render::not_found(),
+                            }
+                        }
                         "edit" => super::admin::post_edit_event(req, env, rid, cid, eid).await,
                         "attendance" => {
                             super::admin::post_attendance(req, env, rid, cid, eid).await

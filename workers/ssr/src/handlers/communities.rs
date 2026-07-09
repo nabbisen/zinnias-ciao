@@ -6,6 +6,9 @@ use crate::db::{self, event as event_db, membership as membership_db};
 use crate::render;
 use crate::session::require_auth;
 use zinnias_ciao_contracts::{i18n, tz};
+use zinnias_ciao_domain::{
+    month_intersects_materialization_window, recurrence_materialization_window,
+};
 
 pub async fn get_communities(
     req: Request,
@@ -54,6 +57,27 @@ pub async fn get_communities(
                 .unwrap_or(false)
         });
     let (month_start, next_month_start) = month_bounds(year, month);
+    let month_end = format!("{year:04}-{month:02}-{:02}", tz::days_in_month(year, month));
+    let materialization_notice = match recurrence_materialization_window(&today_date) {
+        Some(window)
+            if month_intersects_materialization_window(
+                &month_start,
+                &next_month_start,
+                &window,
+            ) =>
+        {
+            let report =
+                db::event_series::materialize_for_community_through(&db, community_id, &month_end)
+                    .await?;
+            if report.cap_reached {
+                Some(i18n::JA_CALENDAR_MATERIALIZATION_LIMIT)
+            } else {
+                None
+            }
+        }
+        Some(_) => Some(i18n::JA_CALENDAR_OUT_OF_RANGE),
+        None => None,
+    };
     let rows =
         event_db::calendar_month_for_community(&db, community_id, &month_start, &next_month_start)
             .await?;
@@ -90,7 +114,7 @@ pub async fn get_communities(
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
-           {calendar}{event_list}\
+           {notice}{calendar}{event_list}\
          </main>{nav}",
         header = render::header_with_switcher_next(
             i18n::JA_NAV_COMMUNITIES,
@@ -99,6 +123,14 @@ pub async fn get_communities(
             &switcher_next(year, month, selected_day.as_deref())
         ),
         calendar = calendar,
+        notice = materialization_notice
+            .map(|msg| format!(
+                "<p role=\"status\" style=\"font-size:.875rem;color:#6e6e73;\
+                 background:#F5F5F7;border-radius:12px;padding:.75rem;margin:0 auto 1rem;\
+                 max-width:42rem;line-height:1.5\">{}</p>",
+                render::escape_html(msg)
+            ))
+            .unwrap_or_default(),
         event_list = event_list,
         nav = nav,
     );
@@ -360,10 +392,16 @@ fn render_calendar_events(
                 },
                 community_tz,
             );
-            let cancelled = if row.event_status == "cancelled" {
+            let cancelled = if row.event_status == "cancelled"
+                || row.occurrence_status == "cancelled"
+            {
                 format!(
                     "<span style=\"font-size:.75rem;color:#B42318;margin-left:.35rem\">{}</span>",
-                    i18n::JA_EVENT_CANCELLED_BADGE
+                    if row.occurrence_status == "cancelled" {
+                        i18n::JA_OCCURRENCE_CANCELLED_BADGE
+                    } else {
+                        i18n::JA_EVENT_CANCELLED_BADGE
+                    }
                 )
             } else {
                 String::new()
