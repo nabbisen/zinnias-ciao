@@ -199,6 +199,16 @@ pub async fn calendar_month_for_community(
     from_day_date: &str,
     to_day_date: &str,
 ) -> Result<Vec<HomeEventRow>> {
+    calendar_month_for_community_limited(db, community_id, from_day_date, to_day_date, 300).await
+}
+
+pub async fn calendar_month_for_community_limited(
+    db: &D1Database,
+    community_id: &str,
+    from_day_date: &str,
+    to_day_date: &str,
+    limit: usize,
+) -> Result<Vec<HomeEventRow>> {
     let rows = db
         .prepare(
             "SELECT \
@@ -215,12 +225,13 @@ pub async fn calendar_month_for_community(
                AND d.day_date >= ?2 \
                AND d.day_date <  ?3 \
              ORDER BY d.day_date ASC, d.starts_at_utc ASC \
-             LIMIT 300",
+             LIMIT ?4",
         )
         .bind(&[
             community_id.into(),
             from_day_date.into(),
             to_day_date.into(),
+            worker::wasm_bindgen::JsValue::from_f64(limit as f64),
         ])?
         .all()
         .await?

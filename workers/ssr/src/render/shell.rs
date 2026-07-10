@@ -3,7 +3,7 @@ use worker::{Response, Result};
 // Static asset paths.
 const MANIFEST: &str = "/manifest.webmanifest";
 const CSS: &str = "/static/app.css";
-const JS: &str = "/static/app.js?v=0.55.0-rfc056-rfc065-rfc066";
+const JS: &str = "/static/app.js?v=0.56.0-rfc056-rfc065-rfc066-rfc067";
 const THEME: &str = "#007AFF";
 
 /// Full HTML document shell.

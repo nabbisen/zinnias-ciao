@@ -175,7 +175,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/tester/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.55.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.56.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -273,6 +273,17 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] RFC-060 cancelled-event recreate provenance remains separate from RFC-066 event-copy provenance. *(create.rs + release gate `rfc066_event_copy_is_admin_reviewed_prefill_not_clone`)*
 - [x] Community switcher from the copy form lands on normal Create Event without hidden source-copy state. *(copy.rs + browser smoke)*
 - [x] Mobile 390px viewport at 200% text scaling keeps helper text, controls, and submit action usable without horizontal overflow. *(scripts/smoke/event-copy.mjs; evidence `.git-exclude/evidence/rfc066/`)*
+
+## Monthly attendance matrix gates (v0.56.0 — RFC-067)
+
+- [x] Calendar keeps the ordinary month grid as the default and exposes matrix mode through `view=matrix`. *(communities.rs + release gate `rfc067_monthly_attendance_matrix_contract_is_guarded`)*
+- [x] Active community members and admins can view the matrix; non-members receive the generic not-found response on direct matrix URLs. *(communities.rs + browser smoke)*
+- [x] Matrix rows include active members only and use stable `display_name, id` ordering. *(membership.rs + release gate)*
+- [x] Matrix cells use the reviewed symbols `○`, `×`, `済`, `?`, and `中`; multi-event cells use `answered/total` with accessible breakdowns. *(matrix/cells.rs + release gate + browser smoke)*
+- [x] Matrix mode fetches one event-day row past the 300-row cap so over-cap months render the too-large fallback instead of silently truncated data. *(event.rs + release gate + unit tests)*
+- [x] Community switching preserves matrix mode only through the exact reviewed `communities:YYYY-MM[:YYYY-MM-DD][:matrix]` grammar. *(community.rs + release gate + browser smoke)*
+- [x] CSV/export remains absent from the member-visible matrix. Future CSV export must be designed separately and admin-only. *(release gate + browser smoke)*
+- [x] Browser smoke verifies member/admin matrix views, non-member denial, switcher preservation, mobile 200% text scaling, matrix-only horizontal scrolling, and no CSV/export copy. *(scripts/smoke/monthly-attendance-matrix.mjs; evidence `.git-exclude/evidence/rfc067/`)*
 
 ## Operational gates
 

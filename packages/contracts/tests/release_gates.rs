@@ -177,6 +177,11 @@ fn i18n_en_ja_parity_count() {
         (EN_CALENDAR_EMPTY_MONTH, JA_CALENDAR_EMPTY_MONTH),
         (EN_CALENDAR_EMPTY_DAY, JA_CALENDAR_EMPTY_DAY),
         (EN_CALENDAR_CREATE_ON_DAY, JA_CALENDAR_CREATE_ON_DAY),
+        (EN_CALENDAR_VIEW_MONTH, JA_CALENDAR_VIEW_MONTH),
+        (EN_CALENDAR_VIEW_MATRIX, JA_CALENDAR_VIEW_MATRIX),
+        (EN_CALENDAR_MATRIX_TITLE, JA_CALENDAR_MATRIX_TITLE),
+        (EN_CALENDAR_MATRIX_TOO_LARGE, JA_CALENDAR_MATRIX_TOO_LARGE),
+        (EN_CALENDAR_MATRIX_NO_MEMBERS, JA_CALENDAR_MATRIX_NO_MEMBERS),
         (EN_STATUS_CLEAR, JA_STATUS_CLEAR),
         (EN_STATUS_CLEAR_LABEL, JA_STATUS_CLEAR_LABEL),
         (EN_NOTE_SECTION_LABEL, JA_NOTE_SECTION_LABEL),
@@ -615,6 +620,7 @@ const AUTHZ_SRC: &str = include_str!("../../../workers/ssr/src/authz.rs");
 const RATE_LIMIT_SRC: &str = include_str!("../../../workers/ssr/src/rate_limit.rs");
 const CALENDAR_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/calendar.rs");
 const COMMUNITY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/community.rs");
+const EVENT_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event.rs");
 const ICS_SRC: &str = include_str!("../../../packages/contracts/src/ics.rs");
 const WRANGLER_TOML_SRC: &str = include_str!("../../../wrangler.toml");
 const GITIGNORE_SRC: &str = include_str!("../../../.gitignore");
@@ -853,7 +859,21 @@ fn sw_cache_version_matches_workspace_version() {
 // known English UI vocabulary, not arbitrary English (comments, code, ARIA
 // values, and HTTP header literals must remain unflagged).
 
-const COMMUNITIES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/communities.rs");
+const COMMUNITIES_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/communities.rs");
+const COMMUNITIES_MATRIX_SRC: &str = concat!(
+    include_str!("../../../workers/ssr/src/handlers/communities/matrix.rs"),
+    include_str!("../../../workers/ssr/src/handlers/communities/matrix/cells.rs"),
+    include_str!("../../../workers/ssr/src/handlers/communities/matrix/detail.rs")
+);
+const COMMUNITIES_SRC: &str = concat!(
+    include_str!("../../../workers/ssr/src/handlers/communities.rs"),
+    include_str!("../../../workers/ssr/src/handlers/communities/calendar.rs"),
+    include_str!("../../../workers/ssr/src/handlers/communities/calendar/events.rs"),
+    include_str!("../../../workers/ssr/src/handlers/communities/matrix.rs"),
+    include_str!("../../../workers/ssr/src/handlers/communities/matrix/cells.rs"),
+    include_str!("../../../workers/ssr/src/handlers/communities/matrix/detail.rs")
+);
 const COMMUNITY_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/community.rs");
 const ADMIN_EVENTS_SRC: &str = concat!(
     include_str!("../../../workers/ssr/src/handlers/admin/events.rs"),
@@ -1394,8 +1414,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.55.0-rfc056-rfc065-rfc066")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.55.0-rfc056-rfc065-rfc066"),
+        RENDER_SRC.contains("/static/app.js?v=0.56.0-rfc056-rfc065-rfc066-rfc067")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.56.0-rfc056-rfc065-rfc066-rfc067"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(
@@ -1542,6 +1562,63 @@ fn calendar_overview_contract_is_explicit() {
             && calendar_src.contains("border:{border_width} solid {border}")
             && calendar_src.contains("#6E6E73"),
         "Today styling must stay calmer than selected-day styling and distinct from ordinary event days"
+    );
+}
+
+#[test]
+fn rfc067_monthly_attendance_matrix_contract_is_guarded() {
+    assert!(
+        COMMUNITIES_HANDLER_SRC.contains("mod calendar;")
+            && COMMUNITIES_HANDLER_SRC.contains("mod matrix;")
+            && COMMUNITIES_HANDLER_SRC.contains("matrix::render_matrix")
+            && COMMUNITIES_HANDLER_SRC.contains("attendance_db::list_for_event_days"),
+        "RFC-067 must keep Calendar route orchestration split from matrix rendering and use one batched attendance query"
+    );
+    assert!(
+        COMMUNITIES_HANDLER_SRC.contains("calendar_month_for_community_limited")
+            && COMMUNITIES_HANDLER_SRC.contains("matrix::EVENT_DAY_ROW_CAP + 1")
+            && EVENT_DB_SRC.contains("pub async fn calendar_month_for_community_limited")
+            && EVENT_DB_SRC.contains("LIMIT ?4"),
+        "RFC-067 matrix mode must fetch one row past the event-day cap so over-cap months cannot render truncated matrices"
+    );
+    assert!(
+        COMMUNITIES_MATRIX_SRC.contains("pub(super) const MEMBER_ROW_CAP: usize = 100")
+            && COMMUNITIES_MATRIX_SRC.contains("pub(super) const EVENT_DAY_ROW_CAP: usize = 300")
+            && COMMUNITIES_MATRIX_SRC.contains("JA_CALENDAR_MATRIX_TOO_LARGE"),
+        "RFC-067 matrix caps and too-large fallback must stay fixed"
+    );
+    assert!(
+        MEMBERSHIP_DB_SRC.contains("ORDER BY display_name ASC, id ASC"),
+        "RFC-067 matrix member ordering must be stable for duplicate display names"
+    );
+    assert!(
+        COMMUNITY_HANDLER_SRC.contains("[\"communities\", month, \"matrix\"]")
+            && COMMUNITY_HANDLER_SRC.contains("[\"communities\", month, day, \"matrix\"]")
+            && COMMUNITY_HANDLER_SRC.contains("&view=matrix"),
+        "RFC-067 community switcher grammar must preserve exact matrix mode shapes"
+    );
+    assert!(
+        COMMUNITIES_MATRIX_SRC.contains("CalendarView::Matrix")
+            && COMMUNITIES_MATRIX_SRC.contains("view=matrix")
+            && COMMUNITIES_MATRIX_SRC.contains("JA_CALENDAR_VIEW_MATRIX")
+            && COMMUNITIES_MATRIX_SRC.contains("JA_CALENDAR_MATRIX_TITLE"),
+        "RFC-067 matrix mode must be route-backed and visibly switchable"
+    );
+    assert!(
+        COMMUNITIES_MATRIX_SRC.contains("\"○\"")
+            && COMMUNITIES_MATRIX_SRC.contains("\"×\"")
+            && COMMUNITIES_MATRIX_SRC.contains("\"済\"")
+            && COMMUNITIES_MATRIX_SRC.contains("\"?\"")
+            && COMMUNITIES_MATRIX_SRC.contains("\"中\"")
+            && COMMUNITIES_MATRIX_SRC.contains("format!(\"{answered}/{total}\")")
+            && COMMUNITIES_MATRIX_SRC.contains("未回答{}件"),
+        "RFC-067 matrix cells must keep the reviewed single-event symbols and multi-event answered/total accessible breakdown"
+    );
+    assert!(
+        !COMMUNITIES_MATRIX_SRC.to_ascii_lowercase().contains("csv")
+            && !COMMUNITIES_MATRIX_SRC.contains("download")
+            && !COMMUNITIES_MATRIX_SRC.contains("export"),
+        "RFC-067 must not add CSV/export payloads to the member-visible matrix"
     );
 }
 

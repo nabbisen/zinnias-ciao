@@ -78,15 +78,15 @@ fn is_admin_target(memberships: &[membership_db::CommunitySummary], cid: &str) -
 }
 
 fn calendar_next_destination(cid: &str, next: &str) -> Option<String> {
-    let mut parts = next.split(':');
-    if parts.next()? != "communities" {
-        return None;
-    }
-    let month = parts.next()?;
-    let day = parts.next();
-    if parts.next().is_some() || parse_month(month).is_none() {
-        return None;
-    }
+    let parts = next.split(':').collect::<Vec<_>>();
+    let (month, day, matrix) = match parts.as_slice() {
+        ["communities", month] => (*month, None, false),
+        ["communities", month, "matrix"] => (*month, None, true),
+        ["communities", month, day] => (*month, Some(*day), false),
+        ["communities", month, day, "matrix"] => (*month, Some(*day), true),
+        _ => return None,
+    };
+    parse_month(month)?;
     let mut dest = format!("/c/{cid}/communities?month={month}");
     if let Some(day) = day {
         let (year, month_num) = parse_month(month)?;
@@ -96,6 +96,9 @@ fn calendar_next_destination(cid: &str, next: &str) -> Option<String> {
         }
         dest.push_str("&day=");
         dest.push_str(day);
+    }
+    if matrix {
+        dest.push_str("&view=matrix");
     }
     Some(dest)
 }

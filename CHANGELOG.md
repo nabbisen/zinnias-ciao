@@ -2,6 +2,73 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.56.0] — 2026-07-10
+
+RFC-067 monthly attendance matrix for Calendar month scanning.
+
+### Changed
+
+- **Release version bumped to v0.56.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+- **Calendar now has a route-backed attendance matrix mode.**
+  Active community members and admins can switch from the ordinary month
+  calendar to a member-by-date monthly answer table with `view=matrix`.
+
+- **Calendar handler responsibilities are split.**
+  The former Calendar page handler now stays as route orchestration while
+  month-grid, event-list, matrix-cell, and matrix-detail rendering live in
+  focused child modules.
+
+### Added
+
+- **Monthly attendance matrix UI.**
+  Matrix rows show active members, columns show dates in the selected month,
+  and compact cells summarize single-event or multi-event attendance state.
+
+- **Selected-date matrix detail.**
+  Matrix date selection keeps event titles and detail links outside dense
+  cells while exposing the full attendance breakdown for the selected date.
+
+- **RFC-067 browser smoke coverage.**
+  `scripts/smoke/monthly-attendance-matrix.mjs` verifies member and admin
+  matrix access, non-member denial, community switcher matrix preservation,
+  mobile 200% text scaling, matrix-only horizontal scrolling, and absence of
+  CSV/export copy in sandboxed/incognito Chromium.
+
+### Fixed
+
+- **Matrix over-cap months no longer render silently truncated data.**
+  Matrix mode fetches one row past the 300 event-day cap so `301+` visible
+  event-day rows render the too-large fallback instead of an incomplete table.
+
+- **Matrix member ordering is stable for duplicate display names.**
+  Active member rows are ordered by display name and membership id.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `git diff --check`
+- `node --check scripts/smoke/monthly-attendance-matrix.mjs`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo build --workspace`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `mdbook build docs`
+- `node scripts/smoke/monthly-attendance-matrix.mjs`
+
+Browser smoke evidence:
+
+- `.git-exclude/evidence/rfc067/rfc067-monthly-attendance-matrix-smoke-results.json`
+- `.git-exclude/evidence/rfc067/member-matrix-mobile-200-percent.png`
+- `.git-exclude/evidence/rfc067/admin-matrix-desktop.png`
+- `.git-exclude/evidence/rfc067/non-member-direct-matrix-url-denied.png`
+- `.git-exclude/evidence/rfc067/switcher-preserves-matrix.png`
+
+Hosted Cloudflare staging smoke was not run in this working tree because no
+hosted staging or production URL was provided as an operator target.
+
 ## [0.55.0] — 2026-07-09
 
 RFC-066 event copy workflow for admin-reviewed Create Event prefill.

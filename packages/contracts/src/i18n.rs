@@ -122,6 +122,12 @@ pub const EN_CALENDAR_ALL_DAYS: &str = "All days";
 pub const EN_CALENDAR_EMPTY_MONTH: &str = "No events this month.";
 pub const EN_CALENDAR_EMPTY_DAY: &str = "No events on this day.";
 pub const EN_CALENDAR_CREATE_ON_DAY: &str = "Create event on this day";
+pub const EN_CALENDAR_VIEW_MONTH: &str = "Calendar";
+pub const EN_CALENDAR_VIEW_MATRIX: &str = "Attendance table";
+pub const EN_CALENDAR_MATRIX_TITLE: &str = "Monthly attendance table";
+pub const EN_CALENDAR_MATRIX_TOO_LARGE: &str =
+    "This month is too large for the attendance table. Use Calendar view.";
+pub const EN_CALENDAR_MATRIX_NO_MEMBERS: &str = "There are no active members.";
 
 pub const JA_HOME_TODAY: &str = "今日";
 pub const JA_HOME_THIS_WEEK: &str = "今週";
@@ -143,6 +149,12 @@ pub const JA_CALENDAR_ALL_DAYS: &str = "月全体";
 pub const JA_CALENDAR_EMPTY_MONTH: &str = "今月の予定はありません。";
 pub const JA_CALENDAR_EMPTY_DAY: &str = "この日の予定はありません。";
 pub const JA_CALENDAR_CREATE_ON_DAY: &str = "この日にイベントを作成";
+pub const JA_CALENDAR_VIEW_MONTH: &str = "カレンダー";
+pub const JA_CALENDAR_VIEW_MATRIX: &str = "回答表";
+pub const JA_CALENDAR_MATRIX_TITLE: &str = "月の回答表";
+pub const JA_CALENDAR_MATRIX_TOO_LARGE: &str =
+    "この月は回答表を表示するには大きすぎます。カレンダー表示をご利用ください。";
+pub const JA_CALENDAR_MATRIX_NO_MEMBERS: &str = "有効なメンバーがいません。";
 
 // ── Status actions ────────────────────────────────────────────────────────
 pub const EN_STATUS_CLEAR: &str = "Clear";

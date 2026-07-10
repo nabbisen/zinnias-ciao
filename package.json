@@ -1,6 +1,6 @@
 {
   "name": "zinnias-ciao",
-  "version": "0.55.0",
+  "version": "0.56.0",
   "private": true,
   "scripts": {
     "setup": "node scripts/setup.mjs",
@@ -17,7 +17,8 @@
     "reset:dev": "node scripts/setup.mjs --reset",
     "smoke:runtime": "node scripts/runtime-smoke.mjs",
     "smoke:recurrence": "node scripts/smoke/recurrence-v2.mjs",
-    "smoke:event-copy": "node scripts/smoke/event-copy.mjs"
+    "smoke:event-copy": "node scripts/smoke/event-copy.mjs",
+    "smoke:matrix": "node scripts/smoke/monthly-attendance-matrix.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

@@ -209,7 +209,7 @@ pub async fn list_all_active(db: &D1Database, community_id: &str) -> Result<Vec<
         .prepare(
             "SELECT id, display_name, role FROM community_memberships \
              WHERE community_id = ?1 AND removed_at IS NULL \
-             ORDER BY display_name ASC",
+             ORDER BY display_name ASC, id ASC",
         )
         .bind(&[community_id.into()])?
         .all()
