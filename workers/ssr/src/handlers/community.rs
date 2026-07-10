@@ -342,6 +342,9 @@ pub async fn dispatch_post(req: Request, env: &Env, rid: &str, path: &str) -> Re
                     }
                 }
                 "invites" => super::admin::post_generate_invite(req, env, rid, cid).await,
+                "calendar/matrix-export/audit" => {
+                    super::communities::post_matrix_export_audit(req, env, rid, cid).await
+                }
                 t if t.starts_with("invites/") => {
                     let (iid, action) = split_once(&t[8..], '/');
                     if action == "revoke" {

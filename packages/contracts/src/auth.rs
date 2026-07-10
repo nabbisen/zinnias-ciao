@@ -31,6 +31,7 @@ pub mod token_purpose {
     pub const ADMIN_HIDE_NOTE: &str = "admin_hide_note";
     pub const REVOKE_INVITE: &str = "revoke_invite";
     pub const CALENDAR_REGENERATE: &str = "calendar_regenerate";
+    pub const CALENDAR_MATRIX_CSV_EXPORT: &str = "calendar_matrix_csv_export";
     pub const COMMUNITY_EXPORT: &str = "community_export";
     pub const CREATE_TEMPLATE: &str = "create_template";
     pub const DELETE_TEMPLATE: &str = "delete_template";

@@ -10,6 +10,7 @@ use crate::db::{
 };
 use crate::render;
 use crate::session::require_auth;
+use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::{i18n, tz};
 use zinnias_ciao_domain::{
     month_intersects_materialization_window, recurrence_materialization_window,
@@ -150,12 +151,32 @@ pub async fn get_communities(
                 let day_ids: Vec<&str> = rows.iter().map(|row| row.day_id.as_str()).collect();
                 attendance_db::list_for_event_days(&db, &day_ids).await?
             };
+            let export_bound_resource =
+                calendar_matrix_csv_bound_resource(community_id, year, month);
+            let export_token = if can_create_event
+                && members.len() <= matrix::MEMBER_ROW_CAP
+                && rows.len() <= matrix::EVENT_DAY_ROW_CAP
+            {
+                Some(
+                    crate::codlet::issue_token(
+                        env,
+                        &auth.user_id,
+                        token_purpose::CALENDAR_MATRIX_CSV_EXPORT,
+                        Some(&export_bound_resource),
+                    )
+                    .await,
+                )
+            } else {
+                None
+            };
             matrix::render_matrix(matrix::MatrixRenderInput {
                 community_id,
                 community_tz,
                 year,
                 month,
                 selected_day: selected_day.as_deref(),
+                can_export_csv: can_create_event,
+                export_token: export_token.as_deref(),
                 rows: &rows,
                 members: &members,
                 attendances: &attendances,
@@ -194,6 +215,85 @@ pub async fn get_communities(
         nav = nav,
     );
     render::page(i18n::JA_NAV_COMMUNITIES, &body)
+}
+
+pub async fn post_matrix_export_audit(
+    mut req: Request,
+    env: &Env,
+    rid: &str,
+    community_id: &str,
+) -> Result<Response> {
+    let auth = match require_auth(&req, env).await {
+        Ok(a) => a,
+        Err(_) => return json_error(401, i18n::JA_SESSION_EXPIRED),
+    };
+    let membership = crate::authz::require_admin(env, &auth, community_id).await?;
+    let db = env.d1("DB")?;
+    let form = req.form_data().await?;
+    let token = form_text(&form, "token");
+    let month = form_text(&form, "month");
+    let export_type = form_text(&form, "export_type");
+
+    if calendar::parse_month(&month).is_none() || export_type != "calendar_matrix_csv" {
+        return json_error(400, i18n::JA_GENERAL_ERROR);
+    }
+    let bound_resource = calendar_matrix_csv_bound_resource_from_month(community_id, &month);
+    let replay = crate::codlet::consume_token(
+        env,
+        &auth.user_id,
+        token_purpose::CALENDAR_MATRIX_CSV_EXPORT,
+        &token,
+        Some(&bound_resource),
+    )
+    .await?;
+    if token.is_empty() || replay.is_some() {
+        return json_error(400, i18n::JA_GENERAL_ERROR);
+    }
+    let pepper = crate::crypto::pepper(env);
+    crate::form_token::set_result(&db, &pepper, &token, "calendar_matrix_csv.export_requested")
+        .await?;
+
+    crate::audit::write(
+        &db,
+        rid,
+        Some(community_id),
+        Some(&membership.membership_id),
+        "calendar_matrix_csv",
+        Some(&month),
+        "calendar_matrix_csv.export_requested",
+        Some(serde_json::json!({
+            "month": month,
+            "export_type": "calendar_matrix_csv",
+        })),
+    )
+    .await?;
+
+    let mut resp = Response::from_json(&serde_json::json!({"ok": true}))?;
+    resp.headers_mut()
+        .set("Cache-Control", "no-store, private")?;
+    Ok(resp)
+}
+
+fn form_text(form: &worker::FormData, name: &str) -> String {
+    form.get_field(name).unwrap_or_default()
+}
+
+fn calendar_matrix_csv_bound_resource(community_id: &str, year: i32, month: i32) -> String {
+    format!("{community_id}:{year:04}-{month:02}")
+}
+
+fn calendar_matrix_csv_bound_resource_from_month(community_id: &str, month: &str) -> String {
+    format!("{community_id}:{month}")
+}
+
+fn json_error(status: u16, message: &str) -> Result<Response> {
+    let mut resp = Response::from_json(&serde_json::json!({
+        "ok": false,
+        "error": message,
+    }))?;
+    resp.headers_mut()
+        .set("Cache-Control", "no-store, private")?;
+    Ok(resp.with_status(status))
 }
 
 #[cfg(test)]

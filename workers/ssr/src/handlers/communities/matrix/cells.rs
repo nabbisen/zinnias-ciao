@@ -5,6 +5,7 @@ use zinnias_ciao_contracts::i18n;
 
 pub(super) struct CellSummary {
     pub(super) visual: String,
+    pub(super) export_value: String,
     pub(super) label: String,
     pub(super) color: &'static str,
     pub(super) background: &'static str,
@@ -19,6 +20,7 @@ pub(super) fn cell_summary(
     if events.is_empty() {
         return CellSummary {
             visual: "&nbsp;".to_string(),
+            export_value: String::new(),
             label: format!("{day_date}、{}、予定なし", member.display_name),
             color: "#8E8E93",
             background: "#FAFAFB",
@@ -30,6 +32,7 @@ pub(super) fn cell_summary(
         if event_day_cancelled(row) {
             return CellSummary {
                 visual: "中".to_string(),
+                export_value: "中".to_string(),
                 label: format!("{day_date}、{}、中止", member.display_name),
                 color: "#6E6E73",
                 background: "#F5F5F7",
@@ -39,6 +42,7 @@ pub(super) fn cell_summary(
         let (visual, label_status, color, bg) = single_status_display(status);
         return CellSummary {
             visual: visual.to_string(),
+            export_value: visual.to_string(),
             label: format!("{day_date}、{}、{label_status}", member.display_name),
             color,
             background: bg,
@@ -66,6 +70,7 @@ pub(super) fn cell_summary(
     if total == 0 {
         return CellSummary {
             visual: "中".to_string(),
+            export_value: "中".to_string(),
             label: format!(
                 "{day_date}、{}、予定{}件、中止{}件、参加0件、不参加0件、参加済み0件、未回答0件",
                 member.display_name,
@@ -80,6 +85,7 @@ pub(super) fn cell_summary(
     let no_reply = total.saturating_sub(answered);
     CellSummary {
         visual: format!("{answered}/{total}"),
+        export_value: format!("{answered}/{total}"),
         label: format!(
             "{day_date}、{}、予定{}件、中止{}件、参加{}件、不参加{}件、参加済み{}件、未回答{}件",
             member.display_name,

@@ -68,6 +68,8 @@ fn en_ja_parity() {
         "CALENDAR_MATRIX_TITLE",
         "CALENDAR_MATRIX_TOO_LARGE",
         "CALENDAR_MATRIX_NO_MEMBERS",
+        "CALENDAR_MATRIX_CSV_EXPORT",
+        "CALENDAR_MATRIX_CSV_ERROR",
         // Me
         "ME_SECTION_NAME",
         "ME_SECTION_COMMUNITY",
@@ -207,7 +209,7 @@ fn en_ja_parity() {
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
     ];
-    assert_eq!(en_keys.len(), 182, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 184, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

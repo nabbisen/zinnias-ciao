@@ -2,6 +2,66 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.57.0] — 2026-07-10
+
+RFC-068 admin-only CSV export for the Calendar monthly attendance matrix.
+
+### Changed
+
+- **Release version bumped to v0.57.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+- **Monthly matrix export is explicitly admin-only.**
+  Active members can continue viewing the matrix, while CSV controls and
+  export-only matrix attributes are rendered only for active community admins.
+
+### Added
+
+- **Calendar matrix CSV export.**
+  Admins can save the visible monthly attendance matrix as
+  `ciao-attendance-YYYY-MM.csv`.
+
+- **Metadata-only export audit request.**
+  The browser sends an admin-only audit request before starting the CSV
+  download. The audit action is `calendar_matrix_csv.export_requested` and
+  stores only month/export-type metadata.
+
+- **Client-side CSV generation and formula hardening.**
+  CSV is generated from the rendered admin matrix in the browser, with BOM,
+  CRLF row endings, quoted cells, escaped quotes, and spreadsheet formula
+  hardening for text values beginning after whitespace with `=`, `+`, `-`, or
+  `@`.
+
+- **RFC-068 browser smoke coverage.**
+  `scripts/smoke/calendar-matrix-csv-export.mjs` verifies member export
+  absence, admin CSV download, audit request, no server CSV endpoint request,
+  and formula hardening in sandboxed/incognito Chromium.
+
+### Fixed
+
+- **CSV export does not add a server CSV/data endpoint.**
+  The server only records the audit request; matrix contents and CSV bytes stay
+  out of the audit POST.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `git diff --check`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo clippy -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr -- -D warnings`
+- `cargo build -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `node scripts/smoke/calendar-matrix-csv-export.mjs`
+
+Browser smoke evidence:
+
+- `.git-exclude/evidence/rfc068/rfc068-calendar-matrix-csv-export-smoke-results.json`
+- `.git-exclude/evidence/rfc068/member-matrix-no-export-contract.png`
+- `.git-exclude/evidence/rfc068/admin-export-audited-browser-csv-download.png`
+
+Hosted Cloudflare staging smoke was not run in this working tree because no
+hosted staging or production URL was provided as an operator target.
+
 ## [0.56.0] — 2026-07-10
 
 RFC-067 monthly attendance matrix for Calendar month scanning.

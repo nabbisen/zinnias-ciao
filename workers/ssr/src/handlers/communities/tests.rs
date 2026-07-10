@@ -72,6 +72,8 @@ fn matrix_render_uses_contract_symbols_and_multi_event_summary() {
         year: 2026,
         month: 7,
         selected_day: Some("2026-07-06"),
+        can_export_csv: false,
+        export_token: None,
         rows: &rows,
         members: &members,
         attendances: &attendances,
@@ -84,6 +86,83 @@ fn matrix_render_uses_contract_symbols_and_multi_event_summary() {
     assert!(html.contains("不参加1件"));
     assert!(html.contains("未回答1件"));
     assert!(html.contains("/c/community-a/events/event_2"));
+    assert!(!html.to_ascii_lowercase().contains("csv"));
+    assert!(!html.contains("data-export-value"));
+}
+
+#[test]
+fn matrix_render_adds_csv_export_contract_for_admin_only() {
+    let members = vec![membership::MemberSummary {
+        id: "mem_a".to_string(),
+        display_name: "Alice, Example".to_string(),
+        role: "admin".to_string(),
+    }];
+    let rows = vec![
+        event_row("day_1", "event_1", "2026-07-05", "Morning", "scheduled"),
+        event_row("day_2", "event_2", "2026-07-06", "Cancelled", "cancelled"),
+    ];
+    let attendances = attendance_map(vec![attendance_row("day_1", "mem_a", Some("going"))]);
+
+    let html = matrix::render_matrix(matrix::MatrixRenderInput {
+        community_id: "community-a",
+        community_tz: "Asia/Tokyo",
+        year: 2026,
+        month: 7,
+        selected_day: None,
+        can_export_csv: true,
+        export_token: Some("tok_admin"),
+        rows: &rows,
+        members: &members,
+        attendances: &attendances,
+    });
+
+    assert!(html.contains("data-calendar-matrix-export=\"true\""));
+    assert!(html.contains("data-calendar-matrix-export-button=\"true\""));
+    assert!(html.contains("data-audit-url=\"/c/community-a/admin/calendar/matrix-export/audit\""));
+    assert!(html.contains("data-month=\"2026-07\""));
+    assert!(html.contains("data-export-type=\"calendar_matrix_csv\""));
+    assert!(html.contains("data-token=\"tok_admin\""));
+    assert!(html.contains("data-date=\"2026-07-05\""));
+    assert!(html.contains("data-member-name=\"Alice, Example\""));
+    assert!(html.contains("data-export-value=\"○\""));
+    assert!(html.contains("data-export-value=\"中\""));
+    assert!(html.contains("data-export-value=\"\""));
+}
+
+#[test]
+fn matrix_render_omits_csv_export_contract_for_non_admin() {
+    let members = vec![membership::MemberSummary {
+        id: "mem_a".to_string(),
+        display_name: "Alice".to_string(),
+        role: "member".to_string(),
+    }];
+    let rows = vec![event_row(
+        "day_1",
+        "event_1",
+        "2026-07-05",
+        "Morning",
+        "scheduled",
+    )];
+    let attendances = attendance_map(vec![attendance_row("day_1", "mem_a", Some("going"))]);
+
+    let html = matrix::render_matrix(matrix::MatrixRenderInput {
+        community_id: "community-a",
+        community_tz: "Asia/Tokyo",
+        year: 2026,
+        month: 7,
+        selected_day: None,
+        can_export_csv: false,
+        export_token: None,
+        rows: &rows,
+        members: &members,
+        attendances: &attendances,
+    });
+
+    assert!(!html.contains("data-calendar-matrix-export"));
+    assert!(!html.contains("data-calendar-matrix-export-button"));
+    assert!(!html.contains("data-export-value"));
+    assert!(!html.contains("data-member-name"));
+    assert!(!html.contains("data-date=\"2026-07-05\""));
     assert!(!html.to_ascii_lowercase().contains("csv"));
 }
 
@@ -102,6 +181,8 @@ fn matrix_render_shows_cap_fallback() {
         year: 2026,
         month: 7,
         selected_day: None,
+        can_export_csv: true,
+        export_token: Some("tok_admin"),
         rows: &[],
         members: &members,
         attendances: &HashMap::new(),
@@ -109,6 +190,7 @@ fn matrix_render_shows_cap_fallback() {
 
     assert!(html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_MATRIX_TOO_LARGE));
     assert!(html.contains("/c/community-a/communities?month=2026-07"));
+    assert!(!html.contains("data-calendar-matrix-export"));
 }
 
 #[test]
@@ -135,6 +217,8 @@ fn matrix_render_shows_event_day_over_cap_fallback() {
         year: 2026,
         month: 7,
         selected_day: None,
+        can_export_csv: true,
+        export_token: Some("tok_admin"),
         rows: &rows,
         members: &members,
         attendances: &HashMap::new(),
@@ -142,6 +226,7 @@ fn matrix_render_shows_event_day_over_cap_fallback() {
 
     assert!(html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_MATRIX_TOO_LARGE));
     assert!(html.contains("/c/community-a/communities?month=2026-07"));
+    assert!(!html.contains("data-calendar-matrix-export"));
 }
 
 #[test]
@@ -168,6 +253,8 @@ fn matrix_render_allows_event_day_cap_boundary() {
         year: 2026,
         month: 7,
         selected_day: None,
+        can_export_csv: false,
+        export_token: None,
         rows: &rows,
         members: &members,
         attendances: &HashMap::new(),

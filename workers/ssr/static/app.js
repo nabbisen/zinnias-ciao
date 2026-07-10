@@ -90,3 +90,78 @@ document.querySelectorAll('form[action="/logout"]').forEach(function(form) {
     }
   });
 });
+
+// ── Monthly attendance matrix CSV export (RFC-068) ───────────────────────
+// Admin-only enhancement. The rendered HTML is the data source; the server
+// receives only a metadata audit request before the browser creates the file.
+function hardenCsvValue(value) {
+  var text = String(value == null ? '' : value);
+  return /^[\s]*[=+\-@]/.test(text) ? "'" + text : text;
+}
+
+function encodeCsvValue(value) {
+  return '"' + hardenCsvValue(value).replace(/"/g, '""') + '"';
+}
+
+function matrixCsvFromTable(table) {
+  var dates = Array.from(table.querySelectorAll('thead th[data-date]'))
+    .map(function(cell) { return cell.dataset.date || ''; });
+  var lines = [['member_name'].concat(dates).map(encodeCsvValue).join(',')];
+
+  table.querySelectorAll('tbody tr').forEach(function(row) {
+    var member = row.querySelector('[data-member-name]');
+    var cells = Array.from(row.querySelectorAll('td[data-export-value]'))
+      .map(function(cell) { return cell.dataset.exportValue || ''; });
+    lines.push([member ? member.dataset.memberName || '' : ''].concat(cells)
+      .map(encodeCsvValue)
+      .join(','));
+  });
+
+  return '\uFEFF' + lines.join('\r\n') + '\r\n';
+}
+
+async function requestMatrixCsvAudit(button) {
+  var body = new FormData();
+  body.set('token', button.dataset.token || '');
+  body.set('month', button.dataset.month || '');
+  body.set('export_type', button.dataset.exportType || 'calendar_matrix_csv');
+  var res = await fetch(button.dataset.auditUrl || '', {
+    method: 'POST',
+    body: body,
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error('matrix csv audit failed');
+}
+
+function downloadMatrixCsv(csv, filename) {
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement('a');
+  link.href = url;
+  link.download = filename || 'ciao-attendance.csv';
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 0);
+}
+
+document.querySelectorAll('[data-calendar-matrix-export-button]').forEach(function(button) {
+  button.addEventListener('click', async function() {
+    var table = document.querySelector('table[data-calendar-matrix-export]');
+    var status = document.querySelector('[data-calendar-matrix-export-status]');
+    if (!table) return;
+    button.disabled = true;
+    if (status) status.textContent = '';
+    try {
+      var csv = matrixCsvFromTable(table);
+      await requestMatrixCsvAudit(button);
+      downloadMatrixCsv(csv, button.dataset.filename);
+    } catch (_) {
+      if (status) status.textContent = status.dataset.errorMessage || '';
+    } finally {
+      button.disabled = false;
+    }
+  });
+});

@@ -73,6 +73,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 065 | [Recurrence v2 and Occurrence Exceptions](./done/065-recurrence-v2-and-occurrence-exceptions.md) | v0.54.0 |
 | 066 | [Event Copy From Existing Event](./done/066-event-copy-from-existing-event.md) | v0.55.0 |
 | 067 | [Monthly Attendance Matrix](./done/067-monthly-attendance-matrix.md) | v0.56.0 |
+| 068 | [Calendar Matrix CSV Export](./done/068-calendar-matrix-csv-export.md) | v0.57.0 |
 
 ## Also Done
 

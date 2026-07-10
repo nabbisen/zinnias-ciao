@@ -2,7 +2,7 @@
 
 ## Status
 
-**Current release:** 0.56.0.
+**Current release:** 0.57.0.
 
 The RFC folder is the source of truth for implementation state:
 
@@ -13,8 +13,8 @@ The RFC folder is the source of truth for implementation state:
 Recent workflow releases focused on calendar-centered use, community bootstrap,
 member administration, admin role transfer, member lifecycle policy,
 admin-mediated help sign-in, Rust module boundary cleanup, recurrence v2 for
-Calendar workflows, admin event-copy creation assistance, and the monthly
-attendance matrix.
+Calendar workflows, admin event-copy creation assistance, the monthly
+attendance matrix, and admin-only matrix CSV export.
 
 ## Proposed Work
 
@@ -58,11 +58,7 @@ Recommended next candidates, in practical order:
    Large feature area touching authorization, event visibility, and community
    boundaries. It should start with design review, not direct implementation.
 
-6. **Calendar CSV Export**
-   The RFC-067 matrix deliberately shipped without CSV export. A follow-up RFC
-   can define an admin-only export contract after the matrix GUI has settled.
-
-7. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
+6. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
    These are good candidates when the project priority shifts from product
    workflow to deployment confidence and Cloudflare-hosted evidence.
 

@@ -175,7 +175,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/tester/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.56.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.57.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -282,8 +282,18 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Matrix cells use the reviewed symbols `○`, `×`, `済`, `?`, and `中`; multi-event cells use `answered/total` with accessible breakdowns. *(matrix/cells.rs + release gate + browser smoke)*
 - [x] Matrix mode fetches one event-day row past the 300-row cap so over-cap months render the too-large fallback instead of silently truncated data. *(event.rs + release gate + unit tests)*
 - [x] Community switching preserves matrix mode only through the exact reviewed `communities:YYYY-MM[:YYYY-MM-DD][:matrix]` grammar. *(community.rs + release gate + browser smoke)*
-- [x] CSV/export remains absent from the member-visible matrix. Future CSV export must be designed separately and admin-only. *(release gate + browser smoke)*
+- [x] Member-visible matrix HTML omits CSV/export controls and export-only data attributes; admin CSV export is covered by RFC-068. *(release gate + RFC-068 browser smoke)*
 - [x] Browser smoke verifies member/admin matrix views, non-member denial, switcher preservation, mobile 200% text scaling, matrix-only horizontal scrolling, and no CSV/export copy. *(scripts/smoke/monthly-attendance-matrix.mjs; evidence `.git-exclude/evidence/rfc067/`)*
+
+## Calendar matrix CSV export gates (v0.57.0 — RFC-068)
+
+- [x] CSV export controls are rendered only for active community admins on matrix mode. *(communities.rs + matrix.rs + release gate `rfc068_calendar_matrix_csv_export_contract_is_guarded`)*
+- [x] Active non-admin members can view the matrix but do not receive export controls, `data-date`, `data-member-name`, or `data-export-value` attributes. *(matrix renderer tests + browser smoke)*
+- [x] CSV is generated in the browser from rendered admin matrix attributes; no server CSV/data endpoint is added. *(app.js + release gate + browser smoke)*
+- [x] The browser sends a metadata-only audit POST before download and does not include matrix contents, member names, statuses, CSV bytes, notes, tokens, invite data, sessions, or filenames. *(communities.rs + implementation review)*
+- [x] The audit action is `calendar_matrix_csv.export_requested`, scoped by a dedicated month-bound form token. *(communities.rs + release gate)*
+- [x] CSV output uses deterministic filename `ciao-attendance-YYYY-MM.csv`, UTF-8 BOM, CRLF row endings, quoted values, escaped quotes, and formula hardening. *(app.js + browser smoke)*
+- [x] Browser smoke verifies member export absence, admin CSV download, formula hardening, audit request, no server CSV endpoint request, and layout overflow checks in sandboxed/incognito Chromium without `--no-sandbox`. *(scripts/smoke/calendar-matrix-csv-export.mjs; evidence `.git-exclude/evidence/rfc068/`)*
 
 ## Operational gates
 

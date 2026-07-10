@@ -106,6 +106,8 @@ pub(super) struct MatrixRenderInput<'a> {
     pub(super) year: i32,
     pub(super) month: i32,
     pub(super) selected_day: Option<&'a str>,
+    pub(super) can_export_csv: bool,
+    pub(super) export_token: Option<&'a str>,
     pub(super) rows: &'a [event_db::HomeEventRow],
     pub(super) members: &'a [membership::MemberSummary],
     pub(super) attendances: &'a HashMap<String, Vec<attendance::AttendanceRow>>,
@@ -118,6 +120,8 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
         year,
         month,
         selected_day,
+        can_export_csv,
+        export_token,
         rows,
         members,
         attendances,
@@ -139,6 +143,16 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
     }
 
     let month_key = format!("{year:04}-{month:02}");
+    let export_controls = render_export_controls(
+        community_id,
+        &month_key,
+        can_export_csv.then_some(()).and(export_token),
+    );
+    let export_table_attr = if can_export_csv && export_token.is_some() {
+        " data-calendar-matrix-export=\"true\""
+    } else {
+        ""
+    };
     let days_in_month = tz::days_in_month(year, month);
     let mut rows_by_date: HashMap<String, Vec<&event_db::HomeEventRow>> = HashMap::new();
     for row in rows {
@@ -177,12 +191,17 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
             ""
         };
         header_cells.push_str(&format!(
-            "<th scope=\"col\" style=\"position:sticky;top:0;z-index:2;\
+            "<th scope=\"col\"{date_attr} style=\"position:sticky;top:0;z-index:2;\
              background:{bg};border:1px solid {border};padding:0;min-width:3.25rem;\
              text-align:center\">\
              <a href=\"{href}\"{aria_current} style=\"display:flex;min-height:44px;\
              align-items:center;justify-content:center;color:#1D1D1F;text-decoration:none;\
-             font-size:.8125rem;font-weight:700\">{day}</a></th>"
+             font-size:.8125rem;font-weight:700\">{day}</a></th>",
+            date_attr = export_attr(
+                "data-date",
+                &day_date,
+                can_export_csv && export_token.is_some()
+            )
         ));
     }
 
@@ -197,21 +216,31 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
                 .unwrap_or(&[]);
             let cell = cell_summary(&day_date, member, events, attendances);
             cells.push_str(&format!(
-                "<td aria-label=\"{label}\" style=\"border:1px solid #E5E5EA;\
+                "<td aria-label=\"{label}\"{export_value_attr} style=\"border:1px solid #E5E5EA;\
                  min-width:3.25rem;height:2.75rem;text-align:center;vertical-align:middle;\
                  font-size:.875rem;font-weight:700;color:{color};background:{bg}\">\
                  {visual}</td>",
                 label = render::escape_html(&cell.label),
+                export_value_attr = export_attr(
+                    "data-export-value",
+                    &cell.export_value,
+                    can_export_csv && export_token.is_some()
+                ),
                 color = cell.color,
                 bg = cell.background,
                 visual = cell.visual
             ));
         }
         body_rows.push_str(&format!(
-            "<tr><th scope=\"row\" style=\"position:sticky;left:0;z-index:1;\
+            "<tr><th scope=\"row\"{member_attr} style=\"position:sticky;left:0;z-index:1;\
              background:#FFFFFF;border:1px solid #E5E5EA;text-align:left;\
              min-width:8rem;max-width:10rem;padding:.5rem;font-size:.875rem;\
              line-height:1.3;white-space:normal\">{name}</th>{cells}</tr>",
+            member_attr = export_attr(
+                "data-member-name",
+                &member.display_name,
+                can_export_csv && export_token.is_some()
+            ),
             name = render::escape_html(&member.display_name),
             cells = cells
         ));
@@ -238,7 +267,7 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
          align-items:flex-end;justify-content:space-between;gap:.75rem;flex-wrap:wrap\">\
          <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{title}</h2>\
          <p style=\"font-size:.9375rem;font-weight:700;color:#6e6e73;margin:0\">\
-         {year}年{month}月</p></div>\
+         {year}年{month}月</p>{export_controls}</div>\
          <nav aria-label=\"Calendar month\" style=\"display:flex;gap:.5rem;\
          align-items:center;justify-content:space-between;margin:0 auto .75rem;\
          max-width:42rem\">\
@@ -252,7 +281,7 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
          <div data-rfc067-matrix-scroller=\"true\" \
          style=\"overflow-x:auto;max-width:100%;border:1px solid #E5E5EA;\
          border-radius:8px;background:#FFFFFF\" tabindex=\"0\">\
-         <table style=\"border-collapse:separate;border-spacing:0;min-width:72rem;\
+         <table{export_table_attr} style=\"border-collapse:separate;border-spacing:0;min-width:72rem;\
          width:max-content\">\
          <thead><tr><th scope=\"col\" style=\"position:sticky;left:0;top:0;\
          z-index:3;background:#FFFFFF;border:1px solid #E5E5EA;text-align:left;\
@@ -268,10 +297,42 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
         prev_label = i18n::JA_CALENDAR_PREV_MONTH,
         next_label = i18n::JA_CALENDAR_NEXT_MONTH,
         current_label = i18n::JA_CALENDAR_THIS_MONTH,
+        export_controls = export_controls,
+        export_table_attr = export_table_attr,
         header_cells = header_cells,
         body_rows = body_rows,
         detail = detail
     )
+}
+
+fn render_export_controls(community_id: &str, month_key: &str, token: Option<&str>) -> String {
+    let Some(token) = token else {
+        return String::new();
+    };
+    format!(
+        "<div style=\"display:flex;align-items:center;gap:.5rem;flex-wrap:wrap\">\
+         <button type=\"button\" data-calendar-matrix-export-button=\"true\" \
+         data-audit-url=\"/c/{cid}/admin/calendar/matrix-export/audit\" \
+         data-month=\"{month}\" data-export-type=\"calendar_matrix_csv\" \
+         data-token=\"{token}\" data-filename=\"ciao-attendance-{month}.csv\" \
+         style=\"min-height:40px;border:1px solid #007AFF;border-radius:8px;\
+         background:#007AFF;color:#FFFFFF;font-size:.875rem;font-weight:700;\
+         padding:.35rem .75rem\">{label}</button>\
+         <span data-calendar-matrix-export-status=\"true\" data-error-message=\"{error}\" aria-live=\"polite\" \
+         style=\"font-size:.8125rem;color:#6e6e73\"></span></div>",
+        cid = render::escape_html(community_id),
+        month = render::escape_html(month_key),
+        token = render::escape_html(token),
+        label = i18n::JA_CALENDAR_MATRIX_CSV_EXPORT,
+        error = render::escape_html(i18n::JA_CALENDAR_MATRIX_CSV_ERROR)
+    )
+}
+
+fn export_attr(name: &str, value: &str, enabled: bool) -> String {
+    if !enabled {
+        return String::new();
+    }
+    format!(" {name}=\"{}\"", render::escape_html(value))
 }
 
 fn render_too_large(community_id: &str, year: i32, month: i32) -> String {

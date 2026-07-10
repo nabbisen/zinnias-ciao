@@ -128,6 +128,8 @@ pub const EN_CALENDAR_MATRIX_TITLE: &str = "Monthly attendance table";
 pub const EN_CALENDAR_MATRIX_TOO_LARGE: &str =
     "This month is too large for the attendance table. Use Calendar view.";
 pub const EN_CALENDAR_MATRIX_NO_MEMBERS: &str = "There are no active members.";
+pub const EN_CALENDAR_MATRIX_CSV_EXPORT: &str = "Save CSV";
+pub const EN_CALENDAR_MATRIX_CSV_ERROR: &str = "CSV could not be saved. Please try again.";
 
 pub const JA_HOME_TODAY: &str = "今日";
 pub const JA_HOME_THIS_WEEK: &str = "今週";
@@ -155,6 +157,9 @@ pub const JA_CALENDAR_MATRIX_TITLE: &str = "月の回答表";
 pub const JA_CALENDAR_MATRIX_TOO_LARGE: &str =
     "この月は回答表を表示するには大きすぎます。カレンダー表示をご利用ください。";
 pub const JA_CALENDAR_MATRIX_NO_MEMBERS: &str = "有効なメンバーがいません。";
+pub const JA_CALENDAR_MATRIX_CSV_EXPORT: &str = "CSVを保存";
+pub const JA_CALENDAR_MATRIX_CSV_ERROR: &str =
+    "CSVを保存できませんでした。もう一度お試しください。";
 
 // ── Status actions ────────────────────────────────────────────────────────
 pub const EN_STATUS_CLEAR: &str = "Clear";

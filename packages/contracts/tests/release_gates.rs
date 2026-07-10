@@ -96,6 +96,7 @@ fn all_state_changing_routes_have_token_purpose() {
         token_purpose::REVOKE_INVITE,
         token_purpose::CALENDAR_REGENERATE,
         token_purpose::CALENDAR_REVOKE,
+        token_purpose::CALENDAR_MATRIX_CSV_EXPORT,
         token_purpose::COMMUNITY_EXPORT,
         token_purpose::CREATE_TEMPLATE,
         token_purpose::DELETE_TEMPLATE,
@@ -182,6 +183,8 @@ fn i18n_en_ja_parity_count() {
         (EN_CALENDAR_MATRIX_TITLE, JA_CALENDAR_MATRIX_TITLE),
         (EN_CALENDAR_MATRIX_TOO_LARGE, JA_CALENDAR_MATRIX_TOO_LARGE),
         (EN_CALENDAR_MATRIX_NO_MEMBERS, JA_CALENDAR_MATRIX_NO_MEMBERS),
+        (EN_CALENDAR_MATRIX_CSV_EXPORT, JA_CALENDAR_MATRIX_CSV_EXPORT),
+        (EN_CALENDAR_MATRIX_CSV_ERROR, JA_CALENDAR_MATRIX_CSV_ERROR),
         (EN_STATUS_CLEAR, JA_STATUS_CLEAR),
         (EN_STATUS_CLEAR_LABEL, JA_STATUS_CLEAR_LABEL),
         (EN_NOTE_SECTION_LABEL, JA_NOTE_SECTION_LABEL),
@@ -791,6 +794,7 @@ fn export_handler_await_count_within_budget() {
 // every `cargo test` run without any external tooling.
 
 const SW_JS_SOURCE: &str = include_str!("../../../workers/ssr/static/sw.js");
+const APP_JS_SOURCE: &str = include_str!("../../../workers/ssr/static/app.js");
 const WORKSPACE_CARGO_TOML: &str = include_str!("../../../Cargo.toml");
 
 #[test]
@@ -1414,8 +1418,9 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.56.0-rfc056-rfc065-rfc066-rfc067")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.56.0-rfc056-rfc065-rfc066-rfc067"),
+        RENDER_SRC.contains("/static/app.js?v=0.57.0-rfc056-rfc065-rfc066-rfc067-rfc068")
+            && STATIC_FILES_SRC
+                .contains("/static/app.js?v=0.57.0-rfc056-rfc065-rfc066-rfc067-rfc068"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(
@@ -1615,10 +1620,53 @@ fn rfc067_monthly_attendance_matrix_contract_is_guarded() {
         "RFC-067 matrix cells must keep the reviewed single-event symbols and multi-event answered/total accessible breakdown"
     );
     assert!(
-        !COMMUNITIES_MATRIX_SRC.to_ascii_lowercase().contains("csv")
-            && !COMMUNITIES_MATRIX_SRC.contains("download")
-            && !COMMUNITIES_MATRIX_SRC.contains("export"),
-        "RFC-067 must not add CSV/export payloads to the member-visible matrix"
+        COMMUNITIES_MATRIX_SRC.contains("data-export-value")
+            && COMMUNITIES_MATRIX_SRC.contains("can_export_csv")
+            && COMMUNITIES_MATRIX_SRC.contains("export_token")
+            && COMMUNITIES_MATRIX_SRC.contains("render_too_large"),
+        "RFC-067/RFC-068 matrix export metadata must stay renderer-owned, admin-gated, and absent from too-large fallback"
+    );
+}
+
+#[test]
+fn rfc068_calendar_matrix_csv_export_contract_is_guarded() {
+    assert!(
+        COMMUNITIES_HANDLER_SRC.contains("token_purpose::CALENDAR_MATRIX_CSV_EXPORT")
+            && COMMUNITIES_HANDLER_SRC.contains("calendar_matrix_csv_bound_resource")
+            && COMMUNITIES_HANDLER_SRC.contains("post_matrix_export_audit")
+            && COMMUNITIES_HANDLER_SRC.contains("form_token::set_result")
+            && COMMUNITY_HANDLER_SRC.contains("\"calendar/matrix-export/audit\""),
+        "RFC-068 matrix CSV export must use a dedicated month-bound single-use token and audited admin POST route"
+    );
+    assert!(
+        COMMUNITIES_HANDLER_SRC.contains("\"calendar_matrix_csv.export_requested\"")
+            && !COMMUNITIES_HANDLER_SRC.contains("\"calendar_matrix_csv.exported\"")
+            && COMMUNITIES_HANDLER_SRC.contains("\"month\"")
+            && COMMUNITIES_HANDLER_SRC.contains("\"export_type\""),
+        "RFC-068 audit action must be metadata-only export_requested, not exported"
+    );
+    assert!(
+        COMMUNITIES_MATRIX_SRC.contains("data-calendar-matrix-export-button")
+            && COMMUNITIES_MATRIX_SRC.contains("data-calendar-matrix-export=\\\"true\\\"")
+            && COMMUNITIES_MATRIX_SRC.contains("data-export-value")
+            && COMMUNITIES_MATRIX_SRC.contains("data-member-name")
+            && COMMUNITIES_MATRIX_SRC.contains("data-date")
+            && COMMUNITIES_MATRIX_SRC.contains("JA_CALENDAR_MATRIX_CSV_EXPORT"),
+        "RFC-068 admin matrix markup must carry the reviewed export controls and explicit cell values"
+    );
+    assert!(
+        APP_JS_SOURCE.contains("matrixCsvFromTable")
+            && APP_JS_SOURCE.contains("requestMatrixCsvAudit")
+            && APP_JS_SOURCE.contains("downloadMatrixCsv")
+            && APP_JS_SOURCE.contains("URL.createObjectURL")
+            && APP_JS_SOURCE.contains("new Blob")
+            && APP_JS_SOURCE.contains("fetch(button.dataset.auditUrl")
+            && APP_JS_SOURCE.contains("/^[\\s]*[=+\\-@]/"),
+        "RFC-068 CSV must be generated client-side from rendered matrix after audit request, with formula hardening"
+    );
+    assert!(
+        !APP_JS_SOURCE.contains("/export/csv") && !COMMUNITY_HANDLER_SRC.contains("export/csv"),
+        "RFC-068 must not add a server CSV/data export endpoint"
     );
 }
 
