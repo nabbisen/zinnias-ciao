@@ -131,6 +131,19 @@ Deploy `[env.staging]`:
 bunx wrangler deploy --env staging --config wrangler.staging.local.toml
 ```
 
+Refresh the hosted staging Worker with the same command after changing source,
+release labels, static asset cache-busters, `wrangler.staging.local.toml`, or
+any D1/KV binding IDs:
+
+```sh
+bunx wrangler deploy --env staging --config wrangler.staging.local.toml
+```
+
+The hosted Worker keeps the binding IDs from the deployment that published it.
+If a staging D1 or KV resource is deleted and recreated, update
+`wrangler.staging.local.toml` with the new resource ID and redeploy before
+testing the hosted URL.
+
 Bootstrap staging login data:
 
 ```sh
@@ -149,6 +162,25 @@ bun run smoke:runtime -- https://<deployed-worker-url>
 
 Use the invite code printed by `bun run bootstrap:staging` for manual
 authenticated staging checks.
+
+### Staging Logs
+
+Use Wrangler tail to read Cloudflare Worker logs while reproducing a hosted
+staging failure:
+
+```sh
+bunx wrangler tail --env staging --config wrangler.staging.local.toml
+```
+
+Then trigger the failing route from another terminal, for example:
+
+```sh
+curl -i https://<deployed-worker-url>/join
+```
+
+If `/join` reports a deleted D1 database ID, the Worker was deployed with a
+stale D1 binding. Update `wrangler.staging.local.toml`, redeploy staging, and
+rerun remote migrations/bootstrap if the database was recreated.
 
 ## Staging Exposure
 

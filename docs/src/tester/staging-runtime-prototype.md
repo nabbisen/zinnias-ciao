@@ -132,6 +132,28 @@ Deploy `[env.staging]` as an explicit operator action:
 bunx wrangler deploy --env staging --config wrangler.staging.local.toml
 ```
 
+### Refresh Staging Deployment
+
+Redeploy staging after changing source, release version variables, static asset
+cache-busters, `wrangler.staging.local.toml`, or any D1/KV binding IDs:
+
+```sh
+bunx wrangler deploy --env staging --config wrangler.staging.local.toml
+```
+
+The deployed Worker keeps using the bindings from the deployment that published
+it. If a staging D1 or KV resource is recreated and
+`wrangler.staging.local.toml` is updated, hosted staging will still use the old
+resource ID until this deploy command is run again.
+
+If staging D1 was recreated, run remote migrations and bootstrap again after
+updating `wrangler.staging.local.toml`:
+
+```sh
+bun run migrate:staging
+bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"
+```
+
 ### Bootstrap Remote Resources
 
 Before hosted smoke, create or refresh staging bootstrap data. This step applies
@@ -182,10 +204,29 @@ to `form_tokens`. If the hosted staging preparation checks above pass but
 Worker:
 
 ```sh
-bunx wrangler tail --env staging
+bunx wrangler tail --env staging --config wrangler.staging.local.toml
 
 # In another terminal:
 curl "https://zinnias-ciao-ssr-stg.<account>.workers.dev/join"
+```
+
+Readable and machine-readable log formats are available:
+
+```sh
+bunx wrangler tail --env staging --config wrangler.staging.local.toml --format pretty
+bunx wrangler tail --env staging --config wrangler.staging.local.toml --format json
+```
+
+If the log says a D1 database ID has been deleted, the deployed Worker is bound
+to a stale D1 ID. Find the current staging D1 ID, update
+`wrangler.staging.local.toml`, redeploy, then rerun migrations/bootstrap if the
+database was recreated:
+
+```sh
+bunx wrangler d1 list
+bunx wrangler deploy --env staging --config wrangler.staging.local.toml
+bun run migrate:staging
+bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"
 ```
 
 ### Close Hosted Staging
