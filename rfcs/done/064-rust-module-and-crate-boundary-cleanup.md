@@ -1,7 +1,7 @@
 # RFC 064 - Rust Module and Crate Boundary Cleanup
 
-**Status.** Proposed
-**Target release.** v0.52.0 Phase 1 shipped; v0.53.0 Phase 2 shipped
+**Status.** Done
+**Shipped in.** v0.52.0 Phase 1; v0.53.0 Phase 2; v0.58.0 Phase 3
 **Tracks.** Maintainability, Rust workspace structure, SSR Worker internals.
 **Touches.** `workers/ssr`, `packages/domain`, `packages/contracts`,
 `Cargo.toml`, release gates, project documentation.
@@ -32,19 +32,19 @@ This RFC proposes a staged cleanup:
 4. Introduce internal crates only after module boundaries are stable and the
    value is clear.
 
-v0.52.0 shipped Phase 1 only. Completing the first admin event module split
-does not complete all of RFC-064. It establishes the first reviewed pattern for
-behavior-preserving structural cleanup. v0.53.0 ships Phase 2 rendering
-boundary cleanup. The Phase 2 design review accepted
-`workers/ssr/src/render.rs` as the target and requested a facade-preserving
-internal module split.
+v0.52.0 shipped Phase 1 by splitting admin event handlers. v0.53.0 shipped
+Phase 2 by splitting shared render helpers behind the existing render facade.
+v0.58.0 ships Phase 3 by splitting contracts i18n constants into private child
+modules behind the existing `zinnias_ciao_contracts::i18n::*` facade. Crate
+extraction remains deferred because no narrower crate target currently meets the
+trigger criteria in this RFC.
 
 ## Background
 
 The project guidelines require design-first development and recommend splitting
 Rust files above 300 effective lines of code, with a strong recommendation
-above 500 effective lines. After the v0.52.0 Phase 1 split, current source size
-evidence still shows several files above that threshold:
+above 500 effective lines. At the start of the RFC-064 cleanup, source size
+evidence showed several files above that threshold:
 
 | File | Lines observed |
 |------|----------------|
@@ -266,6 +266,17 @@ Candidate outcomes:
 This phase should not be used to create many small crates without practical
 benefit.
 
+v0.58.0 Phase 3 result:
+
+- `packages/contracts/src/i18n.rs` is now a small facade with private child
+  modules and facade-level `pub use` re-exports.
+- Existing `zinnias_ciao_contracts::i18n::EN_*` and `JA_*` paths remain
+  unchanged.
+- String values, constant names, call sites, routes, forms, static assets, and
+  rendered behavior were intentionally unchanged.
+- `packages/contracts/src/i18n/tests.rs` remains pointed at the facade.
+- Crate extraction is explicitly deferred under the trigger criteria below.
+
 ### Phase 4 - Optional Internal Crates
 
 Only after phases 1-3, evaluate internal crates. Candidate crate boundaries:
@@ -332,7 +343,7 @@ run the relevant smoke script or request a targeted smoke plan.
 - Large diffs may be difficult to review unless changes are phased by feature
   area.
 
-## Review Questions
+## Review Decisions
 
 - Phase 2 design review accepted `workers/ssr/src/render.rs` as the v0.53.0
   target after the v0.52.0 admin-events split.
@@ -341,16 +352,14 @@ run the relevant smoke script or request a targeted smoke plan.
 - Phase 2 design review accepted `errors.rs` constructing `worker::Response`
   for status-coded pages.
 - Phase 2 design review required preserving the existing public `render::*`
-  caller surface for this slice.
-- Should `packages/contracts/src/i18n.rs` be treated as a structural problem in
-  this RFC, or left to RFC-054 Japanese UX copy review?
-- Do the crate-extraction trigger criteria remain sufficient after Phase 2, or
-  should a follow-up RFC define a narrower first crate candidate?
-
-## Open Decisions
-
-- Whether crate extraction remains deferred after Phase 2 or needs a follow-up
-  RFC with a narrower target.
+  caller surface for that slice.
+- Phase 3 design review accepted `packages/contracts/src/i18n.rs` as a
+  structural target before RFC-054 copy review, as long as wording and public
+  caller paths remained unchanged.
+- Phase 3 implementation review accepted private i18n child modules with
+  facade-level re-exports.
+- Crate extraction is deferred. A later RFC may reopen it only with a narrower
+  crate target and clear value under the trigger criteria in this RFC.
 
 ## Acceptance Criteria
 
@@ -365,15 +374,14 @@ v0.52.0 Phase 1 is complete when:
 - No new crate is introduced.
 - Release notes describe the change as Phase 1 of RFC-064, not the whole RFC.
 
-RFC-064 overall is complete when:
+RFC-064 overall is complete:
 
 - Phase 1 is complete.
 - Phase 2 rendering-boundary cleanup is completed or an explicit decision is
-  recorded to defer it.
-- The `packages/contracts/src/i18n.rs` structural question is resolved, either
-  by RFC-054 copy review, by a later structural cleanup, or by an explicit
-  deferral.
-- Crate extraction is either explicitly deferred using the trigger criteria in
-  this RFC or advanced through a follow-up RFC with a narrower target.
+  recorded to defer it. Phase 2 was completed in v0.53.0.
+- The `packages/contracts/src/i18n.rs` structural question is resolved. Phase 3
+  was completed in v0.58.0.
+- Crate extraction is explicitly deferred using the trigger criteria in this
+  RFC.
 - `rfcs/README.md`, `ROADMAP.md`, and release notes reflect the completed
   structural scope accurately.

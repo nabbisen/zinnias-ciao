@@ -124,7 +124,8 @@ fn all_state_changing_routes_have_token_purpose() {
 // Every EN_* constant must have a non-empty JA_* counterpart.
 // This test registers every member-facing string pair so a JA string going
 // empty or missing causes `cargo test` to fail immediately.
-// To add a new string: add EN_FOO and JA_FOO in i18n.rs, then add the pair below.
+// To add a new string: add EN_FOO and JA_FOO in the relevant i18n child module,
+// then add the pair below.
 
 #[test]
 fn i18n_en_ja_parity_count() {
@@ -1418,9 +1419,9 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.57.0-rfc056-rfc065-rfc066-rfc067-rfc068")
+        RENDER_SRC.contains("/static/app.js?v=0.58.0-rfc056-rfc065-rfc066-rfc067-rfc068-rfc064")
             && STATIC_FILES_SRC
-                .contains("/static/app.js?v=0.57.0-rfc056-rfc065-rfc066-rfc067-rfc068"),
+                .contains("/static/app.js?v=0.58.0-rfc056-rfc065-rfc066-rfc067-rfc068-rfc064"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(

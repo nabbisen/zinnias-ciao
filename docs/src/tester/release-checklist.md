@@ -97,7 +97,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Logout, calendar-token generate, and calendar-token revoke are audited (review P1-5).
 - [x] DST scope limitation documented in `docs/src/maintainer/operations.md` (review P1-2).
 - [x] No-JS community switcher has a visible `<noscript>` submit fallback; confirmed in `render.rs` (review P1-4).
-- [x] i18n parity test covers all 170 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity test covers all 184 EN/JA string pairs; catches empty strings and copy-paste errors. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] `escape_html` moved to tested `contracts::html` module; 10 unit tests including XSS vector and attribute injection; `render::escape_html` delegates to the tested implementation.
 - [~] Staging runtime verification (RFC-045 §6): timezone round-trip, concurrent invite/token races. *(requires Cloudflare staging deployment)*
 
@@ -114,7 +114,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 
 ## Release-gate hardening (v0.34.0 — RFC-044 partial)
 
-- [x] i18n parity gate covers all 170 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] i18n parity gate covers all 184 EN/JA pairs. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [x] Static query-count gates: home.rs, event.rs, export.rs `.await` counts verified within ceiling bounds. *(release_gates.rs `*_await_count_within_budget` — v0.34.0)*
 - [x] SW `CACHE_VERSION` matches workspace version. *(release_gates.rs `sw_cache_version_matches_workspace_version`)*
 
@@ -175,7 +175,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/tester/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.57.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.58.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -240,6 +240,16 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Render source-contract release gates follow the facade plus child modules. *(release_gates.rs `RENDER_SRC`)*
 - [x] Render tests remain split from implementation and use explicit imports instead of `use super::*`. *(workers/ssr/src/render/tests.rs)*
 - [x] All render child modules are below the 300-line guideline. *(implementation review line-count evidence)*
+- [x] Browser smoke is not required for this slice because no route, form field, rendered-copy, or intended browser behavior changed beyond version/cache-buster alignment. *(RFC-064 + implementation review)*
+
+## Contracts i18n boundary cleanup gates (v0.58.0 — RFC-064 Phase 3)
+
+- [x] `packages/contracts/src/i18n.rs` is a facade with private child modules and facade-level re-exports. *(i18n.rs + implementation review)*
+- [x] Existing `zinnias_ciao_contracts::i18n::EN_*` and `JA_*` caller paths remain unchanged. *(implementation review + contracts tests)*
+- [x] String values, constant names, routes, forms, static assets, call sites, and rendered output are unchanged. *(implementation review preservation evidence)*
+- [x] `packages/contracts/src/i18n/tests.rs` continues validating through the facade, not child modules. *(implementation review)*
+- [x] All i18n implementation child modules are below the 300-line guideline. *(implementation review line-count evidence)*
+- [x] Crate extraction is explicitly deferred under RFC-064 trigger criteria. *(RFC-064)*
 - [x] Browser smoke is not required for this slice because no route, form field, rendered-copy, or intended browser behavior changed beyond version/cache-buster alignment. *(RFC-064 + implementation review)*
 
 ## Documentation role-structure gates (v0.53.1)

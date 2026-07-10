@@ -2,6 +2,50 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.58.0] — 2026-07-10
+
+RFC-064 Phase 3 contracts i18n boundary cleanup and RFC-064 completion.
+
+### Changed
+
+- **Release version bumped to v0.58.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+- **Contracts i18n is split behind the existing facade.**
+  `packages/contracts/src/i18n.rs` is now a small facade over private child
+  modules for access, admin, calendar, community, events, export, general,
+  home, me, notes, and templates copy.
+
+- **RFC-064 is marked complete.**
+  Phase 1 admin event handler split shipped in v0.52.0, Phase 2 render split
+  shipped in v0.53.0, and Phase 3 contracts i18n split ships in v0.58.0. Crate
+  extraction remains explicitly deferred under RFC-064 trigger criteria.
+
+- **i18n release-gate guidance points to child modules.**
+  The parity-gate comment now directs future strings to the relevant i18n child
+  module before adding the EN/JA pair to the gate.
+
+### Fixed
+
+- **Stale tester release-checklist i18n pair counts are aligned.**
+  The checklist now references the current 184 EN/JA parity pairs instead of
+  the older 170-pair count.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `git diff --check`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo clippy -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr -- -D warnings`
+- `cargo build -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `mdbook build docs`
+
+Browser smoke was not run because the accepted design and implementation
+reviews scoped this as a pure module move with unchanged strings, routes,
+forms, static assets, call sites, and rendered output.
+
 ## [0.57.0] — 2026-07-10
 
 RFC-068 admin-only CSV export for the Calendar monthly attendance matrix.
