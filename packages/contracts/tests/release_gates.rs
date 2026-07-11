@@ -903,9 +903,12 @@ const MEMBER_REMOVE_HANDLER_SRC: &str =
 const HELP_SIGNIN_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/admin/help_signin.rs");
 const RELINK_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/relink.rs");
+const OPERATOR_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/operator.rs");
 const MEMBERSHIP_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/membership.rs");
 const RELINK_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/relink.rs");
 const SESSION_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/session.rs");
+const RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC: &str =
+    include_str!("../../../scripts/recover-community-access.mjs");
 const APP_JS_SRC: &str = include_str!("../../../workers/ssr/static/app.js");
 const RENDER_SRC: &str = concat!(
     include_str!("../../../workers/ssr/src/render.rs"),
@@ -1243,6 +1246,89 @@ fn rfc024_redemption_is_single_use_generic_and_revokes_old_sessions() {
 }
 
 #[test]
+fn rfc069_operator_recovery_is_disabled_and_secret_authorized_by_default() {
+    assert!(
+        LIB_SRC.contains("(Method::Post, \"/operator/recovery/community-access\")"),
+        "RFC-069 operator recovery must use the reviewed POST-only route"
+    );
+    assert!(
+        WRANGLER_TOML_SRC.contains("COMMUNITY_RECOVERY_ENABLED = \"false\"")
+            && !WRANGLER_TOML_SRC.contains("COMMUNITY_RECOVERY_ENABLED = \"true\""),
+        "Tracked wrangler.toml must keep RFC-069 recovery disabled by default"
+    );
+    assert!(
+        !WRANGLER_TOML_SRC.contains("COMMUNITY_RECOVERY_TOKEN ="),
+        "Tracked wrangler.toml must not contain the operator recovery bearer token"
+    );
+    assert!(
+        OPERATOR_HANDLER_SRC.contains("env.secret(\"COMMUNITY_RECOVERY_TOKEN\")")
+            && !OPERATOR_HANDLER_SRC.contains("env.var(\"COMMUNITY_RECOVERY_TOKEN\")")
+            && OPERATOR_HANDLER_SRC.contains("constant_time_eq")
+            && OPERATOR_HANDLER_SRC.contains("Authorization")
+            && OPERATOR_HANDLER_SRC.contains("\"Bearer \""),
+        "RFC-069 endpoint must read the token only as a secret and compare the bearer in constant time"
+    );
+}
+
+#[test]
+fn rfc069_operator_recovery_targets_existing_active_admins_only() {
+    assert!(
+        OPERATOR_HANDLER_SRC.contains("community_db::find_active")
+            && OPERATOR_HANDLER_SRC.contains("membership_db::find_active_by_id")
+            && OPERATOR_HANDLER_SRC.contains("target.role == \"admin\"")
+            && OPERATOR_HANDLER_SRC.contains("render::not_found()"),
+        "RFC-069 endpoint must converge invalid community/membership/non-admin cases on generic not-found"
+    );
+    assert!(
+        OPERATOR_HANDLER_SRC
+            .contains("db.batch(vec![revoke_stmt, insert_relink_stmt, audit_stmt])")
+            && OPERATOR_HANDLER_SRC.contains("INSERT INTO membership_relink_codes")
+            && OPERATOR_HANDLER_SRC.contains("INSERT INTO audit_log")
+            && !OPERATOR_HANDLER_SRC.contains("let _ = audit::write")
+            && !OPERATOR_HANDLER_SRC.contains("audit::write("),
+        "RFC-069 endpoint must batch relink-code mutation with required audit evidence and must not discard audit errors"
+    );
+}
+
+#[test]
+fn rfc069_operator_recovery_audit_correlates_creation_and_redemption() {
+    assert!(
+        OPERATOR_HANDLER_SRC.contains("operator_recovery.admin_relink_created")
+            && OPERATOR_HANDLER_SRC.contains("\"operator_label\"")
+            && OPERATOR_HANDLER_SRC.contains("\"relink_code_id\"")
+            && OPERATOR_HANDLER_SRC.contains("\"membership_id\"")
+            && OPERATOR_HANDLER_SRC.contains("\"community_id\""),
+        "RFC-069 creation audit must include bounded operator label and relink correlation metadata"
+    );
+    assert!(
+        RELINK_HANDLER_SRC.contains("\"membership.relink_redeemed\"")
+            && RELINK_HANDLER_SRC.contains("\"relink_code_id\": target.id"),
+        "RFC-069 redemption audit must include the relink_code_id created by the operator endpoint"
+    );
+}
+
+#[test]
+fn rfc069_operator_tool_requires_explicit_target_and_production_confirmation() {
+    assert!(
+        RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("COMMUNITY_RECOVERY_TOKEN")
+            && RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("process.env.COMMUNITY_RECOVERY_TOKEN")
+            && RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("--target")
+            && RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("--url")
+            && RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("--community-id")
+            && RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("--admin-membership-id")
+            && RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("--operator-label"),
+        "RFC-069 operator tool must require explicit environment, URL, target IDs, label, and env token"
+    );
+    assert!(
+        RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("--confirm-production")
+            && RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("Type \"production\"")
+            && !RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("writeFile")
+            && !RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC.contains("appendFile"),
+        "RFC-069 operator tool must require production confirmation and avoid plaintext-code evidence files"
+    );
+}
+
+#[test]
 fn rfc057_community_creation_is_guarded_active_admin_only() {
     assert!(
         LIB_SRC.contains("(Method::Get, \"/communities/new\")")
@@ -1419,9 +1505,11 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.58.0-rfc056-rfc065-rfc066-rfc067-rfc068-rfc064")
-            && STATIC_FILES_SRC
-                .contains("/static/app.js?v=0.58.0-rfc056-rfc065-rfc066-rfc067-rfc068-rfc064"),
+        RENDER_SRC
+            .contains("/static/app.js?v=0.59.0-rfc056-rfc065-rfc066-rfc067-rfc068-rfc064-rfc069")
+            && STATIC_FILES_SRC.contains(
+                "/static/app.js?v=0.59.0-rfc056-rfc065-rfc066-rfc067-rfc068-rfc064-rfc069"
+            ),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(

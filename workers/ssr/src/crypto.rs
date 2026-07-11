@@ -48,8 +48,8 @@ pub fn hmac_hex(pepper: &str, value: &str) -> String {
     hex::encode(mac.finalize().into_bytes())
 }
 
-/// Constant-time comparison of two hex strings.
-pub fn hmac_hex_eq(a: &str, b: &str) -> bool {
+/// Constant-time comparison of equal-length strings.
+pub fn constant_time_eq(a: &str, b: &str) -> bool {
     if a.len() != b.len() {
         return false;
     }
@@ -57,6 +57,11 @@ pub fn hmac_hex_eq(a: &str, b: &str) -> bool {
         .zip(b.bytes())
         .fold(0u8, |acc, (x, y)| acc | (x ^ y))
         == 0
+}
+
+/// Constant-time comparison of two hex strings.
+pub fn hmac_hex_eq(a: &str, b: &str) -> bool {
+    constant_time_eq(a, b)
 }
 
 /// Generate a cryptographically random URL-safe token (32 bytes → 64 hex chars).

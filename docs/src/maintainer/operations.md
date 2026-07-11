@@ -120,6 +120,85 @@ This is not a removed-member return flow. Removed members still receive a new
 invite and join as a new membership; old and new memberships are not merged by
 display name.
 
+## Total community access recovery
+
+Use this only when every reachable community admin and member has lost browser
+or session access, and no valid invite or relink code exists. This is an
+operator procedure, not a public self-service recovery feature.
+
+Before mutation:
+
+1. Confirm the request through the external operator policy.
+2. Identify the community by `community_id`, not display name only.
+3. Identify one existing active admin membership by `membership_id`.
+4. Review recent audit rows:
+   ```sql
+   SELECT * FROM audit_log
+   WHERE community_id = '<community_id>'
+   ORDER BY created_at DESC
+   LIMIT 50;
+   ```
+
+Open the temporary recovery window in the ignored Wrangler config for the
+target environment:
+
+```toml
+COMMUNITY_RECOVERY_ENABLED = "true"
+```
+
+Set a short-lived operator bearer secret for the same environment:
+
+```sh
+COMMUNITY_RECOVERY_TOKEN="$(openssl rand -hex 32)"
+printf '%s\n' "$COMMUNITY_RECOVERY_TOKEN" | bunx wrangler secret put \
+  COMMUNITY_RECOVERY_TOKEN --env staging --config wrangler.staging.local.toml
+```
+
+Use `--env production --config wrangler.production.local.toml` for an approved
+production recovery. Do not commit the enabled flag or the token. Deploy after
+changing the flag:
+
+```sh
+bunx wrangler deploy --env staging --config wrangler.staging.local.toml
+```
+
+Run the maintained recovery script:
+
+```sh
+bun run recover:community-access -- \
+  --target staging \
+  --url https://<staging-worker-url> \
+  --community-id com_... \
+  --admin-membership-id mem_... \
+  --operator-label INC-1234
+```
+
+Production additionally requires `--confirm-production` and an interactive
+confirmation. The script prints one `/relink` code; give it only to the intended
+existing active admin. Do not redirect the script output into evidence files.
+
+After successful recovery, close the temporary window:
+
+```toml
+COMMUNITY_RECOVERY_ENABLED = "false"
+```
+
+```sh
+bunx wrangler secret delete COMMUNITY_RECOVERY_TOKEN --env staging \
+  --config wrangler.staging.local.toml
+
+bunx wrangler deploy --env staging --config wrangler.staging.local.toml
+```
+
+Then verify `POST /operator/recovery/community-access` returns the same generic
+not-found response, and review `audit_log` for
+`operator_recovery.admin_relink_created` plus the following
+`membership.relink_redeemed` row with the same `relink_code_id`.
+
+Do not use `scripts/bootstrap-cloudflare.mjs` for routine community access
+recovery. Bootstrap rotates `HMAC_PEPPER`, which invalidates existing sessions,
+invite codes, relink codes, and form tokens for the whole environment.
+
 ## Returning removed members
 
 Member removal stops access but preserves past attendance, notes, and audit

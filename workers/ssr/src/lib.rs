@@ -26,6 +26,11 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         (Method::Get, "/healthz") => handlers::health::get_health(&env).await,
         (Method::Get, "/version") => handlers::health::get_version(&env).await,
 
+        // ── Operator-only recovery ────────────────────────────────────────
+        (Method::Post, "/operator/recovery/community-access") => {
+            handlers::operator::post_community_access_recovery(req, &env, &request_id).await
+        }
+
         // ── Static assets + PWA ───────────────────────────────────────────
         (Method::Get, "/manifest.webmanifest") => {
             handlers::static_files::get_manifest(req, &env).await

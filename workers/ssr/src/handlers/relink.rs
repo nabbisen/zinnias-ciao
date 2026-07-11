@@ -80,6 +80,7 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
         Some(&target.membership_id),
         "membership.relink_redeemed",
         Some(serde_json::json!({
+            "relink_code_id": target.id,
             "membership_id": target.membership_id,
             "created_by_membership_id": target.created_by_membership_id,
             "community_id": target.community_id,

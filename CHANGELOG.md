@@ -2,6 +2,72 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.59.0] — 2026-07-11
+
+RFC-069 total community access recovery.
+
+### Added
+
+- **Operator-only total community access recovery.**
+  A disabled-by-default `POST /operator/recovery/community-access` endpoint can
+  create one short-lived relink code for an existing active admin membership
+  when all ordinary community access paths are unavailable.
+
+- **Maintained recovery operator script.**
+  `scripts/recover-community-access.mjs` requires explicit target, Worker URL,
+  community id, active admin membership id, bounded operator label, and
+  `COMMUNITY_RECOVERY_TOKEN`. Production also requires
+  `--confirm-production` and interactive confirmation.
+
+- **RFC-069 release gates.**
+  Source-contract checks cover disabled-by-default config, secret-only bearer
+  handling, constant-time comparison, active-admin-only targeting, audit
+  metadata, redemption correlation, production confirmation, and no plaintext
+  code evidence-file writes.
+
+### Changed
+
+- **Release version bumped to v0.59.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+- **Operations docs now include total access recovery.**
+  Maintainer docs describe opening the temporary recovery window, setting the
+  operator token secret, running the recovery script, closing the window,
+  deleting or rotating the token, redeploying, and verifying generic not-found.
+
+- **RFC-069 is marked complete.**
+  The RFC is moved to `rfcs/done/` and indexed as shipped in v0.59.0.
+
+### Fixed
+
+- **Operator recovery fails closed on audit failure.**
+  The recovery endpoint batches relink-code revocation, relink-code insertion,
+  and `operator_recovery.admin_relink_created` audit insertion together. The
+  plaintext relink code is returned only after the batch succeeds.
+
+- **Relink redemption audit includes recovery correlation.**
+  Successful `/relink` redemption audit rows now include `relink_code_id`, so
+  operators can correlate recovery code creation and redemption without logging
+  plaintext codes or HMACs.
+
+### Testing
+
+- `cargo fmt --all -- --check`
+- `git diff --check`
+- `node --check scripts/recover-community-access.mjs`
+- `cargo test -p zinnias-ciao-contracts -p zinnias-ciao-ssr rfc069`
+- `cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo clippy -p zinnias-ciao-contracts -p zinnias-ciao-ssr -- -D warnings`
+- `cargo build -p zinnias-ciao-contracts -p zinnias-ciao-ssr`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `mdbook build docs`
+
+Hosted staging recovery drill was not run in this working tree. It remains an
+operator evidence task using non-production data, a temporary recovery window,
+no plaintext relink code in evidence files, and post-closure generic-not-found
+verification.
+
 ## [0.58.0] — 2026-07-10
 
 RFC-064 Phase 3 contracts i18n boundary cleanup and RFC-064 completion.

@@ -4,7 +4,7 @@ This document is the step-by-step operator guide for taking ciao.zinnias from a
 clean tarball to a running production deployment. It is intended to be followed
 exactly, in order, by one operator. Tick each step as you complete it.
 
-**Version this runbook was written for:** v0.58.0
+**Version this runbook was written for:** v0.59.0
 **Estimated time:** 60–90 minutes for a first deployment.
 
 ---
@@ -18,7 +18,7 @@ Before starting, confirm you have:
 - [ ] Rust stable + `wasm32-unknown-unknown` target + `worker-build` installed
   (see `docs/src/developer/quick-start.md`).
 - [ ] `bun` installed.
-- [ ] The v0.58.0 source tarball extracted to a working directory.
+- [ ] The v0.59.0 source tarball extracted to a working directory.
 - [ ] A domain or workers.dev subdomain decided for the production deployment.
 
 ---
@@ -124,6 +124,10 @@ Replace `REPLACE_WITH_STAGING_KV_ID` in `wrangler.staging.local.toml`.
 ## Phase 2 — Set secrets
 
 Secrets are never committed to source. Set them once per environment.
+
+Do not set `COMMUNITY_RECOVERY_TOKEN` during normal launch. That secret is only
+created for a temporary RFC-069 total-community-access recovery window; follow
+`docs/src/maintainer/operations.md` when that incident procedure is approved.
 
 ### 2.1 Generate the HMAC pepper
 

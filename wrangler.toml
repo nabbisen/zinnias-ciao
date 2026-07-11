@@ -21,6 +21,7 @@ id      = "local"
 # Secret bindings — set via `wrangler secret put` in each environment.
 # Never hard-coded here.
 #   HMAC_PEPPER           — server pepper for invite/session/form-token HMACs
+#   COMMUNITY_RECOVERY_TOKEN — temporary RFC-069 operator recovery bearer token
 #
 # SESSION_COOKIE_DOMAIN is a normal [vars] binding (not secret — the domain is
 # not sensitive). Set it per-environment below. Leave unset/empty for a
@@ -30,6 +31,7 @@ id      = "local"
 BUILD_VERSION              = "dev"
 LOG_LEVEL                  = "info"
 COMMUNITY_CREATION_ENABLED = "false"
+COMMUNITY_RECOVERY_ENABLED = "false"
 
 [env.dev]
 name = "zinnias-ciao-ssr-dev"
@@ -37,6 +39,7 @@ name = "zinnias-ciao-ssr-dev"
 BUILD_VERSION              = "dev"
 LOG_LEVEL                  = "debug"
 COMMUNITY_CREATION_ENABLED = "true"
+COMMUNITY_RECOVERY_ENABLED = "false"
 
 [[env.dev.d1_databases]]
 binding       = "DB"
@@ -62,6 +65,7 @@ name = "zinnias-ciao-ssr-stg"
 LOG_LEVEL                  = "info"
 BUILD_VERSION              = "staging"
 COMMUNITY_CREATION_ENABLED = "true"
+COMMUNITY_RECOVERY_ENABLED = "false"
 
 [[env.staging.d1_databases]]
 binding       = "DB"
@@ -78,6 +82,7 @@ name = "zinnias-ciao-ssr-prd"
 LOG_LEVEL                  = "warn"
 BUILD_VERSION              = "production"
 COMMUNITY_CREATION_ENABLED = "false"
+COMMUNITY_RECOVERY_ENABLED = "false"
 
 [[env.production.d1_databases]]
 binding       = "DB"

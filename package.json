@@ -1,6 +1,6 @@
 {
   "name": "zinnias-ciao",
-  "version": "0.58.0",
+  "version": "0.59.0",
   "private": true,
   "scripts": {
     "setup": "node scripts/setup.mjs",
@@ -11,6 +11,7 @@
     "migrate:prod": "bunx wrangler d1 migrations apply zinnias-ciao --remote --env production --config wrangler.production.local.toml",
     "bootstrap:staging": "node scripts/bootstrap-cloudflare.mjs --target staging --config wrangler.staging.local.toml",
     "bootstrap:production": "node scripts/bootstrap-cloudflare.mjs --target production --config wrangler.production.local.toml",
+    "recover:community-access": "node scripts/recover-community-access.mjs",
     "test": "cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr",
     "lint": "cargo clippy -p zinnias-ciao-domain -p zinnias-ciao-contracts -- -D warnings",
     "fmt": "cargo fmt --all -- --check",

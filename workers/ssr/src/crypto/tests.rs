@@ -24,6 +24,13 @@ fn hmac_hex_eq_constant_time() {
 }
 
 #[test]
+fn constant_time_eq_requires_equal_strings() {
+    assert!(constant_time_eq("same-secret", "same-secret"));
+    assert!(!constant_time_eq("same-secret", "other-secret"));
+    assert!(!constant_time_eq("same-secret", "short"));
+}
+
+#[test]
 fn normalize_invite_code_strips_separators() {
     assert_eq!(normalize_invite_code("X7-Y9 Z2"), "X7Y9Z2");
     assert_eq!(normalize_invite_code("x7y9z2"), "X7Y9Z2");

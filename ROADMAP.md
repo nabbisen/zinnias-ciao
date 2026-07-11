@@ -2,7 +2,7 @@
 
 ## Status
 
-**Current release:** 0.58.0.
+**Current release:** 0.59.0.
 
 The RFC folder is the source of truth for implementation state:
 
@@ -14,8 +14,8 @@ Recent workflow releases focused on calendar-centered use, community bootstrap,
 member administration, admin role transfer, member lifecycle policy,
 admin-mediated help sign-in, Rust module boundary cleanup, recurrence v2 for
 Calendar workflows, admin event-copy creation assistance, the monthly
-attendance matrix, admin-only matrix CSV export, and contracts i18n boundary
-cleanup.
+attendance matrix, admin-only matrix CSV export, contracts i18n boundary
+cleanup, and operator-only total community access recovery.
 
 ## Proposed Work
 
@@ -32,7 +32,6 @@ The active proposed backlog is:
 | 045 | Pre-pilot runtime verification matrix | Runtime evidence and operator verification candidate. |
 | 050 | Staging runtime verification evidence pack | Prototype exists; full evidence workflow remains. |
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
-| 069 | Total community access recovery | Future operator/system-admin recovery path for total community access loss. |
 
 ## Near-Term Candidates
 
@@ -40,7 +39,8 @@ Recommended next candidates, in practical order:
 
 1. **RFC-054: Japanese UX Copy Review**
    Recent releases added sensitive recovery and member-management flows. Copy
-   quality is now part of usability and safety.
+   quality is part of usability and safety, but the full native-speaker copy
+   review should wait until the user-facing surface is more stable.
 
 2. **RFC-021 and RFC-034: Notifications and Quiet Mode**
    These should be designed together to avoid adding reminders without a clear

@@ -175,7 +175,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Prototype route checks cover `/healthz`, `/version`, `/join`, `/offline`, `/manifest.webmanifest`, and `/sw.js` with representative security/cache headers. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype browser checks launch sandboxed/incognito Chromium without `--no-sandbox`, capture mobile screenshots, exercise 200% text size, and render `/join` with JavaScript disabled. *(scripts/runtime-smoke.mjs)*
 - [x] Prototype evidence path and manual RFC-050 evidence template are documented. *(docs/src/tester/staging-runtime-prototype.md)*
-- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.58.0 bun run smoke:runtime -- <deployed-worker-url>`)*
+- [~] Hosted Cloudflare staging smoke executed and evidence attached. *(operator task: deploy staging with `BUILD_VERSION` set to the release label, then `EXPECTED_VERSION=v0.59.0 bun run smoke:runtime -- <deployed-worker-url>`)*
 - [~] Hosted staging exposure reviewed: non-production data only, separate staging resources/secrets, short public window, and route disabled/removed or Worker deleted after evidence if no longer needed. *(operator task — RFC-050 staging exposure policy)*
 - [~] Hosted staging bootstrap invite generated for authenticated checks. *(operator task: `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"`; keep the printed invite code private)*
 - [~] Seeded authenticated RFC-050 flows, race checks, real-phone 200% scaling, Logpush, and CPU/runtime review completed. *(manual/operator evidence)*
@@ -251,6 +251,17 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] All i18n implementation child modules are below the 300-line guideline. *(implementation review line-count evidence)*
 - [x] Crate extraction is explicitly deferred under RFC-064 trigger criteria. *(RFC-064)*
 - [x] Browser smoke is not required for this slice because no route, form field, rendered-copy, or intended browser behavior changed beyond version/cache-buster alignment. *(RFC-064 + implementation review)*
+
+## Total community access recovery gates (v0.59.0 — RFC-069)
+
+- [x] Operator recovery is disabled by default in tracked `wrangler.toml`, including production. *(wrangler.toml + release gate)*
+- [x] `COMMUNITY_RECOVERY_TOKEN` is read only as a Worker secret and compared with constant-time equality. *(operator.rs + release gate)*
+- [x] `POST /operator/recovery/community-access` creates one relink code only for an existing active admin membership in an active community. *(operator.rs + release gate)*
+- [x] Disabled, unauthenticated, invalid community, invalid membership, non-admin, and removed-member cases converge on the generic not-found response. *(operator.rs + release gate)*
+- [x] Recovery creation audit records `operator_recovery.admin_relink_created` with `operator_label`, `relink_code_id`, `membership_id`, and `community_id`; redemption audit includes the same `relink_code_id`. *(operator.rs + relink.rs + release gate)*
+- [x] Maintained recovery script requires explicit target, URL, community id, admin membership id, operator label, `COMMUNITY_RECOVERY_TOKEN`, and production confirmation. *(scripts/recover-community-access.mjs + release gate)*
+- [x] Maintainer operations docs describe enabling the temporary window, setting the secret, running the script, disabling the flag, deleting or rotating the secret, redeploying, and verifying generic not-found after closure. *(docs/src/maintainer/operations.md)*
+- [ ] Hosted staging recovery drill executed with non-production data and endpoint closed afterward. *(operator task; do not store plaintext relink code in evidence files)*
 
 ## Documentation role-structure gates (v0.53.1)
 

@@ -75,6 +75,7 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 067 | [Monthly Attendance Matrix](./done/067-monthly-attendance-matrix.md) | v0.56.0 |
 | 068 | [Calendar Matrix CSV Export](./done/068-calendar-matrix-csv-export.md) | v0.57.0 |
 | 064 | [Rust Module and Crate Boundary Cleanup](./done/064-rust-module-and-crate-boundary-cleanup.md) | v0.52.0 / v0.53.0 / v0.58.0 |
+| 069 | [Total Community Access Recovery](./done/069-total-community-access-recovery.md) | v0.59.0 |
 
 ## Also Done
 
@@ -105,12 +106,6 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 045 | Pre-Pilot Runtime Verification Matrix | [./proposed/045-pre-pilot-runtime-verification-matrix.md](./proposed/045-pre-pilot-runtime-verification-matrix.md) | Source verification discharged; staging-runtime matrix pending environment |
 | 050 | [Staging Runtime Verification Evidence Pack](./proposed/050-staging-runtime-verification-evidence-pack.md) | Runtime evidence collector prototype added in v0.47.0; full Cloudflare evidence pending |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
-
-## Proposed — operations and recovery (069)
-
-| ID | Title | File | Note |
-|----|-------|------|------|
-| 069 | Total Community Access Recovery | [./proposed/069-total-community-access-recovery.md](./proposed/069-total-community-access-recovery.md) | Operator/system-admin recovery path for total community access loss |
 
 ## Archive
 
