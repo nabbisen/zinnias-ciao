@@ -56,6 +56,14 @@ fn not_found_and_forbidden_same_message() {
         AppError::not_found().user_message,
         AppError::forbidden().user_message
     );
+    assert!(
+        RENDER_SRC.contains("fn recovery_links()")
+            && RENDER_SRC.contains("href=\\\"/\\\"")
+            && RENDER_SRC.contains("href=\\\"/join\\\"")
+            && LIB_SRC.contains("is_not_found_error(&e)")
+            && LIB_SRC.contains("render::not_found()"),
+        "Generic not-found/forbidden and error pages must be recoverable and expected authorization denial must not render as internal error"
+    );
 }
 
 #[test]
@@ -110,6 +118,7 @@ fn all_state_changing_routes_have_token_purpose() {
         token_purpose::JOIN_PROFILE,
         token_purpose::LOGOUT,
         token_purpose::CREATE_COMMUNITY,
+        token_purpose::CHANGE_DISPLAY_NAME,
     ];
     for p in required {
         assert!(!p.is_empty(), "token purpose must not be empty: {p}");
@@ -135,6 +144,8 @@ fn i18n_en_ja_parity_count() {
         (EN_JOIN_SUBHEADING, JA_JOIN_SUBHEADING),
         (EN_JOIN_CODE_LABEL, JA_JOIN_CODE_LABEL),
         (EN_JOIN_CODE_HINT, JA_JOIN_CODE_HINT),
+        (EN_JOIN_RELINK_HINT, JA_JOIN_RELINK_HINT),
+        (EN_JOIN_RELINK_LINK, JA_JOIN_RELINK_LINK),
         (EN_JOIN_SUBMIT, JA_JOIN_SUBMIT),
         (EN_JOIN_PROFILE_HEADING, JA_JOIN_PROFILE_HEADING),
         (EN_JOIN_PROFILE_HINT, JA_JOIN_PROFILE_HINT),
@@ -193,6 +204,18 @@ fn i18n_en_ja_parity_count() {
         (EN_NOTE_CHAR_HINT, JA_NOTE_CHAR_HINT),
         (EN_NOTE_VISIBILITY, JA_NOTE_VISIBILITY),
         (EN_ME_SECTION_NAME, JA_ME_SECTION_NAME),
+        (EN_ME_CHANGE_DISPLAY_NAME, JA_ME_CHANGE_DISPLAY_NAME),
+        (EN_ME_DISPLAY_NAME_EDIT_TITLE, JA_ME_DISPLAY_NAME_EDIT_TITLE),
+        (
+            EN_ME_DISPLAY_NAME_EDIT_SUBMIT,
+            JA_ME_DISPLAY_NAME_EDIT_SUBMIT,
+        ),
+        (
+            EN_ME_DISPLAY_NAME_EDIT_CANCEL,
+            JA_ME_DISPLAY_NAME_EDIT_CANCEL,
+        ),
+        (EN_ME_DISPLAY_NAME_UPDATED, JA_ME_DISPLAY_NAME_UPDATED),
+        (EN_ME_DISPLAY_NAME_ERROR, JA_ME_DISPLAY_NAME_ERROR),
         (EN_ME_SECTION_COMMUNITY, JA_ME_SECTION_COMMUNITY),
         (EN_ME_SECTION_HELP, JA_ME_SECTION_HELP),
         (EN_ME_HELP_BODY, JA_ME_HELP_BODY),
@@ -347,6 +370,26 @@ fn i18n_en_ja_parity_count() {
         (
             EN_ADMIN_HELP_SIGNIN_CODE_HINT,
             JA_ADMIN_HELP_SIGNIN_CODE_HINT,
+        ),
+        (
+            EN_ADMIN_HELP_SIGNIN_RELINK_HINT,
+            JA_ADMIN_HELP_SIGNIN_RELINK_HINT,
+        ),
+        (
+            EN_ADMIN_HELP_SIGNIN_RELINK_LINK,
+            JA_ADMIN_HELP_SIGNIN_RELINK_LINK,
+        ),
+        (
+            EN_ADMIN_HELP_SIGNIN_COPY_CODE,
+            JA_ADMIN_HELP_SIGNIN_COPY_CODE,
+        ),
+        (
+            EN_ADMIN_HELP_SIGNIN_COPY_DONE,
+            JA_ADMIN_HELP_SIGNIN_COPY_DONE,
+        ),
+        (
+            EN_ADMIN_HELP_SIGNIN_COPY_FAILED,
+            JA_ADMIN_HELP_SIGNIN_COPY_FAILED,
         ),
         (EN_RELINK_TITLE, JA_RELINK_TITLE),
         (EN_RELINK_BODY, JA_RELINK_BODY),
@@ -1147,6 +1190,19 @@ fn rfc024_help_signin_copy_and_ttl_are_locked() {
     assert_eq!(RELINK_CODE_TTL_SECONDS, 15 * 60);
     assert_eq!(JA_ADMIN_HELP_SIGNIN_ACTION, "サインインを手伝う");
     assert_eq!(EN_ADMIN_HELP_SIGNIN_ACTION, "Help sign in again");
+    assert!(
+        JA_ADMIN_HELP_SIGNIN_RELINK_HINT.contains("招待コード欄では使えません。")
+            && JA_ADMIN_HELP_SIGNIN_RELINK_LINK == "サインインし直す画面を開く"
+            && HELP_SIGNIN_HANDLER_SRC.contains("href=\\\"/relink\\\"")
+            && JOIN_HANDLER_SRC.contains("href=\\\"/relink\\\"")
+            && RENDER_SRC.contains("href=\\\"/relink\\\"")
+            && HELP_SIGNIN_HANDLER_SRC.contains("data-copy-code-button")
+            && HELP_SIGNIN_HANDLER_SRC.contains("data-copy-code-value")
+            && APP_JS_SRC.contains("navigator.clipboard.writeText")
+            && JA_JOIN_RELINK_LINK == JA_ADMIN_HELP_SIGNIN_RELINK_LINK
+            && HELP_SIGNIN_HANDLER_SRC.contains("rel=\\\"noopener\\\""),
+        "RFC-024 help-signin result must direct members to /relink and distinguish it from invite-code entry"
+    );
     assert_eq!(
         JA_RELINK_INVALID,
         "このコードは無効か、有効期限が切れています。"
@@ -1427,6 +1483,93 @@ fn rfc057_me_entry_and_feature_flag_defaults_are_reviewed() {
             && WRANGLER_TOML_SRC.contains("[env.production.vars]")
             && WRANGLER_TOML_SRC.contains("COMMUNITY_CREATION_ENABLED = \"false\""),
         "Community creation flag should be enabled for local/staging review and off in production by default"
+    );
+}
+
+#[test]
+fn rfc070_self_display_name_editing_routes_are_member_scoped() {
+    assert!(
+        COMMUNITY_HANDLER_SRC.contains("\"me/display-name\"")
+            && COMMUNITY_HANDLER_SRC.contains("get_display_name")
+            && COMMUNITY_HANDLER_SRC.contains("post_display_name"),
+        "RFC-070 must expose GET/POST /c/:cid/me/display-name through the community router"
+    );
+    assert!(
+        ME_HANDLER_SRC.contains("require_membership(env, &auth, community_id)")
+            && !ME_HANDLER_SRC.contains("require_admin(env, &auth, community_id)"),
+        "RFC-070 display-name editing must require active membership, not admin role"
+    );
+    assert!(
+        ME_HANDLER_SRC.contains("JA_ME_CHANGE_DISPLAY_NAME")
+            && ME_HANDLER_SRC.contains("JA_ME_DISPLAY_NAME_UPDATED")
+            && ME_HANDLER_SRC.contains("?flash={DISPLAY_NAME_UPDATED_REF}"),
+        "RFC-070 Me page must expose the edit link and fixed-code success feedback"
+    );
+}
+
+#[test]
+fn rfc070_display_name_token_replay_and_validation_are_guarded() {
+    assert!(
+        ME_HANDLER_SRC.contains("token_purpose::CHANGE_DISPLAY_NAME")
+            && ME_HANDLER_SRC.contains("validate_display_name(&raw_display_name)")
+            && ME_HANDLER_SRC.contains("consume_detailed")
+            && ME_HANDLER_SRC.contains("ConsumeResult::Replay(Some(result_ref))")
+            && ME_HANDLER_SRC.contains("DISPLAY_NAME_UPDATED_REF")
+            && ME_HANDLER_SRC.contains("DISPLAY_NAME_UNCHANGED_REF"),
+        "RFC-070 must validate before detailed token consume and branch replays by stored result_ref"
+    );
+    assert!(
+        ME_HANDLER_SRC.contains("form_token::set_result")
+            && ME_HANDLER_SRC.contains("DISPLAY_NAME_UNCHANGED_REF")
+            && ME_HANDLER_SRC.contains("return redirect(&format!(\"/c/{community_id}/me\"))"),
+        "RFC-070 same-value no-op must store display_name_unchanged before redirecting"
+    );
+    assert!(
+        ME_HANDLER_SRC.contains("ConsumeResult::Replay(_)")
+            && !ME_HANDLER_SRC.contains("if replay.is_some()"),
+        "RFC-070 must not use the older replay-is-some pattern that misses consumed tokens with no result_ref"
+    );
+}
+
+#[test]
+fn rfc070_display_name_update_audit_and_result_are_batched() {
+    assert!(
+        ME_HANDLER_SRC.contains("db.batch(vec![update_stmt, audit_stmt, result_stmt])")
+            && ME_HANDLER_SRC.contains("UPDATE community_memberships")
+            && ME_HANDLER_SRC.contains("SET display_name = ?1")
+            && ME_HANDLER_SRC.contains("AND community_id = ?3")
+            && ME_HANDLER_SRC.contains("AND user_id = ?4")
+            && ME_HANDLER_SRC.contains("AND removed_at IS NULL"),
+        "RFC-070 display-name update must be scoped to active membership, community, and authenticated user"
+    );
+    assert!(
+        ME_HANDLER_SRC.contains("INSERT INTO audit_log")
+            && ME_HANDLER_SRC.contains("membership.display_name_updated")
+            && ME_HANDLER_SRC.contains("\"changed\": [\"display_name\"]")
+            && ME_HANDLER_SRC.contains("UPDATE form_tokens")
+            && ME_HANDLER_SRC.contains("result_ref = ?1")
+            && ME_HANDLER_SRC.contains("require_changed(&results, 0")
+            && ME_HANDLER_SRC.contains("require_changed(&results, 1")
+            && ME_HANDLER_SRC.contains("require_changed(&results, 2"),
+        "RFC-070 actual changes must batch update, audit insert, replay-result storage, and check each write"
+    );
+    assert!(
+        !ME_HANDLER_SRC.contains("let _ = audit::write")
+            && !ME_HANDLER_SRC.contains("audit::write("),
+        "RFC-070 display-name updates must not use best-effort audit::write"
+    );
+    let metadata_start = ME_HANDLER_SRC
+        .find("let metadata = serde_json::json!")
+        .expect("RFC-070 must build explicit display-name audit metadata");
+    let metadata_end = ME_HANDLER_SRC[metadata_start..]
+        .find(".to_string();")
+        .expect("RFC-070 metadata block must be stringified");
+    let metadata_block = &ME_HANDLER_SRC[metadata_start..metadata_start + metadata_end];
+    assert!(
+        metadata_block.contains("\"changed\": [\"display_name\"]")
+            && !metadata_block.contains("\"membership_id\"")
+            && !metadata_block.contains("\"community_id\""),
+        "RFC-070 metadata_json must keep IDs in audit columns and store only the changed field list"
     );
 }
 

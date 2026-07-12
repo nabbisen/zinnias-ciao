@@ -7,6 +7,8 @@ fn en_ja_parity() {
         "JOIN_SUBHEADING",
         "JOIN_CODE_LABEL",
         "JOIN_CODE_HINT",
+        "JOIN_RELINK_HINT",
+        "JOIN_RELINK_LINK",
         "JOIN_SUBMIT",
         "JOIN_PROFILE_HEADING",
         "JOIN_PROFILE_HINT",
@@ -130,6 +132,16 @@ fn en_ja_parity() {
         "ADMIN_REMOVE_CONFIRM",
         "ADMIN_REMOVE_CONSEQUENCE",
         "ADMIN_LAST_ADMIN",
+        "ADMIN_HELP_SIGNIN_ACTION",
+        "ADMIN_HELP_SIGNIN_TITLE",
+        "ADMIN_HELP_SIGNIN_CONSEQUENCE",
+        "ADMIN_HELP_SIGNIN_CREATE",
+        "ADMIN_HELP_SIGNIN_CODE_HINT",
+        "ADMIN_HELP_SIGNIN_RELINK_HINT",
+        "ADMIN_HELP_SIGNIN_RELINK_LINK",
+        "ADMIN_HELP_SIGNIN_COPY_CODE",
+        "ADMIN_HELP_SIGNIN_COPY_DONE",
+        "ADMIN_HELP_SIGNIN_COPY_FAILED",
         // Communities
         "COMMUNITIES_JOIN_ANOTHER",
         // Community creation (RFC-057)
@@ -209,7 +221,7 @@ fn en_ja_parity() {
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
     ];
-    assert_eq!(en_keys.len(), 184, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 196, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

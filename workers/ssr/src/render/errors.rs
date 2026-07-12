@@ -16,16 +16,20 @@ pub fn placeholder() -> Result<Response> {
 
 pub fn not_found() -> Result<Response> {
     let body = format!(
-        "<main style=\"padding:2rem\"><p>{}</p></main>",
-        i18n::JA_NOT_FOUND
+        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+         <p>{}</p>{}</main>",
+        i18n::JA_NOT_FOUND,
+        recovery_links()
     );
     Ok(Response::from_html(shell(i18n::JA_NOT_FOUND, &body))?.with_status(404))
 }
 
 pub fn internal_error() -> Result<Response> {
     let body = format!(
-        "<main style=\"padding:2rem\"><p>{}</p></main>",
-        i18n::JA_INTERNAL_ERROR
+        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+         <p>{}</p>{}</main>",
+        i18n::JA_INTERNAL_ERROR,
+        recovery_links()
     );
     Ok(Response::from_html(shell(i18n::JA_GENERAL_ERROR, &body))?.with_status(500))
 }
@@ -34,9 +38,26 @@ pub fn session_expired() -> Result<Response> {
     let body = format!(
         "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
          <p style=\"color:#FF3B30\">{msg}</p>\
-         <a href=\"/join\" style=\"display:inline-block;margin-top:1rem;color:#007AFF\">{join}</a></main>",
+         <div style=\"display:flex;flex-direction:column;gap:.75rem;margin-top:1rem\">\
+           <a href=\"/relink\" style=\"display:block;color:#007AFF;text-decoration:none\">\
+             {relink}</a>\
+           <a href=\"/join\" style=\"display:block;color:#007AFF;text-decoration:none\">\
+             {join}</a>\
+         </div></main>",
         msg = i18n::JA_SESSION_EXPIRED,
         join = i18n::JA_JOIN_SUBMIT,
+        relink = i18n::JA_JOIN_RELINK_LINK,
     );
     Ok(Response::from_html(shell(i18n::JA_GENERAL_ERROR, &body))?.with_status(401))
+}
+
+fn recovery_links() -> String {
+    format!(
+        "<div style=\"display:flex;flex-direction:column;gap:.75rem;margin-top:1rem\">\
+           <a href=\"/\" style=\"display:block;color:#007AFF;text-decoration:none\">{home}</a>\
+           <a href=\"/join\" style=\"display:block;color:#007AFF;text-decoration:none\">{join}</a>\
+         </div>",
+        home = i18n::JA_NAV_HOME,
+        join = i18n::JA_JOIN_SUBMIT,
+    )
 }

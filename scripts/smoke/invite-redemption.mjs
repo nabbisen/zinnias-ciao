@@ -1,32 +1,27 @@
 #!/usr/bin/env node
-// Scenario smoke for RFC-024 help-signin. Local wrangler dev only.
+// Scenario smoke for admin-generated invite redemption. Local wrangler dev only.
 
 import { createHmac } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 
-const port = Number(process.env.SMOKE_PORT ?? 8795);
-const remotePort = Number(process.env.CHROME_REMOTE_PORT ?? 9247);
+const port = Number(process.env.SMOKE_PORT ?? 8799);
+const remotePort = Number(process.env.CHROME_REMOTE_PORT ?? 9251);
 const baseUrl = `http://127.0.0.1:${port}`;
-const outDir = process.env.EVIDENCE_DIR ?? '.git-exclude/evidence/rfc024';
-const reportName = process.env.REPORT_NAME ?? 'rfc024-help-signin-smoke-results.json';
-const userDataDir = `.git-exclude/tmp/chrome-help-signin-sandboxed-${Date.now()}`;
+const outDir = process.env.EVIDENCE_DIR ?? '.git-exclude/evidence/invite-redemption';
+const reportName = process.env.REPORT_NAME ?? 'invite-redemption-smoke-results.json';
+const userDataDir = `.git-exclude/tmp/chrome-invite-redemption-sandboxed-${Date.now()}`;
 const chromium = process.env.CHROMIUM ?? '/usr/bin/chromium';
 const pepper = 'dev-pepper-change-in-production';
-const now = '2026-07-07T00:00:00.000Z';
+const now = '2026-07-12T00:00:00.000Z';
 
-const primaryCommunityId = 'com_rfc024_primary';
-const otherCommunityId = 'com_rfc024_other';
-const adminUserId = 'usr_rfc024_admin';
-const memberUserId = 'usr_rfc024_member';
-const removedUserId = 'usr_rfc024_removed';
-const adminMembershipId = 'mem_rfc024_admin';
-const memberMembershipId = 'mem_rfc024_member';
-const removedMembershipId = 'mem_rfc024_removed';
-const adminSessionSecret = 'rfc024-smoke-admin-session';
-const oldMemberSessionSecret = 'rfc024-smoke-old-member-session';
+const communityId = 'com_smoke_invite_redemption';
+const adminUserId = 'usr_smoke_invite_admin';
+const adminMembershipId = 'mem_smoke_invite_admin';
+const adminSessionSecret = 'smoke-invite-redemption-admin-session';
 const adminSessionHmac = hmac(adminSessionSecret);
-const oldMemberSessionHmac = hmac(oldMemberSessionSecret);
+const runSuffix = Date.now().toString().slice(-6);
+const newMemberDisplayName = `Invite Smoke ${runSuffix}`;
 
 assertLocalOnly();
 await mkdir(outDir, { recursive: true });
@@ -39,23 +34,24 @@ function hmac(secret) {
 function assertLocalOnly() {
   const parsed = new URL(baseUrl);
   if (!['127.0.0.1', 'localhost'].includes(parsed.hostname)) {
-    throw new Error(`help-signin smoke is local-only; refusing base URL ${baseUrl}`);
+    throw new Error(`invite-redemption smoke is local-only; refusing base URL ${baseUrl}`);
   }
   for (const arg of process.argv.slice(2)) {
     if (arg === '--remote' || arg.includes('staging') || arg.includes('production')) {
-      throw new Error(`help-signin smoke is local-only; refused argument ${arg}`);
+      throw new Error(`invite-redemption smoke is local-only; refused argument ${arg}`);
     }
   }
 }
 
 function runWrangler(args) {
   if (args.includes('--remote')) {
-    throw new Error('help-signin smoke refuses remote D1 operations');
+    throw new Error('invite-redemption smoke refuses remote D1 operations');
   }
   try {
-    execFileSync('bunx', ['wrangler', ...args], {
+    return execFileSync('bunx', ['wrangler', ...args], {
       cwd: process.cwd(),
       stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
     });
   } catch (error) {
     throw new Error(
@@ -77,26 +73,38 @@ function sql(statement) {
   ]);
 }
 
+function query(statement) {
+  const raw = runWrangler([
+    'd1',
+    'execute',
+    'zinnias-ciao-dev',
+    '--local',
+    '--env',
+    'dev',
+    '--json',
+    '--command',
+    statement,
+  ]);
+  const parsed = JSON.parse(raw);
+  return parsed?.[0]?.results ?? parsed?.results ?? [];
+}
+
+function esc(value) {
+  return String(value).replaceAll("'", "''");
+}
+
 function seed() {
   runWrangler(['d1', 'migrations', 'apply', 'zinnias-ciao-dev', '--local', '--env', 'dev']);
   const statements = [
-    `INSERT OR IGNORE INTO communities (id, name, timezone, is_active, created_at) VALUES ('${primaryCommunityId}', 'RFC024 Primary Community', 'Asia/Tokyo', 1, '${now}')`,
-    `INSERT OR IGNORE INTO communities (id, name, timezone, is_active, created_at) VALUES ('${otherCommunityId}', 'RFC024 Other Community', 'Asia/Tokyo', 1, '${now}')`,
-    `UPDATE communities SET name='RFC024 Primary Community', timezone='Asia/Tokyo', is_active=1 WHERE id='${primaryCommunityId}'`,
-    `UPDATE communities SET name='RFC024 Other Community', timezone='Asia/Tokyo', is_active=1 WHERE id='${otherCommunityId}'`,
+    `INSERT OR IGNORE INTO communities (id, name, timezone, is_active, created_at) VALUES ('${communityId}', 'Invite Redemption Smoke Community', 'Asia/Tokyo', 1, '${now}')`,
+    `UPDATE communities SET name='Invite Redemption Smoke Community', timezone='Asia/Tokyo', is_active=1 WHERE id='${communityId}'`,
     `INSERT OR IGNORE INTO users (id, created_at) VALUES ('${adminUserId}', '${now}')`,
-    `INSERT OR IGNORE INTO users (id, created_at) VALUES ('${memberUserId}', '${now}')`,
-    `INSERT OR IGNORE INTO users (id, created_at) VALUES ('${removedUserId}', '${now}')`,
-    `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${adminMembershipId}', '${primaryCommunityId}', '${adminUserId}', 'admin', 'RFC024 Admin', '${now}')`,
-    `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${memberMembershipId}', '${primaryCommunityId}', '${memberUserId}', 'member', 'RFC024 Active Member', '${now}')`,
-    `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at, removed_at) VALUES ('${removedMembershipId}', '${primaryCommunityId}', '${removedUserId}', 'member', 'RFC024 Removed Member', '${now}', '${now}')`,
-    `UPDATE community_memberships SET role='admin', display_name='RFC024 Admin', removed_at=NULL WHERE id='${adminMembershipId}'`,
-    `UPDATE community_memberships SET role='member', display_name='RFC024 Active Member', removed_at=NULL WHERE id='${memberMembershipId}'`,
-    `UPDATE community_memberships SET role='member', display_name='RFC024 Removed Member', removed_at='${now}' WHERE id='${removedMembershipId}'`,
-    `DELETE FROM membership_relink_codes WHERE community_id IN ('${primaryCommunityId}', '${otherCommunityId}')`,
-    `DELETE FROM sessions WHERE id IN ('sess_rfc024_admin', 'sess_rfc024_old_member') OR session_hmac IN ('${adminSessionHmac}', '${oldMemberSessionHmac}')`,
-    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc024_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
-    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc024_old_member', '${memberUserId}', '${oldMemberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
+    `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${adminMembershipId}', '${communityId}', '${adminUserId}', 'admin', 'Invite Smoke Admin', '${now}')`,
+    `UPDATE community_memberships SET role='admin', display_name='Invite Smoke Admin', removed_at=NULL WHERE id='${adminMembershipId}'`,
+    `DELETE FROM sessions WHERE id = 'sess_smoke_invite_admin' OR session_hmac = '${adminSessionHmac}'`,
+    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_smoke_invite_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
+    `DELETE FROM invite_codes WHERE community_id = '${communityId}'`,
+    `DELETE FROM form_tokens WHERE user_id = '' OR user_id = '${adminUserId}'`,
   ];
   for (const statement of statements) sql(statement);
 }
@@ -106,7 +114,7 @@ function sleep(ms) {
 }
 
 function logStep(message) {
-  console.error(`[help-signin-smoke] ${message}`);
+  console.error(`[invite-redemption-smoke] ${message}`);
 }
 
 async function withTimeout(promise, label, ms = 10000) {
@@ -323,31 +331,52 @@ async function submitFormByAction(cdp, action) {
   await sleep(150);
 }
 
-async function fillAndSubmitRelink(cdp, code) {
+async function fillAndSubmitJoin(cdp, code) {
   const loaded = cdp.once('Page.loadEventFired');
   const submitted = await evalExpr(
     cdp,
     `(() => {
       const input = document.querySelector('input[name="code"]');
-      const form = document.querySelector('form[action="/relink"]');
+      const form = document.querySelector('form[action="/join"]');
       if (!input || !form) return false;
       input.value = ${JSON.stringify(code)};
       form.requestSubmit();
       return true;
     })()`,
   );
-  if (!submitted) throw new Error('Relink form not found');
-  await withTimeout(loaded, 'submit relink form');
+  if (!submitted) throw new Error('Join form not found');
+  await withTimeout(loaded, 'submit join form');
   await sleep(250);
 }
 
-async function codeFromPage(cdp) {
-  return await evalExpr(
+async function fillAndSubmitProfile(cdp, displayName) {
+  const loaded = cdp.once('Page.loadEventFired');
+  const submitted = await evalExpr(
     cdp,
     `(() => {
-      const node = document.querySelector('[aria-label="コード"]');
-      return node ? node.innerText.trim() : '';
+      const input = document.querySelector('input[name="display_name"]');
+      const form = document.querySelector('form[action="/join/profile"]');
+      if (!input || !form) return false;
+      input.value = ${JSON.stringify(displayName)};
+      form.requestSubmit();
+      return true;
     })()`,
+  );
+  if (!submitted) throw new Error('Join profile form not found');
+  await withTimeout(loaded, 'submit join profile form');
+  await sleep(250);
+}
+
+async function inviteCodeFromLocation(cdp) {
+  return await evalExpr(
+    cdp,
+    `(() => new URLSearchParams(location.search).get('code') || '')()`,
+  );
+}
+
+function latestInviteRows() {
+  return query(
+    `SELECT id, community_id, grants_role, used_at, revoked_at, expires_at FROM invite_codes WHERE community_id='${communityId}' ORDER BY expires_at DESC LIMIT 5`,
   );
 }
 
@@ -393,128 +422,146 @@ try {
 
   const adminPage = await newPage(adminSessionSecret);
 
-  logStep('checking member row exposes active help-signin and hides removed member');
-  await navigate(adminPage, `/c/${primaryCommunityId}/admin/members`, { textScale: 2 });
-  const membersPage = await collect(adminPage);
+  logStep('checking invite page before generation');
+  await navigate(adminPage, `/c/${communityId}/admin/invites`, { textScale: 2 });
+  const inviteStart = await collect(adminPage);
   results.push({
-    name: 'members-page-shows-active-help-signin-only',
-    screenshotPath: await screenshot(adminPage, 'members-page-shows-active-help-signin-only'),
-    observed: membersPage,
+    name: 'admin-can-open-invite-page',
+    screenshotPath: await screenshot(adminPage, 'admin-can-open-invite-page'),
+    observed: inviteStart,
     checks: {
-      noHorizontalScroll: membersPage.noHorizontalScroll,
-      activeHelpSigninLink: membersPage.hrefs.includes(
-        `/c/${primaryCommunityId}/admin/members/${memberMembershipId}/help-signin`,
-      ),
-      removedMemberHidden: !membersPage.text.includes('RFC024 Removed Member'),
-      noRemovedHelpSigninLink: !membersPage.hrefs.includes(
-        `/c/${primaryCommunityId}/admin/members/${removedMembershipId}/help-signin`,
-      ),
+      noHorizontalScroll: inviteStart.noHorizontalScroll,
+      onInvitePage: inviteStart.path === `/c/${communityId}/admin/invites`,
+      hasGenerateForm: inviteStart.values._token?.length > 0,
+      generateCopyVisible: inviteStart.text.includes('コードを生成'),
     },
   });
 
-  logStep('checking help-signin confirmation copy at 200% text');
-  await navigate(
-    adminPage,
-    `/c/${primaryCommunityId}/admin/members/${memberMembershipId}/help-signin`,
-    { textScale: 2 },
+  logStep('generating invite code');
+  await submitFormByAction(adminPage, `/c/${communityId}/admin/invites`);
+  const inviteGenerated = await collect(adminPage);
+  const inviteCode = await inviteCodeFromLocation(adminPage);
+  const generatedRows = latestInviteRows();
+  results.push({
+    name: 'admin-generated-invite-is-stored-and-shown-once',
+    screenshotPath: await screenshot(adminPage, 'admin-generated-invite-is-stored-and-shown-once'),
+    observed: {
+      ...inviteGenerated,
+      codeLength: inviteCode.length,
+      inviteRows: generatedRows.map((row) => ({
+        id: row.id,
+        community_id: row.community_id,
+        grants_role: row.grants_role,
+        used_at: row.used_at,
+        revoked_at: row.revoked_at,
+        expires_at: row.expires_at,
+      })),
+    },
+    checks: {
+      noHorizontalScroll: inviteGenerated.noHorizontalScroll,
+      codeLooksPresent: /^[A-Z2-9]{6}$/.test(inviteCode),
+      storedOneInvite: generatedRows.length === 1,
+      storedForCommunity: generatedRows[0]?.community_id === communityId,
+      storedAsMemberInvite: generatedRows[0]?.grants_role === 'member',
+      storedUnused: generatedRows[0]?.used_at == null,
+      storedUnrevoked: generatedRows[0]?.revoked_at == null,
+    },
+  });
+
+  logStep('redeeming invite in a fresh browser context');
+  const freshPage = await newPage();
+  await navigate(freshPage, `/c/${communityId}/home`, { textScale: 2 });
+  const sessionExpired = await collect(freshPage);
+  results.push({
+    name: 'session-expired-page-links-sign-in-again-flow',
+    screenshotPath: await screenshot(freshPage, 'session-expired-page-links-sign-in-again-flow'),
+    observed: sessionExpired,
+    checks: {
+      noHorizontalScroll: sessionExpired.noHorizontalScroll,
+      sessionExpiredCopyVisible: sessionExpired.text.includes('もう一度入る必要があります'),
+      relinkLinkVisible: sessionExpired.hrefs.includes('/relink'),
+      joinLinkVisible: sessionExpired.hrefs.includes('/join'),
+    },
+  });
+  await navigate(freshPage, '/join', { textScale: 2 });
+  const joinStart = await collect(freshPage);
+  results.push({
+    name: 'join-page-links-sign-in-again-flow',
+    screenshotPath: await screenshot(freshPage, 'join-page-links-sign-in-again-flow'),
+    observed: joinStart,
+    checks: {
+      noHorizontalScroll: joinStart.noHorizontalScroll,
+      onJoinPage: joinStart.path === '/join',
+      relinkHintVisible: joinStart.text.includes('サインインし直すためのコード'),
+      relinkLinkVisible: joinStart.hrefs.includes('/relink'),
+    },
+  });
+  await fillAndSubmitJoin(freshPage, inviteCode);
+  const profilePage = await collect(freshPage);
+  results.push({
+    name: 'fresh-context-invite-opens-profile-step',
+    screenshotPath: await screenshot(freshPage, 'fresh-context-invite-opens-profile-step'),
+    observed: profilePage,
+    checks: {
+      noHorizontalScroll: profilePage.noHorizontalScroll,
+      onProfileStep: profilePage.path === '/join/profile',
+      hasProfileToken: profilePage.values._token?.length > 0,
+      noInviteError: !profilePage.text.includes('招待コードはコミュニティの管理者にお問い合わせください'),
+    },
+  });
+
+  logStep('completing join profile');
+  await fillAndSubmitProfile(freshPage, newMemberDisplayName);
+  const joinedHome = await collect(freshPage);
+  const redeemedRows = latestInviteRows();
+  const joinedMembershipRows = query(
+    `SELECT id, community_id, role, display_name, removed_at FROM community_memberships WHERE community_id='${communityId}' AND display_name='${esc(newMemberDisplayName)}'`,
   );
-  const confirmPage = await collect(adminPage);
   results.push({
-    name: 'help-signin-confirmation-copy-fits-at-200-percent',
-    screenshotPath: await screenshot(adminPage, 'help-signin-confirmation-copy-fits-at-200-percent'),
-    observed: confirmPage,
+    name: 'fresh-context-completes-profile-and-lands-signed-in',
+    screenshotPath: await screenshot(freshPage, 'fresh-context-completes-profile-and-lands-signed-in'),
+    observed: {
+      ...joinedHome,
+      inviteRows: redeemedRows.map((row) => ({
+        id: row.id,
+        community_id: row.community_id,
+        grants_role: row.grants_role,
+        used_at: row.used_at,
+        revoked_at: row.revoked_at,
+        expires_at: row.expires_at,
+      })),
+      joinedMembershipRows,
+    },
     checks: {
-      noHorizontalScroll: confirmPage.noHorizontalScroll,
-      titleVisible: confirmPage.text.includes('サインインし直すお手伝いをしますか'),
-      warnsAccess: confirmPage.text.includes('このメンバーとしてサインインできます'),
-      ttlVisible: confirmPage.text.includes('15分'),
-      oneUseVisible: confirmPage.text.includes('1回だけ'),
+      noHorizontalScroll: joinedHome.noHorizontalScroll,
+      landedInCommunity: joinedHome.path === `/c/${communityId}/home`,
+      communityVisible: joinedHome.text.includes('Invite Redemption Smoke Community'),
+      inviteMarkedUsed: Boolean(redeemedRows[0]?.used_at),
+      membershipCreated: joinedMembershipRows.length === 1,
+      membershipRoleMember: joinedMembershipRows[0]?.role === 'member',
+      membershipActive: joinedMembershipRows[0]?.removed_at == null,
     },
   });
 
-  logStep('creating help-signin code');
-  await submitFormByAction(
-    adminPage,
-    `/c/${primaryCommunityId}/admin/members/${memberMembershipId}/help-signin`,
-  );
-  const codePage = await collect(adminPage);
-  const code = await codeFromPage(adminPage);
-  results.push({
-    name: 'help-signin-code-shown-once',
-    screenshotPath: await screenshot(adminPage, 'help-signin-code-shown-once'),
-    observed: { ...codePage, codeLength: code.length },
-    checks: {
-      noHorizontalScroll: codePage.noHorizontalScroll,
-      codeLooksPresent: /^[A-F0-9]{16}$/.test(code),
-      oneTimeHintVisible: codePage.text.includes('一度だけ表示されます'),
-      relinkHintVisible: codePage.text.includes('サインインし直す画面')
-        && codePage.text.includes('招待コード欄では使えません'),
-      relinkLinkVisible: codePage.hrefs.includes('/relink'),
-      copyButtonVisible: codePage.text.includes('コードをコピー'),
-      copyStatusStartsEmpty: !codePage.text.includes('コピーしました')
-        && !codePage.text.includes('コピーできませんでした'),
-    },
-  });
-
-  logStep('redeeming code in a fresh browser context');
-  const freshMemberPage = await newPage();
-  await navigate(freshMemberPage, '/relink', { textScale: 2 });
-  await fillAndSubmitRelink(freshMemberPage, code);
-  const redeemedPage = await collect(freshMemberPage);
-  results.push({
-    name: 'fresh-context-redeems-code-and-lands-signed-in',
-    screenshotPath: await screenshot(freshMemberPage, 'fresh-context-redeems-code-and-lands-signed-in'),
-    observed: redeemedPage,
-    checks: {
-      noHorizontalScroll: redeemedPage.noHorizontalScroll,
-      landedInPrimaryCommunity: redeemedPage.path === `/c/${primaryCommunityId}/home`,
-      signedInAsMember: redeemedPage.text.includes('RFC024 Primary Community'),
-      notOnRelinkPage: !redeemedPage.path.startsWith('/relink'),
-    },
-  });
-
-  logStep('checking reused code gives generic error');
+  logStep('checking reused invite code fails generically');
   const reusePage = await newPage();
-  await navigate(reusePage, '/relink', { textScale: 2 });
-  await fillAndSubmitRelink(reusePage, code);
-  const reusedPage = await collect(reusePage);
+  await navigate(reusePage, '/join', { textScale: 2 });
+  await fillAndSubmitJoin(reusePage, inviteCode);
+  const reusedJoin = await collect(reusePage);
   results.push({
-    name: 'reused-code-shows-generic-error',
-    screenshotPath: await screenshot(reusePage, 'reused-code-shows-generic-error'),
-    observed: reusedPage,
+    name: 'reused-invite-shows-generic-join-error',
+    screenshotPath: await screenshot(reusePage, 'reused-invite-shows-generic-join-error'),
+    observed: reusedJoin,
     checks: {
-      noHorizontalScroll: reusedPage.noHorizontalScroll,
-      stillOnRelink: reusedPage.path === '/relink',
-      genericError: reusedPage.text.includes('このコードは無効か、有効期限が切れています'),
-      noSpecificReason: !/使用済み|期限切れ|別のコミュニティ|used|expired|community/i.test(
-        reusedPage.text,
-      ),
-    },
-  });
-
-  logStep('checking relinked session does not grant another community');
-  await navigate(freshMemberPage, `/c/${otherCommunityId}/home`, { textScale: 2 });
-  const otherCommunityDenied = await collect(freshMemberPage);
-  results.push({
-    name: 'relinked-session-does-not-authorize-other-community',
-    screenshotPath: await screenshot(
-      freshMemberPage,
-      'relinked-session-does-not-authorize-other-community',
-    ),
-    observed: otherCommunityDenied,
-    checks: {
-      noHorizontalScroll: otherCommunityDenied.noHorizontalScroll,
-      notOtherHome: otherCommunityDenied.path !== `/c/${otherCommunityId}/home`
-        || !otherCommunityDenied.text.includes('RFC024 Other Community'),
-      genericDenial: !otherCommunityDenied.text.includes('RFC024 Other Community'),
-      recoverableDenial: otherCommunityDenied.hrefs.includes('/join')
-        && (otherCommunityDenied.hrefs.includes('/') || otherCommunityDenied.hrefs.includes('/relink')),
-      notInternalErrorCopy: !otherCommunityDenied.text.includes('問題が発生しました'),
+      noHorizontalScroll: reusedJoin.noHorizontalScroll,
+      stillOnJoin: reusedJoin.path === '/join',
+      genericError: reusedJoin.text.includes('招待コードはコミュニティの管理者にお問い合わせください'),
+      notProfileStep: reusedJoin.path !== '/join/profile',
     },
   });
 
   adminPage.close();
-  freshMemberPage.close();
+  freshPage.close();
   reusePage.close();
 
   for (const result of results) {
@@ -527,7 +574,7 @@ try {
     baseUrl,
     userDataDir,
     flags,
-    note: 'Chromium launched with --incognito and without --no-sandbox. Local wrangler dev only.',
+    note: 'Chromium launched with --incognito and without --no-sandbox. Local wrangler dev only. Plain invite code is not stored in the report.',
     localOnlyGuard: true,
     results,
     passed: results.every((result) => result.passed),
@@ -552,11 +599,11 @@ try {
   if (!report.passed) process.exitCode = 1;
 } catch (error) {
   if (devStderr.trim()) {
-    console.error('[help-signin-smoke] wrangler stderr follows:');
+    console.error('[invite-redemption-smoke] wrangler stderr follows:');
     console.error(devStderr.trim());
   }
   if (chromeStderr.trim()) {
-    console.error('[help-signin-smoke] chromium stderr follows:');
+    console.error('[invite-redemption-smoke] chromium stderr follows:');
     console.error(chromeStderr.trim());
   }
   throw error;

@@ -30,16 +30,17 @@ pub async fn get_join(req: Request, env: &Env, _rid: &str) -> Result<Response> {
 
 // ── POST /join ────────────────────────────────────────────────────────────
 
-pub async fn post_join(mut req: Request, env: &Env, _rid: &str) -> Result<Response> {
+pub async fn post_join(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
     let body = req.form_data().await?;
     let raw_code = body.get_field("code").unwrap_or_default();
     let raw_token = body.get_field("_token").unwrap_or_default();
 
     if validate_invite_input(&raw_code).is_err() {
+        worker::console_log!("[{}] join invite rejected: reason=format", rid);
         return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
     }
 
-    legacy_post_join(req, env, raw_code, raw_token).await
+    legacy_post_join(req, env, rid, raw_code, raw_token).await
 }
 
 // ── GET /join/profile ──────────────────────────────────────────────────────
@@ -74,12 +75,14 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
 async fn legacy_post_join(
     req: Request,
     env: &Env,
+    rid: &str,
     raw_code: String,
     raw_token: String,
 ) -> Result<Response> {
     use zinnias_ciao_contracts::auth::token_purpose;
     let client_ip = crate::rate_limit::client_ip(&req);
     if crate::rate_limit::is_rate_limited(env, &client_ip).await {
+        worker::console_log!("[{}] join invite rejected: reason=rate_limited", rid);
         return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
     }
     let pepper = crate::crypto::pepper(env);
@@ -98,6 +101,7 @@ async fn legacy_post_join(
     let invite = crate::db::invite::find_valid(&db, &code_hmac).await?;
     if invite.is_none() {
         crate::rate_limit::record_failure(env, &client_ip).await;
+        worker::console_log!("[{}] join invite rejected: reason=no_valid_invite", rid);
         return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
     }
     let invite = invite.unwrap();
@@ -269,6 +273,9 @@ fn render_join_form(token: &str, error: Option<&str>) -> Result<Response> {
                    font-size:1rem;font-weight:600;cursor:pointer\">{submit}</button>\
          </form>\
          <p style=\"margin-top:1.5rem;color:#6e6e73;font-size:.8125rem\">{hint}</p>\
+         <p style=\"margin-top:.75rem;color:#6e6e73;font-size:.8125rem\">\
+           {relink_hint} <a href=\"/relink\" style=\"color:#007AFF;text-decoration:none\">\
+           {relink_link}</a></p>\
          </main>",
         heading = i18n::JA_JOIN_HEADING,
         sub = i18n::JA_JOIN_SUBHEADING,
@@ -276,6 +283,8 @@ fn render_join_form(token: &str, error: Option<&str>) -> Result<Response> {
         token = escape_html(token),
         submit = i18n::JA_JOIN_SUBMIT,
         hint = i18n::JA_JOIN_CODE_HINT,
+        relink_hint = i18n::JA_JOIN_RELINK_HINT,
+        relink_link = i18n::JA_JOIN_RELINK_LINK,
     );
     render::page(i18n::JA_JOIN_PAGE_TITLE, &body)
 }

@@ -91,6 +91,54 @@ document.querySelectorAll('form[action="/logout"]').forEach(function(form) {
   });
 });
 
+// ── One-time code copy button ─────────────────────────────────────────────
+// Help-signin codes remain visible and manually selectable without JS. This
+// enhancement only adds a convenience button after the one-time code is shown.
+function fallbackCopyText(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '-1000px';
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch (_) {
+    ok = false;
+  }
+  ta.remove();
+  return ok;
+}
+
+document.querySelectorAll('[data-copy-code-button]').forEach(function(button) {
+  var container = button.closest('div');
+  var codeNode = container && container.querySelector('[data-copy-code-value]');
+  var status = container && container.querySelector('[data-copy-code-status]');
+  if (!codeNode) return;
+  button.hidden = false;
+  button.addEventListener('click', async function() {
+    var text = (codeNode.textContent || '').trim();
+    var copied = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      }
+    } catch (_) {
+      copied = false;
+    }
+    if (!copied) copied = fallbackCopyText(text);
+    if (status) {
+      status.textContent = copied
+        ? button.dataset.copySuccess || ''
+        : button.dataset.copyError || '';
+      status.style.color = copied ? '#167A34' : '#B42318';
+    }
+  });
+});
+
 // ── Monthly attendance matrix CSV export (RFC-068) ───────────────────────
 // Admin-only enhancement. The rendered HTML is the data source; the server
 // receives only a metadata audit request before the browser creates the file.

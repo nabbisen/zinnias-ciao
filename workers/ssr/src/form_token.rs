@@ -14,6 +14,11 @@ use zinnias_ciao_contracts::FORM_TOKEN_TTL_SECONDS;
 use crate::crypto::{hmac_hex, random_token};
 use crate::db::{add_seconds_to_now, now_utc};
 
+pub enum ConsumeResult {
+    Proceed,
+    Replay(Option<String>),
+}
+
 /// Issue a new form token, insert it into `form_tokens`, and return
 /// the raw secret (to be embedded in the rendered form as a hidden field).
 pub async fn issue(
@@ -53,8 +58,7 @@ pub async fn issue(
 /// - Checks the token has not expired.
 /// - Checks (if provided) that `bound_resource` matches.
 /// - On success, marks `consumed_at` atomically.
-/// - A previously consumed token returns `Err(TokenConsumed)` — the caller
-///   should return the prior result ref if available (idempotency).
+/// - A previously consumed token returns the prior result ref if available.
 pub async fn consume(
     db: &D1Database,
     pepper: &str,
@@ -63,6 +67,22 @@ pub async fn consume(
     raw_token: &str,
     bound_resource: Option<&str>,
 ) -> Result<Option<String>> {
+    match consume_detailed(db, pepper, user_id, purpose, raw_token, bound_resource).await? {
+        ConsumeResult::Proceed => Ok(None),
+        ConsumeResult::Replay(result_ref) => Ok(result_ref),
+    }
+}
+
+/// Detailed consume outcome for handlers that must distinguish a first consume
+/// from a replay whose result_ref is still absent.
+pub async fn consume_detailed(
+    db: &D1Database,
+    pepper: &str,
+    user_id: &str,
+    purpose: &str,
+    raw_token: &str,
+    bound_resource: Option<&str>,
+) -> Result<ConsumeResult> {
     // Returns the prior result_ref if already consumed (idempotent replay).
     let now = now_utc();
     let token_hmac = hmac_hex(pepper, raw_token);
@@ -103,7 +123,7 @@ pub async fn consume(
     // Fast path: won the atomic race.
     use zinnias_ciao_contracts::auth::{TokenConsumeOutcome, classify_token_consume};
     if changed == 1 {
-        return Ok(None);
+        return Ok(ConsumeResult::Proceed);
     }
 
     // changed == 0: classify why via a follow-up SELECT (no race-sensitive write).
@@ -141,13 +161,13 @@ pub async fn consume(
     };
 
     match classify_token_consume(changed, found, already_consumed, binding_ok) {
-        TokenConsumeOutcome::Proceed => Ok(None), // unreachable for changed==0, but safe
+        TokenConsumeOutcome::Proceed => Ok(ConsumeResult::Proceed), // unreachable for changed==0
         TokenConsumeOutcome::Replay => {
             let result_ref = row
                 .as_ref()
                 .and_then(|r| r.get("result_ref").and_then(|v| v.as_str()))
                 .map(|s| s.to_owned());
-            Ok(result_ref)
+            Ok(ConsumeResult::Replay(result_ref))
         }
         TokenConsumeOutcome::Invalid => Err(invalid()),
     }

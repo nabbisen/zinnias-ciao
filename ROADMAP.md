@@ -32,29 +32,42 @@ The active proposed backlog is:
 | 045 | Pre-pilot runtime verification matrix | Runtime evidence and operator verification candidate. |
 | 050 | Staging runtime verification evidence pack | Prototype exists; full evidence workflow remains. |
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
+| 070 | Self display name editing | Member-facing profile maintenance candidate. |
+| 071 | Application threat model and form security baseline | Consolidate security reasoning before more form-heavy workflows. |
 
 ## Near-Term Candidates
 
 Recommended next candidates, in practical order:
 
-1. **RFC-054: Japanese UX Copy Review**
+1. **RFC-070: Self Display Name Editing**
+   Small member-facing profile maintenance feature. It lets active members fix
+   their own community-scoped display name without admin/operator D1 repair or
+   re-invite workarounds.
+
+2. **RFC-071: Application Threat Model and Form Security Baseline**
+   Security controls exist across requirements, RFCs, release gates, and
+   operations docs. This should consolidate assets, actors, trust boundaries,
+   threats, controls, evidence, and form-review expectations before the project
+   adds more form-heavy workflows.
+
+3. **RFC-054: Japanese UX Copy Review**
    Recent releases added sensitive recovery and member-management flows. Copy
    quality is part of usability and safety, but the full native-speaker copy
    review should wait until the user-facing surface is more stable.
 
-2. **RFC-021 and RFC-034: Notifications and Quiet Mode**
+4. **RFC-021 and RFC-034: Notifications and Quiet Mode**
    These should be designed together to avoid adding reminders without a clear
    attention and opt-out policy.
 
-3. **RFC-031: Consentful Contact Channels**
+5. **RFC-031: Consentful Contact Channels**
    Useful after notification policy is clear. This should remain privacy-first
    and consent-bound.
 
-4. **RFC-033: Subgroups and Event Visibility**
+6. **RFC-033: Subgroups and Event Visibility**
    Large feature area touching authorization, event visibility, and community
    boundaries. It should start with design review, not direct implementation.
 
-5. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
+7. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
    These are good candidates when the project priority shifts from product
    workflow to deployment confidence and Cloudflare-hosted evidence.
 
@@ -70,6 +83,7 @@ service.
 - [ ] Configure required KV/D1 bindings per environment.
 - [ ] Configure `SESSION_COOKIE_DOMAIN` as a non-secret variable only when a shared cookie domain is required.
 - [ ] Configure Logpush for production if production audit retention requires it.
+- [ ] Consolidate and review the application threat model and form-security baseline.
 - [ ] Run security review against the release checklist.
 
 ### Browser and Device QA

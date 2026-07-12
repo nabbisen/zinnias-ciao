@@ -46,6 +46,11 @@ pub const EN_ADMIN_HELP_SIGNIN_CONSEQUENCE: &str = "This code lets someone sign 
 pub const EN_ADMIN_HELP_SIGNIN_CREATE: &str = "Create code";
 pub const EN_ADMIN_HELP_SIGNIN_CODE_HINT: &str =
     "Share this code only with the intended member. It is shown once.";
+pub const EN_ADMIN_HELP_SIGNIN_RELINK_HINT: &str = "Open the sign-in-again page in the other browser and enter this code. It is not an invite code.";
+pub const EN_ADMIN_HELP_SIGNIN_RELINK_LINK: &str = "Open sign-in-again page";
+pub const EN_ADMIN_HELP_SIGNIN_COPY_CODE: &str = "Copy code";
+pub const EN_ADMIN_HELP_SIGNIN_COPY_DONE: &str = "Copied";
+pub const EN_ADMIN_HELP_SIGNIN_COPY_FAILED: &str = "Could not copy";
 
 pub const JA_ADMIN_MEMBERS_TITLE: &str = "メンバー";
 pub const JA_ADMIN_MEMBERS_GENERATE_INVITE: &str = "招待コードを生成";
@@ -71,3 +76,8 @@ pub const JA_ADMIN_HELP_SIGNIN_CONSEQUENCE: &str = "このコードを使うと�
 pub const JA_ADMIN_HELP_SIGNIN_CREATE: &str = "コードを作成";
 pub const JA_ADMIN_HELP_SIGNIN_CODE_HINT: &str =
     "このコードは本人にだけ渡してください。ここで一度だけ表示されます。";
+pub const JA_ADMIN_HELP_SIGNIN_RELINK_HINT: &str = "別のブラウザでサインインし直す画面を開き、このコードを入力してください。招待コード欄では使えません。";
+pub const JA_ADMIN_HELP_SIGNIN_RELINK_LINK: &str = "サインインし直す画面を開く";
+pub const JA_ADMIN_HELP_SIGNIN_COPY_CODE: &str = "コードをコピー";
+pub const JA_ADMIN_HELP_SIGNIN_COPY_DONE: &str = "コピーしました";
+pub const JA_ADMIN_HELP_SIGNIN_COPY_FAILED: &str = "コピーできませんでした";

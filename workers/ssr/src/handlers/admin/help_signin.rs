@@ -174,8 +174,18 @@ pub async fn post_help_signin(
          <div style=\"background:#edfaf0;border:1px solid #34C759;border-radius:12px;\
              padding:1rem;margin:1rem 0\">\
            <div style=\"font-size:1.5rem;font-weight:700;letter-spacing:.16em;color:#1D1D1F;\
-             overflow-wrap:anywhere\" aria-label=\"{code_label}\">{code}</div>\
+             overflow-wrap:anywhere\" aria-label=\"{code_label}\" data-copy-code-value=\"true\">{code}</div>\
+           <button type=\"button\" data-copy-code-button=\"true\" hidden \
+             data-copy-success=\"{copy_done}\" data-copy-error=\"{copy_failed}\" \
+             style=\"margin-top:.75rem;padding:.625rem .875rem;background:#fff;color:#007AFF;\
+             border:1px solid #007AFF;border-radius:8px;font-size:.9375rem;font-weight:600;\
+             min-height:44px;cursor:pointer\">{copy_code}</button>\
+           <span data-copy-code-status=\"true\" aria-live=\"polite\" \
+             style=\"display:block;margin-top:.5rem;font-size:.8125rem;color:#167A34\"></span>\
          </div>\
+         <p style=\"font-size:.9375rem;color:#6e6e73;margin:0 0 .75rem\">{relink_hint}</p>\
+         <p><a href=\"/relink\" target=\"_blank\" rel=\"noopener\" \
+           style=\"color:#007AFF;text-decoration:none\">{relink_link}</a></p>\
          <p><a href=\"/c/{cid}/admin/members\" \
            style=\"color:#007AFF;text-decoration:none\">{back}</a></p>\
          </main>{nav}",
@@ -189,6 +199,11 @@ pub async fn post_help_signin(
         hint = i18n::JA_ADMIN_HELP_SIGNIN_CODE_HINT,
         code_label = i18n::JA_RELINK_CODE_LABEL,
         code = render::escape_html(&code),
+        copy_code = i18n::JA_ADMIN_HELP_SIGNIN_COPY_CODE,
+        copy_done = i18n::JA_ADMIN_HELP_SIGNIN_COPY_DONE,
+        copy_failed = i18n::JA_ADMIN_HELP_SIGNIN_COPY_FAILED,
+        relink_hint = i18n::JA_ADMIN_HELP_SIGNIN_RELINK_HINT,
+        relink_link = i18n::JA_ADMIN_HELP_SIGNIN_RELINK_LINK,
         cid = render::escape_html(community_id),
         back = i18n::JA_ADMIN_INVITES_BACK_TO_MEMBERS,
         nav = nav,

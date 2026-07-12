@@ -1,10 +1,10 @@
 // ── Session / auth ────────────────────────────────────────────────────────
 pub const EN_SESSION_EXPIRED: &str =
-    "Your session expired. Please ask your community admin for a new invite code.";
+    "Your session expired. Use an invite code or a sign-in-again code from your community admin.";
 pub const EN_LOGOUT: &str = "Log out";
 pub const EN_LOGOUT_CONFIRM: &str = "Log out?";
 
-pub const JA_SESSION_EXPIRED: &str = "もう一度、招待コードを入力してください。招待コードがない場合は、コミュニティの管理者にお問い合わせください。";
+pub const JA_SESSION_EXPIRED: &str = "時間がたったため、もう一度入る必要があります。管理者から受け取った招待コード、またはサインインし直すためのコードを使ってください。";
 pub const JA_LOGOUT: &str = "ログアウト";
 pub const JA_LOGOUT_CONFIRM: &str = "ログアウトしますか？";
 

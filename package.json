@@ -19,6 +19,8 @@
     "smoke:runtime": "node scripts/runtime-smoke.mjs",
     "smoke:recurrence": "node scripts/smoke/recurrence-v2.mjs",
     "smoke:event-copy": "node scripts/smoke/event-copy.mjs",
+    "smoke:invite": "node scripts/smoke/invite-redemption.mjs",
+    "smoke:display-name": "node scripts/smoke/self-display-name-editing.mjs",
     "smoke:matrix": "node scripts/smoke/monthly-attendance-matrix.mjs",
     "smoke:matrix-csv": "node scripts/smoke/calendar-matrix-csv-export.mjs"
   },

@@ -107,6 +107,13 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 050 | [Staging Runtime Verification Evidence Pack](./proposed/050-staging-runtime-verification-evidence-pack.md) | Runtime evidence collector prototype added in v0.47.0; full Cloudflare evidence pending |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
 
+## Proposed — profile and security baseline (070–071)
+
+| ID | Title | File | Note |
+|----|-------|------|------|
+| 070 | [Self Display Name Editing](./proposed/070-self-display-name-editing.md) | Community-scoped self-service display-name update for active members |
+| 071 | [Application Threat Model and Form Security Baseline](./proposed/071-application-threat-model-and-form-security-baseline.md) | Consolidated threat model and reusable form-security review baseline |
+
 ## Archive
 
 _None._

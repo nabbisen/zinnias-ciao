@@ -80,12 +80,21 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             Ok(resp)
         }
         Err(e) => {
+            if is_not_found_error(&e) {
+                let mut resp = render::not_found()?;
+                attach_security_headers(&mut resp, &request_id)?;
+                return Ok(resp);
+            }
             console_error!("[{}] unhandled error: {:?}", request_id, e);
             let mut resp = render::internal_error()?;
             attach_security_headers(&mut resp, &request_id)?;
             Ok(resp)
         }
     }
+}
+
+fn is_not_found_error(e: &Error) -> bool {
+    matches!(e, Error::RustError(message) if message == "Not found.")
 }
 
 fn generate_request_id() -> String {

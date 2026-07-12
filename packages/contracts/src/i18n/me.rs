@@ -1,10 +1,22 @@
 // ── Me / profile ──────────────────────────────────────────────────────────
 pub const EN_ME_SECTION_NAME: &str = "Name";
+pub const EN_ME_CHANGE_DISPLAY_NAME: &str = "Change display name";
+pub const EN_ME_DISPLAY_NAME_EDIT_TITLE: &str = "Change display name";
+pub const EN_ME_DISPLAY_NAME_EDIT_SUBMIT: &str = "Save display name";
+pub const EN_ME_DISPLAY_NAME_EDIT_CANCEL: &str = "Cancel";
+pub const EN_ME_DISPLAY_NAME_UPDATED: &str = "Display name updated.";
+pub const EN_ME_DISPLAY_NAME_ERROR: &str = "Enter a display name.";
 pub const EN_ME_SECTION_COMMUNITY: &str = "Current community";
 pub const EN_ME_SECTION_HELP: &str = "Help";
 pub const EN_ME_HELP_BODY: &str = "Ask your community admin if you cannot enter or lost access.";
 
 pub const JA_ME_SECTION_NAME: &str = "名前";
+pub const JA_ME_CHANGE_DISPLAY_NAME: &str = "表示名を変更";
+pub const JA_ME_DISPLAY_NAME_EDIT_TITLE: &str = "表示名を変更";
+pub const JA_ME_DISPLAY_NAME_EDIT_SUBMIT: &str = "表示名を保存";
+pub const JA_ME_DISPLAY_NAME_EDIT_CANCEL: &str = "やめる";
+pub const JA_ME_DISPLAY_NAME_UPDATED: &str = "表示名を変更しました。";
+pub const JA_ME_DISPLAY_NAME_ERROR: &str = "表示名を入力してください。";
 pub const JA_ME_SECTION_COMMUNITY: &str = "現在のコミュニティ";
 pub const JA_ME_SECTION_HELP: &str = "ヘルプ";
 pub const JA_ME_HELP_BODY: &str =

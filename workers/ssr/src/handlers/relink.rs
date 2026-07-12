@@ -30,6 +30,7 @@ pub async fn get_relink(req: Request, env: &Env, _rid: &str) -> Result<Response>
 pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
     let client_ip = crate::rate_limit::client_ip(&req);
     if crate::rate_limit::is_relink_rate_limited(env, &client_ip).await {
+        worker::console_log!("[{}] relink rejected: reason=rate_limited", rid);
         return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
     }
 
@@ -49,6 +50,7 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
     )
     .await?;
     if replay.is_some() {
+        worker::console_log!("[{}] relink rejected: reason=form_replay", rid);
         return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
     }
 
@@ -56,11 +58,13 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
     let code_hmac = hmac_hex(&pepper, &normalized);
     let Some(target) = relink_db::find_valid_by_hmac(&db, &code_hmac).await? else {
         crate::rate_limit::record_relink_failure(env, &client_ip).await;
+        worker::console_log!("[{}] relink rejected: reason=no_valid_relink", rid);
         return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
     };
 
     if !relink_db::mark_used(&db, &target.id).await? {
         crate::rate_limit::record_relink_failure(env, &client_ip).await;
+        worker::console_log!("[{}] relink rejected: reason=mark_used_lost", rid);
         return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
     }
 

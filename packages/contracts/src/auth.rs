@@ -46,6 +46,7 @@ pub mod token_purpose {
     pub const JOIN_PROFILE: &str = "join_profile";
     pub const LOGOUT: &str = "logout";
     pub const CREATE_COMMUNITY: &str = "create_community";
+    pub const CHANGE_DISPLAY_NAME: &str = "change_display_name";
 }
 
 /// Outcome of attempting to consume a single-use form token.
