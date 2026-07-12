@@ -34,6 +34,7 @@ The active proposed backlog is:
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
 | 070 | Self display name editing | Member-facing profile maintenance candidate. |
 | 071 | Application threat model and form security baseline | Consolidate security reasoning before more form-heavy workflows. |
+| 072 | Member language preference and runtime localization | User-settings design for selectable EN/JA UI language. |
 
 ## Near-Term Candidates
 
@@ -70,6 +71,12 @@ Recommended next candidates, in practical order:
 7. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
    These are good candidates when the project priority shifts from product
    workflow to deployment confidence and Cloudflare-hosted evidence.
+
+8. **RFC-072: Member Language Preference and Runtime Localization**
+   The i18n scaffold exists, but runtime UI language selection does not. This
+   should start with design review around membership-vs-user scope, locale
+   precedence, settings UX, `html lang`, and tests before schema or handler
+   work.
 
 ## Before First Pilot Deployment
 
