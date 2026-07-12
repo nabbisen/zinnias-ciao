@@ -6,6 +6,8 @@ This section is for people changing the codebase.
   tests, and wasm type-checking.
 - [Architecture](architecture.md) describes the workspace layout, data grain,
   security model, and test strategy.
+- [Application Threat Model](security-threat-model.md) maps assets, actors,
+  trust boundaries, controls, evidence, gaps, and the form-security baseline.
 
 Shared references useful during development:
 

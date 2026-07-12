@@ -5,6 +5,7 @@
 - [Developer](./developer/index.md)
   - [Quick Start](./developer/quick-start.md)
   - [Architecture](./developer/architecture.md)
+  - [Application Threat Model](./developer/security-threat-model.md)
 - [Maintainer](./maintainer/index.md)
   - [Operations](./maintainer/operations.md)
   - [Launch Runbook](./maintainer/launch-runbook.md)

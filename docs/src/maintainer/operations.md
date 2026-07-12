@@ -1,5 +1,10 @@
 # Operations
 
+Use this runbook together with the
+[Application Threat Model](../developer/security-threat-model.md), especially
+for staging exposure, production secret handling, D1/KV binding changes,
+operator-only recovery, and audit/log access.
+
 ## Health check
 
 ```sh

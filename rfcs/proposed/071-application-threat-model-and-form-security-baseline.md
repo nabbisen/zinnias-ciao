@@ -97,6 +97,8 @@ The document should be linked from:
 ```text
 docs/src/SUMMARY.md
 docs/src/developer/index.md
+docs/src/maintainer/index.md
+docs/src/maintainer/operations.md
 docs/src/tester/release-checklist.md
 ROADMAP.md
 ```
@@ -300,16 +302,31 @@ The developer document should use this chapter outline:
 The tester release checklist should link to the threat model and add a compact
 form-security review gate rather than duplicating the full model.
 
+Maintainer docs should link to the threat model as the operations-facing entry
+point for deployment/config leakage, staging exposure, D1/KV binding changes,
+secret handling, log access, audit retention, and operator-only recovery. A
+separate shorter maintainer copy is deferred unless operators find the developer
+document too hard to use.
+
 The roadmap should include threat-model maintenance before broad public pilot
 deployment.
+
+Future security-sensitive RFCs and every new or materially changed form must
+include a short threat-model impact note or explicitly cite the release
+checklist's form-security baseline gate. The note can be brief, but it should
+name the affected assets, actors, trust boundaries, controls, and evidence.
 
 ## Acceptance Criteria
 
 - Threat model document exists under `docs/src/developer/`.
 - `docs/src/SUMMARY.md` links the new document.
 - `docs/src/developer/index.md` links the new document.
+- Maintainer docs link to the new document as the operations-facing entry
+  point, or explicitly defer a maintainer summary.
 - `docs/src/tester/release-checklist.md` links the threat model and adds a
   form-security baseline gate.
+- The future-review hook for security-sensitive RFCs and new/changed forms is
+  documented.
 - `ROADMAP.md` includes RFC-071 as a near-term security hardening candidate.
 - `rfcs/README.md` indexes RFC-071.
 - The threat model maps assets, actors, trust boundaries, threats, controls,

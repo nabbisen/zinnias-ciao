@@ -11,6 +11,9 @@ preparing production or pilot launches.
   migration safety.
 - [Audit Policy](audit-policy.md) documents audit access, retention, metadata,
   and incident procedures.
+- [Application Threat Model](../developer/security-threat-model.md) maps the
+  security boundaries that affect operations, staging, production, recovery,
+  logging, secrets, D1, and KV.
 
 Shared material:
 

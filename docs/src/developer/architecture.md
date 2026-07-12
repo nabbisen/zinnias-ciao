@@ -105,6 +105,9 @@ The ≤200-char note is per `(event, membership)`, not per day.
 - **Resource enumeration**: 404 and 403 return identical user-facing messages.
 - **Rate limiting**: invite code failures counted in KV, hard-capped per IP window.
 
+For the durable security map and form-review baseline, see
+[Application Threat Model](security-threat-model.md).
+
 ## Test strategy
 
 ```

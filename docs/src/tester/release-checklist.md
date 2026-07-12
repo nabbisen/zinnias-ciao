@@ -4,6 +4,10 @@ Fill this for every release candidate before promoting to production.
 
 Legend: `[x]` = verified by code inspection or automated test · `[~]` = requires human QA pass · `[ ]` = not yet done
 
+Release review must check security-sensitive changes and every new or
+materially changed form against the
+[Application Threat Model](../developer/security-threat-model.md).
+
 ---
 
 ## Functional gates
@@ -42,6 +46,7 @@ Legend: `[x]` = verified by code inspection or automated test · `[~]` = require
 - [x] Community switcher admin-member targets require an active admin role in the destination community; member-only destinations fall back to Home. *(community.rs + release gate — RFC-061)*
 - [x] Script tag in note/title/name renders as text (not executed). *(render.rs escape_html used at every user-content insertion; test: escape_script_tag)*
 - [x] Private page cache cleared on logout. *(RFC-042: authenticated HTML is never cached; only static shell assets are stored. No private cache exists to clear — the property holds trivially. PURGE_PRIVATE is retained for defence-in-depth.)*
+- [~] New or materially changed forms were reviewed against the form-security baseline: POST repeats authorization, hidden fields are attacker-controlled, token purpose/resource binding is explicit, SQL writes are parameterized and scoped, render output is escaped, replay behavior is defined, audit metadata is minimal, no-JS behavior remains valid, and required evidence is identified. *(Application Threat Model - RFC-071)*
 
 ## Auth storage gates (v0.38.6)
 
