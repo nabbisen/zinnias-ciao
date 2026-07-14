@@ -126,6 +126,7 @@ _None._
 | ID | Title | File | Note |
 |----|-------|------|------|
 | 076 | [One-Time Invite Code Response Isolation](./proposed/076-one-time-invite-code-response-isolation.md) | Remove plaintext invite codes from redirect URLs; architecture review required before implementation |
+| 077 | [Fail-Closed HMAC Pepper Configuration](./proposed/077-fail-closed-hmac-pepper-configuration.md) | Remove the public fallback and enforce required-secret plus runtime `503` behavior; architecture review required before implementation |
 
 ## Proposed — profile, security baseline, settings, and UX hardening (070–075)
 

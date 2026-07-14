@@ -63,6 +63,7 @@ The active proposed backlog is:
 | 074 | Community switch route preservation | Design remains proposed; implementation is paused by the architect remediation hold. |
 | 075 | Render style system and inline style reduction | Design remains proposed; implementation is paused by the architect remediation hold. |
 | 076 | One-time invite code response isolation | B1 remediation design; Proposed pending architecture review and owner acceptance. |
+| 077 | Fail-closed HMAC pepper configuration | B2 remediation design; Proposed pending architecture review and owner acceptance. |
 
 ## Post-Hold Feature Candidates
 
