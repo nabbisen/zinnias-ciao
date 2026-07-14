@@ -65,6 +65,7 @@ The active proposed backlog is:
 | 076 | One-time invite code response isolation | B1 remediation design; Proposed pending architecture review and owner acceptance. |
 | 077 | Fail-closed HMAC pepper configuration | B2 remediation design; Proposed pending architecture review and owner acceptance. |
 | 078 | Fail-closed strongly consistent abuse controls | B3 remediation design; Proposed pending architecture review and owner acceptance. |
+| 079 | Atomic required audits and recursive metadata redaction | B5 remediation design; Proposed pending architecture review and owner acceptance. |
 
 ## Post-Hold Feature Candidates
 
