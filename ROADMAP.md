@@ -64,6 +64,7 @@ The active proposed backlog is:
 | 075 | Render style system and inline style reduction | Design remains proposed; implementation is paused by the architect remediation hold. |
 | 076 | One-time invite code response isolation | B1 remediation design; Proposed pending architecture review and owner acceptance. |
 | 077 | Fail-closed HMAC pepper configuration | B2 remediation design; Proposed pending architecture review and owner acceptance. |
+| 078 | Fail-closed strongly consistent abuse controls | B3 remediation design; Proposed pending architecture review and owner acceptance. |
 
 ## Post-Hold Feature Candidates
 
