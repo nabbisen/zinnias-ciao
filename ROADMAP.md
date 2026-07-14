@@ -35,6 +35,9 @@ The active proposed backlog is:
 | 070 | Self display name editing | Member-facing profile maintenance candidate. |
 | 071 | Application threat model and form security baseline | Consolidate security reasoning before more form-heavy workflows. |
 | 072 | Member language preference and runtime localization | User-settings design for selectable EN/JA UI language. |
+| 073 | Calendar events list and day detail UX | Split Calendar grid, Events list, and Attendance table into clearer views. |
+| 074 | Community switch route preservation | Keep users on equivalent page after community switch when safe. |
+| 075 | Render style system and inline style reduction | Reduce inline CSS maintenance risk through reusable classes. |
 
 ## Near-Term Candidates
 
@@ -77,6 +80,21 @@ Recommended next candidates, in practical order:
    should start with design review around membership-vs-user scope, locale
    precedence, settings UX, `html lang`, and tests before schema or handler
    work.
+
+9. **RFC-073: Calendar Events List and Day Detail UX**
+   The Calendar grid, monthly event list, and attendance matrix now carry
+   different user jobs. Split them into explicit tabs and make selected-day
+   detail appear under the calendar without sending users back to the top.
+
+10. **RFC-074: Community Switch Route Preservation**
+    Header switching should preserve the current page family where safe, such
+    as Calendar or My Page, and fall back only when the target community lacks
+    permission or no equivalent route exists.
+
+11. **RFC-075: Render Style System and Inline Style Reduction**
+    Inline styling across server-rendered Rust strings is now a maintenance
+    risk. Start with a reviewed CSS/class strategy and migrate by surface,
+    likely beginning with Calendar.
 
 ## Before First Pilot Deployment
 

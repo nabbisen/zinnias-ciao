@@ -107,13 +107,16 @@ Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-
 | 050 | [Staging Runtime Verification Evidence Pack](./proposed/050-staging-runtime-verification-evidence-pack.md) | Runtime evidence collector prototype added in v0.47.0; full Cloudflare evidence pending |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
 
-## Proposed — profile, security baseline, and settings (070–072)
+## Proposed — profile, security baseline, settings, and UX hardening (070–075)
 
 | ID | Title | File | Note |
 |----|-------|------|------|
 | 070 | [Self Display Name Editing](./proposed/070-self-display-name-editing.md) | Community-scoped self-service display-name update for active members |
 | 071 | [Application Threat Model and Form Security Baseline](./proposed/071-application-threat-model-and-form-security-baseline.md) | Consolidated threat model and reusable form-security review baseline |
 | 072 | [Member Language Preference and Runtime Localization](./proposed/072-member-language-preference-and-runtime-localization.md) | Controlled design for user-selectable EN/JA runtime UI language |
+| 073 | [Calendar Events List and Day Detail UX](./proposed/073-calendar-events-list-and-day-detail-ux.md) | Split Calendar grid, Events list, and Attendance table into distinct views |
+| 074 | [Community Switch Route Preservation](./proposed/074-community-switch-route-preservation.md) | Preserve current route family on community switch when safe |
+| 075 | [Render Style System and Inline Style Reduction](./proposed/075-render-style-system-and-inline-style-reduction.md) | Incremental CSS/class migration for server-rendered UI |
 
 ## Archive
 
