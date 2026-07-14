@@ -17,6 +17,28 @@ Calendar workflows, admin event-copy creation assistance, the monthly
 attendance matrix, admin-only matrix CSV export, contracts i18n boundary
 cleanup, and operator-only total community access recovery.
 
+## Architect Review Remediation Hold
+
+The 2026-07-14 architecture preparation review found production/pilot blockers
+in one-time invite-code handling, hosted secret configuration, abuse controls,
+and audit durability/redaction. Until those blockers are resolved and reviewed:
+
+- do not implement new product-feature breadth from the proposed RFC backlog,
+  including RFC-072 through RFC-075;
+- remediation design and implementation take priority over the candidate order
+  below;
+- RFC-050 hosted evidence work and RFC-054 Japanese copy review may continue,
+  because they close existing release evidence rather than add feature scope;
+- production, public-pilot, and first-real-community deployment remain No-Go;
+- controlled staging remains conditional on the architecture review's B1-B3
+  findings being fixed or explicitly risk-accepted for an isolated, short-lived
+  non-production environment.
+
+The next design work is the RFC lifecycle/approval clarification followed by
+focused remediation RFCs for secure invite-code presentation, fail-closed
+hosted security dependencies, and audit durability/redaction. Feature work
+resumes only after the remediation hold is explicitly lifted in this roadmap.
+
 ## Proposed Work
 
 The active proposed backlog is:
@@ -34,10 +56,10 @@ The active proposed backlog is:
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
 | 070 | Self display name editing | Member-facing profile maintenance candidate. |
 | 071 | Application threat model and form security baseline | Consolidate security reasoning before more form-heavy workflows. |
-| 072 | Member language preference and runtime localization | User-settings design for selectable EN/JA UI language. |
-| 073 | Calendar events list and day detail UX | Split Calendar grid, Events list, and Attendance table into clearer views. |
-| 074 | Community switch route preservation | Keep users on equivalent page after community switch when safe. |
-| 075 | Render style system and inline style reduction | Reduce inline CSS maintenance risk through reusable classes. |
+| 072 | Member language preference and runtime localization | Design remains proposed; implementation is paused by the architect remediation hold. |
+| 073 | Calendar events list and day detail UX | Design remains proposed; implementation is paused by the architect remediation hold. |
+| 074 | Community switch route preservation | Design remains proposed; implementation is paused by the architect remediation hold. |
+| 075 | Render style system and inline style reduction | Design remains proposed; implementation is paused by the architect remediation hold. |
 
 ## Near-Term Candidates
 
