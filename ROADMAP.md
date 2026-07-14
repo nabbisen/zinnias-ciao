@@ -62,10 +62,13 @@ The active proposed backlog is:
 | 073 | Calendar events list and day detail UX | Design remains proposed; implementation is paused by the architect remediation hold. |
 | 074 | Community switch route preservation | Design remains proposed; implementation is paused by the architect remediation hold. |
 | 075 | Render style system and inline style reduction | Design remains proposed; implementation is paused by the architect remediation hold. |
+| 076 | One-time invite code response isolation | B1 remediation design; Proposed pending architecture review and owner acceptance. |
 
-## Near-Term Candidates
+## Post-Hold Feature Candidates
 
-Recommended next candidates, in practical order:
+The feature candidates below are paused while the architect-review remediation
+hold is active. Their relative order is preserved for reconsideration after the
+hold is explicitly lifted; this list is not implementation authorization.
 
 1. **RFC-070: Self Display Name Editing**
    Small member-facing profile maintenance feature. It lets active members fix

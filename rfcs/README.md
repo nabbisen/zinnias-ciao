@@ -121,6 +121,12 @@ _None._
 | 050 | [Staging Runtime Verification Evidence Pack](./proposed/050-staging-runtime-verification-evidence-pack.md) | Runtime evidence collector prototype added in v0.47.0; full Cloudflare evidence pending |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
 
+## Proposed — architect-review remediation (076+)
+
+| ID | Title | File | Note |
+|----|-------|------|------|
+| 076 | [One-Time Invite Code Response Isolation](./proposed/076-one-time-invite-code-response-isolation.md) | Remove plaintext invite codes from redirect URLs; architecture review required before implementation |
+
 ## Proposed — profile, security baseline, settings, and UX hardening (070–075)
 
 | ID | Title | File | Note |
