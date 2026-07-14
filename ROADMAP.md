@@ -54,7 +54,7 @@ The active proposed backlog is:
 | 034 | Notification-free quiet mode and attention design | Should be considered with RFC-021. |
 | 044 | D1 query-budget gate and integration test harness | Runtime/integration hardening candidate. |
 | 045 | Pre-pilot runtime verification matrix | Runtime evidence and operator verification candidate. |
-| 050 | Staging runtime verification evidence pack | Prototype exists; full evidence workflow remains. |
+| 050 | Exact-candidate hosted staging evidence and pilot gate | B4 remediation revision; Proposed pending architecture review and owner acceptance. |
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
 | 070 | Self display name editing | Member-facing profile maintenance candidate. |
 | 071 | Application threat model and form security baseline | Consolidate security reasoning before more form-heavy workflows. |
