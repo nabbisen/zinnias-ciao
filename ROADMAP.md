@@ -7,6 +7,7 @@
 The RFC folder is the source of truth for implementation state:
 
 - Detailed RFC index: [rfcs/README.md](./rfcs/README.md)
+- Accepted RFCs: [rfcs/accepted/](./rfcs/accepted/)
 - Implemented RFCs: [rfcs/done/](./rfcs/done/)
 - Proposed RFCs: [rfcs/proposed/](./rfcs/proposed/)
 
@@ -34,10 +35,11 @@ and audit durability/redaction. Until those blockers are resolved and reviewed:
   findings being fixed or explicitly risk-accepted for an isolated, short-lived
   non-production environment.
 
-The next design work is the RFC lifecycle/approval clarification followed by
-focused remediation RFCs for secure invite-code presentation, fail-closed
-hosted security dependencies, and audit durability/redaction. Feature work
-resumes only after the remediation hold is explicitly lifted in this roadmap.
+The RFC lifecycle now separates Proposed design from Accepted implementation.
+The next design work is focused remediation RFCs for secure invite-code
+presentation, fail-closed hosted security dependencies, and audit
+durability/redaction. Feature work resumes only after the remediation hold is
+explicitly lifted in this roadmap.
 
 ## Proposed Work
 

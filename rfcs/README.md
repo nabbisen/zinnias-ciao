@@ -2,11 +2,19 @@
 
 Folder is the source of truth for state (see [RFC 000](./done/000-rfc-lifecycle-policy.md)). This index mirrors the folders.
 
+Lifecycle: `proposed/` is design under review; `accepted/` is reviewed and
+owner-approved for implementation; `done/` is shipped. Only Accepted RFCs
+authorize implementation.
+
 > **Implementation hold (2026-07-14):** The proposed feature backlog must not
 > move into implementation while the architecture preparation review's
 > production/pilot blockers remain open. Remediation RFC work, RFC-050 hosted
 > evidence, and RFC-054 Japanese copy review may continue. See
 > [ROADMAP.md](../ROADMAP.md#architect-review-remediation-hold).
+
+## Accepted — approved for implementation
+
+_None._
 
 ## Done — MVP core (001–019)
 

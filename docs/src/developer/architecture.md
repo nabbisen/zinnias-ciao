@@ -63,7 +63,8 @@ scripts/
 docs/src/                    mdbook documentation (SUMMARY.md is the index)
 rfcs/
   done/                      Implemented RFCs
-  proposed/                  Backlog RFCs (see ROADMAP.md)
+  accepted/                  Reviewed, owner-approved implementation queue
+  proposed/                  Design under review; implementation not authorized
   README.md                  RFC index
 ```
 

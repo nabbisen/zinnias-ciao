@@ -1,6 +1,9 @@
 # RFC 000 — RFC lifecycle policy
 
 **Status.** Implemented
+**Amended.** 2026-07-14 — project adopted the five-folder lifecycle with an
+explicit Accepted state because architecture approval and implementation are
+separate responsibilities.
 **Tracks.** Cross-cutting documentation policy. Not tied to any
 single feature; applies to the RFC directory itself.
 **Touches.** `rfcs/` folder structure, the index file at
@@ -78,6 +81,11 @@ are not RFCs and should not introduce a parallel status system.
 This policy gives them a small companion-document convention so
 they remain findable without becoming a second lifecycle.
 
+For ciao.zinnias, architecture/design review and implementation are now
+separate responsibilities. The project therefore uses the explicit
+**Accepted** state described below. An RFC in `proposed/` remains design work;
+only an RFC in `accepted/` authorizes implementation.
+
 ## Lifecycle states
 
 An RFC is in exactly one of the following states at any time:
@@ -86,29 +94,27 @@ An RFC is in exactly one of the following states at any time:
 |---|---|
 | **Draft** | The author is still writing. Not ready for review by anyone but the author and immediate collaborators. |
 | **Proposed** | Open for review and discussion. Implementer should *not* yet start work — the design may change. |
+| **Accepted** | Architecture/design review is complete and the project owner has approved implementation. The work may start but has not yet shipped. |
 | **Implemented** | The work has shipped (in a release, on `main`, or wherever the project's stability marker lives). The RFC is now a historical record. |
 | **Withdrawn** | The author or maintainer decided not to pursue this RFC. The work will not happen. |
 | **Superseded** | A later RFC replaces this one. The replacement RFC's identifier is recorded in this RFC's Status field. |
 
-The states are deliberately few. Some projects add **Accepted**
-between Proposed and Implemented (meaning "design is settled,
-implementer may start, but work has not yet shipped"). For most
-projects this state is formalisation overhead — proposed and
-accepted collapse in practice because the same person both
-proposes and implements. Larger organisations with separated
-roles may want it; the variant is described in
-[§ Folder layout: 5-folder variant](#folder-layout-5-folder-variant)
-below.
+The states are deliberately few. Projects where the same person proposes,
+approves, and implements may collapse Accepted into Proposed. ciao.zinnias does
+not: independent architecture review and explicit owner acceptance are
+meaningful gates, so Proposed and Accepted remain distinct.
 
 ## Folder layout
 
-The recommended structure is **four folders**, three of which
-hold RFCs:
+The ciao.zinnias structure uses **five lifecycle folders**, four of which are
+normally present in the repository:
 
 ```
 rfcs/
   README.md           ← index; lists all RFCs by state
   proposed/           ← Proposed RFCs (open for review)
+    NNN-slug.md
+  accepted/           ← Accepted RFCs (approved for implementation)
     NNN-slug.md
   done/               ← Implemented RFCs
     NNN-slug.md
@@ -116,7 +122,7 @@ rfcs/
     NNN-slug.md
 ```
 
-A fourth, optional folder holds Drafts:
+An optional folder holds Drafts:
 
 ```
   draft/              ← (optional) Draft RFCs not yet in review
@@ -140,10 +146,12 @@ implementation companion documents:
       README.md      ← optional index / scope note for this RFC's handoffs
 ```
 
-`handoffs/` is deliberately not split into `proposed/`, `done/`,
+`handoffs/` is deliberately not split into `proposed/`, `accepted/`, `done/`,
 or `archive/`. A handoff's status is inherited from the matching
 RFC number. If `rfcs/proposed/057-slug.md` is Proposed, then
 `rfcs/handoffs/057-slug/` is a proposed implementation companion.
+If the RFC moves to `accepted/`, the handoff becomes authorized execution
+guidance.
 If the RFC moves to `done/`, the handoff becomes historical with
 it. If the RFC moves to `archive/`, the handoff follows that
 meaning. Do not manage handoff status separately.
@@ -154,40 +162,32 @@ location is what determines its state, not the Status field
 inside the file (the file's Status field must be kept consistent
 with the folder, but if the two ever disagree, the folder wins).
 
-Movement between folders is the operation that changes an RFC's
-state. To accept an RFC for implementation, you move it from
-`proposed/` to `accepted/` (in the 5-folder variant) or leave
-it in `proposed/` until it ships (in the 4-folder variant). To
-mark it Implemented, you move it to `done/`. To withdraw or
+Movement between folders is the operation that changes an RFC's state. To
+accept an RFC for implementation, move it from `proposed/` to `accepted/` and
+update its Status field in the same change. To mark it Implemented, move it
+from `accepted/` to `done/`. To withdraw or
 supersede it, you move it to `archive/`.
 
 Handoffs do not move between state folders. They remain under
 `rfcs/handoffs/NNN-slug/`; their lifecycle meaning is derived
 from the RFC's current folder and Status field.
 
-### Folder layout: 5-folder variant
+### Folder layout: collapsed variant
 
-For organisations where the design and implementation roles
-are clearly separated, a fifth folder makes the boundary
-explicit:
+Projects where design approval and implementation are not meaningfully separate
+may omit `accepted/`:
 
 ```
 rfcs/
   proposed/    ← under review
-  accepted/    ← review complete; implementer may start
   done/        ← shipped
   archive/     ← withdrawn or superseded
   draft/       ← (optional)
 ```
 
-Use this variant if "the maintainer signed off" is a meaningful
-event distinct from "the implementer finished." Skip it
-otherwise — `accepted/` will sit empty in projects where the
-two events collapse, and an empty folder is a maintenance
-burden with no payoff.
-
-This RFC is written for the 4-folder variant. The 5-folder
-variant works identically with one extra transition.
+In that collapsed variant, project-specific policy must say what authorizes
+implementation while an RFC remains Proposed. ciao.zinnias does not use the
+collapsed variant.
 
 ## Companion handoffs
 
@@ -245,6 +245,12 @@ release tag in which the work shipped:
 
 ```markdown
 **Status.** Implemented (v1.4.0)
+```
+
+For Accepted RFCs, use:
+
+```markdown
+**Status.** Accepted
 ```
 
 For Superseded RFCs, the field names the replacement:
@@ -314,7 +320,7 @@ below), but for projects without CI on RFC files, periodic
 manual sweeps suffice.
 
 A common convention to make this less painful: when an RFC
-moves to `done/` or `archive/`, the maintainer also runs a
+moves to `accepted/`, `done/`, or `archive/`, the maintainer also runs a
 quick `grep -l "<NNN>-<slug>.md" rfcs/` to find inbound
 references and updates them in the same commit. The cost is
 seconds per move; the alternative — broken links accumulating
@@ -327,25 +333,26 @@ preview, which gives a second line of defence.
 If a handoff exists for an RFC, the RFC may link to it with a
 relative path such as `../handoffs/057-slug/README.md`, and the
 handoff should link back to the RFC. These links are references,
-not lifecycle state. Moving the RFC between `proposed/`, `done/`,
-and `archive/` requires the same link sweep described above.
+not lifecycle state. Moving the RFC between `proposed/`, `accepted/`,
+`done/`, and `archive/` requires the same link sweep described above.
 
 ## Review and transitions
 
 The transitions between states are:
 
 ```
-                    ┌─────────────────────┐
-                    ▼                     │
-[author writes]──▶ Draft? ──▶ Proposed ──▶ Implemented
-                                │             │
-                                ▼             ▼
-                          Withdrawn      (lives in done/)
-                          Superseded     forever
-                                │
-                                ▼
-                          (lives in archive/)
-                          forever
+                    ┌────────────────────────────────┐
+                    ▼                                │
+[author writes]──▶ Draft? ──▶ Proposed ──▶ Accepted ──▶ Implemented
+                                │           │              │
+                                ▼           ▼              ▼
+                          Withdrawn    Withdrawn       (lives in done/)
+                          Superseded   Superseded      forever
+                                │           │
+                                └─────┬─────┘
+                                      ▼
+                              (lives in archive/)
+                              forever
 ```
 
 State transitions are operations performed by the maintainer
@@ -355,10 +362,13 @@ operations:
 - **Open.** New file in `proposed/` (or `draft/` if used).
   Triggered by an author opening a pull request adding the
   file.
-- **Accept and ship.** RFC is implemented; the implementer or
-  maintainer moves the file from `proposed/` to `done/` and
-  updates the Status field with the release tag. Done in the
-  same commit (or commit series) that ships the implementation.
+- **Accept.** Architecture/design review is complete and the project owner
+  authorizes implementation. Move the file from `proposed/` to `accepted/`,
+  update the Status field to `Accepted`, update inbound links and the index,
+  and attach or link any reviewed developer handoff.
+- **Ship.** The accepted work is implemented and reaches the project's
+  stability marker. Move the file from `accepted/` to `done/` and update the
+  Status field with the release tag in the same change that ships it.
 - **Withdraw.** The author or maintainer decides not to pursue
   the RFC. Move to `archive/` with Status updated and a brief
   reason added in the file.
@@ -380,10 +390,10 @@ the partial work captures the RFC's main design decision; any
 deferred work either gets a follow-up RFC or is logged in the
 RFC's Status section as an explicit "deferred" note.
 
-This is a judgement call. The principle: **don't keep an RFC
-in `proposed/` indefinitely just because one open question
-remains**. Move it to `done/` when the design has shipped, and
-record what didn't make it.
+This is a judgement call. The principle: **do not keep an RFC in `accepted/`
+indefinitely just because one non-essential item remains**. Move it to `done/`
+when the accepted design has shipped, and record what did not make it. Do not
+move an RFC out of `proposed/` while blocking design questions remain.
 
 ## README integrity
 
@@ -408,6 +418,11 @@ A typical structure:
 |----|-------|----------|
 | 042 | [Feature flags](./proposed/042-feature-flags.md) | High |
 | 047 | [Caching layer](./proposed/047-caching.md) | Medium |
+
+## Accepted
+| ID | Title | Approved for |
+|----|-------|--------------|
+| 051 | [Session hardening](./accepted/051-session-hardening.md) | v1.6.0 |
 
 ## Implemented
 | ID | Title | Shipped in |
@@ -442,8 +457,8 @@ invariants are worth checking:
   matches the title (loosely).
 - Every `rfcs/handoffs/NNN-slug/` directory, if handoffs are
   used, corresponds to an existing RFC number.
-- Handoff directories do not duplicate lifecycle state with
-  their own `proposed/`, `done/`, or `archive/` subfolders.
+- Handoff directories do not duplicate lifecycle state with their own
+  `proposed/`, `accepted/`, `done/`, or `archive/` subfolders.
 
 A simple script in `scripts/check-rfcs.sh` or
 `xtask check-rfcs` can run these checks. None of them need
@@ -459,19 +474,22 @@ build elaborate tooling before the project's scale demands it.
 If you're starting an `rfcs/` directory from scratch, the
 minimum viable adoption of this policy is:
 
-1. Create `rfcs/proposed/`, `rfcs/done/`, `rfcs/archive/`.
+1. Create `rfcs/proposed/`, `rfcs/accepted/`, `rfcs/done/`, and
+   `rfcs/archive/`.
 2. Add `rfcs/README.md` with a state-grouped index.
 3. Adopt the `NNN-slug.md` naming and start at `001`.
 4. Write the first RFC. Put it in `proposed/`.
-5. When the work ships, move it to `done/` with a Status
-   field carrying the release tag.
+5. When review and owner approval are complete, move it to `accepted/` and
+   update its Status field.
+6. When the accepted work ships, move it to `done/` with a Status field
+   carrying the release tag.
 
 If an RFC is large enough to need execution guidance, add an
 optional companion directory under `rfcs/handoffs/NNN-slug/`. Do
 not add a separate handoff status folder; the RFC's state is
 enough.
 
-That's the entire policy in five steps, plus optional handoffs
+That's the entire policy in six steps, plus optional handoffs
 when they are genuinely useful. The other sections of
 this RFC exist to handle edge cases as the directory grows;
 ignore them until you hit the relevant case.
@@ -524,7 +542,7 @@ every one of those references silently.
 
 The numbering is permanent. Withdrawn numbers stay withdrawn.
 
-### Formalising `accepted/` in small projects
+### Formalising `accepted/` without a real approval boundary
 
 The 5-folder variant is appealing because it makes the
 "maintainer approved" event explicit. In small projects this
@@ -534,9 +552,9 @@ person makes both decisions, often in the same commit. The
 go straight from `proposed/` to `done/`) or perpetually full
 (because nothing ever ships and they all sit there).
 
-Adopt the 5-folder variant only if the design and
-implementation roles are genuinely separate. Otherwise the
-4-folder variant is right-sized.
+Adopt the five-folder lifecycle only if design approval and implementation are
+genuinely separate. ciao.zinnias meets that condition: an independent architect
+reviews design, the project owner accepts it, and implementation follows.
 
 ### Letting cross-references rot
 
@@ -608,6 +626,10 @@ RFC into the new folder structure. Both happened in the same
 release. This is the recommended adoption pattern for
 existing directories: combine the policy's introduction with
 the migration into a single, atomic change.
+
+The 2026-07-14 amendment adopted `accepted/` without reclassifying the existing
+backlog. Existing Proposed RFCs remain Proposed until they receive architecture
+review and explicit owner acceptance under this amended policy.
 
 ## Open questions
 
