@@ -14,7 +14,9 @@ authorize implementation.
 
 ## Accepted — approved for implementation
 
-_None._
+| ID | Title | Accepted | Note |
+|----|-------|----------|------|
+| 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | B5 remediation architecture accepted; implementation authorized, with local and exact-candidate hosted evidence still required |
 
 ## Done — MVP core (001–019)
 
@@ -128,7 +130,6 @@ _None._
 | 076 | [One-Time Invite Code Response Isolation](./proposed/076-one-time-invite-code-response-isolation.md) | Remove plaintext invite codes from redirect URLs; architecture review required before implementation |
 | 077 | [Fail-Closed HMAC Pepper Configuration](./proposed/077-fail-closed-hmac-pepper-configuration.md) | Remove the public fallback and enforce required-secret plus runtime `503` behavior; architecture review required before implementation |
 | 078 | [Fail-Closed Strongly Consistent Abuse Controls](./proposed/078-fail-closed-strongly-consistent-abuse-controls.md) | Replace fail-open KV counters with HMAC-sharded SQLite Durable Objects; architecture review required before implementation |
-| 079 | [Atomic Required Audits and Recursive Metadata Redaction](./proposed/079-atomic-required-audits-and-recursive-redaction.md) | Batch required mutations with audit evidence, classify the logout exception, and replace arbitrary metadata with typed allowlists plus recursive redaction; architecture review required |
 
 ## Proposed — profile, security baseline, settings, and UX hardening (070–075)
 

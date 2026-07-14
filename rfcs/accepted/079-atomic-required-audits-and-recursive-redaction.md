@@ -1,6 +1,7 @@
 # RFC 079 — Atomic Required Audits and Recursive Metadata Redaction
 
-**Status.** Proposed — design review required; implementation is not authorized
+**Status.** Accepted — architecture review accepted with notes on 2026-07-14;
+explicit owner acceptance recorded on 2026-07-15; implementation is authorized
 
 **Priority.** Architect-review remediation B5; blocks every public or production
 pilot
@@ -14,6 +15,39 @@ RFC-050, RFC-052, RFC-057, RFC-062, RFC-068, RFC-069, RFC-070, RFC-071
 and database mutation helper, a new D1 migration, contracts and Worker tests,
 audit/threat-model/operations documentation, release gates and exact-candidate
 hosted evidence
+
+## Owner Acceptance Record
+
+The owner explicitly accepts the following consequences of this architecture:
+
+- logout revocation is the sole current Class C safety-first exception;
+- all legacy `metadata_json` values are permanently reset to `{}` in the live
+  audit table;
+- the migration preserves core event identity, actor/scope/target, action, and
+  timestamp chronology;
+- pre-migration backups and D1 recovery history are potentially sensitive and
+  remain access-controlled; and
+- recovery rolls forward and must not restore the unsafe writer, arbitrary
+  metadata, or removed legacy metadata.
+
+Acceptance authorizes implementation; it does not close finding B5 or authorize
+a public or production pilot. The reviewed dependency baseline resolves
+`worker`, `worker-macros`, and `worker-sys` to worker-rs 0.8.4.
+
+The implementation handoff must also preserve the architecture review notes:
+
+1. choose either explicit legacy-plus-current operator queries or a reviewed,
+   deterministic mapping for known legacy `(target_kind, action)` pairs;
+   unknown historical actions must not be guessed or silently rewritten;
+2. pin one concrete D1/SQLite-compatible zero-winner assertion primitive,
+   including statement order, cleanup, transaction-unique keys, concurrent-call
+   behavior, and deliberate SQL failure, before converting join or relink;
+3. treat delivery to an approved persistent incident sink as an evidence
+   prerequisite; structured console emission and `wrangler tail` alone are not
+   durable evidence; and
+4. include pre/post migration queryability checks and the accepted data-reset,
+   backup-sensitivity, and roll-forward consequences in rehearsal and operator
+   documentation.
 
 ## Summary
 
@@ -54,8 +88,9 @@ identity/action/timestamp columns but resets all pre-RFC-079 `metadata_json` to
 `{}` because the current implementation cannot prove that retained nested or
 misnamed content is safe.
 
-This is a remediation design, not implementation approval. It may move to
-`rfcs/accepted/` only after architecture review and explicit owner acceptance.
+This accepted remediation design authorizes implementation. Completion and
+pilot readiness still require the local real-D1 and exact-candidate hosted
+evidence specified below.
 
 ## Problem and Security Invariants
 
@@ -661,4 +696,4 @@ authorization/response and name the event honestly as authorized/requested.
 - [Cloudflare D1 Database `batch()` documentation](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch).
 - [Cloudflare D1 Workers Binding API](https://developers.cloudflare.com/d1/worker-api/).
 - [Cloudflare Workers best practices](https://developers.cloudflare.com/workers/best-practices/workers-best-practices/).
-- Installed worker-rs 0.8.x D1 binding API.
+- Installed worker-rs 0.8.4 D1 binding API.

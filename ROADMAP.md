@@ -36,10 +36,14 @@ and audit durability/redaction. Until those blockers are resolved and reviewed:
   non-production environment.
 
 The RFC lifecycle now separates Proposed design from Accepted implementation.
-The next design work is focused remediation RFCs for secure invite-code
-presentation, fail-closed hosted security dependencies, and audit
-durability/redaction. Feature work resumes only after the remediation hold is
-explicitly lifted in this roadmap.
+Remediation design and accepted implementation take priority. Feature work
+resumes only after the remediation hold is explicitly lifted in this roadmap.
+
+## Accepted Remediation Work
+
+| RFC | Theme | Current note |
+|-----|-------|--------------|
+| 079 | Atomic required audits and recursive metadata redaction | Architecture reviewed and owner-accepted on 2026-07-15; implementation is authorized. B5 and every public/production pilot gate remain open pending implementation, local real-D1 evidence, and RFC-050 exact-candidate hosted evidence. |
 
 ## Proposed Work
 
@@ -65,7 +69,6 @@ The active proposed backlog is:
 | 076 | One-time invite code response isolation | B1 remediation design; Proposed pending architecture review and owner acceptance. |
 | 077 | Fail-closed HMAC pepper configuration | B2 remediation design; Proposed pending architecture review and owner acceptance. |
 | 078 | Fail-closed strongly consistent abuse controls | B3 remediation design; Proposed pending architecture review and owner acceptance. |
-| 079 | Atomic required audits and recursive metadata redaction | B5 remediation design; Proposed pending architecture review and owner acceptance. |
 
 ## Post-Hold Feature Candidates
 
