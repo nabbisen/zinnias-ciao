@@ -122,15 +122,16 @@ pub async fn post_admin_hide_note(
 
     crate::db::event_note::admin_hide(&db, event_id, target_membership_id).await?;
 
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "event_note",
         Some(event_id),
-        "admin_hidden",
-        Some(serde_json::json!({ "target_membership_id": target_membership_id })),
+        audit::LegacyAuditAction::EventNoteAdminHidden,
+        audit::LegacyAuditMetadata::AdminNoteHidden {
+            target_membership_id: target_membership_id.to_owned(),
+        },
     )
     .await;
 

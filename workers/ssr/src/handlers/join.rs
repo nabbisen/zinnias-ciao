@@ -190,15 +190,14 @@ async fn legacy_post_profile(
     let session_hmac = crate::crypto::hmac_hex(&pepper, &session_secret);
     let session_id = crate::crypto::random_token();
     crate::db::session::insert(&db, &session_id, &user_id, &session_hmac).await?;
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(&community_id),
         Some(&membership_id),
-        "invite_code",
         Some(&invite_id),
-        "redeemed",
-        Some(serde_json::json!({ "membership_id": membership_id })),
+        audit::LegacyAuditAction::InviteCodeRedeemed,
+        audit::LegacyAuditMetadata::None,
     )
     .await;
     let cookie_domain = env

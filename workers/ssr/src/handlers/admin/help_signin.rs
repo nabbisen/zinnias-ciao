@@ -148,19 +148,16 @@ pub async fn post_help_signin(
     )
     .await?;
 
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "membership",
         Some(target_membership_id),
-        "membership.relink_code_created",
-        Some(serde_json::json!({
-            "membership_id": target_membership_id,
-            "created_by_membership_id": membership.membership_id,
-            "community_id": community_id,
-        })),
+        audit::LegacyAuditAction::MembershipRelinkCodeCreated,
+        audit::LegacyAuditMetadata::RelinkCorrelation {
+            relink_code_id: code_id,
+        },
     )
     .await;
 

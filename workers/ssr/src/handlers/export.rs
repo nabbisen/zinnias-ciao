@@ -149,15 +149,14 @@ pub async fn get_export_json(
     let filename = format!("{}-export.json", slugify(&community_name));
 
     // Audit the export (no content logged).
-    let _ = crate::audit::write(
+    let _ = crate::audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "community",
         Some(community_id),
-        "exported",
-        None,
+        crate::audit::LegacyAuditAction::CommunityExportAuthorized,
+        crate::audit::LegacyAuditMetadata::None,
     )
     .await;
 

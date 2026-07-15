@@ -214,15 +214,16 @@ pub async fn post_attendance(
         }
     }
 
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "attendance",
         Some(event_id),
-        "admin_override",
-        Some(serde_json::json!({ "changes": changes })),
+        audit::LegacyAuditAction::AttendanceAdminOverride,
+        audit::LegacyAuditMetadata::AttendanceOverride {
+            changed_count: changes,
+        },
     )
     .await;
 

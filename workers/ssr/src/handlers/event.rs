@@ -476,15 +476,14 @@ pub async fn post_my_status(
 
     // Audit admin attendance correction
     if membership.is_admin() && matches!(requested, Some(AttendanceStatus::Attended)) {
-        let _ = audit::write(
+        let _ = audit::write_legacy(
             &db,
             rid,
             Some(community_id),
             Some(&membership.membership_id),
-            "attendance",
             Some(day_id),
-            "admin_set_attended",
-            Some(serde_json::json!({ "event_id": event_id })),
+            audit::LegacyAuditAction::AttendanceAdminSetAttended,
+            audit::LegacyAuditMetadata::None,
         )
         .await;
     }

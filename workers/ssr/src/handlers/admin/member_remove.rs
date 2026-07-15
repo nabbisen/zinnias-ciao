@@ -138,15 +138,14 @@ pub async fn post_remove_member(
 
     match membership_db::soft_remove_guarded(&db, target_membership_id, community_id).await? {
         membership_db::RemoveMemberResult::Removed => {
-            let _ = audit::write(
+            let _ = audit::write_legacy(
                 &db,
                 rid,
                 Some(community_id),
                 Some(&membership.membership_id),
-                "membership",
                 Some(target_membership_id),
-                "removed",
-                None,
+                audit::LegacyAuditAction::MembershipRemoved,
+                audit::LegacyAuditMetadata::None,
             )
             .await;
             redirect(&format!("/c/{community_id}/admin/members"))

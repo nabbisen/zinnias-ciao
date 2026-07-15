@@ -279,22 +279,27 @@ fn recurring_until_before_base_resets_only_end_controls() {
 
 #[test]
 fn audit_metadata_separates_cancelled_recreate_from_event_copy() {
-    let recreate = create_event_audit_metadata(
-        Some(&CreateEventProvenance::CancelledRecreate(
-            "evt-old".to_string(),
-        )),
-        "New title",
-    );
-    assert_eq!(recreate["created_from_cancelled_event_id"], "evt-old");
-    assert!(recreate.get("copy_mode").is_none());
+    let recreate = create_event_audit_metadata(Some(&CreateEventProvenance::CancelledRecreate(
+        "evt-old".to_string(),
+    )));
+    assert!(matches!(
+        recreate,
+        crate::audit::LegacyAuditMetadata::EventCreated {
+            creation_mode: crate::audit::EventCreationMode::CancelledRecreate,
+            source_event_id: Some(source),
+        } if source == "evt-old"
+    ));
 
-    let copied = create_event_audit_metadata(
-        Some(&CreateEventProvenance::EventCopy("evt-src".to_string())),
-        "New title",
-    );
-    assert_eq!(copied["copy_source_event_id"], "evt-src");
-    assert_eq!(copied["copy_mode"], "event_copy");
-    assert!(copied.get("title").is_none());
+    let copied = create_event_audit_metadata(Some(&CreateEventProvenance::EventCopy(
+        "evt-src".to_string(),
+    )));
+    assert!(matches!(
+        copied,
+        crate::audit::LegacyAuditMetadata::EventCreated {
+            creation_mode: crate::audit::EventCreationMode::EventCopy,
+            source_event_id: Some(source),
+        } if source == "evt-src"
+    ));
 }
 
 #[test]

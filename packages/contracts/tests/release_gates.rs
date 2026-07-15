@@ -1056,9 +1056,9 @@ fn rfc062_role_transfer_uses_guarded_member_management_flow() {
         "RFC-062 handlers must use dedicated token purposes, reviewed copy, and server-side self-target denial"
     );
     assert!(
-        ROLE_TRANSFER_HANDLER_SRC.contains("membership.promoted_to_admin")
-            && ROLE_TRANSFER_HANDLER_SRC.contains("membership.demoted_to_member")
-            && ROLE_TRANSFER_HANDLER_SRC.contains("None,"),
+        ROLE_TRANSFER_HANDLER_SRC.contains("LegacyAuditAction::MembershipPromotedToAdmin")
+            && ROLE_TRANSFER_HANDLER_SRC.contains("LegacyAuditAction::MembershipDemotedToMember")
+            && ROLE_TRANSFER_HANDLER_SRC.contains("LegacyAuditMetadata::None"),
         "RFC-062 role changes must audit direction by action name without extra metadata"
     );
 }
@@ -1291,12 +1291,12 @@ fn rfc024_redemption_is_single_use_generic_and_revokes_old_sessions() {
             && SESSION_DB_SRC.contains("id != ?3"),
         "RFC-024 redemption must revoke other active sessions for the target user after inserting the new session"
     );
-    let audit_write_count = RELINK_HANDLER_SRC.matches("audit::write(").count();
+    let audit_write_count = RELINK_HANDLER_SRC.matches("audit::write_legacy(").count();
     assert!(
         RELINK_HANDLER_SRC.contains("rate_limit::is_relink_rate_limited")
             && RELINK_HANDLER_SRC.contains("record_relink_failure")
             && audit_write_count == 1
-            && RELINK_HANDLER_SRC.contains("\"membership.relink_redeemed\""),
+            && RELINK_HANDLER_SRC.contains("LegacyAuditAction::MembershipRelinkRedeemed"),
         "RFC-024 failed redemption should be rate-limited, not audited as a membership event"
     );
 }
@@ -1357,8 +1357,8 @@ fn rfc069_operator_recovery_audit_correlates_creation_and_redemption() {
         "RFC-069 creation audit must include bounded operator label and relink correlation metadata"
     );
     assert!(
-        RELINK_HANDLER_SRC.contains("\"membership.relink_redeemed\"")
-            && RELINK_HANDLER_SRC.contains("\"relink_code_id\": target.id"),
+        RELINK_HANDLER_SRC.contains("LegacyAuditAction::MembershipRelinkRedeemed")
+            && RELINK_HANDLER_SRC.contains("relink_code_id: target.id.clone()"),
         "RFC-069 redemption audit must include the relink_code_id created by the operator endpoint"
     );
 }
@@ -1702,13 +1702,11 @@ fn rfc053_calendar_feed_privacy_and_revocation_ux_is_guarded() {
         .and_then(|s| s.split("fn redirect").next())
         .expect("Calendar token audit helper must exist");
     assert!(
-        CALENDAR_HANDLER_SRC.contains("\"calendar_token_generated\"")
-            && CALENDAR_HANDLER_SRC.contains("\"calendar_token_revoked\"")
-            && calendar_audit_helper_src.contains("crate::audit::write")
-            && calendar_audit_helper_src.contains("\"calendar_feed\"")
+        CALENDAR_HANDLER_SRC.contains("LegacyAuditAction::CalendarFeedTokenGenerated")
+            && CALENDAR_HANDLER_SRC.contains("LegacyAuditAction::CalendarFeedTokenRevoked")
+            && calendar_audit_helper_src.contains("crate::audit::write_legacy")
             && calendar_audit_helper_src.contains("let target_id: Option<&str> = None;")
-            && calendar_audit_helper_src
-                .contains("let metadata: Option<serde_json::Value> = None;"),
+            && calendar_audit_helper_src.contains("LegacyAuditMetadata::None"),
         "Calendar token generation/revocation must be audited without token-bearing target_id or metadata"
     );
     assert!(
@@ -2007,7 +2005,8 @@ fn rfc060_cancelled_event_recreate_is_admin_only_and_details_only() {
             && ADMIN_EVENTS_SRC
                 .contains("event_db::find_for_community(&db, &source_id, community_id)")
             && ADMIN_EVENTS_SRC.contains("return render::not_found()")
-            && ADMIN_EVENTS_SRC.contains("created_from_cancelled_event_id"),
+            && ADMIN_EVENTS_SRC.contains("EventCreationMode::CancelledRecreate")
+            && ADMIN_EVENTS_SRC.contains("source_event_id: Some(source_id.clone())"),
         "Create POST must re-check source event community/status and record safe provenance"
     );
     let recreate_fields_src = ADMIN_EVENTS_SRC
@@ -2074,8 +2073,9 @@ fn rfc066_event_copy_is_admin_reviewed_prefill_not_clone() {
             && ADMIN_EVENTS_SRC.contains("\"event_copy\"")
             && ADMIN_EVENTS_SRC.contains("event_can_seed_copy")
             && ADMIN_EVENTS_SRC.contains("event_can_seed_recreate")
-            && ADMIN_EVENTS_SRC.contains("created_from_cancelled_event_id")
-            && ADMIN_EVENTS_SRC.contains("\"copy_source_event_id\""),
+            && ADMIN_EVENTS_SRC.contains("EventCreationMode::CancelledRecreate")
+            && ADMIN_EVENTS_SRC.contains("EventCreationMode::EventCopy")
+            && ADMIN_EVENTS_SRC.contains("source_event_id: Some(source_id.clone())"),
         "Create POST must separate RFC-066 event-copy provenance from RFC-060 cancelled-event recreate"
     );
     assert!(
@@ -2125,6 +2125,7 @@ const RFC079_ASSERTION_WORKER_SRC: &str =
     include_str!("../../../workers/ssr/tests/fixtures/rfc079-assertion-worker.mjs");
 const RFC079_ASSERTION_RUNNER_SRC: &str =
     include_str!("../../../scripts/test-rfc079-assertion.mjs");
+const RFC079_AUDIT_CORE_SRC: &str = include_str!("../../../workers/ssr/src/audit.rs");
 
 #[derive(Default)]
 struct AuditSourceScan {
@@ -2194,7 +2195,7 @@ fn named_call_blocks(source: &str, needle: &str) -> Vec<String> {
 }
 
 fn audit_call_blocks(source: &str) -> Vec<String> {
-    named_call_blocks(source, "audit::write(")
+    named_call_blocks(source, "audit::write_legacy(")
 }
 
 fn compact_brace_block(source: &str, marker: &str) -> String {
@@ -2364,81 +2365,109 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
     let expected_call_shapes: [(&str, &[&str]); 18] = [
         (
             "handlers/auth.rs",
-            &["\"session\", Some(&auth.session_id), \"logout\", None"],
+            &[
+                "None, crate::audit::LegacyAuditAction::SessionLogout, crate::audit::LegacyAuditMetadata::None",
+            ],
         ),
         (
             "handlers/calendar.rs",
-            &["\"calendar_feed\", target_id, action, metadata"],
+            &["target_id, action, crate::audit::LegacyAuditMetadata::None"],
         ),
         (
             "handlers/communities.rs",
-            &["\"calendar_matrix_csv\", Some(&month), \"calendar_matrix_csv.export_requested\""],
+            &[
+                "Some(&month), crate::audit::LegacyAuditAction::CalendarMatrixCsvExportRequested, crate::audit::LegacyAuditMetadata::MatrixExportRequested",
+            ],
         ),
         (
             "handlers/export.rs",
-            &["\"community\", Some(community_id), \"exported\", None"],
+            &[
+                "Some(community_id), crate::audit::LegacyAuditAction::CommunityExportAuthorized, crate::audit::LegacyAuditMetadata::None",
+            ],
         ),
         (
             "handlers/event.rs",
-            &["\"attendance\", Some(day_id), \"admin_set_attended\""],
+            &[
+                "Some(day_id), audit::LegacyAuditAction::AttendanceAdminSetAttended, audit::LegacyAuditMetadata::None",
+            ],
         ),
         (
             "handlers/join.rs",
-            &["\"invite_code\", Some(&invite_id), \"redeemed\""],
+            &[
+                "Some(&invite_id), audit::LegacyAuditAction::InviteCodeRedeemed, audit::LegacyAuditMetadata::None",
+            ],
         ),
         (
             "handlers/relink.rs",
-            &["\"membership\", Some(&target.membership_id), \"membership.relink_redeemed\""],
+            &[
+                "Some(&target.membership_id), audit::LegacyAuditAction::MembershipRelinkRedeemed, audit::LegacyAuditMetadata::RelinkCorrelation",
+            ],
         ),
         (
             "handlers/templates.rs",
             &[
-                "\"event_template\", Some(&template_id), \"created\", None",
-                "\"event_template\", Some(template_id), \"deleted\", None",
+                "Some(&template_id), audit::LegacyAuditAction::EventTemplateCreated, audit::LegacyAuditMetadata::None",
+                "Some(template_id), audit::LegacyAuditAction::EventTemplateDeleted, audit::LegacyAuditMetadata::None",
             ],
         ),
         (
             "handlers/admin/help_signin.rs",
-            &["\"membership\", Some(target_membership_id), \"membership.relink_code_created\""],
+            &[
+                "Some(target_membership_id), audit::LegacyAuditAction::MembershipRelinkCodeCreated, audit::LegacyAuditMetadata::RelinkCorrelation",
+            ],
         ),
         (
             "handlers/admin/member_remove.rs",
-            &["\"membership\", Some(target_membership_id), \"removed\", None"],
+            &[
+                "Some(target_membership_id), audit::LegacyAuditAction::MembershipRemoved, audit::LegacyAuditMetadata::None",
+            ],
         ),
         (
             "handlers/admin/members.rs",
             &[
-                "\"invite_code\", Some(&invite_id), \"generated\", None",
-                "\"invite_code\", Some(invite_id), \"revoked\", None",
+                "Some(&invite_id), audit::LegacyAuditAction::InviteCodeGenerated, audit::LegacyAuditMetadata::None",
+                "Some(invite_id), audit::LegacyAuditAction::InviteCodeRevoked, audit::LegacyAuditMetadata::None",
             ],
         ),
         (
             "handlers/admin/role_transfer.rs",
-            &["\"membership\", Some(target_membership_id), audit_action, None"],
+            &["Some(target_membership_id), audit_action, audit::LegacyAuditMetadata::None"],
         ),
         (
             "handlers/admin/events/attendance.rs",
-            &["\"attendance\", Some(event_id), \"admin_override\""],
+            &[
+                "Some(event_id), audit::LegacyAuditAction::AttendanceAdminOverride, audit::LegacyAuditMetadata::AttendanceOverride",
+            ],
         ),
         (
             "handlers/admin/events/cancel.rs",
-            &["\"event\", Some(event_id), \"cancelled\", None"],
+            &[
+                "Some(event_id), audit::LegacyAuditAction::EventCancelled, audit::LegacyAuditMetadata::None",
+            ],
         ),
         (
             "handlers/admin/events/create.rs",
-            &["\"event\", Some(&event_id), \"created\""],
+            &[
+                "Some(&event_id), audit::LegacyAuditAction::EventCreated, create_event_audit_metadata",
+            ],
         ),
         (
             "handlers/admin/events/edit.rs",
-            &["\"event\", Some(event_id), \"edited\""],
+            &[
+                "Some(event_id), audit::LegacyAuditAction::EventEdited, audit::LegacyAuditMetadata::EventEdited",
+            ],
         ),
         (
             "handlers/admin/events/notes.rs",
-            &["\"event_note\", Some(event_id), \"admin_hidden\""],
+            &[
+                "Some(event_id), audit::LegacyAuditAction::EventNoteAdminHidden, audit::LegacyAuditMetadata::AdminNoteHidden",
+            ],
         ),
         (
             "handlers/admin/events/occurrence.rs",
-            &["\"event_day\", Some(day_id), \"occurrence_cancelled\""],
+            &[
+                "Some(day_id), audit::LegacyAuditAction::EventOccurrenceCancelled, audit::LegacyAuditMetadata::OccurrenceCancelled",
+            ],
         ),
     ];
     for (path, expected_shapes) in expected_call_shapes {
@@ -2451,6 +2480,15 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
             "audit call shape changed in {path}; expected {expected_shapes:?}, actual {actual:?}"
         );
     }
+    let auth_audit_call = scan
+        .generic_calls
+        .get("handlers/auth.rs")
+        .and_then(|calls| calls.first())
+        .expect("logout audit call must remain pinned");
+    assert!(
+        !auth_audit_call.contains("auth.session_id"),
+        "session.logout must never place the session ID in its audit target or metadata"
+    );
 
     let source_by_path = sources
         .iter()
@@ -2463,8 +2501,8 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
         .expect("calendar audit source must exist");
     let calendar_calls = named_call_blocks(calendar_source, "write_calendar_token_audit(");
     let expected_calendar_calls = [
-        "write_calendar_token_audit(&db,rid,community_id,&membership.membership_id,\"calendar_token_generated\",)",
-        "write_calendar_token_audit(&db,rid,community_id,&membership.membership_id,\"calendar_token_revoked\",)",
+        "write_calendar_token_audit(&db,rid,community_id,&membership.membership_id,crate::audit::LegacyAuditAction::CalendarFeedTokenGenerated,)",
+        "write_calendar_token_audit(&db,rid,community_id,&membership.membership_id,crate::audit::LegacyAuditAction::CalendarFeedTokenRevoked,)",
     ];
     assert!(
         call_shapes_match(&calendar_calls, &expected_calendar_calls),
@@ -2483,7 +2521,7 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
     );
     assert_eq!(
         compact_brace_block(role_source, "let audit_action = match mutation"),
-        "letaudit_action=matchmutation{RoleMutation::Promote=>\"membership.promoted_to_admin\",RoleMutation::Demote=>\"membership.demoted_to_member\",}",
+        "letaudit_action=matchmutation{RoleMutation::Promote=>audit::LegacyAuditAction::MembershipPromotedToAdmin,RoleMutation::Demote=>audit::LegacyAuditAction::MembershipDemotedToMember,}",
         "role audit-action mapping changed; reconcile the accepted dynamic audit inventory"
     );
 
@@ -2561,6 +2599,47 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
 }
 
 #[test]
+fn rfc079_package1_closed_core_and_nondeployable_boundary_are_pinned() {
+    for required in [
+        "pub(crate) enum AuditAction",
+        "pub(crate) enum AuditMetadata",
+        "pub(crate) struct AuditRecord",
+        "pub(crate) enum LegacyAuditAction",
+        "pub(crate) enum LegacyAuditMetadata",
+        "pub(crate) async fn write_legacy",
+        "fn sanitize_and_serialize",
+        "fn format_event",
+        "const MAX_METADATA_DEPTH: usize = 8",
+        "const MAX_METADATA_NODES: usize = 128",
+        "const MAX_METADATA_BYTES: usize = 2_048",
+    ] {
+        assert!(
+            RFC079_AUDIT_CORE_SRC.contains(required),
+            "RFC-079 Package 1 closed-core contract is missing {required:?}"
+        );
+    }
+    assert!(
+        !RFC079_AUDIT_CORE_SRC.contains("pub async fn write(")
+            && !RFC079_AUDIT_CORE_SRC.contains("pub(crate) async fn write(")
+            && !RFC079_AUDIT_CORE_SRC.contains("action: &str")
+            && !RFC079_AUDIT_CORE_SRC.contains("metadata: Option<serde_json::Value>"),
+        "Package 1 must not restore the arbitrary string/Value audit writer"
+    );
+    assert!(
+        RFC079_AUDIT_CORE_SRC.contains("event=audit.write request_id={}")
+            && !RFC079_AUDIT_CORE_SRC.contains("target={}:{}")
+            && !RFC079_AUDIT_CORE_SRC.contains("actor={} community={}"),
+        "Package 1 structured audit events must exclude raw actor/community/target identifiers"
+    );
+    assert!(
+        RFC079_AUDIT_CORE_SRC.contains("deliberately non-deployable")
+            && RFC079_AUDIT_CORE_SRC.contains("LegacyAuditAction")
+            && RFC079_AUDIT_CORE_SRC.contains("LegacyAuditMetadata"),
+        "the private compatibility adapter must keep Package 1 explicitly non-deployable"
+    );
+}
+
+#[test]
 fn rfc079_package0a_assertion_fixture_is_bounded_and_outside_the_ledger() {
     assert!(
         RFC079_ASSERTION_FIXTURE_SRC.contains("CREATE TABLE audit_change_assertions")
@@ -2605,11 +2684,13 @@ fn rfc079_inventory_scanner_detects_new_files_and_action_substitution() {
     let synthetic_sources = vec![
         (
             "known.rs".to_owned(),
-            "fn known() { audit::write(db, \"membership\", \"removed\"); }".to_owned(),
+            "fn known() { audit::write_legacy(db, LegacyAuditAction::MembershipRemoved); }"
+                .to_owned(),
         ),
         (
             "new_handler.rs".to_owned(),
-            "fn added() { audit::write(db, \"event\", \"unexpected\"); }".to_owned(),
+            "fn added() { audit::write_legacy(db, LegacyAuditAction::EventUnexpected); }"
+                .to_owned(),
         ),
         (
             "new_direct.rs".to_owned(),
@@ -2628,26 +2709,29 @@ fn rfc079_inventory_scanner_detects_new_files_and_action_substitution() {
 
     let substituted = &scan.generic_calls["known.rs"];
     assert!(
-        !call_shapes_match(substituted, &["\"membership\", \"promoted_to_admin\""]),
+        !call_shapes_match(
+            substituted,
+            &["LegacyAuditAction::MembershipPromotedToAdmin"]
+        ),
         "a substituted expected action must fail exact call-shape matching"
     );
     assert!(
-        !call_shapes_match(&[], &["\"membership\", \"removed\""]),
+        !call_shapes_match(&[], &["LegacyAuditAction::MembershipRemoved"]),
         "removing an expected audit call must fail exact call-shape matching"
     );
 
     let calendar_with_extra = r#"
-        write_calendar_token_audit(db, "calendar_token_generated");
-        write_calendar_token_audit(db, "calendar_token_revoked");
-        write_calendar_token_audit(db, "calendar_token_unexpected");
+        write_calendar_token_audit(db, LegacyAuditAction::CalendarFeedTokenGenerated);
+        write_calendar_token_audit(db, LegacyAuditAction::CalendarFeedTokenRevoked);
+        write_calendar_token_audit(db, LegacyAuditAction::CalendarFeedTokenUnexpected);
     "#;
     let calendar_calls = named_call_blocks(calendar_with_extra, "write_calendar_token_audit(");
     assert!(
         !call_shapes_match(
             &calendar_calls,
             &[
-                "write_calendar_token_audit(db, \"calendar_token_generated\")",
-                "write_calendar_token_audit(db, \"calendar_token_revoked\")",
+                "write_calendar_token_audit(db, LegacyAuditAction::CalendarFeedTokenGenerated)",
+                "write_calendar_token_audit(db, LegacyAuditAction::CalendarFeedTokenRevoked)",
             ]
         ),
         "an additional calendar audit-wrapper invocation must fail the exhaustive expansion gate"
@@ -2655,14 +2739,14 @@ fn rfc079_inventory_scanner_detects_new_files_and_action_substitution() {
 
     let role_with_extra = r#"
         let audit_action = match mutation {
-            RoleMutation::Promote => "membership.promoted_to_admin",
-            RoleMutation::Demote => "membership.demoted_to_member",
-            RoleMutation::Suspend => "membership.suspended",
+            RoleMutation::Promote => audit::LegacyAuditAction::MembershipPromotedToAdmin,
+            RoleMutation::Demote => audit::LegacyAuditAction::MembershipDemotedToMember,
+            RoleMutation::Suspend => audit::LegacyAuditAction::MembershipSuspended,
         };
     "#;
     assert_ne!(
         compact_brace_block(role_with_extra, "let audit_action = match mutation"),
-        "letaudit_action=matchmutation{RoleMutation::Promote=>\"membership.promoted_to_admin\",RoleMutation::Demote=>\"membership.demoted_to_member\",}",
+        "letaudit_action=matchmutation{RoleMutation::Promote=>audit::LegacyAuditAction::MembershipPromotedToAdmin,RoleMutation::Demote=>audit::LegacyAuditAction::MembershipDemotedToMember,}",
         "an additional dynamic role/action branch must fail the exhaustive mapping gate"
     );
 }

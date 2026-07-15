@@ -217,7 +217,7 @@ pub async fn post_regenerate_calendar(
         rid,
         community_id,
         &membership.membership_id,
-        "calendar_token_generated",
+        crate::audit::LegacyAuditAction::CalendarFeedTokenGenerated,
     )
     .await;
 
@@ -261,7 +261,7 @@ pub async fn post_revoke_calendar(
         rid,
         community_id,
         &membership.membership_id,
-        "calendar_token_revoked",
+        crate::audit::LegacyAuditAction::CalendarFeedTokenRevoked,
     )
     .await;
 
@@ -350,21 +350,19 @@ async fn write_calendar_token_audit(
     rid: &str,
     community_id: &str,
     membership_id: &str,
-    action: &str,
+    action: crate::audit::LegacyAuditAction,
 ) -> Result<()> {
     // Security-relevant audit event (RFC-045 P1-5). Keep token ids, HMACs,
     // and bearer URLs out of both target_id and metadata.
     let target_id: Option<&str> = None;
-    let metadata: Option<serde_json::Value> = None;
-    crate::audit::write(
+    crate::audit::write_legacy(
         db,
         rid,
         Some(community_id),
         Some(membership_id),
-        "calendar_feed",
         target_id,
         action,
-        metadata,
+        crate::audit::LegacyAuditMetadata::None,
     )
     .await
 }

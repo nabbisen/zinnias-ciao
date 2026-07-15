@@ -357,18 +357,14 @@ pub async fn post_create_event(
     )
     .await?;
 
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "event",
         Some(&event_id),
-        "created",
-        Some(create_event_audit_metadata(
-            provenance.as_ref(),
-            &validated.title,
-        )),
+        audit::LegacyAuditAction::EventCreated,
+        create_event_audit_metadata(provenance.as_ref()),
     )
     .await;
 
@@ -377,16 +373,23 @@ pub async fn post_create_event(
 
 pub(super) fn create_event_audit_metadata(
     provenance: Option<&CreateEventProvenance>,
-    title: &str,
-) -> serde_json::Value {
+) -> audit::LegacyAuditMetadata {
     match provenance {
-        Some(CreateEventProvenance::CancelledRecreate(source_id)) => serde_json::json!({
-            "created_from_cancelled_event_id": source_id
-        }),
-        Some(CreateEventProvenance::EventCopy(source_id)) => serde_json::json!({
-            "copy_source_event_id": source_id,
-            "copy_mode": "event_copy"
-        }),
-        None => serde_json::json!({ "title": title }),
+        Some(CreateEventProvenance::CancelledRecreate(source_id)) => {
+            audit::LegacyAuditMetadata::EventCreated {
+                creation_mode: audit::EventCreationMode::CancelledRecreate,
+                source_event_id: Some(source_id.clone()),
+            }
+        }
+        Some(CreateEventProvenance::EventCopy(source_id)) => {
+            audit::LegacyAuditMetadata::EventCreated {
+                creation_mode: audit::EventCreationMode::EventCopy,
+                source_event_id: Some(source_id.clone()),
+            }
+        }
+        None => audit::LegacyAuditMetadata::EventCreated {
+            creation_mode: audit::EventCreationMode::New,
+            source_event_id: None,
+        },
     }
 }

@@ -25,15 +25,14 @@ pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Respo
             .await?;
 
     let _ = session_db::revoke(&db, &auth.session_id).await;
-    let _ = crate::audit::write(
+    let _ = crate::audit::write_legacy(
         &db,
         rid,
         None,
         None,
-        "session",
-        Some(&auth.session_id),
-        "logout",
         None,
+        crate::audit::LegacyAuditAction::SessionLogout,
+        crate::audit::LegacyAuditMetadata::None,
     )
     .await;
 

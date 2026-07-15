@@ -210,8 +210,8 @@ async fn post_role_change(
         RoleMutation::Demote => token_purpose::DEMOTE_MEMBER,
     };
     let audit_action = match mutation {
-        RoleMutation::Promote => "membership.promoted_to_admin",
-        RoleMutation::Demote => "membership.demoted_to_member",
+        RoleMutation::Promote => audit::LegacyAuditAction::MembershipPromotedToAdmin,
+        RoleMutation::Demote => audit::LegacyAuditAction::MembershipDemotedToMember,
     };
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -238,15 +238,14 @@ async fn post_role_change(
 
     match result {
         membership_db::RoleUpdateResult::Changed => {
-            let _ = audit::write(
+            let _ = audit::write_legacy(
                 &db,
                 rid,
                 Some(community_id),
                 Some(&membership.membership_id),
-                "membership",
                 Some(target_membership_id),
                 audit_action,
-                None,
+                audit::LegacyAuditMetadata::None,
             )
             .await;
             redirect(&format!("/c/{community_id}/admin/members"))

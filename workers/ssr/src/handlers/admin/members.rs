@@ -218,15 +218,14 @@ pub async fn post_generate_invite(
         "member",
     )
     .await?;
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "invite_code",
         Some(&invite_id),
-        "generated",
-        None,
+        audit::LegacyAuditAction::InviteCodeGenerated,
+        audit::LegacyAuditMetadata::None,
     )
     .await;
     redirect(&format!("/c/{community_id}/admin/invites?code={code}"))
@@ -264,15 +263,14 @@ pub async fn post_revoke_invite(
 
     crate::codlet::revoke_invite(env, invite_id, community_id).await?;
 
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "invite_code",
         Some(invite_id),
-        "revoked",
-        None,
+        audit::LegacyAuditAction::InviteCodeRevoked,
+        audit::LegacyAuditMetadata::None,
     )
     .await;
 

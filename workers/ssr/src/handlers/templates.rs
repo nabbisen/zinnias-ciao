@@ -257,15 +257,14 @@ pub async fn post_create_template(
     )
     .await?;
 
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "event_template",
         Some(&template_id),
-        "created",
-        None,
+        audit::LegacyAuditAction::EventTemplateCreated,
+        audit::LegacyAuditMetadata::None,
     )
     .await;
 
@@ -306,15 +305,14 @@ pub async fn post_delete_template(
 
     tmpl_db::soft_delete(&db, template_id, community_id).await?;
 
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "event_template",
         Some(template_id),
-        "deleted",
-        None,
+        audit::LegacyAuditAction::EventTemplateDeleted,
+        audit::LegacyAuditMetadata::None,
     )
     .await;
 

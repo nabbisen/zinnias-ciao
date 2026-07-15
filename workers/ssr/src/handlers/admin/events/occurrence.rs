@@ -94,7 +94,7 @@ pub async fn post_cancel_occurrence(
     if replay.is_some() {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
-    let event = match event_db::find_for_community(&db, event_id, community_id).await? {
+    let _event = match event_db::find_for_community(&db, event_id, community_id).await? {
         Some(e) if e.status != "cancelled" => e,
         _ => return render::not_found(),
     };
@@ -117,19 +117,17 @@ pub async fn post_cancel_occurrence(
         exception_day_date,
     )
     .await?;
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "event_day",
         Some(day_id),
-        "occurrence_cancelled",
-        Some(serde_json::json!({
-            "event_id": event.id,
-            "series_id": series_id,
-            "exception_day_date": exception_day_date
-        })),
+        audit::LegacyAuditAction::EventOccurrenceCancelled,
+        audit::LegacyAuditMetadata::OccurrenceCancelled {
+            series_id: series_id.to_owned(),
+            day_date: exception_day_date.to_owned(),
+        },
     )
     .await;
     redirect(&format!("/c/{community_id}/events/{event_id}"))

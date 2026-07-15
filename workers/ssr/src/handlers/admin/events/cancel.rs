@@ -126,15 +126,14 @@ pub async fn post_cancel_event(
     }
 
     event_write::cancel_event(&db, event_id, &membership.membership_id).await?;
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "event",
         Some(event_id),
-        "cancelled",
-        None,
+        audit::LegacyAuditAction::EventCancelled,
+        audit::LegacyAuditMetadata::None,
     )
     .await;
 

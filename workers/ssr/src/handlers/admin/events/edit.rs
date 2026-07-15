@@ -291,17 +291,20 @@ pub async fn post_edit_event(
     )
     .await?;
 
-    let _ = audit::write(
+    let _ = audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "event",
         Some(event_id),
-        "edited",
-        Some(serde_json::json!({
-            "edit_scope": if schedule_editable { "single_day_schedule" } else { "details_only" }
-        })),
+        audit::LegacyAuditAction::EventEdited,
+        audit::LegacyAuditMetadata::EventEdited {
+            edit_scope: if schedule_editable {
+                audit::EventEditScope::SingleDaySchedule
+            } else {
+                audit::EventEditScope::DetailsOnly
+            },
+        },
     )
     .await;
 

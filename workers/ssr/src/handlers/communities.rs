@@ -253,18 +253,16 @@ pub async fn post_matrix_export_audit(
     crate::form_token::set_result(&db, &pepper, &token, "calendar_matrix_csv.export_requested")
         .await?;
 
-    crate::audit::write(
+    crate::audit::write_legacy(
         &db,
         rid,
         Some(community_id),
         Some(&membership.membership_id),
-        "calendar_matrix_csv",
         Some(&month),
-        "calendar_matrix_csv.export_requested",
-        Some(serde_json::json!({
-            "month": month,
-            "export_type": "calendar_matrix_csv",
-        })),
+        crate::audit::LegacyAuditAction::CalendarMatrixCsvExportRequested,
+        crate::audit::LegacyAuditMetadata::MatrixExportRequested {
+            month: month.clone(),
+        },
     )
     .await?;
 
