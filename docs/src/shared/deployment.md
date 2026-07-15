@@ -402,6 +402,30 @@ bunx wrangler d1 execute zinnias-ciao-staging --remote --env staging --command \
 Destructive migration changes require a backup/export and operator approval
 before applying to production.
 
+### RFC-079 migration 0010 boundary
+
+Migration `0010_audit_integrity.sql` destructively resets every historical
+`audit_log.metadata_json` value to `{}` while preserving core chronology. A
+pre-0010 export is potentially sensitive and must be handled under the
+[backup/recovery policy](../maintainer/backup-recovery.md) without inspecting or
+copying legacy metadata into evidence.
+
+Do not apply 0010 to hosted staging or production merely because the migration
+exists in the repository. Package 2 is non-deployable; hosted application waits
+for the later RFC-079 packages and architecture approval of an exact candidate.
+When authorized, apply to isolated staging first and verify only bounded values:
+
+- migration ledger contains `0010_audit_integrity.sql` once;
+- audit row count and core-column comparison match the approved preflight;
+- every migrated row has `request_id = 'legacy'` and `metadata_json = '{}'` by
+  count, without printing metadata;
+- both audit indexes and `audit_change_assertions` exist; and
+- the legacy and migration-guard tables are absent.
+
+Migration recovery is roll-forward only. Worker rollback does not restore the
+old audit schema and must never re-enable arbitrary metadata or best-effort
+required audits.
+
 ## Runtime Smoke
 
 The runtime smoke collector checks an already-running Worker URL. It does not

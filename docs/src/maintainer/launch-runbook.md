@@ -204,7 +204,10 @@ Or leave unset for a host-only cookie.
 bun run migrate:staging
 ```
 
-Confirm output shows all migrations applied (`0001` through `0009`).
+Confirm output shows all migrations applied (`0001` through `0010`) only for an
+RFC-079 exact candidate authorized for hosted staging. Migration 0010 resets
+legacy audit metadata; complete the sensitive-backup and bounded-verification
+steps in the shared deployment guide without displaying metadata.
 Then verify the D1-backed form-token table exists:
 
 ```sh
@@ -224,7 +227,9 @@ bunx wrangler d1 execute zinnias-ciao-staging --remote --env staging --command \
 bun run migrate:prod
 ```
 
-Confirm all migrations applied (`0001` through `0009`).
+Confirm all migrations applied (`0001` through `0010`). Production use of 0010
+requires the separately approved RFC-079 exact candidate and the staged
+destructive-migration evidence.
 
 - [ ] Done.
 
@@ -418,6 +423,8 @@ bunx wrangler rollback --env production
 
 The deployed Worker version and the migration state are independent. Rollback
 reverts the code; it does not revert the database. Write forward migrations only.
+After migration 0010, never roll back to code that accepts arbitrary audit
+metadata, omits required request IDs, or treats required audits as best effort.
 
 ---
 

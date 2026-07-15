@@ -136,9 +136,11 @@ Before mutation:
 1. Confirm the request through the external operator policy.
 2. Identify the community by `community_id`, not display name only.
 3. Identify one existing active admin membership by `membership_id`.
-4. Review recent audit rows:
+4. Review recent audit core rows without selecting metadata:
    ```sql
-   SELECT * FROM audit_log
+   SELECT id, request_id, community_id, actor_membership_id,
+          target_kind, target_id, action, created_at
+   FROM audit_log
    WHERE community_id = '<community_id>'
    ORDER BY created_at DESC
    LIMIT 50;
@@ -175,7 +177,7 @@ bun run recover:community-access -- \
   --url https://<staging-worker-url> \
   --community-id com_... \
   --admin-membership-id mem_... \
-  --operator-label INC-1234
+  --operator-label inc-1234
 ```
 
 Production additionally requires `--confirm-production` and an interactive
@@ -213,9 +215,14 @@ membership and are not merged by display name.
 
 ## Incident response
 
-1. Identify the affected community and actor from the `audit_log` table:
+1. Identify the affected community and actor from bounded audit core columns:
    ```sql
-   SELECT * FROM audit_log WHERE community_id = '<cid>' ORDER BY created_at DESC LIMIT 50;
+   SELECT id, request_id, community_id, actor_membership_id,
+          target_kind, target_id, action, created_at
+   FROM audit_log
+   WHERE community_id = '<cid>'
+   ORDER BY created_at DESC
+   LIMIT 50;
    ```
 2. Revoke the affected session (see above).
 3. If an invite code was compromised, revoke it (see above).
@@ -234,3 +241,16 @@ bunx wrangler tail --env production
 For persistent log storage, configure Logpush (see `docs/src/maintainer/launch-runbook.md` §6).
 Logs should never contain plaintext invite codes, session tokens, or note content —
 this is enforced by the audit writer (RFC-014).
+
+## Mixed legacy and canonical audit actions
+
+Migration 0010 preserves raw historical action values. Use the compatibility
+query in [Audit Retention and Access Policy](audit-policy.md#raw-history-compatibility-query)
+when an investigation spans pre- and post-RFC-079 rows. Keep raw
+`target_kind`/`action` beside the derived logical action, apply the three
+documented aliases before generic rules, and do not rewrite unknown history.
+
+Do not select `metadata_json` for ordinary chronology checks. All migrated
+legacy metadata is `{}`; new metadata is closed and typed but remains
+operator-only. Pre-0010 backups are potentially sensitive and follow the
+[Backup and Recovery](backup-recovery.md) access and roll-forward rules.

@@ -2126,6 +2126,14 @@ const RFC079_ASSERTION_WORKER_SRC: &str =
 const RFC079_ASSERTION_RUNNER_SRC: &str =
     include_str!("../../../scripts/test-rfc079-assertion.mjs");
 const RFC079_AUDIT_CORE_SRC: &str = include_str!("../../../workers/ssr/src/audit.rs");
+const RFC079_MIGRATION_SRC: &str = include_str!("../../../migrations/0010_audit_integrity.sql");
+const RFC079_MIGRATION_RUNNER_SRC: &str =
+    include_str!("../../../scripts/test-rfc079-migration.mjs");
+const RFC079_AUDIT_POLICY_SRC: &str = include_str!("../../../docs/src/maintainer/audit-policy.md");
+const RFC079_BACKUP_RECOVERY_SRC: &str =
+    include_str!("../../../docs/src/maintainer/backup-recovery.md");
+const RFC079_DEPLOYMENT_SRC: &str = include_str!("../../../docs/src/shared/deployment.md");
+const RFC079_OPERATIONS_SRC: &str = include_str!("../../../docs/src/maintainer/operations.md");
 
 #[derive(Default)]
 struct AuditSourceScan {
@@ -2636,6 +2644,110 @@ fn rfc079_package1_closed_core_and_nondeployable_boundary_are_pinned() {
             && RFC079_AUDIT_CORE_SRC.contains("LegacyAuditAction")
             && RFC079_AUDIT_CORE_SRC.contains("LegacyAuditMetadata"),
         "the private compatibility adapter must keep Package 1 explicitly non-deployable"
+    );
+}
+
+#[test]
+fn rfc079_package2_migration_and_operator_policy_are_pinned() {
+    for required in [
+        "CREATE TABLE audit_log_v2",
+        "request_id           TEXT NOT NULL",
+        "json_valid(metadata_json)",
+        "json_type(metadata_json) = 'object'",
+        "length(CAST(metadata_json AS BLOB)) <= 2048",
+        "CHECK (length(request_id) BETWEEN 1 AND 96)",
+        "CREATE TABLE audit_change_assertions",
+        "length(operation_id) = 26",
+        "changed_count INTEGER NOT NULL CHECK (changed_count = 1)",
+        "CREATE INDEX idx_audit_log_community_created_at",
+        "CREATE INDEX idx_audit_log_action_created_at",
+    ] {
+        assert!(
+            RFC079_MIGRATION_SRC.contains(required),
+            "RFC-079 migration 0010 is missing {required:?}"
+        );
+    }
+    assert!(
+        RFC079_MIGRATION_SRC.contains("'legacy'")
+            && RFC079_MIGRATION_SRC.contains("'{}'")
+            && !RFC079_MIGRATION_SRC.contains("SELECT metadata_json")
+            && !RFC079_MIGRATION_SRC.contains("metadata_json FROM audit_log"),
+        "migration 0010 must assign legacy request IDs and empty metadata without reading legacy metadata"
+    );
+    assert_eq!(
+        RFC079_MIGRATION_SRC.matches("EXCEPT").count(),
+        2,
+        "migration 0010 must compare preserved core rows in both directions"
+    );
+    let verify_position = RFC079_MIGRATION_SRC
+        .find("'core_rows_reverse'")
+        .expect("migration must contain reverse core-row verification");
+    let swap_position = RFC079_MIGRATION_SRC
+        .find("ALTER TABLE audit_log RENAME TO audit_log_legacy_0010")
+        .expect("migration must swap the old audit table only after verification");
+    let drop_position = RFC079_MIGRATION_SRC
+        .find("DROP TABLE audit_log_legacy_0010")
+        .expect("migration must remove the old audit table after the swap");
+    assert!(
+        verify_position < swap_position && swap_position < drop_position,
+        "migration verification, swap, and drop order changed"
+    );
+    assert!(
+        RFC079_MIGRATION_SRC.contains("CHECK (passed = 1)")
+            && RFC079_MIGRATION_SRC.contains("DROP TABLE audit_migration_0010_guard"),
+        "migration mismatch checks must fail closed and leave no guard table"
+    );
+    assert!(
+        RFC079_AUDIT_CORE_SRC.contains(
+            "(id, request_id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at)"
+        ) && RFC079_AUDIT_CORE_SRC.contains("D1Type::Text(self.request_id.as_str())")
+            && RFC079_AUDIT_CORE_SRC.matches("unwrap_or(D1Type::Null)").count() == 3,
+        "the central statement builder must bind the validated request ID required by migration 0010"
+    );
+
+    assert!(
+        RFC079_MIGRATION_RUNNER_SRC.contains("'migrations', 'apply'")
+            && RFC079_MIGRATION_RUNNER_SRC.contains("'--local'")
+            && RFC079_MIGRATION_RUNNER_SRC.contains("'--persist-to'")
+            && !RFC079_MIGRATION_RUNNER_SRC.contains("'--remote'")
+            && RFC079_MIGRATION_RUNNER_SRC.contains("legacyMetadataSelected: false")
+            && RFC079_MIGRATION_RUNNER_SRC.contains("legacyMetadataPrinted: false")
+            && RFC079_MIGRATION_RUNNER_SRC.contains("inheritNonAuthorityEnvironment")
+            && RFC079_MIGRATION_RUNNER_SRC.contains("sentinel authority value was read"),
+        "Package 2 rehearsal must apply the real ledger locally, isolate authority, and never select/print legacy metadata"
+    );
+
+    let alias_occurrence = RFC079_AUDIT_POLICY_SRC
+        .find("target_kind = 'event_day' AND action = 'occurrence_cancelled'")
+        .expect("audit policy must define the event-day alias");
+    let alias_generated = RFC079_AUDIT_POLICY_SRC
+        .find("target_kind = 'calendar_feed' AND action = 'calendar_token_generated'")
+        .expect("audit policy must define the calendar-generation alias");
+    let alias_revoked = RFC079_AUDIT_POLICY_SRC
+        .find("target_kind = 'calendar_feed' AND action = 'calendar_token_revoked'")
+        .expect("audit policy must define the calendar-revocation alias");
+    let generic_rule = RFC079_AUDIT_POLICY_SRC
+        .find("WHEN instr(action, '.') > 0 THEN action")
+        .expect("audit policy must define the namespaced-action fallback");
+    assert!(
+        alias_occurrence < generic_rule
+            && alias_generated < generic_rule
+            && alias_revoked < generic_rule
+            && RFC079_AUDIT_POLICY_SRC.contains("target_kind AS raw_target_kind")
+            && RFC079_AUDIT_POLICY_SRC.contains("action AS raw_action")
+            && RFC079_AUDIT_POLICY_SRC.contains("community.exported")
+            && RFC079_AUDIT_POLICY_SRC.contains("community.export_authorized"),
+        "raw-history compatibility policy must preserve raw values and apply explicit aliases before generic rules"
+    );
+    assert!(
+        RFC079_BACKUP_RECOVERY_SRC.contains("pre-0010")
+            && RFC079_BACKUP_RECOVERY_SRC.contains("potentially sensitive")
+            && RFC079_BACKUP_RECOVERY_SRC.contains("Roll-forward recovery")
+            && RFC079_DEPLOYMENT_SRC.contains("Package 2 is non-deployable")
+            && RFC079_DEPLOYMENT_SRC.contains("roll-forward only")
+            && RFC079_OPERATIONS_SRC.contains("Mixed legacy and canonical audit actions")
+            && RFC079_OPERATIONS_SRC.contains("Do not select `metadata_json`"),
+        "Package 2 operator policy must cover sensitive backups, non-deployment, compatibility queries, and roll-forward recovery"
     );
 }
 

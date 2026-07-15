@@ -43,7 +43,13 @@ wc -l backup-*.sql
 ```
 
 The export file is a portable SQLite dump. Store it securely — it contains
-community names, display names, and event content.
+community names, display names, event content, and audit history.
+
+Any backup created before RFC-079 migration 0010 may also contain unsafe legacy
+`audit_log.metadata_json`. Classify it as potentially sensitive without opening,
+querying, or copying that metadata into tickets or review evidence. Restrict
+access to the minimum operator group and apply the approved retention/deletion
+policy to the backup as a whole.
 
 **Never commit backup files to source control.**
 
@@ -61,15 +67,22 @@ bunx wrangler d1 create zinnias-ciao-restored
 bunx wrangler d1 execute zinnias-ciao-restored --remote --env production \
   --file backup-YYYYMMDD-HHMMSS.sql
 
-# 3. Update ignored wrangler.production.local.toml to point to the new database ID, then deploy
+# 3. Apply every forward migration, including 0010, before binding a Worker.
+#    Do not inspect or export legacy audit metadata during this step.
+bunx wrangler d1 migrations apply zinnias-ciao-restored --remote \
+  --config wrangler.production.local.toml
+
+# 4. Update ignored wrangler.production.local.toml to point to the new database ID, then deploy
 #    wrangler.production.local.toml [[env.production.d1_databases]] database_id = "<new id>"
 bunx wrangler deploy --env production --config wrangler.production.local.toml
 
-# 4. Verify, then delete the old broken database when confident
+# 5. Verify, then delete the old broken database when confident
 ```
 
-A restore replaces the database; any changes made since the backup point are lost.
-Communicate downtime to community admins before restoring.
+A restore replaces the database; any changes made since the backup point are
+lost. Communicate downtime to community admins before restoring. A restored
+pre-0010 database must never receive traffic until migration 0010 has reset
+legacy metadata and the compatible forward-only application candidate is ready.
 
 ---
 
@@ -93,7 +106,8 @@ D1 exports contain:
 - Community names and event titles.
 - Member display names and notes.
 - Attendance records.
-- Audit log entries (without note content).
+- Audit log entries. Pre-0010 backups may contain untrusted arbitrary metadata
+  even though note content was prohibited by policy.
 
 They do **not** contain:
 
@@ -115,6 +129,13 @@ D1 migrations are forward-only. To undo a migration:
 
 Never delete rows from the `d1_migrations` table to "reset" a migration —
 this will cause the migration to re-apply and may cause data loss.
+
+Migration 0010 is a destructive privacy boundary. Roll-forward recovery must
+not restore arbitrary legacy metadata, the shallow redactor, stringly typed
+actions, or best-effort required-audit behavior. If a post-0010 problem occurs,
+keep traffic stopped, write a new reviewed forward migration or restore into an
+isolated replacement database, then apply 0010 before verification. Do not use
+schema rollback to make old metadata live again.
 
 ---
 

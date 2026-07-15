@@ -1,192 +1,192 @@
-# Audit Retention and Access Policy (RFC-052)
+# Audit Retention and Access Policy (RFC-052 / RFC-079)
 
 **Applies to:** ciao.zinnias pilot and beta  
-**Implemented in:** v0.36.0  
-**Source:** `workers/ssr/src/audit.rs`, `workers/ssr/src/handlers/`, `migrations/0001_initial.sql`
-
----
+**Source:** `workers/ssr/src/audit.rs`, `workers/ssr/src/handlers/`,
+`migrations/0010_audit_integrity.sql`
 
 ## Overview
 
-ciao.zinnias records structured audit events for security- and
-moderation-relevant admin actions. This document defines who can read them,
-how long they are kept, what metadata is allowed, and how the operator uses
-them for incident response.
+Audit events are operator-only security and moderation records. RFC-079 makes
+required audit writes atomic with their business mutations, closes action and
+metadata inputs, and recursively sanitizes the typed metadata before storage.
+The migration resets all historical metadata to `{}` because the old arbitrary
+JSON writer and direct inserts could not prove that legacy values were safe.
 
----
+Package 2 defines the final schema and policy, but it is not itself deployable.
+Do not apply migration 0010 to a hosted database until the later implementation
+packages and architecture review establish the earliest deployable boundary.
 
 ## Access policy
 
-Audit events are **operator access only**. There is no audit UI in the
-application. Members and admins cannot read audit records through the app.
-
-The operator reads audit events directly from D1:
+Members and admins cannot read audit records through the application. Only an
+authorized operator may query them directly in D1. Prefer explicit core columns
+and bounded result sets; do not use `SELECT *` in evidence collection.
 
 ```sql
--- Most recent 50 events in a community
-SELECT id, actor_membership_id, target_kind, target_id, action,
-       metadata_json, created_at
-FROM   audit_log
-WHERE  community_id = '<community_id>'
-ORDER  BY created_at DESC
-LIMIT  50;
-
--- Events for a specific membership
-SELECT * FROM audit_log
-WHERE  actor_membership_id = '<membership_id>'
-ORDER  BY created_at DESC
-LIMIT  100;
-
--- Events for a specific action type
-SELECT * FROM audit_log
-WHERE  action = 'removed'
-ORDER  BY created_at DESC
-LIMIT  100;
+SELECT id, request_id, community_id, actor_membership_id,
+       target_kind, target_id, action, created_at
+FROM audit_log
+WHERE community_id = '<community_id>'
+ORDER BY created_at DESC
+LIMIT 50;
 ```
 
----
+Metadata is not needed for ordinary chronology checks. When an approved
+incident investigation requires typed metadata, select it deliberately and do
+not copy it into review evidence.
+
+## Raw-history compatibility query
+
+Migration 0010 preserves every historical `target_kind` and `action` byte-for-
+byte. It does not rename legacy values. Use this query to derive a logical
+action for mixed legacy/new history while retaining both raw columns:
+
+```sql
+SELECT
+    id,
+    request_id,
+    community_id,
+    actor_membership_id,
+    target_kind AS raw_target_kind,
+    target_id,
+    action AS raw_action,
+    CASE
+        WHEN target_kind = 'event_day' AND action = 'occurrence_cancelled'
+            THEN 'event.occurrence_cancelled'
+        WHEN target_kind = 'calendar_feed' AND action = 'calendar_token_generated'
+            THEN 'calendar_feed.token_generated'
+        WHEN target_kind = 'calendar_feed' AND action = 'calendar_token_revoked'
+            THEN 'calendar_feed.token_revoked'
+        WHEN instr(action, '.') > 0 THEN action
+        ELSE target_kind || '.' || action
+    END AS logical_action,
+    created_at
+FROM audit_log
+ORDER BY created_at DESC
+LIMIT 100;
+```
+
+The three aliases must precede the generic rules. Historical `community` +
+`exported` therefore remains `community.exported` and is distinct from new
+pre-disclosure evidence named `community.export_authorized`. Unknown historical
+values remain visible through the generic `target_kind || '.' || action` rule;
+operators must not guess or rewrite their meaning.
 
 ## Retention policy
 
-**Pilot and beta:** indefinite. Audit log volume is small (one row per admin
-action). No TTL cleanup runs.
+**Pilot and beta:** indefinite. No TTL cleanup runs.
 
-**Future production:** a TTL-based cleanup job may be added by a follow-up
-RFC once volume is understood. The minimum recommended retention is 90 days
-for incident investigation.
+**Future production:** a follow-up RFC may add TTL cleanup after volume and
+incident needs are understood. The current minimum recommendation is 90 days.
 
----
+Backups created before migration 0010 are a separate sensitive class because
+they may contain unsafe legacy `metadata_json`. Follow
+[Backup and Recovery](backup-recovery.md) without opening or copying that
+metadata into evidence.
 
-## Metadata allowlist
+## Closed metadata allowlist
 
-Each audit record stores structured JSON metadata. The following fields are
-permitted:
+Identifiers already represented by `community_id`, `actor_membership_id`, or
+`target_id` are never duplicated in metadata.
 
-| Field | Type | Example | Notes |
-|---|---|---|---|
-| `title` | string | `"お花見 2026"` | Event title at time of action |
-| `role_granted` | string | `"admin"` or `"member"` | On invite redemption |
-| `membership_id` | string | `"mem_xxx"` | Help-signin target membership |
-| `created_by_membership_id` | string | `"mem_admin"` | Admin membership that created a help-signin code |
-| `community_id` | string | `"com_xxx"` | Community scope for help-signin audit |
+| Action family | Allowed metadata |
+|---|---|
+| Invite generation/revocation, membership removal/role, event cancellation, templates, calendar tokens, community export, logout | `{}` |
+| Invite redemption | Optional closed `role_granted` value only when required |
+| Relink creation/redemption | `relink_code_id` only |
+| Operator recovery | Lowercase bounded `operator_label`, `relink_code_id` |
+| Event creation | `creation_mode`, optional `source_event_id` |
+| Event edit | `edit_scope` or fixed `changed_fields` |
+| Occurrence cancellation | `series_id`, ISO local `day_date` |
+| Attendance override | Bounded integer `changed_count` |
+| Admin note moderation | Target membership ID only when no target column can represent it |
+| Display-name update | `changed_fields: ["display_name"]` |
+| Matrix export request | Validated `YYYY-MM` month |
 
-The following fields are **explicitly forbidden** from metadata:
+Event titles/descriptions, display names, note content, exported content,
+credentials, codes, HMACs, sessions, cookies, and arbitrary JSON are forbidden.
+The typed model is the primary boundary. The recursive sanitizer is defense in
+depth and enforces an object root, depth 8, 128 visited nodes, and 2,048
+serialized UTF-8 bytes.
 
-- Note body text (`memo`, `note`, `body`)
-- Invite code plaintexts or HMACs (`code`, `code_hmac`)
-- Session token values (`session_id`, `token`)
-- Display names or personal information beyond what is already captured in `actor_membership_id` / `target_id`
+## Canonical action inventory
 
-The `audit.rs` writer calls `redact_sensitive_keys()` before persisting any
-metadata JSON. The redact list covers `password`, `token`, `secret`, `code`,
-`hmac`, `session`, `note`, `memo`, `body`.
+Class A contains exactly 23 actions:
 
----
+```text
+community.created
+membership.created_first_admin
+membership.display_name_updated
+invite_code.generated
+invite_code.revoked
+invite_code.redeemed
+membership.relink_code_created
+membership.relink_redeemed
+operator_recovery.admin_relink_created
+membership.removed
+membership.promoted_to_admin
+membership.demoted_to_member
+event.created
+event.edited
+event.cancelled
+event.occurrence_cancelled
+attendance.admin_override
+attendance.admin_set_attended
+event_note.admin_hidden
+calendar_feed.token_generated
+calendar_feed.token_revoked
+event_template.created
+event_template.deleted
+```
 
-## Audit event inventory
-
-All events currently written. Format: `target_kind.action`.
-
-| Event | Trigger | Actor |
-|---|---|---|
-| `invite_code.generated` | Admin generates an invite code | Admin |
-| `invite_code.redeemed` | User redeems a valid invite code (join succeeds) | New member |
-| `invite_code.revoked` | Admin revokes an unused invite code | Admin |
-| `membership.removed` | Admin removes a member | Admin |
-| `membership.relink_code_created` | Admin creates an active-member help-signin code | Admin |
-| `membership.relink_redeemed` | Member redeems a help-signin code | Member |
-| `event.created` | Admin creates a new event | Admin |
-| `event.edited` | Admin edits an event's fields | Admin |
-| `event.cancelled` | Admin cancels an event | Admin |
-| `attendance.admin_override` | Admin sets attendance for a member | Admin |
-| `attendance.admin_set_attended` | Admin marks a member as attended after event end | Admin |
-| `event_note.admin_hidden` | Admin hides an inappropriate member note | Admin |
-| `session.logout` | Any user logs out | Member or Admin |
-| `calendar_feed.calendar_token_generated` | Member generates an ICS feed URL | Member |
-| `calendar_feed.calendar_token_revoked` | Member revokes their ICS feed URL | Member |
-| `community.exported` | Admin downloads community JSON export | Admin |
-| `event_template.created` | Admin saves an event template | Admin |
-| `event_template.deleted` | Admin deletes an event template | Admin |
-
----
+Class B contains `community.export_authorized` and
+`calendar_matrix_csv.export_requested`. Class C contains only `session.logout`
+and carries no session, actor, community, or target identifier.
 
 ## Schema reference
 
-```sql
-CREATE TABLE IF NOT EXISTS audit_log (
-    id                   TEXT PRIMARY KEY,
-    community_id         TEXT,
-    actor_membership_id  TEXT,
-    target_kind          TEXT NOT NULL,
-    target_id            TEXT,
-    action               TEXT NOT NULL,
-    metadata_json        TEXT,         -- structured JSON; sensitive keys redacted
-    created_at           TEXT NOT NULL -- UTC ISO-8601
-);
-```
+Migration 0010 rebuilds `audit_log` as a STRICT table with:
 
-The `id` column is a 16-character random hex string generated at write time.
-There is no auto-increment; UUIDs were avoided to keep the size small.
+- `request_id TEXT NOT NULL` bounded to 1–96 bytes;
+- required object JSON metadata bounded to 2,048 bytes;
+- bounded ID, target-kind, and action fields;
+- `(community_id, created_at)` and `(action, created_at)` indexes; and
+- a shared STRICT `audit_change_assertions` table for the reviewed one-row
+  assertion primitive.
 
----
+All legacy rows receive `request_id = 'legacy'` and `metadata_json = '{}'`.
+Migration guard checks compare the row count and every core column in both
+directions before the old table is dropped.
 
-## Incident response procedure
-
-### Investigate suspicious invite-code activity
+## Incident response queries
 
 ```sql
-SELECT id, actor_membership_id, target_id, action, metadata_json, created_at
-FROM   audit_log
-WHERE  target_kind = 'invite_code'
-  AND  created_at >= datetime('now', '-7 days')
-ORDER  BY created_at DESC;
+-- Invite chronology without metadata
+SELECT id, request_id, community_id, actor_membership_id,
+       target_kind, target_id, action, created_at
+FROM audit_log
+WHERE target_kind = 'invite_code'
+  AND created_at >= datetime('now', '-7 days')
+ORDER BY created_at DESC
+LIMIT 100;
+
+-- Membership chronology
+SELECT id, request_id, community_id, actor_membership_id,
+       target_kind, target_id, action, created_at
+FROM audit_log
+WHERE target_kind = 'membership'
+  AND target_id = '<membership_id>'
+ORDER BY created_at DESC
+LIMIT 100;
 ```
 
-If repeated `invite_code.redeemed` events appear with different
-`actor_membership_id` values in a short window, investigate whether codes were
-shared broadly. Revoke the relevant codes:
-
-```sql
--- Identify the invite code IDs from the audit target_id
--- Then mark them revoked in the invite_codes table:
-UPDATE invite_codes SET revoked_at = datetime('now') WHERE id = '<code_id>';
-```
-
-### Investigate removed member
-
-```sql
-SELECT * FROM audit_log
-WHERE  target_kind  = 'membership'
-  AND  target_id    = '<membership_id>'
-ORDER  BY created_at DESC;
-```
-
-### Investigate note moderation
-
-```sql
-SELECT * FROM audit_log
-WHERE  target_kind = 'event_note'
-ORDER  BY created_at DESC
-LIMIT  50;
-```
-
----
-
-## What audit does not cover
-
-The following are **not** audit-logged and are by design:
-
-- Member self-service attendance changes (`going`, `not_going`) — high-volume,
-  low-risk; observable via the `attendances` table directly
-- Member memo saves and deletes (own notes) — observable via `event_notes`
-- Read access (GET requests) — no logging; D1 query logs via Logpush if needed
-- Failed authentication attempts — rate-limit state is in KV, not D1
-
----
+Member self-service attendance, a member's own note writes, reads, and invalid
+credential guesses remain intentionally unaudited at subject level.
 
 ## Related
 
-- RFC-014 — Audit system implementation
-- RFC-052 — This policy RFC
-- `docs/src/maintainer/operations.md` — D1 direct access commands
-- `docs/src/maintainer/backup-recovery.md` — D1 backup and restore
+- RFC-014 — original audit implementation
+- RFC-052 — retention and access policy
+- RFC-079 — atomic required audits and recursive redaction
+- `docs/src/maintainer/operations.md` — operator procedures
+- `docs/src/maintainer/backup-recovery.md` — sensitive backup and recovery policy

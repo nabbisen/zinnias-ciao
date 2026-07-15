@@ -6,7 +6,7 @@
 use crate::crypto::random_token;
 use crate::db::now_utc;
 use serde_json::{Map, Value, json};
-use worker::{D1Database, Result, console_log};
+use worker::{D1Database, D1Type, Result, console_log};
 
 const MAX_ID_BYTES: usize = 128;
 const MAX_REQUEST_ID_BYTES: usize = 96;
@@ -487,21 +487,38 @@ impl AuditRecord {
     }
 
     pub(crate) fn statement(&self, db: &D1Database) -> Result<worker::D1PreparedStatement> {
+        let community_id = self
+            .community_id
+            .as_deref()
+            .map(D1Type::Text)
+            .unwrap_or(D1Type::Null);
+        let actor_membership_id = self
+            .actor_membership_id
+            .as_deref()
+            .map(D1Type::Text)
+            .unwrap_or(D1Type::Null);
+        let target_id = self
+            .target_id
+            .as_deref()
+            .map(D1Type::Text)
+            .unwrap_or(D1Type::Null);
+        let values = [
+            D1Type::Text(self.id.as_str()),
+            D1Type::Text(self.request_id.as_str()),
+            community_id,
+            actor_membership_id,
+            D1Type::Text(self.action.target_kind()),
+            target_id,
+            D1Type::Text(self.action.canonical()),
+            D1Type::Text(self.metadata_json.as_str()),
+            D1Type::Text(self.created_at.as_str()),
+        ];
         db.prepare(
             "INSERT INTO audit_log \
-             (id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+             (id, request_id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         )
-        .bind(&[
-            self.id.as_str().into(),
-            self.community_id.as_deref().unwrap_or("").into(),
-            self.actor_membership_id.as_deref().unwrap_or("").into(),
-            self.action.target_kind().into(),
-            self.target_id.as_deref().unwrap_or("").into(),
-            self.action.canonical().into(),
-            self.metadata_json.as_str().into(),
-            self.created_at.as_str().into(),
-        ])
+        .bind_refs(&values)
     }
 
     fn success_event(&self) -> String {
