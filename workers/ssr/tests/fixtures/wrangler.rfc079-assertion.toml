@@ -1,0 +1,11 @@
+name = "zinnias-ciao-rfc079-assertion-local"
+main = "rfc079-assertion-worker.mjs"
+# Maximum supported by the Wrangler 4.97.0 bundled local workerd used by this
+# proof harness. This test-only setting does not change the application Worker.
+compatibility_date = "2026-06-08"
+workers_dev = false
+
+[[d1_databases]]
+binding = "PROOF_DB"
+database_name = "zinnias-ciao-rfc079-assertion-local"
+database_id = "local"

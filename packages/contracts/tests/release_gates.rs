@@ -2117,6 +2117,556 @@ const MEMBERS_HANDLER_SRC: &str =
 const JOIN_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/join.rs");
 const INVITE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/invite.rs");
 
+// ── RFC-079 Package 0A audit inventory gate ─────────────────────────────
+
+const RFC079_ASSERTION_FIXTURE_SRC: &str =
+    include_str!("../../../workers/ssr/tests/fixtures/audit_change_assertion.sql");
+const RFC079_ASSERTION_WORKER_SRC: &str =
+    include_str!("../../../workers/ssr/tests/fixtures/rfc079-assertion-worker.mjs");
+const RFC079_ASSERTION_RUNNER_SRC: &str =
+    include_str!("../../../scripts/test-rfc079-assertion.mjs");
+
+#[derive(Default)]
+struct AuditSourceScan {
+    generic_calls: std::collections::BTreeMap<String, Vec<String>>,
+    direct_inserts: std::collections::BTreeMap<String, usize>,
+    assertion_table_refs: Vec<String>,
+    operation_id_refs: Vec<String>,
+}
+
+fn compact_source(value: &str) -> String {
+    value.split_whitespace().collect()
+}
+
+fn named_call_blocks(source: &str, needle: &str) -> Vec<String> {
+    assert!(
+        needle.ends_with('('),
+        "call needle must end with an opening parenthesis"
+    );
+    let mut blocks = Vec::new();
+    let mut cursor = 0usize;
+
+    while let Some(relative_start) = source[cursor..].find(needle) {
+        let start = cursor + relative_start;
+        let open = start + needle.len() - 1;
+        let preceding_token = source[..start].split_whitespace().last();
+        if preceding_token == Some("fn") {
+            cursor = open + 1;
+            continue;
+        }
+        let mut depth = 0usize;
+        let mut in_string = false;
+        let mut escaped = false;
+        let mut end = None;
+
+        for (offset, ch) in source[open..].char_indices() {
+            if in_string {
+                if escaped {
+                    escaped = false;
+                } else if ch == '\\' {
+                    escaped = true;
+                } else if ch == '"' {
+                    in_string = false;
+                }
+                continue;
+            }
+            if ch == '"' {
+                in_string = true;
+            } else if ch == '(' {
+                depth += 1;
+            } else if ch == ')' {
+                depth = depth
+                    .checked_sub(1)
+                    .expect("audit call parser encountered an unmatched closing parenthesis");
+                if depth == 0 {
+                    end = Some(open + offset + ch.len_utf8());
+                    break;
+                }
+            }
+        }
+
+        let end = end.expect("named call must have balanced parentheses");
+        blocks.push(compact_source(&source[start..end]));
+        cursor = end;
+    }
+
+    blocks
+}
+
+fn audit_call_blocks(source: &str) -> Vec<String> {
+    named_call_blocks(source, "audit::write(")
+}
+
+fn compact_brace_block(source: &str, marker: &str) -> String {
+    let start = source
+        .find(marker)
+        .unwrap_or_else(|| panic!("missing source marker {marker:?}"));
+    let open = source[start..]
+        .find('{')
+        .map(|offset| start + offset)
+        .unwrap_or_else(|| panic!("source marker {marker:?} has no opening brace"));
+    let mut depth = 0usize;
+    let mut end = None;
+    for (offset, ch) in source[open..].char_indices() {
+        if ch == '{' {
+            depth += 1;
+        } else if ch == '}' {
+            depth = depth
+                .checked_sub(1)
+                .expect("brace parser encountered an unmatched closing brace");
+            if depth == 0 {
+                end = Some(open + offset + ch.len_utf8());
+                break;
+            }
+        }
+    }
+    let end = end.unwrap_or_else(|| panic!("source marker {marker:?} has unbalanced braces"));
+    compact_source(&source[start..end])
+}
+
+fn collect_rust_sources(
+    root: &std::path::Path,
+    directory: &std::path::Path,
+    output: &mut Vec<(String, String)>,
+) {
+    let mut entries = std::fs::read_dir(directory)
+        .unwrap_or_else(|error| panic!("failed to scan {}: {error}", directory.display()))
+        .map(|entry| entry.expect("Rust source directory entry must be readable"))
+        .collect::<Vec<_>>();
+    entries.sort_by_key(|entry| entry.path());
+
+    for entry in entries {
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .expect("Rust source entry type must be readable");
+        if file_type.is_dir() {
+            collect_rust_sources(root, &path, output);
+        } else if file_type.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
+            let relative = path
+                .strip_prefix(root)
+                .expect("scanned Rust source must stay under workers/ssr/src")
+                .to_string_lossy()
+                .replace('\\', "/");
+            let source = std::fs::read_to_string(&path)
+                .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+            output.push((relative, source));
+        }
+    }
+}
+
+fn scan_audit_sources(sources: &[(String, String)]) -> AuditSourceScan {
+    let mut scan = AuditSourceScan::default();
+    for (path, source) in sources {
+        let calls = audit_call_blocks(source);
+        if !calls.is_empty() {
+            scan.generic_calls.insert(path.clone(), calls);
+        }
+        let direct_count = source.matches("INSERT INTO audit_log").count();
+        if direct_count > 0 {
+            scan.direct_inserts.insert(path.clone(), direct_count);
+        }
+        if source.contains("audit_change_assertions") {
+            scan.assertion_table_refs.push(path.clone());
+        }
+        if source.contains("operation_id") {
+            scan.operation_id_refs.push(path.clone());
+        }
+    }
+    scan
+}
+
+fn call_shapes_match(actual: &[String], expected_shapes: &[&str]) -> bool {
+    actual.len() == expected_shapes.len()
+        && expected_shapes.iter().all(|expected| {
+            actual
+                .iter()
+                .filter(|call| call.contains(&compact_source(expected)))
+                .count()
+                == 1
+        })
+        && actual.iter().all(|call| {
+            expected_shapes
+                .iter()
+                .filter(|expected| call.contains(&compact_source(expected)))
+                .count()
+                == 1
+        })
+}
+
+#[test]
+fn rfc079_package0a_current_audit_inventory_is_pinned() {
+    let source_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../workers/ssr/src")
+        .canonicalize()
+        .expect("workers/ssr/src must exist for the RFC-079 repository-wide source gate");
+    let mut sources = Vec::new();
+    collect_rust_sources(&source_root, &source_root, &mut sources);
+    assert!(
+        sources.len() >= 78,
+        "RFC-079 source gate scanned too few Rust files; repository root may be wrong"
+    );
+    let scan = scan_audit_sources(&sources);
+
+    let expected_generic_counts = std::collections::BTreeMap::from([
+        ("handlers/admin/events/attendance.rs".to_owned(), 1usize),
+        ("handlers/admin/events/cancel.rs".to_owned(), 1),
+        ("handlers/admin/events/create.rs".to_owned(), 1),
+        ("handlers/admin/events/edit.rs".to_owned(), 1),
+        ("handlers/admin/events/notes.rs".to_owned(), 1),
+        ("handlers/admin/events/occurrence.rs".to_owned(), 1),
+        ("handlers/admin/help_signin.rs".to_owned(), 1),
+        ("handlers/admin/member_remove.rs".to_owned(), 1),
+        ("handlers/admin/members.rs".to_owned(), 2),
+        ("handlers/admin/role_transfer.rs".to_owned(), 1),
+        ("handlers/auth.rs".to_owned(), 1),
+        ("handlers/calendar.rs".to_owned(), 1),
+        ("handlers/communities.rs".to_owned(), 1),
+        ("handlers/event.rs".to_owned(), 1),
+        ("handlers/export.rs".to_owned(), 1),
+        ("handlers/join.rs".to_owned(), 1),
+        ("handlers/relink.rs".to_owned(), 1),
+        ("handlers/templates.rs".to_owned(), 2),
+    ]);
+    let actual_generic_counts = scan
+        .generic_calls
+        .iter()
+        .map(|(path, calls)| (path.clone(), calls.len()))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(
+        actual_generic_counts, expected_generic_counts,
+        "repository-wide generic audit-call distribution changed; reconcile RFC-079 before proceeding"
+    );
+
+    let expected_direct_inserts = std::collections::BTreeMap::from([
+        ("audit.rs".to_owned(), 1usize),
+        ("db/community.rs".to_owned(), 2),
+        ("handlers/me.rs".to_owned(), 1),
+        ("handlers/operator.rs".to_owned(), 1),
+    ]);
+    assert_eq!(
+        scan.direct_inserts, expected_direct_inserts,
+        "repository-wide audit INSERT distribution changed; audit.rs must be the one central insert and exactly four current direct inserts must remain reconciled"
+    );
+
+    assert_eq!(
+        scan.generic_calls.values().map(Vec::len).sum::<usize>(),
+        20,
+        "RFC-079 accepted inventory expects exactly 20 generic audit-writer call sites"
+    );
+    assert!(
+        scan.assertion_table_refs.is_empty() && scan.operation_id_refs.is_empty(),
+        "Package 0A assertion table/operation ID must not appear in production Rust sources: table={:?}, operation_id={:?}",
+        scan.assertion_table_refs,
+        scan.operation_id_refs
+    );
+
+    let expected_call_shapes: [(&str, &[&str]); 18] = [
+        (
+            "handlers/auth.rs",
+            &["\"session\", Some(&auth.session_id), \"logout\", None"],
+        ),
+        (
+            "handlers/calendar.rs",
+            &["\"calendar_feed\", target_id, action, metadata"],
+        ),
+        (
+            "handlers/communities.rs",
+            &["\"calendar_matrix_csv\", Some(&month), \"calendar_matrix_csv.export_requested\""],
+        ),
+        (
+            "handlers/export.rs",
+            &["\"community\", Some(community_id), \"exported\", None"],
+        ),
+        (
+            "handlers/event.rs",
+            &["\"attendance\", Some(day_id), \"admin_set_attended\""],
+        ),
+        (
+            "handlers/join.rs",
+            &["\"invite_code\", Some(&invite_id), \"redeemed\""],
+        ),
+        (
+            "handlers/relink.rs",
+            &["\"membership\", Some(&target.membership_id), \"membership.relink_redeemed\""],
+        ),
+        (
+            "handlers/templates.rs",
+            &[
+                "\"event_template\", Some(&template_id), \"created\", None",
+                "\"event_template\", Some(template_id), \"deleted\", None",
+            ],
+        ),
+        (
+            "handlers/admin/help_signin.rs",
+            &["\"membership\", Some(target_membership_id), \"membership.relink_code_created\""],
+        ),
+        (
+            "handlers/admin/member_remove.rs",
+            &["\"membership\", Some(target_membership_id), \"removed\", None"],
+        ),
+        (
+            "handlers/admin/members.rs",
+            &[
+                "\"invite_code\", Some(&invite_id), \"generated\", None",
+                "\"invite_code\", Some(invite_id), \"revoked\", None",
+            ],
+        ),
+        (
+            "handlers/admin/role_transfer.rs",
+            &["\"membership\", Some(target_membership_id), audit_action, None"],
+        ),
+        (
+            "handlers/admin/events/attendance.rs",
+            &["\"attendance\", Some(event_id), \"admin_override\""],
+        ),
+        (
+            "handlers/admin/events/cancel.rs",
+            &["\"event\", Some(event_id), \"cancelled\", None"],
+        ),
+        (
+            "handlers/admin/events/create.rs",
+            &["\"event\", Some(&event_id), \"created\""],
+        ),
+        (
+            "handlers/admin/events/edit.rs",
+            &["\"event\", Some(event_id), \"edited\""],
+        ),
+        (
+            "handlers/admin/events/notes.rs",
+            &["\"event_note\", Some(event_id), \"admin_hidden\""],
+        ),
+        (
+            "handlers/admin/events/occurrence.rs",
+            &["\"event_day\", Some(day_id), \"occurrence_cancelled\""],
+        ),
+    ];
+    for (path, expected_shapes) in expected_call_shapes {
+        let actual = scan
+            .generic_calls
+            .get(path)
+            .unwrap_or_else(|| panic!("missing pinned audit call file {path}"));
+        assert!(
+            call_shapes_match(actual, expected_shapes),
+            "audit call shape changed in {path}; expected {expected_shapes:?}, actual {actual:?}"
+        );
+    }
+
+    let source_by_path = sources
+        .iter()
+        .map(|(path, source)| (path.as_str(), compact_source(source)))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let calendar_source = sources
+        .iter()
+        .find(|(path, _)| path == "handlers/calendar.rs")
+        .map(|(_, source)| source.as_str())
+        .expect("calendar audit source must exist");
+    let calendar_calls = named_call_blocks(calendar_source, "write_calendar_token_audit(");
+    let expected_calendar_calls = [
+        "write_calendar_token_audit(&db,rid,community_id,&membership.membership_id,\"calendar_token_generated\",)",
+        "write_calendar_token_audit(&db,rid,community_id,&membership.membership_id,\"calendar_token_revoked\",)",
+    ];
+    assert!(
+        call_shapes_match(&calendar_calls, &expected_calendar_calls),
+        "calendar audit wrapper invocation set changed; expected {expected_calendar_calls:?}, actual {calendar_calls:?}"
+    );
+
+    let role_source = sources
+        .iter()
+        .find(|(path, _)| path == "handlers/admin/role_transfer.rs")
+        .map(|(_, source)| source.as_str())
+        .expect("role-transfer audit source must exist");
+    assert_eq!(
+        compact_brace_block(role_source, "enum RoleMutation"),
+        "enumRoleMutation{Promote,Demote,}",
+        "RoleMutation variants changed; reconcile the accepted dynamic audit inventory"
+    );
+    assert_eq!(
+        compact_brace_block(role_source, "let audit_action = match mutation"),
+        "letaudit_action=matchmutation{RoleMutation::Promote=>\"membership.promoted_to_admin\",RoleMutation::Demote=>\"membership.demoted_to_member\",}",
+        "role audit-action mapping changed; reconcile the accepted dynamic audit inventory"
+    );
+
+    let direct_shapes: [(&str, &[&str]); 3] = [
+        (
+            "db/community.rs",
+            &[
+                "'community', ?4, 'community.created', '{}', ?5",
+                "'membership', ?4, 'membership.created_first_admin', '{}', ?5",
+            ],
+        ),
+        (
+            "handlers/me.rs",
+            &["'membership', ?4, 'membership.display_name_updated', ?5, ?6"],
+        ),
+        (
+            "handlers/operator.rs",
+            &["'membership', ?4, 'operator_recovery.admin_relink_created', ?5, ?6"],
+        ),
+    ];
+    for (path, shapes) in direct_shapes {
+        let source = source_by_path
+            .get(path)
+            .unwrap_or_else(|| panic!("missing direct audit source {path}"));
+        for shape in shapes {
+            assert!(
+                source.contains(&compact_source(shape)),
+                "direct audit action shape {shape:?} is missing from {path}"
+            );
+        }
+    }
+
+    let class_a = [
+        "community.created",
+        "membership.created_first_admin",
+        "membership.display_name_updated",
+        "invite_code.generated",
+        "invite_code.revoked",
+        "invite_code.redeemed",
+        "membership.relink_code_created",
+        "membership.relink_redeemed",
+        "operator_recovery.admin_relink_created",
+        "membership.removed",
+        "membership.promoted_to_admin",
+        "membership.demoted_to_member",
+        "event.created",
+        "event.edited",
+        "event.cancelled",
+        "event.occurrence_cancelled",
+        "attendance.admin_override",
+        "attendance.admin_set_attended",
+        "event_note.admin_hidden",
+        "calendar_feed.token_generated",
+        "calendar_feed.token_revoked",
+        "event_template.created",
+        "event_template.deleted",
+    ];
+    let class_b = [
+        "community.export_authorized",
+        "calendar_matrix_csv.export_requested",
+    ];
+    let class_c = ["session.logout"];
+    let mut canonical_actions = std::collections::BTreeSet::new();
+    for canonical in class_a.into_iter().chain(class_b).chain(class_c) {
+        assert!(
+            canonical_actions.insert(canonical),
+            "duplicate canonical RFC-079 action in inventory: {canonical}"
+        );
+    }
+    assert_eq!(
+        canonical_actions.len(),
+        26,
+        "RFC-079 inventory must remain 23 Class A + 2 Class B + 1 Class C"
+    );
+}
+
+#[test]
+fn rfc079_package0a_assertion_fixture_is_bounded_and_outside_the_ledger() {
+    assert!(
+        RFC079_ASSERTION_FIXTURE_SRC.contains("CREATE TABLE audit_change_assertions")
+            && RFC079_ASSERTION_FIXTURE_SRC.contains("length(operation_id) = 26")
+            && RFC079_ASSERTION_FIXTURE_SRC.contains("changed_count = 1"),
+        "Package 0A fixture must pin the reviewed operation-ID and one-row CHECK constraints"
+    );
+    assert!(
+        !RFC079_ASSERTION_FIXTURE_SRC.contains("d1_migrations")
+            && !RFC079_ASSERTION_FIXTURE_SRC.contains("audit_log"),
+        "Package 0A fixture must stay outside the D1 ledger and production audit schema"
+    );
+    assert!(
+        RFC079_ASSERTION_WORKER_SRC.contains("VALUES (?1, changes())")
+            && RFC079_ASSERTION_WORKER_SRC.contains("db.batch(statements)")
+            && !RFC079_ASSERTION_WORKER_SRC.contains("console."),
+        "Package 0A Worker must exercise the exact D1 batch primitive without console output"
+    );
+    assert!(
+        RFC079_ASSERTION_RUNNER_SRC.contains("cloudflareAuthorityKey")
+            && RFC079_ASSERTION_RUNNER_SRC.contains("CLOUDFLARE_")
+            && RFC079_ASSERTION_RUNNER_SRC.contains("Object.keys(source)")
+            && !RFC079_ASSERTION_RUNNER_SRC.contains("Object.entries(process.env)")
+            && RFC079_ASSERTION_RUNNER_SRC.contains("sentinel authority value was read")
+            && !RFC079_ASSERTION_RUNNER_SRC.contains("genericCallSites")
+            && !RFC079_ASSERTION_RUNNER_SRC.contains("directSqlOutsideAuditModule")
+            && !RFC079_ASSERTION_RUNNER_SRC.contains("classifiedActions"),
+        "Package 0A runner must scrub inherited Cloudflare authority and must not report declarative inventory as D1 evidence"
+    );
+    let proof_audit_schema = RFC079_ASSERTION_FIXTURE_SRC
+        .split("CREATE TABLE proof_audits")
+        .nth(1)
+        .expect("proof fixture must define its synthetic audit table");
+    assert!(
+        !proof_audit_schema.contains("operation_id"),
+        "assertion operation IDs must not enter even the synthetic audit row"
+    );
+}
+
+#[test]
+fn rfc079_inventory_scanner_detects_new_files_and_action_substitution() {
+    let synthetic_sources = vec![
+        (
+            "known.rs".to_owned(),
+            "fn known() { audit::write(db, \"membership\", \"removed\"); }".to_owned(),
+        ),
+        (
+            "new_handler.rs".to_owned(),
+            "fn added() { audit::write(db, \"event\", \"unexpected\"); }".to_owned(),
+        ),
+        (
+            "new_direct.rs".to_owned(),
+            "const SQL: &str = \"INSERT INTO audit_log VALUES (...)\";".to_owned(),
+        ),
+        (
+            "new_privacy_ref.rs".to_owned(),
+            "fn leaked(operation_id: &str) { let _ = audit_change_assertions; }".to_owned(),
+        ),
+    ];
+    let scan = scan_audit_sources(&synthetic_sources);
+    assert_eq!(scan.generic_calls["new_handler.rs"].len(), 1);
+    assert_eq!(scan.direct_inserts["new_direct.rs"], 1);
+    assert_eq!(scan.assertion_table_refs, ["new_privacy_ref.rs"]);
+    assert_eq!(scan.operation_id_refs, ["new_privacy_ref.rs"]);
+
+    let substituted = &scan.generic_calls["known.rs"];
+    assert!(
+        !call_shapes_match(substituted, &["\"membership\", \"promoted_to_admin\""]),
+        "a substituted expected action must fail exact call-shape matching"
+    );
+    assert!(
+        !call_shapes_match(&[], &["\"membership\", \"removed\""]),
+        "removing an expected audit call must fail exact call-shape matching"
+    );
+
+    let calendar_with_extra = r#"
+        write_calendar_token_audit(db, "calendar_token_generated");
+        write_calendar_token_audit(db, "calendar_token_revoked");
+        write_calendar_token_audit(db, "calendar_token_unexpected");
+    "#;
+    let calendar_calls = named_call_blocks(calendar_with_extra, "write_calendar_token_audit(");
+    assert!(
+        !call_shapes_match(
+            &calendar_calls,
+            &[
+                "write_calendar_token_audit(db, \"calendar_token_generated\")",
+                "write_calendar_token_audit(db, \"calendar_token_revoked\")",
+            ]
+        ),
+        "an additional calendar audit-wrapper invocation must fail the exhaustive expansion gate"
+    );
+
+    let role_with_extra = r#"
+        let audit_action = match mutation {
+            RoleMutation::Promote => "membership.promoted_to_admin",
+            RoleMutation::Demote => "membership.demoted_to_member",
+            RoleMutation::Suspend => "membership.suspended",
+        };
+    "#;
+    assert_ne!(
+        compact_brace_block(role_with_extra, "let audit_action = match mutation"),
+        "letaudit_action=matchmutation{RoleMutation::Promote=>\"membership.promoted_to_admin\",RoleMutation::Demote=>\"membership.demoted_to_member\",}",
+        "an additional dynamic role/action branch must fail the exhaustive mapping gate"
+    );
+}
+
 #[test]
 fn invite_code_generator_does_not_use_unwrap_or_default_on_getrandom() {
     // If this fails, the generator has regressed to fail-open: randomness
