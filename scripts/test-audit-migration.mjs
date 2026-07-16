@@ -1,4 +1,4 @@
-// RFC-079 Package 2: disposable local-only migration rehearsal.
+// Disposable local-only audit integrity migration rehearsal.
 // Never add --remote, hosted configuration, credentials, or production data.
 
 import { createHash } from 'node:crypto';
@@ -11,7 +11,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceMigrations = join(root, 'migrations');
 const wranglerBin = join(root, 'node_modules/.bin/wrangler');
 const wranglerPackage = join(root, 'node_modules/wrangler/package.json');
-const database = 'zinnias-ciao-rfc079-package2-local';
+const database = 'zinnias-ciao-audit-migration-local';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -64,7 +64,7 @@ function digestCore(rows) {
 
 const disposableRoot = join(root, '.git-exclude/tmp');
 await mkdir(disposableRoot, { recursive: true });
-const tempRoot = await mkdtemp(join(disposableRoot, 'rfc079-package2-'));
+const tempRoot = await mkdtemp(join(disposableRoot, 'audit-migration-'));
 const migrationsDir = join(tempRoot, 'migrations');
 const persistTo = join(tempRoot, 'state');
 const xdgConfig = join(tempRoot, 'xdg');
@@ -87,7 +87,7 @@ function inheritNonAuthorityEnvironment(source) {
   return allowed;
 }
 
-const sentinelEnvironment = { PACKAGE2_LOCAL_SENTINEL: 'retained' };
+const sentinelEnvironment = { AUDIT_MIGRATION_LOCAL_SENTINEL: 'retained' };
 Object.defineProperty(sentinelEnvironment, 'CLOUDFLARE_API_TOKEN', {
   enumerable: true,
   get() {
@@ -96,7 +96,7 @@ Object.defineProperty(sentinelEnvironment, 'CLOUDFLARE_API_TOKEN', {
 });
 const sentinelResult = inheritNonAuthorityEnvironment(sentinelEnvironment);
 assert(
-  sentinelResult.PACKAGE2_LOCAL_SENTINEL === 'retained'
+  sentinelResult.AUDIT_MIGRATION_LOCAL_SENTINEL === 'retained'
     && !Object.hasOwn(sentinelResult, 'CLOUDFLARE_API_TOKEN'),
   'authority-key filtering regression',
 );
@@ -130,10 +130,10 @@ async function execute(command, { expectFailure = false } = {}) {
 try {
   const wranglerMetadata = JSON.parse(await readFile(wranglerPackage, 'utf8'));
   const wranglerVersion = String(wranglerMetadata.version ?? '');
-  assert(/^4\./u.test(wranglerVersion), `Package 2 requires Wrangler 4.x, found ${wranglerVersion || 'unknown'}`);
+  assert(/^4\./u.test(wranglerVersion), `Audit migration rehearsal requires Wrangler 4.x, found ${wranglerVersion || 'unknown'}`);
 
   await writeFile(config, [
-    'name = "zinnias-ciao-rfc079-package2-local"',
+    'name = "zinnias-ciao-audit-migration-local"',
     'main = "worker.mjs"',
     'compatibility_date = "2026-07-15"',
     '',

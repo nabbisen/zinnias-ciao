@@ -2122,13 +2122,13 @@ const INVITE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/invite.rs"
 const RFC079_ASSERTION_FIXTURE_SRC: &str =
     include_str!("../../../workers/ssr/tests/fixtures/audit_change_assertion.sql");
 const RFC079_ASSERTION_WORKER_SRC: &str =
-    include_str!("../../../workers/ssr/tests/fixtures/rfc079-assertion-worker.mjs");
+    include_str!("../../../workers/ssr/tests/fixtures/audit-assertion-worker.mjs");
 const RFC079_ASSERTION_RUNNER_SRC: &str =
-    include_str!("../../../scripts/test-rfc079-assertion.mjs");
+    include_str!("../../../scripts/test-audit-assertion.mjs");
 const RFC079_AUDIT_CORE_SRC: &str = include_str!("../../../workers/ssr/src/audit.rs");
 const RFC079_MIGRATION_SRC: &str = include_str!("../../../migrations/0010_audit_integrity.sql");
 const RFC079_MIGRATION_RUNNER_SRC: &str =
-    include_str!("../../../scripts/test-rfc079-migration.mjs");
+    include_str!("../../../scripts/test-audit-migration.mjs");
 const RFC079_AUDIT_POLICY_SRC: &str = include_str!("../../../docs/src/maintainer/audit-policy.md");
 const RFC079_BACKUP_RECOVERY_SRC: &str =
     include_str!("../../../docs/src/maintainer/backup-recovery.md");

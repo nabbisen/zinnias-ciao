@@ -1,3 +1,4 @@
+// Local Worker fixture for the audit change assertion proof.
 const OPERATION_ID_PATTERN = /^ast_[A-Za-z0-9_-]{22}$/;
 
 function operationId() {

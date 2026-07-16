@@ -1,4 +1,4 @@
-// RFC-079 Package 0A: local-only real-D1 assertion proof.
+// Local-only real-D1 audit change assertion proof.
 // Never add --remote, hosted configuration, credentials, or production data.
 
 import { spawn } from 'node:child_process';
@@ -10,9 +10,9 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixtureDir = join(root, 'workers/ssr/tests/fixtures');
 const fixture = join(fixtureDir, 'audit_change_assertion.sql');
-const config = join(fixtureDir, 'wrangler.rfc079-assertion.toml');
-const workerSource = join(fixtureDir, 'rfc079-assertion-worker.mjs');
-const database = 'zinnias-ciao-rfc079-assertion-local';
+const config = join(fixtureDir, 'wrangler.audit-assertion.toml');
+const workerSource = join(fixtureDir, 'audit-assertion-worker.mjs');
+const database = 'zinnias-ciao-audit-assertion-local';
 const wranglerBin = join(root, 'node_modules/.bin/wrangler');
 const wranglerPackage = join(root, 'node_modules/wrangler/package.json');
 
@@ -84,7 +84,7 @@ function expectState(actual, expected, label) {
 
 const disposableRoot = join(root, '.git-exclude/tmp');
 await mkdir(disposableRoot, { recursive: true });
-const tempRoot = await mkdtemp(join(disposableRoot, 'rfc079-package0a-'));
+const tempRoot = await mkdtemp(join(disposableRoot, 'audit-assertion-'));
 const persistTo = join(tempRoot, 'state');
 const xdgConfig = join(tempRoot, 'xdg');
 const wranglerLog = join(tempRoot, 'wrangler.log');
@@ -103,7 +103,7 @@ function inheritNonAuthorityEnvironment(source) {
   return allowed;
 }
 
-const sentinelEnvironment = { PACKAGE0A_LOCAL_SENTINEL: 'retained' };
+const sentinelEnvironment = { AUDIT_ASSERTION_LOCAL_SENTINEL: 'retained' };
 Object.defineProperty(sentinelEnvironment, 'CLOUDFLARE_API_TOKEN', {
   enumerable: true,
   get() {
@@ -112,7 +112,7 @@ Object.defineProperty(sentinelEnvironment, 'CLOUDFLARE_API_TOKEN', {
 });
 const sentinelResult = inheritNonAuthorityEnvironment(sentinelEnvironment);
 assert(
-  sentinelResult.PACKAGE0A_LOCAL_SENTINEL === 'retained'
+  sentinelResult.AUDIT_ASSERTION_LOCAL_SENTINEL === 'retained'
     && !Object.hasOwn(sentinelResult, 'CLOUDFLARE_API_TOKEN'),
   'authority-key filtering regression',
 );
@@ -130,7 +130,7 @@ let dev;
 try {
   const wranglerMetadata = JSON.parse(await readFile(wranglerPackage, 'utf8'));
   const wranglerVersion = String(wranglerMetadata.version ?? '');
-  assert(/^4\./u.test(wranglerVersion), `Package 0A requires Wrangler 4.x, found ${wranglerVersion || 'unknown'}`);
+  assert(/^4\./u.test(wranglerVersion), `Audit assertion proof requires Wrangler 4.x, found ${wranglerVersion || 'unknown'}`);
 
   const source = await readFile(workerSource, 'utf8');
   const schema = await readFile(fixture, 'utf8');
