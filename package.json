@@ -22,6 +22,7 @@
     "smoke:invite": "node scripts/smoke/invite-redemption.mjs",
     "test:audit-assertion": "node scripts/test-audit-assertion.mjs",
     "test:audit-atomicity": "node scripts/test-audit-atomicity.mjs",
+    "test:audit-boundaries": "node scripts/test-audit-boundaries.mjs",
     "test:audit-migration": "node scripts/test-audit-migration.mjs",
     "smoke:display-name": "node scripts/smoke/self-display-name-editing.mjs",
     "smoke:matrix": "node scripts/smoke/monthly-attendance-matrix.mjs",

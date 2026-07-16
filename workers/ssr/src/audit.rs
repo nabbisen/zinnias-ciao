@@ -6,7 +6,9 @@
 use crate::crypto::random_token;
 use crate::db::now_utc;
 use serde_json::{Map, Value, json};
-use worker::{D1Database, D1PreparedStatement, D1Result, D1Type, Result, console_log};
+use worker::{
+    D1Database, D1PreparedStatement, D1Result, D1Type, Result, console_error, console_log,
+};
 
 const MAX_ID_BYTES: usize = 128;
 const MAX_REQUEST_ID_BYTES: usize = 96;
@@ -825,6 +827,118 @@ pub(crate) async fn execute_asserted_required(
     Ok(results)
 }
 
+/// Persist Class B authorization evidence before any protected response is
+/// returned. Construction and storage failures emit only bounded operational
+/// fields; callers must translate the error into a disclosure-free 503.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn write_pre_disclosure(
+    db: &D1Database,
+    request_id: &str,
+    community_id: &str,
+    actor_membership_id: &str,
+    target_id: &str,
+    action: AuditAction,
+    metadata: AuditMetadata,
+) -> Result<()> {
+    if !matches!(
+        action,
+        AuditAction::CommunityExportAuthorized | AuditAction::CalendarMatrixCsvExportRequested
+    ) {
+        log_failure(
+            request_id,
+            action,
+            AuditFailureEvent::PreDisclosure,
+            AuditFailureCategory::Construction,
+        );
+        return Err(worker::Error::RustError(
+            "non-Class-B pre-disclosure audit rejected".to_owned(),
+        ));
+    }
+    let record = match required_record(
+        request_id,
+        Some(community_id),
+        Some(actor_membership_id),
+        Some(target_id),
+        action,
+        metadata,
+    ) {
+        Ok(record) => record,
+        Err(error) => {
+            log_failure(
+                request_id,
+                action,
+                AuditFailureEvent::PreDisclosure,
+                AuditFailureCategory::Construction,
+            );
+            return Err(error);
+        }
+    };
+    let statement = match record.statement(db) {
+        Ok(statement) => statement,
+        Err(error) => {
+            log_failure(
+                request_id,
+                action,
+                AuditFailureEvent::PreDisclosure,
+                AuditFailureCategory::Construction,
+            );
+            return Err(error);
+        }
+    };
+    if let Err(error) = statement.run().await {
+        log_failure(
+            request_id,
+            action,
+            AuditFailureEvent::PreDisclosure,
+            AuditFailureCategory::Storage,
+        );
+        return Err(error);
+    }
+    record.log_success();
+    Ok(())
+}
+
+/// Logout is the sole Class C safety-first exception. This helper deliberately
+/// accepts no subject or session identifier and owns its bounded failure
+/// incident so the caller can always continue to cookie clearing.
+pub(crate) async fn write_logout_secondary(db: &D1Database, request_id: &str) {
+    let action = AuditAction::SessionLogout;
+    let record = match required_record(request_id, None, None, None, action, AuditMetadata::None) {
+        Ok(record) => record,
+        Err(_) => {
+            log_failure(
+                request_id,
+                action,
+                AuditFailureEvent::SecondaryWrite,
+                AuditFailureCategory::Construction,
+            );
+            return;
+        }
+    };
+    let statement = match record.statement(db) {
+        Ok(statement) => statement,
+        Err(_) => {
+            log_failure(
+                request_id,
+                action,
+                AuditFailureEvent::SecondaryWrite,
+                AuditFailureCategory::Construction,
+            );
+            return;
+        }
+    };
+    if statement.run().await.is_err() {
+        log_failure(
+            request_id,
+            action,
+            AuditFailureEvent::SecondaryWrite,
+            AuditFailureCategory::Storage,
+        );
+        return;
+    }
+    record.log_success();
+}
+
 pub(crate) fn result_changes(results: &[D1Result], index: usize) -> usize {
     results
         .get(index)
@@ -834,6 +948,7 @@ pub(crate) fn result_changes(results: &[D1Result], index: usize) -> usize {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(dead_code)]
 pub(crate) async fn write_legacy(
     db: &D1Database,
     request_id: &str,
@@ -1171,6 +1286,43 @@ enum AuditOutcome {
     Success,
 }
 
+#[derive(Clone, Copy)]
+enum AuditFailureEvent {
+    PreDisclosure,
+    SecondaryWrite,
+}
+
+impl AuditFailureEvent {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::PreDisclosure => "audit.pre_disclosure_failed",
+            Self::SecondaryWrite => "audit.secondary_write_failed",
+        }
+    }
+
+    const fn route_class(self) -> &'static str {
+        match self {
+            Self::PreDisclosure => "class_b",
+            Self::SecondaryWrite => "class_c",
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum AuditFailureCategory {
+    Construction,
+    Storage,
+}
+
+impl AuditFailureCategory {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Construction => "construction",
+            Self::Storage => "storage",
+        }
+    }
+}
+
 impl AuditOutcome {
     const fn as_str(self) -> &'static str {
         match self {
@@ -1186,6 +1338,34 @@ fn format_event(request_id: &str, action: AuditAction, outcome: AuditOutcome) ->
         action.canonical(),
         outcome.as_str()
     )
+}
+
+fn format_failure_event(
+    request_id: &str,
+    action: AuditAction,
+    event: AuditFailureEvent,
+    category: AuditFailureCategory,
+) -> String {
+    format!(
+        "event={} request_id={} action={} failure_category={} route_class={}",
+        event.as_str(),
+        request_id,
+        action.canonical(),
+        category.as_str(),
+        event.route_class(),
+    )
+}
+
+fn log_failure(
+    request_id: &str,
+    action: AuditAction,
+    event: AuditFailureEvent,
+    category: AuditFailureCategory,
+) {
+    console_error!(
+        "{}",
+        format_failure_event(request_id, action, event, category)
+    );
 }
 
 #[cfg(test)]
@@ -1565,6 +1745,44 @@ mod tests {
         );
         for forbidden in ["actor", "community", "target", "metadata", "sql", "bind"] {
             assert!(!event.contains(forbidden));
+        }
+    }
+
+    #[test]
+    fn failure_events_contain_only_bounded_operational_fields() {
+        let pre_disclosure = format_failure_event(
+            "0123456789abcdef",
+            AuditAction::CommunityExportAuthorized,
+            AuditFailureEvent::PreDisclosure,
+            AuditFailureCategory::Storage,
+        );
+        assert_eq!(
+            pre_disclosure,
+            "event=audit.pre_disclosure_failed request_id=0123456789abcdef action=community.export_authorized failure_category=storage route_class=class_b"
+        );
+        let secondary = format_failure_event(
+            "0123456789abcdef",
+            AuditAction::SessionLogout,
+            AuditFailureEvent::SecondaryWrite,
+            AuditFailureCategory::Construction,
+        );
+        assert_eq!(
+            secondary,
+            "event=audit.secondary_write_failed request_id=0123456789abcdef action=session.logout failure_category=construction route_class=class_c"
+        );
+        for event in [pre_disclosure, secondary] {
+            for forbidden in [
+                "community_id",
+                "actor_membership_id",
+                "target_id",
+                "session_id",
+                "metadata",
+                "sql",
+                "bind",
+                "cookie",
+            ] {
+                assert!(!event.contains(forbidden));
+            }
         }
     }
 }

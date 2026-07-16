@@ -253,18 +253,22 @@ pub async fn post_matrix_export_audit(
     crate::form_token::set_result(&db, &pepper, &token, "calendar_matrix_csv.export_requested")
         .await?;
 
-    crate::audit::write_legacy(
+    if crate::audit::write_pre_disclosure(
         &db,
         rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(&month),
-        crate::audit::LegacyAuditAction::CalendarMatrixCsvExportRequested,
-        crate::audit::LegacyAuditMetadata::MatrixExportRequested {
+        community_id,
+        &membership.membership_id,
+        &month,
+        crate::audit::AuditAction::CalendarMatrixCsvExportRequested,
+        crate::audit::AuditMetadata::MatrixExportRequested {
             month: month.clone(),
         },
     )
-    .await?;
+    .await
+    .is_err()
+    {
+        return json_error(503, i18n::JA_GENERAL_ERROR);
+    }
 
     let mut resp = Response::from_json(&serde_json::json!({"ok": true}))?;
     resp.headers_mut()

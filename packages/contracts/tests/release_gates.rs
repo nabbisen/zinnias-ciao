@@ -658,6 +658,7 @@ fn query_budgets_are_positive_and_ordered() {
 const HOME_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/home.rs");
 const EVENT_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/event.rs");
 const EXPORT_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/export.rs");
+const AUTH_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/auth.rs");
 const CALENDAR_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/calendar.rs");
 const COMMUNITY_CREATE_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/community_create.rs");
@@ -2137,6 +2138,12 @@ const RFC079_ATOMICITY_WORKER_SRC: &str =
     include_str!("../../../workers/ssr/tests/fixtures/audit-atomicity-worker.mjs");
 const RFC079_ATOMICITY_FIXTURE_SRC: &str =
     include_str!("../../../workers/ssr/tests/fixtures/audit_atomicity.sql");
+const RFC079_BOUNDARY_RUNNER_SRC: &str = include_str!("../../../scripts/test-audit-boundaries.mjs");
+const RFC079_BOUNDARY_WORKER_SRC: &str =
+    include_str!("../../../workers/ssr/tests/fixtures/audit-boundaries-worker.mjs");
+const RFC079_BOUNDARY_FIXTURE_SRC: &str =
+    include_str!("../../../workers/ssr/tests/fixtures/audit_response_boundaries.sql");
+const PACKAGE_JSON_SRC: &str = include_str!("../../../package.json");
 
 #[derive(Default)]
 struct AuditSourceScan {
@@ -2320,11 +2327,7 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
     );
     let scan = scan_audit_sources(&sources);
 
-    let expected_generic_counts = std::collections::BTreeMap::from([
-        ("handlers/auth.rs".to_owned(), 1usize),
-        ("handlers/communities.rs".to_owned(), 1),
-        ("handlers/export.rs".to_owned(), 1),
-    ]);
+    let expected_generic_counts = std::collections::BTreeMap::new();
     let actual_generic_counts = scan
         .generic_calls
         .iter()
@@ -2344,55 +2347,15 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
 
     assert_eq!(
         scan.generic_calls.values().map(Vec::len).sum::<usize>(),
-        3,
-        "RFC-079 Package 5 inventory expects exactly 3 deferred compatibility-writer call sites"
+        0,
+        "RFC-079 Package 6 inventory expects no remaining compatibility-writer call sites"
     );
     assert!(
         scan.assertion_table_refs == vec!["audit.rs".to_owned()]
             && scan.operation_id_refs == vec!["audit.rs".to_owned()],
-        "Package 5 assertion table/operation IDs must be owned only by audit.rs: table={:?}, operation_id={:?}",
+        "Package 6 assertion table/operation IDs must be owned only by audit.rs: table={:?}, operation_id={:?}",
         scan.assertion_table_refs,
         scan.operation_id_refs
-    );
-
-    let expected_call_shapes: [(&str, &[&str]); 3] = [
-        (
-            "handlers/auth.rs",
-            &[
-                "None, crate::audit::LegacyAuditAction::SessionLogout, crate::audit::LegacyAuditMetadata::None",
-            ],
-        ),
-        (
-            "handlers/communities.rs",
-            &[
-                "Some(&month), crate::audit::LegacyAuditAction::CalendarMatrixCsvExportRequested, crate::audit::LegacyAuditMetadata::MatrixExportRequested",
-            ],
-        ),
-        (
-            "handlers/export.rs",
-            &[
-                "Some(community_id), crate::audit::LegacyAuditAction::CommunityExportAuthorized, crate::audit::LegacyAuditMetadata::None",
-            ],
-        ),
-    ];
-    for (path, expected_shapes) in expected_call_shapes {
-        let actual = scan
-            .generic_calls
-            .get(path)
-            .unwrap_or_else(|| panic!("missing pinned audit call file {path}"));
-        assert!(
-            call_shapes_match(actual, expected_shapes),
-            "audit call shape changed in {path}; expected {expected_shapes:?}, actual {actual:?}"
-        );
-    }
-    let auth_audit_call = scan
-        .generic_calls
-        .get("handlers/auth.rs")
-        .and_then(|calls| calls.first())
-        .expect("logout audit call must remain pinned");
-    assert!(
-        !auth_audit_call.contains("auth.session_id"),
-        "session.logout must never place the session ID in its audit target or metadata"
     );
 
     let source_by_path = sources
@@ -2881,6 +2844,126 @@ fn rfc079_package5_one_winner_batches_and_correlation_are_pinned() {
             && RFC079_ASSERTION_FIXTURE_SRC.contains("proof_flow_sessions")
             && RFC079_ASSERTION_FIXTURE_SRC.contains("proof_flow_audits"),
         "Package 5 local D1 proof must show one winner/one audit, no losing candidate identity/session residue, and full audit-failure rollback"
+    );
+}
+
+#[test]
+fn rfc079_package6_disclosure_and_logout_boundaries_are_pinned() {
+    let export_audit = EXPORT_HANDLER_SRC
+        .find("audit::write_pre_disclosure(")
+        .expect("community JSON export must persist pre-disclosure audit evidence");
+    let export_payload = EXPORT_HANDLER_SRC
+        .find("let payload = build_export(")
+        .expect("community JSON export payload construction must remain explicit");
+    let export_response = EXPORT_HANDLER_SRC
+        .find("let mut resp = Response::ok(json)?")
+        .expect("community JSON export response must remain explicit");
+    assert!(
+        export_audit < export_payload
+            && export_payload < export_response
+            && EXPORT_HANDLER_SRC.contains("AuditAction::CommunityExportAuthorized")
+            && EXPORT_HANDLER_SRC.contains("return render::service_unavailable();"),
+        "community JSON export must return disclosure-free 503 unless typed audit evidence is durable"
+    );
+
+    let matrix_post = COMMUNITIES_HANDLER_SRC
+        .split("pub async fn post_matrix_export_audit")
+        .nth(1)
+        .expect("matrix export acknowledgement handler must exist");
+    let matrix_audit = matrix_post
+        .find("crate::audit::write_pre_disclosure(")
+        .expect("matrix export acknowledgement must persist pre-disclosure evidence");
+    let matrix_response = matrix_post
+        .find("Response::from_json")
+        .expect("matrix export acknowledgement response must remain explicit");
+    assert!(
+        matrix_audit < matrix_response
+            && matrix_post.contains("AuditAction::CalendarMatrixCsvExportRequested")
+            && matrix_post.contains("AuditMetadata::MatrixExportRequested")
+            && matrix_post.contains("return json_error(503, i18n::JA_GENERAL_ERROR);"),
+        "matrix export acknowledgement must return privacy-safe JSON 503 when typed audit evidence fails"
+    );
+    assert!(
+        RENDER_SRC.contains("pub fn service_unavailable()")
+            && RENDER_SRC.contains("with_status(503)"),
+        "Class B HTML failure must use a generic 503 renderer"
+    );
+
+    let revoke = AUTH_HANDLER_SRC
+        .find("session_db::revoke(&db, &auth.session_id).await?;")
+        .expect("logout must require awaited server-side revocation");
+    let secondary = AUTH_HANDLER_SRC
+        .find("crate::audit::write_logout_secondary(&db, rid).await;")
+        .expect("logout must await its bounded secondary audit attempt");
+    let clear_cookie = AUTH_HANDLER_SRC
+        .find("crate::session::clear_session_cookie")
+        .expect("logout must clear the client credential");
+    assert!(
+        revoke < secondary && secondary < clear_cookie,
+        "logout must revoke first, await secondary audit, then clear the cookie"
+    );
+    let logout_secondary = RFC079_AUDIT_CORE_SRC
+        .split("pub(crate) async fn write_logout_secondary")
+        .nth(1)
+        .and_then(|source| source.split("pub(crate) fn result_changes").next())
+        .expect("logout-only secondary writer must remain bounded");
+    assert!(
+        logout_secondary.contains("let action = AuditAction::SessionLogout;")
+            && logout_secondary.contains("AuditFailureEvent::SecondaryWrite")
+            && logout_secondary.contains("AuditMetadata::None")
+            && !logout_secondary.contains("session_id")
+            && !logout_secondary.contains("target_id"),
+        "logout secondary audit must accept no credential/subject identifier and must emit its bounded incident"
+    );
+    assert!(
+        RFC079_AUDIT_CORE_SRC.contains("audit.pre_disclosure_failed")
+            && RFC079_AUDIT_CORE_SRC.contains("audit.secondary_write_failed")
+            && RFC079_AUDIT_CORE_SRC.contains("failure_category={}")
+            && RFC079_AUDIT_CORE_SRC.contains("route_class={}"),
+        "Package 6 audit failures must emit bounded structured operational events"
+    );
+
+    let source_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../workers/ssr/src")
+        .canonicalize()
+        .expect("workers/ssr/src must exist for the Package 6 source gate");
+    let mut sources = Vec::new();
+    collect_rust_sources(&source_root, &source_root, &mut sources);
+    let secondary_owners = sources
+        .iter()
+        .filter(|(_, source)| source.contains("write_logout_secondary("))
+        .map(|(path, _)| path.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        secondary_owners,
+        vec!["audit.rs", "handlers/auth.rs"],
+        "logout must remain the only caller and owner of the Class C secondary-audit exception"
+    );
+    let pre_disclosure_owners = sources
+        .iter()
+        .filter(|(_, source)| source.contains("write_pre_disclosure("))
+        .map(|(path, _)| path.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        pre_disclosure_owners,
+        vec!["audit.rs", "handlers/communities.rs", "handlers/export.rs"],
+        "only the two reviewed Class B surfaces may use the pre-disclosure writer"
+    );
+    assert!(
+        PACKAGE_JSON_SRC.contains("\"test:audit-boundaries\"")
+            && RFC079_BOUNDARY_RUNNER_SRC.contains("/class-b/community/audit-failure")
+            && RFC079_BOUNDARY_RUNNER_SRC.contains("/class-b/matrix/audit-failure")
+            && RFC079_BOUNDARY_RUNNER_SRC.contains("/class-c/logout/audit-failure")
+            && RFC079_BOUNDARY_RUNNER_SRC.contains("status === 503")
+            && RFC079_BOUNDARY_RUNNER_SRC.contains("status === 303")
+            && RFC079_BOUNDARY_RUNNER_SRC.contains("Max-Age=0")
+            && RFC079_BOUNDARY_WORKER_SRC.contains("community.export_authorized")
+            && RFC079_BOUNDARY_WORKER_SRC.contains("calendar_matrix_csv.export_requested")
+            && RFC079_BOUNDARY_WORKER_SRC.contains("session.logout")
+            && RFC079_BOUNDARY_FIXTURE_SRC.contains("proof_boundary_sessions")
+            && RFC079_BOUNDARY_FIXTURE_SRC.contains("proof_boundary_audits")
+            && !RFC079_BOUNDARY_WORKER_SRC.contains("console."),
+        "Package 6 local D1 proof must cover disclosure-free Class B failure and safety-first Class C failure without Worker logging"
     );
 }
 

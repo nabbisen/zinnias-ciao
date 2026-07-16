@@ -24,17 +24,8 @@ pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Respo
         crate::codlet::consume_token(env, &auth.user_id, token_purpose::LOGOUT, &raw_token, None)
             .await?;
 
-    let _ = session_db::revoke(&db, &auth.session_id).await;
-    let _ = crate::audit::write_legacy(
-        &db,
-        rid,
-        None,
-        None,
-        None,
-        crate::audit::LegacyAuditAction::SessionLogout,
-        crate::audit::LegacyAuditMetadata::None,
-    )
-    .await;
+    session_db::revoke(&db, &auth.session_id).await?;
+    crate::audit::write_logout_secondary(&db, rid).await;
 
     let domain = env
         .var("SESSION_COOKIE_DOMAIN")

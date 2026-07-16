@@ -10,6 +10,7 @@
 use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 
+use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::authz::require_admin;
 use crate::db::{self, community as community_db, membership as membership_db};
 use crate::render;
@@ -140,25 +141,28 @@ pub async fn get_export_json(
         return redirect(&format!("/c/{community_id}/admin/export"));
     }
 
-    // Build the export payload.
+    if audit::write_pre_disclosure(
+        &db,
+        rid,
+        community_id,
+        &membership.membership_id,
+        community_id,
+        AuditAction::CommunityExportAuthorized,
+        AuditMetadata::None,
+    )
+    .await
+    .is_err()
+    {
+        return render::service_unavailable();
+    }
+
+    // Build the export payload only after authorization evidence is durable.
     let payload = build_export(&db, community_id).await?;
     let json = serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".to_owned());
 
     let community = community_db::find_active(&db, community_id).await?;
     let community_name = community.map(|c| c.name).unwrap_or_default();
     let filename = format!("{}-export.json", slugify(&community_name));
-
-    // Audit the export (no content logged).
-    let _ = crate::audit::write_legacy(
-        &db,
-        rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(community_id),
-        crate::audit::LegacyAuditAction::CommunityExportAuthorized,
-        crate::audit::LegacyAuditMetadata::None,
-    )
-    .await;
 
     let mut resp = Response::ok(json)?;
     resp.headers_mut()
