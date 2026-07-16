@@ -1,9 +1,14 @@
 #![allow(dead_code)]
 //! Event creation, edit, and cancellation (RFC-009).
 
+use crate::audit::{self, AuditAction, AuditMetadata, EventEditScope};
 use crate::crypto::random_token;
 use crate::db::now_utc;
 use worker::{D1Database, Result};
+use zinnias_ciao_domain::RECURRENCE_MATERIALIZATION_INSERT_CAP;
+
+/// event + optional series + 64 days + required audit
+pub(crate) const EVENT_CREATE_STATEMENT_CAP: usize = RECURRENCE_MATERIALIZATION_INSERT_CAP + 3;
 
 pub struct EventDayInsert<'a> {
     pub seq: u32,
@@ -27,12 +32,18 @@ pub struct EventSeriesInsert<'a> {
     pub materialized_through_day_date: Option<&'a str>,
 }
 
+pub struct EventCreateSource<'a> {
+    pub event_id: &'a str,
+    pub must_be_cancelled: bool,
+}
+
 /// Create an event and its day rows in one logical batch.
 /// `repeat_rule` and `repeat_count` are stored for reference; the actual
 /// day rows in `days` are already the fully-expanded occurrences.
 #[allow(clippy::too_many_arguments)]
 pub async fn create_event(
     db: &D1Database,
+    request_id: &str,
     community_id: &str,
     created_by_membership_id: &str,
     title: &str,
@@ -42,31 +53,61 @@ pub async fn create_event(
     repeat_rule: &str,
     repeat_count: Option<u32>,
     series: Option<EventSeriesInsert<'_>>,
+    source: Option<EventCreateSource<'_>>,
+    audit_metadata: AuditMetadata,
 ) -> Result<String> {
+    if days.is_empty() || days.len() > RECURRENCE_MATERIALIZATION_INSERT_CAP {
+        return Err(worker::Error::RustError(
+            "event day batch bound rejected".to_owned(),
+        ));
+    }
+    let statement_count = 1 + usize::from(series.is_some()) + days.len() + 1;
+    if statement_count > EVENT_CREATE_STATEMENT_CAP {
+        return Err(worker::Error::RustError(
+            "event create statement budget exceeded".to_owned(),
+        ));
+    }
     let event_id = random_token()[..24].to_owned();
     let now = now_utc();
     let rc_js: worker::wasm_bindgen::JsValue = repeat_count
         .map(|n| worker::wasm_bindgen::JsValue::from_f64(n as f64))
         .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
-    db.prepare(
-        "INSERT INTO events \
+    let source_id = source
+        .as_ref()
+        .map(|source| worker::wasm_bindgen::JsValue::from_str(source.event_id))
+        .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
+    let source_must_be_cancelled = source
+        .as_ref()
+        .is_some_and(|source| source.must_be_cancelled);
+    let mut statements = vec![
+        db.prepare(
+            "INSERT INTO events \
          (id, community_id, created_by_membership_id, title, location, description, \
           status, repeat_rule, repeat_count, created_at, updated_at) \
-         VALUES (?1,?2,?3,?4,?5,?6,'scheduled',?7,?8,?9,?9)",
-    )
-    .bind(&[
-        event_id.as_str().into(),
-        community_id.into(),
-        created_by_membership_id.into(),
-        title.into(),
-        location.unwrap_or("").into(),
-        description.unwrap_or("").into(),
-        repeat_rule.into(),
-        rc_js,
-        now.as_str().into(),
-    ])?
-    .run()
-    .await?;
+         SELECT ?1,?2,?3,?4,?5,?6,'scheduled',?7,?8,?9,?9 \
+         WHERE EXISTS (SELECT 1 FROM communities c \
+                       WHERE c.id=?2 AND c.is_active=1) \
+           AND EXISTS (SELECT 1 FROM community_memberships actor \
+                       WHERE actor.id=?3 AND actor.community_id=?2 \
+                         AND actor.role='admin' AND actor.removed_at IS NULL) \
+           AND (?10 IS NULL OR EXISTS (SELECT 1 FROM events source \
+                       WHERE source.id=?10 AND source.community_id=?2 \
+                         AND (?11=0 OR source.status='cancelled')))",
+        )
+        .bind(&[
+            event_id.as_str().into(),
+            community_id.into(),
+            created_by_membership_id.into(),
+            title.into(),
+            location.unwrap_or("").into(),
+            description.unwrap_or("").into(),
+            repeat_rule.into(),
+            rc_js,
+            now.as_str().into(),
+            source_id,
+            source_must_be_cancelled.into(),
+        ])?,
+    ];
 
     if let Some(series) = series {
         let occurrence_count_js: worker::wasm_bindgen::JsValue = series
@@ -81,30 +122,38 @@ pub async fn create_event(
             .materialized_through_day_date
             .map(worker::wasm_bindgen::JsValue::from_str)
             .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
-        db.prepare(
-            "INSERT INTO event_series \
+        statements.push(
+            db.prepare(
+                "INSERT INTO event_series \
              (id, event_id, community_id, frequency, start_day_date, starts_at_local, \
               ends_at_local, timezone, end_mode, occurrence_count, until_day_date, \
               materialized_through_day_date, created_at, updated_at) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?13)",
-        )
-        .bind(&[
-            series.id.into(),
-            event_id.as_str().into(),
-            community_id.into(),
-            series.frequency.into(),
-            series.start_day_date.into(),
-            series.starts_at_local.into(),
-            series.ends_at_local.into(),
-            series.timezone.into(),
-            series.end_mode.into(),
-            occurrence_count_js,
-            until_day_date_js,
-            materialized_through_js,
-            now.as_str().into(),
-        ])?
-        .run()
-        .await?;
+             SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?13 \
+             WHERE EXISTS (SELECT 1 FROM events e \
+                           WHERE e.id=?2 AND e.community_id=?3 \
+                             AND e.created_by_membership_id=?14 \
+                             AND e.status='scheduled') \
+               AND EXISTS (SELECT 1 FROM community_memberships actor \
+                           WHERE actor.id=?14 AND actor.community_id=?3 \
+                             AND actor.role='admin' AND actor.removed_at IS NULL)",
+            )
+            .bind(&[
+                series.id.into(),
+                event_id.as_str().into(),
+                community_id.into(),
+                series.frequency.into(),
+                series.start_day_date.into(),
+                series.starts_at_local.into(),
+                series.ends_at_local.into(),
+                series.timezone.into(),
+                series.end_mode.into(),
+                occurrence_count_js,
+                until_day_date_js,
+                materialized_through_js,
+                now.as_str().into(),
+                created_by_membership_id.into(),
+            ])?,
+        );
     }
 
     for day in days {
@@ -117,32 +166,56 @@ pub async fn create_event(
             .series_occurrence_date
             .map(worker::wasm_bindgen::JsValue::from_str)
             .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
-        db.prepare(
-            "INSERT INTO event_days \
+        statements.push(
+            db.prepare(
+                "INSERT INTO event_days \
              (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at, \
               series_id, series_occurrence_date) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-        )
-        .bind(&[
-            day_id.as_str().into(),
-            event_id.as_str().into(),
-            community_id.into(),
-            day.seq.into(),
-            day.day_date.into(),
-            day.starts_at_utc.into(),
-            day.ends_at_utc.into(),
-            now.as_str().into(),
-            series_id,
-            series_occurrence_date,
-        ])?
-        .run()
-        .await?;
+             SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10 \
+             WHERE EXISTS (SELECT 1 FROM events e \
+                           WHERE e.id=?2 AND e.community_id=?3 \
+                             AND e.created_by_membership_id=?11 \
+                             AND e.status='scheduled') \
+               AND EXISTS (SELECT 1 FROM community_memberships actor \
+                           WHERE actor.id=?11 AND actor.community_id=?3 \
+                             AND actor.role='admin' AND actor.removed_at IS NULL)",
+            )
+            .bind(&[
+                day_id.as_str().into(),
+                event_id.as_str().into(),
+                community_id.into(),
+                day.seq.into(),
+                day.day_date.into(),
+                day.starts_at_utc.into(),
+                day.ends_at_utc.into(),
+                now.as_str().into(),
+                series_id,
+                series_occurrence_date,
+                created_by_membership_id.into(),
+            ])?,
+        );
+    }
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(created_by_membership_id),
+        Some(&event_id),
+        AuditAction::EventCreated,
+        audit_metadata,
+    )?;
+    if !audit::execute_required_tail(db, statements, &record).await? {
+        return Err(worker::Error::RustError(
+            "event creation authorization changed".to_owned(),
+        ));
     }
     Ok(event_id)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn cancel_occurrence(
     db: &D1Database,
+    request_id: &str,
+    event_id: &str,
     event_day_id: &str,
     membership_id: &str,
     series_id: &str,
@@ -150,32 +223,59 @@ pub async fn cancel_occurrence(
     exception_day_date: &str,
 ) -> Result<()> {
     let now = now_utc();
-    db.prepare("UPDATE event_days SET occurrence_status='cancelled' WHERE id=?1")
-        .bind(&[event_day_id.into()])?
-        .run()
-        .await?;
+    let cancel = db
+        .prepare(
+            "UPDATE event_days SET occurrence_status='cancelled' \
+         WHERE id=?1 AND event_id=?2 AND community_id=?3 \
+           AND series_id=?4 AND series_occurrence_date=?5 \
+           AND occurrence_status='scheduled' \
+           AND EXISTS (SELECT 1 FROM events e WHERE e.id=?2 \
+                       AND e.community_id=?3 AND e.status='scheduled') \
+           AND EXISTS (SELECT 1 FROM community_memberships actor \
+                       WHERE actor.id=?6 AND actor.community_id=?3 \
+                         AND actor.role='admin' AND actor.removed_at IS NULL)",
+        )
+        .bind(&[
+            event_day_id.into(),
+            event_id.into(),
+            community_id.into(),
+            series_id.into(),
+            exception_day_date.into(),
+            membership_id.into(),
+        ])?;
 
-    db.prepare(
-        "INSERT INTO event_series_exceptions \
+    let exception = db
+        .prepare(
+            "INSERT INTO event_series_exceptions \
          (id, series_id, community_id, exception_day_date, action, event_day_id, \
           created_by_membership_id, created_at) \
-         VALUES (?1,?2,?3,?4,'cancel',?5,?6,?7) \
+         SELECT ?1,?2,?3,?4,'cancel',?5,?6,?7 WHERE changes()=1 \
          ON CONFLICT(series_id, exception_day_date) DO UPDATE SET \
            action='cancel', event_day_id=excluded.event_day_id, \
            created_by_membership_id=excluded.created_by_membership_id, \
            created_at=excluded.created_at",
-    )
-    .bind(&[
-        random_token()[..24].to_owned().into(),
-        series_id.into(),
-        community_id.into(),
-        exception_day_date.into(),
-        event_day_id.into(),
-        membership_id.into(),
-        now.as_str().into(),
-    ])?
-    .run()
-    .await?;
+        )
+        .bind(&[
+            random_token()[..24].to_owned().into(),
+            series_id.into(),
+            community_id.into(),
+            exception_day_date.into(),
+            event_day_id.into(),
+            membership_id.into(),
+            now.as_str().into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(membership_id),
+        Some(event_day_id),
+        AuditAction::EventOccurrenceCancelled,
+        AuditMetadata::OccurrenceCancelled {
+            series_id: series_id.to_owned(),
+            day_date: exception_day_date.to_owned(),
+        },
+    )?;
+    audit::execute_required_tail(db, vec![cancel, exception], &record).await?;
     Ok(())
 }
 
@@ -185,8 +285,12 @@ pub async fn cancel_occurrence(
 /// `day` is `(day_date, starts_at_utc, ends_at_utc)`; pass `None` to edit
 /// details only (e.g. multi-day/recurring events, where per-day time editing
 /// is out of scope).
+#[allow(clippy::too_many_arguments)]
 pub async fn edit_event(
     db: &D1Database,
+    request_id: &str,
+    community_id: &str,
+    membership_id: &str,
     event_id: &str,
     title: &str,
     location: Option<&str>,
@@ -194,55 +298,133 @@ pub async fn edit_event(
     day: Option<(&str, &str, &str)>,
 ) -> Result<()> {
     let now = now_utc();
-    db.prepare(
-        "UPDATE events SET title=?1, location=?2, description=?3, updated_at=?4 WHERE id=?5",
-    )
-    .bind(&[
-        title.into(),
-        location.unwrap_or("").into(),
-        description.unwrap_or("").into(),
-        now.as_str().into(),
-        event_id.into(),
-    ])?
-    .run()
-    .await?;
-
-    // Persist the single-day time edit (seq = 1). For multi-day/recurring
-    // events `day` is None and only the details above are updated.
+    let mut statements = Vec::new();
     if let Some((day_date, starts_utc, ends_utc)) = day {
-        db.prepare(
+        statements.push(db.prepare(
             "UPDATE event_days SET day_date=?1, starts_at_utc=?2, ends_at_utc=?3 \
-             WHERE event_id=?4 AND seq=1",
-        )
-        .bind(&[
-            day_date.into(),
-            starts_utc.into(),
-            ends_utc.into(),
-            event_id.into(),
-        ])?
-        .run()
-        .await?;
+             WHERE event_id=?4 AND community_id=?5 AND seq=1 \
+               AND occurrence_status='scheduled' \
+               AND (day_date IS NOT ?1 OR starts_at_utc IS NOT ?2 OR ends_at_utc IS NOT ?3 \
+                    OR EXISTS (SELECT 1 FROM events e WHERE e.id=?4 \
+                        AND (e.title IS NOT ?6 OR e.location IS NOT ?7 OR e.description IS NOT ?8))) \
+               AND (SELECT COUNT(*) FROM event_days WHERE event_id=?4)=1 \
+               AND NOT EXISTS (SELECT 1 FROM event_days \
+                               WHERE event_id=?4 AND starts_at_utc<=?9) \
+               AND EXISTS (SELECT 1 FROM events e WHERE e.id=?4 \
+                           AND e.community_id=?5 AND e.status='scheduled') \
+               AND EXISTS (SELECT 1 FROM community_memberships actor \
+                           WHERE actor.id=?10 AND actor.community_id=?5 \
+                             AND actor.role='admin' AND actor.removed_at IS NULL)")
+            .bind(&[
+                day_date.into(), starts_utc.into(), ends_utc.into(), event_id.into(),
+                community_id.into(), title.into(), location.unwrap_or("").into(),
+                description.unwrap_or("").into(), now.as_str().into(), membership_id.into(),
+            ])?);
     }
+    if let Some((day_date, starts_utc, ends_utc)) = day {
+        statements.push(
+            db.prepare(
+                "UPDATE events SET title=?1, location=?2, description=?3, updated_at=?4 \
+                 WHERE id=?5 AND community_id=?6 AND status='scheduled' \
+                   AND (title IS NOT ?1 OR location IS NOT ?2 OR description IS NOT ?3 \
+                        OR changes()=1) \
+                   AND (SELECT COUNT(*) FROM event_days WHERE event_id=?5)=1 \
+                   AND EXISTS (SELECT 1 FROM event_days d \
+                               WHERE d.event_id=?5 AND d.community_id=?6 AND d.seq=1 \
+                                 AND d.occurrence_status='scheduled' \
+                                 AND d.day_date IS ?8 \
+                                 AND d.starts_at_utc IS ?9 AND d.ends_at_utc IS ?10 \
+                                 AND d.starts_at_utc>?4) \
+                   AND EXISTS (SELECT 1 FROM community_memberships actor \
+                               WHERE actor.id=?7 AND actor.community_id=?6 \
+                                 AND actor.role='admin' AND actor.removed_at IS NULL)",
+            )
+            .bind(&[
+                title.into(),
+                location.unwrap_or("").into(),
+                description.unwrap_or("").into(),
+                now.as_str().into(),
+                event_id.into(),
+                community_id.into(),
+                membership_id.into(),
+                day_date.into(),
+                starts_utc.into(),
+                ends_utc.into(),
+            ])?,
+        );
+    } else {
+        statements.push(
+            db.prepare(
+                "UPDATE events SET title=?1, location=?2, description=?3, updated_at=?4 \
+                 WHERE id=?5 AND community_id=?6 AND status='scheduled' \
+                   AND (title IS NOT ?1 OR location IS NOT ?2 OR description IS NOT ?3) \
+                   AND NOT EXISTS (SELECT 1 FROM event_days \
+                                   WHERE event_id=?5 AND starts_at_utc<=?4) \
+                   AND EXISTS (SELECT 1 FROM community_memberships actor \
+                               WHERE actor.id=?7 AND actor.community_id=?6 \
+                                 AND actor.role='admin' AND actor.removed_at IS NULL)",
+            )
+            .bind(&[
+                title.into(),
+                location.unwrap_or("").into(),
+                description.unwrap_or("").into(),
+                now.as_str().into(),
+                event_id.into(),
+                community_id.into(),
+                membership_id.into(),
+            ])?,
+        );
+    }
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(membership_id),
+        Some(event_id),
+        AuditAction::EventEdited,
+        AuditMetadata::EventEdited {
+            edit_scope: if day.is_some() {
+                EventEditScope::SingleDaySchedule
+            } else {
+                EventEditScope::DetailsOnly
+            },
+        },
+    )?;
+    audit::execute_required_tail(db, statements, &record).await?;
     Ok(())
 }
 
 /// Soft-cancel an event.
 pub async fn cancel_event(
     db: &D1Database,
+    request_id: &str,
+    community_id: &str,
     event_id: &str,
     cancelled_by_membership_id: &str,
 ) -> Result<()> {
     let now = now_utc();
-    db.prepare(
-        "UPDATE events SET status='cancelled', cancelled_at=?1, \
-         cancelled_by_membership_id=?2, updated_at=?1 WHERE id=?3",
-    )
-    .bind(&[
-        now.as_str().into(),
-        cancelled_by_membership_id.into(),
-        event_id.into(),
-    ])?
-    .run()
-    .await?;
+    let mutation = db
+        .prepare(
+            "UPDATE events SET status='cancelled', cancelled_at=?1, \
+         cancelled_by_membership_id=?2, updated_at=?1 \
+         WHERE id=?3 AND community_id=?4 AND status='scheduled' \
+           AND EXISTS (SELECT 1 FROM community_memberships actor \
+                       WHERE actor.id=?2 AND actor.community_id=?4 \
+                         AND actor.role='admin' AND actor.removed_at IS NULL)",
+        )
+        .bind(&[
+            now.as_str().into(),
+            cancelled_by_membership_id.into(),
+            event_id.into(),
+            community_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(cancelled_by_membership_id),
+        Some(event_id),
+        AuditAction::EventCancelled,
+        AuditMetadata::None,
+    )?;
+    audit::execute_required(db, mutation, &record).await?;
     Ok(())
 }

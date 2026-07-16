@@ -204,6 +204,49 @@ try {
   assert(multiFailure.batchSucceeded === false, 'unconditional audit rejection unexpectedly committed');
   expectState(multiFailure.state, { businessState: 0, multiWrites: 0, audits: 0 }, 'unconditional audit failure');
 
+  assert((await request(baseUrl, '/reset')).reset === true, 'Package 4 fixture reset failed');
+  const eventCreate = await request(baseUrl, '/package4/event/success');
+  assert(eventCreate.batchSucceeded === true, 'bounded event create did not commit');
+  assert(JSON.stringify(eventCreate.statementChanges) === '[1,1,1,1]', 'event create statement accounting changed');
+  assert(eventCreate.state.eventHeaders === 1 && eventCreate.state.eventParts === 2 && eventCreate.state.audits === 1,
+    'event create did not commit all business rows with one audit');
+
+  const eventFailure = await request(baseUrl, '/package4/event/audit-failure');
+  assert(eventFailure.batchSucceeded === false, 'event create audit rejection unexpectedly committed');
+  assert(eventFailure.state.eventHeaders === 1 && eventFailure.state.eventParts === 2 && eventFailure.state.audits === 0,
+    'event create audit failure did not roll back its full multi-write batch');
+
+  const editEligibilityLoss = await request(baseUrl, '/package4/edit/eligibility-loss');
+  assert(JSON.stringify(editEligibilityLoss.statementChanges) === '[0,0,0]',
+    'ineligible schedule edit reached its event tail or audit');
+  assert(editEligibilityLoss.state.title === 'old title' && editEligibilityLoss.state.dayCount === 2
+    && editEligibilityLoss.state.requestedDays === 0 && editEligibilityLoss.state.audits === 0,
+  'ineligible schedule edit committed a partial transition');
+
+  const occurrence = await request(baseUrl, '/package4/occurrence/success');
+  assert(occurrence.batchSucceeded === true && JSON.stringify(occurrence.statementChanges) === '[1,1,1]',
+    'occurrence cancellation did not commit its three-statement chain');
+  assert(occurrence.state.status === 'cancelled' && occurrence.state.exceptions === 1 && occurrence.state.audits === 1,
+    'occurrence cancellation success state is incomplete');
+  const occurrenceReplay = await request(baseUrl, '/package4/occurrence/replay');
+  assert(occurrenceReplay.batchSucceeded === true && JSON.stringify(occurrenceReplay.statementChanges) === '[0,0,0]',
+    'occurrence cancellation replay wrote state or audit');
+  const occurrenceFailure = await request(baseUrl, '/package4/occurrence/audit-failure');
+  assert(occurrenceFailure.batchSucceeded === false && occurrenceFailure.state.status === 'scheduled'
+    && occurrenceFailure.state.exceptions === 0 && occurrenceFailure.state.audits === 0,
+  'occurrence audit failure did not roll back day and exception state');
+
+  const attendance = await request(baseUrl, '/package4/attendance/success');
+  assert(JSON.stringify(attendance.statementChanges) === '[2,1]' && attendance.changedCount === 2,
+    'set-based attendance count was not database-derived');
+  const attendanceReplay = await request(baseUrl, '/package4/attendance/replay');
+  assert(JSON.stringify(attendanceReplay.statementChanges) === '[0,0]' && attendanceReplay.changedCount === 0,
+    'set-based attendance replay wrote state or audit');
+
+  const calendarFailure = await request(baseUrl, '/package4/calendar/audit-failure');
+  assert(calendarFailure.batchSucceeded === false && calendarFailure.state.activeTokens === 1,
+    'calendar rotation audit failure did not restore the predecessor token');
+
   process.stdout.write(`${JSON.stringify({
     wrangler: wranglerVersion,
     mode: 'local-only',
@@ -214,6 +257,15 @@ try {
       authorizationLoss: { committed: true, statementChanges: authorization.statementChanges, state: authorization.state },
       conditionalAuditFailure: { committed: false, state: auditFailure.state },
       unconditionalAuditFailure: { committed: false, state: multiFailure.state },
+      boundedEventCreate: { committed: true, statementChanges: eventCreate.statementChanges },
+      boundedEventAuditFailure: { committed: false },
+      editEligibilityLoss: { statementChanges: editEligibilityLoss.statementChanges, state: editEligibilityLoss.state },
+      occurrenceCancellation: { committed: true, statementChanges: occurrence.statementChanges },
+      occurrenceReplay: { statementChanges: occurrenceReplay.statementChanges },
+      occurrenceAuditFailure: { committed: false, dayAndExceptionRolledBack: true },
+      setBasedAttendance: { statementChanges: attendance.statementChanges, changedCount: attendance.changedCount },
+      setBasedAttendanceReplay: { statementChanges: attendanceReplay.statementChanges, changedCount: 0 },
+      calendarRotationAuditFailure: { committed: false, predecessorRestored: true },
     },
     privacy: { identifiersPrinted: false, metadataPrinted: false, workerConsoleCalls: 0 },
   }, null, 2)}\n`);

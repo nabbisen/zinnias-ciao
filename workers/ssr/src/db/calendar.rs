@@ -6,6 +6,8 @@
 use worker::Result;
 use worker::d1::D1Database;
 
+use crate::audit::{self, AuditAction, AuditMetadata};
+
 /// Metadata returned to callers — never includes the HMAC.
 pub struct CalendarTokenRow {
     pub id: String,
@@ -116,6 +118,87 @@ pub async fn revoke_for_membership(
     .run()
     .await?;
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn rotate_required(
+    db: &D1Database,
+    request_id: &str,
+    id: &str,
+    community_id: &str,
+    membership_id: &str,
+    token_hmac: &str,
+    now: &str,
+) -> Result<bool> {
+    let revoke = db
+        .prepare(
+            "UPDATE calendar_tokens SET revoked_at = ?1 \
+             WHERE membership_id = ?2 AND community_id = ?3 \
+               AND revoked_at IS NULL \
+               AND EXISTS (SELECT 1 FROM community_memberships m \
+                   WHERE m.id = ?2 AND m.community_id = ?3 AND m.removed_at IS NULL)",
+        )
+        .bind(&[now.into(), membership_id.into(), community_id.into()])?;
+    let insert = db
+        .prepare(
+            "INSERT INTO calendar_tokens \
+             (id, community_id, membership_id, token_hmac, created_at) \
+             SELECT ?1, ?2, ?3, ?4, ?5 \
+             WHERE EXISTS (SELECT 1 FROM community_memberships m \
+                 WHERE m.id = ?3 AND m.community_id = ?2 AND m.removed_at IS NULL)",
+        )
+        .bind(&[
+            id.into(),
+            community_id.into(),
+            membership_id.into(),
+            token_hmac.into(),
+            now.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(membership_id),
+        None,
+        AuditAction::CalendarFeedTokenGenerated,
+        AuditMetadata::None,
+    )?;
+    audit::execute_required_tail(db, vec![revoke, insert], &record).await
+}
+
+pub async fn revoke_required(
+    db: &D1Database,
+    request_id: &str,
+    community_id: &str,
+    membership_id: &str,
+    now: &str,
+) -> Result<usize> {
+    const ACTIVE_TOKEN_CAP: u32 = 10_000;
+    let mutation = db
+        .prepare(
+            "UPDATE calendar_tokens SET revoked_at = ?1 \
+             WHERE membership_id = ?2 AND community_id = ?3 \
+               AND revoked_at IS NULL \
+               AND EXISTS (SELECT 1 FROM community_memberships m \
+                   WHERE m.id = ?2 AND m.community_id = ?3 AND m.removed_at IS NULL) \
+               AND (SELECT COUNT(*) FROM calendar_tokens c \
+                    WHERE c.membership_id = ?2 AND c.community_id = ?3 \
+                      AND c.revoked_at IS NULL) <= ?4",
+        )
+        .bind(&[
+            now.into(),
+            membership_id.into(),
+            community_id.into(),
+            ACTIVE_TOKEN_CAP.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(membership_id),
+        None,
+        AuditAction::CalendarFeedTokenRevoked,
+        AuditMetadata::None,
+    )?;
+    audit::execute_required_bounded(db, mutation, &record, ACTIVE_TOKEN_CAP).await
 }
 
 /// Events for the ICS feed: title, times, location, status.

@@ -1,7 +1,6 @@
 use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::{auth::token_purpose, i18n};
 
-use crate::audit;
 use crate::authz::require_admin;
 use crate::db::{event as event_db, event_write};
 use crate::render;
@@ -110,6 +109,8 @@ pub async fn post_cancel_occurrence(
         .unwrap_or(day.day_date.as_str());
     event_write::cancel_occurrence(
         &db,
+        rid,
+        event_id,
         day_id,
         &membership.membership_id,
         series_id,
@@ -117,18 +118,5 @@ pub async fn post_cancel_occurrence(
         exception_day_date,
     )
     .await?;
-    let _ = audit::write_legacy(
-        &db,
-        rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(day_id),
-        audit::LegacyAuditAction::EventOccurrenceCancelled,
-        audit::LegacyAuditMetadata::OccurrenceCancelled {
-            series_id: series_id.to_owned(),
-            day_date: exception_day_date.to_owned(),
-        },
-    )
-    .await;
     redirect(&format!("/c/{community_id}/events/{event_id}"))
 }

@@ -6,7 +6,7 @@
 //!   POST /c/:cid/me/calendar/revoke       — revoke (disable) feed
 //!   GET  /c/:cid/cal/:token               — unauthenticated ICS feed (bearer URL)
 
-use worker::{D1Database, Env, Request, Response, Result};
+use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
@@ -196,14 +196,12 @@ pub async fn post_regenerate_calendar(
     }
 
     let now = db::now_utc();
-    // Revoke any existing token first.
-    cal_db::revoke_for_membership(&db, &membership.membership_id, community_id, &now).await?;
-
     // Generate new token — the ID is stored; HMAC(pepper, id) is the bearer secret.
     let token_id = random_token()[..32].to_owned();
     let token_hmac = hmac_hex(&pp, &token_id);
-    cal_db::insert(
+    cal_db::rotate_required(
         &db,
+        rid,
         &token_id,
         community_id,
         &membership.membership_id,
@@ -211,15 +209,6 @@ pub async fn post_regenerate_calendar(
         &now,
     )
     .await?;
-
-    let _ = write_calendar_token_audit(
-        &db,
-        rid,
-        community_id,
-        &membership.membership_id,
-        crate::audit::LegacyAuditAction::CalendarFeedTokenGenerated,
-    )
-    .await;
 
     redirect(&format!("/c/{community_id}/me/calendar?flash=generated"))
 }
@@ -254,16 +243,7 @@ pub async fn post_revoke_calendar(
     }
 
     let now = db::now_utc();
-    cal_db::revoke_for_membership(&db, &membership.membership_id, community_id, &now).await?;
-
-    let _ = write_calendar_token_audit(
-        &db,
-        rid,
-        community_id,
-        &membership.membership_id,
-        crate::audit::LegacyAuditAction::CalendarFeedTokenRevoked,
-    )
-    .await;
+    cal_db::revoke_required(&db, rid, community_id, &membership.membership_id, &now).await?;
 
     redirect(&format!("/c/{community_id}/me/calendar?flash=disabled"))
 }
@@ -343,28 +323,6 @@ pub async fn get_ics_feed(
     resp.headers_mut()
         .set("X-Content-Type-Options", "nosniff")?;
     Ok(resp)
-}
-
-async fn write_calendar_token_audit(
-    db: &D1Database,
-    rid: &str,
-    community_id: &str,
-    membership_id: &str,
-    action: crate::audit::LegacyAuditAction,
-) -> Result<()> {
-    // Security-relevant audit event (RFC-045 P1-5). Keep token ids, HMACs,
-    // and bearer URLs out of both target_id and metadata.
-    let target_id: Option<&str> = None;
-    crate::audit::write_legacy(
-        db,
-        rid,
-        Some(community_id),
-        Some(membership_id),
-        target_id,
-        action,
-        crate::audit::LegacyAuditMetadata::None,
-    )
-    .await
 }
 
 fn redirect(location: &str) -> Result<Response> {

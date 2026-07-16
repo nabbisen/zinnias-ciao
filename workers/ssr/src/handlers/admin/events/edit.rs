@@ -4,7 +4,6 @@ use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::status::DayTimeState;
 use zinnias_ciao_domain::{EventInput, validate_event};
 
-use crate::audit;
 use crate::authz::require_admin;
 use crate::db::{self, event as event_db, event_write, membership as membership_db};
 use crate::handlers::event::classify_day;
@@ -277,6 +276,9 @@ pub async fn post_edit_event(
 
     event_write::edit_event(
         &db,
+        rid,
+        community_id,
+        &membership.membership_id,
         event_id,
         &submission.details.title,
         submission.details.location.as_deref(),
@@ -290,23 +292,6 @@ pub async fn post_edit_event(
         }),
     )
     .await?;
-
-    let _ = audit::write_legacy(
-        &db,
-        rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(event_id),
-        audit::LegacyAuditAction::EventEdited,
-        audit::LegacyAuditMetadata::EventEdited {
-            edit_scope: if schedule_editable {
-                audit::EventEditScope::SingleDaySchedule
-            } else {
-                audit::EventEditScope::DetailsOnly
-            },
-        },
-    )
-    .await;
 
     redirect(&format!("/c/{community_id}/events/{event_id}"))
 }

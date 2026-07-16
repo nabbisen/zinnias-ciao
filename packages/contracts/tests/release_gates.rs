@@ -1692,17 +1692,13 @@ fn rfc053_calendar_feed_privacy_and_revocation_ux_is_guarded() {
             && !CALENDAR_HANDLER_SRC.contains("render::escape_html(&f)"),
         "Calendar feed actions must not surface raw or English flash query text"
     );
-    let calendar_audit_helper_src = CALENDAR_HANDLER_SRC
-        .split("async fn write_calendar_token_audit")
-        .nth(1)
-        .and_then(|s| s.split("fn redirect").next())
-        .expect("Calendar token audit helper must exist");
     assert!(
-        CALENDAR_HANDLER_SRC.contains("LegacyAuditAction::CalendarFeedTokenGenerated")
-            && CALENDAR_HANDLER_SRC.contains("LegacyAuditAction::CalendarFeedTokenRevoked")
-            && calendar_audit_helper_src.contains("crate::audit::write_legacy")
-            && calendar_audit_helper_src.contains("let target_id: Option<&str> = None;")
-            && calendar_audit_helper_src.contains("LegacyAuditMetadata::None"),
+        CALENDAR_HANDLER_SRC.contains("cal_db::rotate_required")
+            && CALENDAR_HANDLER_SRC.contains("cal_db::revoke_required")
+            && CALENDAR_DB_SRC.contains("AuditAction::CalendarFeedTokenGenerated")
+            && CALENDAR_DB_SRC.contains("AuditAction::CalendarFeedTokenRevoked")
+            && CALENDAR_DB_SRC.contains("AuditMetadata::None")
+            && !CALENDAR_DB_SRC.contains("LegacyAuditAction"),
         "Calendar token generation/revocation must be audited without token-bearing target_id or metadata"
     );
     assert!(
@@ -1966,7 +1962,7 @@ fn rfc051_event_edit_semantics_are_details_only_for_multi_day() {
         ADMIN_EVENTS_SRC.contains("edit_post_contains_schedule_fields")
             && ADMIN_EVENTS_SRC.contains("JA_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE")
             && ADMIN_EVENTS_SRC.contains("validate_event_details")
-            && ADMIN_EVENTS_SRC.contains("edit_scope"),
+            && RFC079_EVENT_WRITE_DB_SRC.contains("edit_scope"),
         "Details-only POST must reject direct schedule fields, validate only details, and audit the edit scope"
     );
     assert!(
@@ -2129,6 +2125,7 @@ const RFC079_BACKUP_RECOVERY_SRC: &str =
 const RFC079_DEPLOYMENT_SRC: &str = include_str!("../../../docs/src/shared/deployment.md");
 const RFC079_OPERATIONS_SRC: &str = include_str!("../../../docs/src/maintainer/operations.md");
 const RFC079_ATTENDANCE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/attendance.rs");
+const RFC079_EVENT_WRITE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event_write.rs");
 const RFC079_EVENT_NOTE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event_note.rs");
 const RFC079_EVENT_TEMPLATE_DB_SRC: &str =
     include_str!("../../../workers/ssr/src/db/event_template.rs");
@@ -2325,14 +2322,8 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
     let scan = scan_audit_sources(&sources);
 
     let expected_generic_counts = std::collections::BTreeMap::from([
-        ("handlers/admin/events/attendance.rs".to_owned(), 1usize),
-        ("handlers/admin/events/cancel.rs".to_owned(), 1),
-        ("handlers/admin/events/create.rs".to_owned(), 1),
-        ("handlers/admin/events/edit.rs".to_owned(), 1),
-        ("handlers/admin/events/occurrence.rs".to_owned(), 1),
-        ("handlers/admin/help_signin.rs".to_owned(), 1),
+        ("handlers/admin/help_signin.rs".to_owned(), 1usize),
         ("handlers/auth.rs".to_owned(), 1),
-        ("handlers/calendar.rs".to_owned(), 1),
         ("handlers/communities.rs".to_owned(), 1),
         ("handlers/export.rs".to_owned(), 1),
         ("handlers/join.rs".to_owned(), 1),
@@ -2357,8 +2348,8 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
 
     assert_eq!(
         scan.generic_calls.values().map(Vec::len).sum::<usize>(),
-        12,
-        "RFC-079 Package 3 inventory expects exactly 12 deferred compatibility-writer call sites"
+        6,
+        "RFC-079 Package 4 inventory expects exactly 6 deferred compatibility-writer call sites"
     );
     assert!(
         scan.assertion_table_refs.is_empty() && scan.operation_id_refs.is_empty(),
@@ -2367,16 +2358,12 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
         scan.operation_id_refs
     );
 
-    let expected_call_shapes: [(&str, &[&str]); 12] = [
+    let expected_call_shapes: [(&str, &[&str]); 6] = [
         (
             "handlers/auth.rs",
             &[
                 "None, crate::audit::LegacyAuditAction::SessionLogout, crate::audit::LegacyAuditMetadata::None",
             ],
-        ),
-        (
-            "handlers/calendar.rs",
-            &["target_id, action, crate::audit::LegacyAuditMetadata::None"],
         ),
         (
             "handlers/communities.rs",
@@ -2408,36 +2395,6 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
                 "Some(target_membership_id), audit::LegacyAuditAction::MembershipRelinkCodeCreated, audit::LegacyAuditMetadata::RelinkCorrelation",
             ],
         ),
-        (
-            "handlers/admin/events/attendance.rs",
-            &[
-                "Some(event_id), audit::LegacyAuditAction::AttendanceAdminOverride, audit::LegacyAuditMetadata::AttendanceOverride",
-            ],
-        ),
-        (
-            "handlers/admin/events/cancel.rs",
-            &[
-                "Some(event_id), audit::LegacyAuditAction::EventCancelled, audit::LegacyAuditMetadata::None",
-            ],
-        ),
-        (
-            "handlers/admin/events/create.rs",
-            &[
-                "Some(&event_id), audit::LegacyAuditAction::EventCreated, create_event_audit_metadata",
-            ],
-        ),
-        (
-            "handlers/admin/events/edit.rs",
-            &[
-                "Some(event_id), audit::LegacyAuditAction::EventEdited, audit::LegacyAuditMetadata::EventEdited",
-            ],
-        ),
-        (
-            "handlers/admin/events/occurrence.rs",
-            &[
-                "Some(day_id), audit::LegacyAuditAction::EventOccurrenceCancelled, audit::LegacyAuditMetadata::OccurrenceCancelled",
-            ],
-        ),
     ];
     for (path, expected_shapes) in expected_call_shapes {
         let actual = scan
@@ -2463,21 +2420,6 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
         .iter()
         .map(|(path, source)| (path.as_str(), compact_source(source)))
         .collect::<std::collections::BTreeMap<_, _>>();
-    let calendar_source = sources
-        .iter()
-        .find(|(path, _)| path == "handlers/calendar.rs")
-        .map(|(_, source)| source.as_str())
-        .expect("calendar audit source must exist");
-    let calendar_calls = named_call_blocks(calendar_source, "write_calendar_token_audit(");
-    let expected_calendar_calls = [
-        "write_calendar_token_audit(&db,rid,community_id,&membership.membership_id,crate::audit::LegacyAuditAction::CalendarFeedTokenGenerated,)",
-        "write_calendar_token_audit(&db,rid,community_id,&membership.membership_id,crate::audit::LegacyAuditAction::CalendarFeedTokenRevoked,)",
-    ];
-    assert!(
-        call_shapes_match(&calendar_calls, &expected_calendar_calls),
-        "calendar audit wrapper invocation set changed; expected {expected_calendar_calls:?}, actual {calendar_calls:?}"
-    );
-
     let role_source = sources
         .iter()
         .find(|(path, _)| path == "handlers/admin/role_transfer.rs")
@@ -2497,7 +2439,6 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
             "role audit-action mapping is missing {required}"
         );
     }
-
     let class_a = [
         "community.created",
         "membership.created_first_admin",
@@ -2633,11 +2574,16 @@ fn rfc079_package2_migration_and_operator_policy_are_pinned() {
             && RFC079_MIGRATION_SRC.contains("DROP TABLE audit_migration_0010_guard"),
         "migration mismatch checks must fail closed and leave no guard table"
     );
+    let central_statement_builder = RFC079_AUDIT_CORE_SRC
+        .split("fn statement_with_suffix")
+        .nth(1)
+        .and_then(|source| source.split("fn success_event").next())
+        .expect("central audit statement builder must exist");
     assert!(
         RFC079_AUDIT_CORE_SRC.contains(
             "(id, request_id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at)"
-        ) && RFC079_AUDIT_CORE_SRC.contains("D1Type::Text(self.request_id.as_str())")
-            && RFC079_AUDIT_CORE_SRC.matches("unwrap_or(D1Type::Null)").count() == 3,
+        ) && central_statement_builder.contains("D1Type::Text(self.request_id.as_str())")
+            && central_statement_builder.matches("unwrap_or(D1Type::Null)").count() == 3,
         "the central statement builder must bind the validated request ID required by migration 0010"
     );
 
@@ -2792,6 +2738,83 @@ fn rfc079_package3_simple_required_batches_are_pinned() {
             && RFC079_ATOMICITY_FIXTURE_SRC
                 .contains("RAISE(ABORT, 'synthetic required audit rejection')"),
         "Package 3 real-D1 proof must remain local-only, authority-isolated, privacy-bounded, and cover audit-trigger rollback"
+    );
+}
+
+#[test]
+fn rfc079_package4_event_calendar_and_attendance_batches_are_pinned() {
+    assert!(
+        RFC079_EVENT_WRITE_DB_SRC.contains("RECURRENCE_MATERIALIZATION_INSERT_CAP + 3")
+            && RFC079_EVENT_WRITE_DB_SRC.contains("event create statement budget exceeded")
+            && RFC079_EVENT_WRITE_DB_SRC.contains("execute_required_tail")
+            && RFC079_EVENT_WRITE_DB_SRC.contains("EventOccurrenceCancelled")
+            && RFC079_EVENT_WRITE_DB_SRC.contains("EventEditScope::SingleDaySchedule")
+            && RFC079_EVENT_WRITE_DB_SRC.contains("AuditAction::EventCancelled"),
+        "Package 4 event creation and mutation batches must remain bounded and typed"
+    );
+    for required in [
+        "actor.role='admin'",
+        "actor.removed_at IS NULL",
+        "e.status='scheduled'",
+        "occurrence_status='scheduled'",
+        "WHERE changes()=1",
+    ] {
+        assert!(
+            RFC079_EVENT_WRITE_DB_SRC.contains(required),
+            "Package 4 event mutation boundary is missing {required:?}"
+        );
+    }
+    for required in [
+        "AND (SELECT COUNT(*) FROM event_days WHERE event_id=?5)=1",
+        "AND EXISTS (SELECT 1 FROM event_days d",
+        "d.occurrence_status='scheduled'",
+        "d.day_date IS ?8",
+        "d.starts_at_utc IS ?9 AND d.ends_at_utc IS ?10",
+        "d.starts_at_utc>?4",
+    ] {
+        assert!(
+            RFC079_EVENT_WRITE_DB_SRC.contains(required),
+            "single-day edit tail must prove its exact eligible day post-state: missing {required:?}"
+        );
+    }
+    assert!(
+        RFC079_ATTENDANCE_DB_SRC.contains("ADMIN_OVERRIDE_CELL_CAP: usize = 10_000")
+            && RFC079_ATTENDANCE_DB_SRC.contains("FROM json_each(?1)")
+            && RFC079_ATTENDANCE_DB_SRC.contains("SELECT COUNT(*) FROM eligible")
+            && RFC079_ATTENDANCE_DB_SRC.contains("attendances.status IS NOT excluded.status")
+            && RFC079_ATTENDANCE_DB_SRC.contains("execute_required_attendance_override"),
+        "Package 4 attendance override must remain one bounded, all-or-nothing set-based mutation"
+    );
+    assert!(
+        RFC079_AUDIT_CORE_SRC.contains("json_object('changed_count', changes())")
+            && RFC079_AUDIT_CORE_SRC.contains("WHERE changes() BETWEEN 1 AND")
+            && RFC079_AUDIT_CORE_SRC.contains("attendance audit cardinality mismatch"),
+        "attendance audit metadata must use the database mutation cardinality"
+    );
+    assert!(
+        CALENDAR_DB_SRC.contains("pub async fn rotate_required")
+            && CALENDAR_DB_SRC.contains("pub async fn revoke_required")
+            && CALENDAR_DB_SRC.contains("execute_required_tail")
+            && CALENDAR_DB_SRC.contains("execute_required_bounded")
+            && CALENDAR_DB_SRC.contains("m.removed_at IS NULL")
+            && !CALENDAR_HANDLER_SRC.contains("write_calendar_token_audit"),
+        "Package 4 calendar-token rotation/revocation must remain typed and atomic"
+    );
+    assert!(
+        RFC079_ATOMICITY_RUNNER_SRC.contains("/package4/event/audit-failure")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("/package4/edit/eligibility-loss")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("/package4/occurrence/success")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("/package4/occurrence/replay")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("/package4/occurrence/audit-failure")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("/package4/attendance/replay")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("/package4/calendar/audit-failure")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("predecessorRestored: true")
+            && RFC079_ATOMICITY_WORKER_SRC.contains("json_object('changed_count', changes())")
+            && RFC079_ATOMICITY_WORKER_SRC.contains("proof_event_parts")
+            && RFC079_ATOMICITY_FIXTURE_SRC.contains("proof_edit_days")
+            && RFC079_ATOMICITY_FIXTURE_SRC.contains("proof_occurrence_exceptions")
+            && RFC079_ATOMICITY_FIXTURE_SRC.contains("proof_calendar_tokens"),
+        "Package 4 real-D1 proof must cover edit eligibility loss, occurrence success/no-op/rollback, multi-write rollback, database-derived attendance count/no-op, and calendar predecessor restoration"
     );
 }
 

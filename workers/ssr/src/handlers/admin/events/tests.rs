@@ -284,7 +284,7 @@ fn audit_metadata_separates_cancelled_recreate_from_event_copy() {
     )));
     assert!(matches!(
         recreate,
-        crate::audit::LegacyAuditMetadata::EventCreated {
+        crate::audit::AuditMetadata::EventCreated {
             creation_mode: crate::audit::EventCreationMode::CancelledRecreate,
             source_event_id: Some(source),
         } if source == "evt-old"
@@ -295,7 +295,7 @@ fn audit_metadata_separates_cancelled_recreate_from_event_copy() {
     )));
     assert!(matches!(
         copied,
-        crate::audit::LegacyAuditMetadata::EventCreated {
+        crate::audit::AuditMetadata::EventCreated {
             creation_mode: crate::audit::EventCreationMode::EventCopy,
             source_event_id: Some(source),
         } if source == "evt-src"

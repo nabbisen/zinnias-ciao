@@ -4,9 +4,8 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
-use crate::audit;
 use crate::authz::require_admin;
-use crate::db::{event as event_db, membership as membership_db};
+use crate::db::{attendance as attendance_db, event as event_db, membership as membership_db};
 use crate::render;
 use crate::session::require_auth;
 
@@ -198,7 +197,14 @@ pub async fn post_attendance(
     let days = event_db::days_for_event(&db, event_id).await?;
     let members = membership_db::list_all_active(&db, community_id).await?;
 
-    let mut changes: u32 = 0;
+    let submitted_cells = days
+        .len()
+        .checked_mul(members.len())
+        .ok_or_else(|| worker::Error::RustError("attendance override size overflow".to_owned()))?;
+    if submitted_cells > attendance_db::ADMIN_OVERRIDE_CELL_CAP {
+        return render::internal_error();
+    }
+    let mut submitted = Vec::with_capacity(submitted_cells);
     for day in &days {
         for m in &members {
             let field_name = format!("att_{}_{}", day.id, m.id);
@@ -209,23 +215,25 @@ pub async fn post_attendance(
                 "attended" => Some("attended"),
                 _ => None,
             };
-            crate::db::attendance::upsert(&db, &day.id, &m.id, status).await?;
-            changes += 1;
+            submitted.push(serde_json::json!({
+                "day_id": day.id,
+                "membership_id": m.id,
+                "status": status,
+            }));
         }
     }
-
-    let _ = audit::write_legacy(
+    let submitted_json = serde_json::to_string(&submitted)
+        .map_err(|_| worker::Error::RustError("attendance override encoding failed".to_owned()))?;
+    attendance_db::admin_override_matrix(
         &db,
         rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(event_id),
-        audit::LegacyAuditAction::AttendanceAdminOverride,
-        audit::LegacyAuditMetadata::AttendanceOverride {
-            changed_count: changes,
-        },
+        community_id,
+        event_id,
+        &membership.membership_id,
+        &submitted_json,
+        submitted_cells,
     )
-    .await;
+    .await?;
 
     redirect(&format!(
         "/c/{community_id}/admin/events/{event_id}/attendance?flash=Saved"

@@ -14,6 +14,8 @@ const MAX_METADATA_DEPTH: usize = 8;
 const MAX_METADATA_NODES: usize = 128;
 const MAX_METADATA_BYTES: usize = 2_048;
 const MAX_CHANGED_COUNT: u32 = 10_000;
+const AUDIT_INSERT_SQL: &str = "INSERT INTO audit_log \
+    (id, request_id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at)";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AuditAction {
@@ -503,6 +505,66 @@ impl AuditRecord {
         )
     }
 
+    /// Insert this record when the adjacent set-based mutation changed at
+    /// least one row, up to the caller's explicit domain bound.
+    pub(crate) fn statement_after_bounded_changes(
+        &self,
+        db: &D1Database,
+        max_changes: u32,
+    ) -> Result<D1PreparedStatement> {
+        let suffix = format!(
+            "SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9 \
+             WHERE changes() BETWEEN 1 AND {max_changes}"
+        );
+        self.statement_with_suffix(db, &suffix)
+    }
+
+    /// Attendance override counts must come from the set-based database
+    /// mutation itself, not from a racy application-side estimate.
+    fn attendance_statement_after_bounded_changes(
+        &self,
+        db: &D1Database,
+        max_changes: u32,
+    ) -> Result<D1PreparedStatement> {
+        if self.action != AuditAction::AttendanceAdminOverride {
+            return Err(worker::Error::RustError(
+                "dynamic attendance metadata used with incompatible action".to_owned(),
+            ));
+        }
+        let community_id = self
+            .community_id
+            .as_deref()
+            .map(D1Type::Text)
+            .unwrap_or(D1Type::Null);
+        let actor_membership_id = self
+            .actor_membership_id
+            .as_deref()
+            .map(D1Type::Text)
+            .unwrap_or(D1Type::Null);
+        let target_id = self
+            .target_id
+            .as_deref()
+            .map(D1Type::Text)
+            .unwrap_or(D1Type::Null);
+        let values = [
+            D1Type::Text(self.id.as_str()),
+            D1Type::Text(self.request_id.as_str()),
+            community_id,
+            actor_membership_id,
+            D1Type::Text(self.action.target_kind()),
+            target_id,
+            D1Type::Text(self.action.canonical()),
+            D1Type::Text(self.created_at.as_str()),
+        ];
+        db.prepare(format!(
+            "{AUDIT_INSERT_SQL} \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, \
+                    json_object('changed_count', changes()), ?8 \
+             WHERE changes() BETWEEN 1 AND {max_changes}"
+        ))
+        .bind_refs(&values)
+    }
+
     fn statement_with_suffix(
         &self,
         db: &D1Database,
@@ -534,12 +596,8 @@ impl AuditRecord {
             D1Type::Text(self.metadata_json.as_str()),
             D1Type::Text(self.created_at.as_str()),
         ];
-        db.prepare(format!(
-            "INSERT INTO audit_log \
-             (id, request_id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at) \
-             {values_sql}"
-        ))
-        .bind_refs(&values)
+        db.prepare(format!("{AUDIT_INSERT_SQL} {values_sql}"))
+            .bind_refs(&values)
     }
 
     fn success_event(&self) -> String {
@@ -594,6 +652,68 @@ pub(crate) async fn execute_required(
     }
 }
 
+pub(crate) async fn execute_required_bounded(
+    db: &D1Database,
+    mutation: D1PreparedStatement,
+    audit: &AuditRecord,
+    max_changes: u32,
+) -> Result<usize> {
+    if max_changes == 0 || max_changes > MAX_CHANGED_COUNT {
+        return Err(worker::Error::RustError(
+            "required audit change bound rejected".to_owned(),
+        ));
+    }
+    let results = db
+        .batch(vec![
+            mutation,
+            audit.statement_after_bounded_changes(db, max_changes)?,
+        ])
+        .await?;
+    let mutation_changes = result_changes(&results, 0);
+    let audit_changes = result_changes(&results, 1);
+    if mutation_changes == 0 && audit_changes == 0 {
+        return Ok(0);
+    }
+    if mutation_changes <= max_changes as usize && audit_changes == 1 {
+        audit.log_success();
+        return Ok(mutation_changes);
+    }
+    Err(worker::Error::RustError(format!(
+        "required bounded audit cardinality mismatch: mutation={mutation_changes} audit={audit_changes}"
+    )))
+}
+
+pub(crate) async fn execute_required_attendance_override(
+    db: &D1Database,
+    mutation: D1PreparedStatement,
+    audit: &AuditRecord,
+    max_changes: u32,
+) -> Result<usize> {
+    if max_changes == 0 || max_changes > MAX_CHANGED_COUNT {
+        return Err(worker::Error::RustError(
+            "attendance override change bound rejected".to_owned(),
+        ));
+    }
+    let results = db
+        .batch(vec![
+            mutation,
+            audit.attendance_statement_after_bounded_changes(db, max_changes)?,
+        ])
+        .await?;
+    let mutation_changes = result_changes(&results, 0);
+    let audit_changes = result_changes(&results, 1);
+    if mutation_changes == 0 && audit_changes == 0 {
+        return Ok(0);
+    }
+    if mutation_changes <= max_changes as usize && audit_changes == 1 {
+        audit.log_success();
+        return Ok(mutation_changes);
+    }
+    Err(worker::Error::RustError(format!(
+        "attendance audit cardinality mismatch: mutation={mutation_changes} audit={audit_changes}"
+    )))
+}
+
 pub(crate) async fn execute_required_batch(
     db: &D1Database,
     mut business: Vec<D1PreparedStatement>,
@@ -607,6 +727,36 @@ pub(crate) async fn execute_required_batch(
         audit.log_success();
     }
     Ok(results)
+}
+
+/// Execute a bounded multi-statement business transition whose final
+/// statement is the success witness. The audit remains adjacent to that
+/// witness and is omitted when the whole guarded chain is a no-op.
+pub(crate) async fn execute_required_tail(
+    db: &D1Database,
+    mut business: Vec<D1PreparedStatement>,
+    audit: &AuditRecord,
+) -> Result<bool> {
+    if business.is_empty() {
+        return Err(worker::Error::RustError(
+            "required audit business batch is empty".to_owned(),
+        ));
+    }
+    let tail_index = business.len() - 1;
+    business.push(audit.statement_after_one_change(db)?);
+    let results = db.batch(business).await?;
+    let tail_changes = result_changes(&results, tail_index);
+    let audit_changes = result_changes(&results, tail_index + 1);
+    match (tail_changes, audit_changes) {
+        (0, 0) => Ok(false),
+        (1, 1) => {
+            audit.log_success();
+            Ok(true)
+        }
+        _ => Err(worker::Error::RustError(format!(
+            "required tail audit cardinality mismatch: mutation={tail_changes} audit={audit_changes}"
+        ))),
+    }
 }
 
 pub(crate) fn result_changes(results: &[D1Result], index: usize) -> usize {

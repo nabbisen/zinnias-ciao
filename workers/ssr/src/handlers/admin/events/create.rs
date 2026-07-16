@@ -345,6 +345,7 @@ pub async fn post_create_event(
     });
     let event_id = event_write::create_event(
         &db,
+        rid,
         community_id,
         &membership.membership_id,
         &validated.title,
@@ -354,40 +355,38 @@ pub async fn post_create_event(
         freq.as_str(),
         repeat_count_stored,
         series_insert,
-    )
-    .await?;
-
-    let _ = audit::write_legacy(
-        &db,
-        rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(&event_id),
-        audit::LegacyAuditAction::EventCreated,
+        provenance.as_ref().map(|provenance| match provenance {
+            CreateEventProvenance::CancelledRecreate(source_id) => event_write::EventCreateSource {
+                event_id: source_id,
+                must_be_cancelled: true,
+            },
+            CreateEventProvenance::EventCopy(source_id) => event_write::EventCreateSource {
+                event_id: source_id,
+                must_be_cancelled: false,
+            },
+        }),
         create_event_audit_metadata(provenance.as_ref()),
     )
-    .await;
+    .await?;
 
     redirect(&format!("/c/{community_id}/events/{event_id}"))
 }
 
 pub(super) fn create_event_audit_metadata(
     provenance: Option<&CreateEventProvenance>,
-) -> audit::LegacyAuditMetadata {
+) -> audit::AuditMetadata {
     match provenance {
         Some(CreateEventProvenance::CancelledRecreate(source_id)) => {
-            audit::LegacyAuditMetadata::EventCreated {
+            audit::AuditMetadata::EventCreated {
                 creation_mode: audit::EventCreationMode::CancelledRecreate,
                 source_event_id: Some(source_id.clone()),
             }
         }
-        Some(CreateEventProvenance::EventCopy(source_id)) => {
-            audit::LegacyAuditMetadata::EventCreated {
-                creation_mode: audit::EventCreationMode::EventCopy,
-                source_event_id: Some(source_id.clone()),
-            }
-        }
-        None => audit::LegacyAuditMetadata::EventCreated {
+        Some(CreateEventProvenance::EventCopy(source_id)) => audit::AuditMetadata::EventCreated {
+            creation_mode: audit::EventCreationMode::EventCopy,
+            source_event_id: Some(source_id.clone()),
+        },
+        None => audit::AuditMetadata::EventCreated {
             creation_mode: audit::EventCreationMode::New,
             source_event_id: None,
         },

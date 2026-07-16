@@ -7,6 +7,8 @@ use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::db::now_utc;
 use worker::{D1Database, Result};
 
+pub const ADMIN_OVERRIDE_CELL_CAP: usize = 10_000;
+
 pub struct AttendanceRow {
     pub event_day_id: String,
     pub membership_id: String,
@@ -220,6 +222,89 @@ pub async fn upsert(
         }
     }
     Ok(())
+}
+
+/// Apply the complete admin attendance matrix in one set-based statement and
+/// append exactly one audit row when at least one semantic status changes.
+#[allow(clippy::too_many_arguments)]
+pub async fn admin_override_matrix(
+    db: &D1Database,
+    request_id: &str,
+    community_id: &str,
+    event_id: &str,
+    admin_membership_id: &str,
+    submitted_json: &str,
+    submitted_cells: usize,
+) -> Result<usize> {
+    if submitted_cells == 0 {
+        return Ok(0);
+    }
+    if submitted_cells > ADMIN_OVERRIDE_CELL_CAP {
+        return Err(worker::Error::RustError(
+            "attendance override cell bound exceeded".to_owned(),
+        ));
+    }
+    let now = now_utc();
+    let mutation = db
+        .prepare(
+            "WITH submitted AS ( \
+               SELECT json_extract(value, '$.day_id') AS day_id, \
+                      json_extract(value, '$.membership_id') AS membership_id, \
+                      json_extract(value, '$.status') AS status \
+               FROM json_each(?1) \
+             ), eligible AS ( \
+               SELECT s.day_id, s.membership_id, s.status \
+               FROM submitted s \
+               JOIN event_days d ON d.id = s.day_id \
+               JOIN events e ON e.id = d.event_id \
+               JOIN community_memberships target ON target.id = s.membership_id \
+               WHERE d.event_id = ?3 \
+                 AND d.community_id = ?4 AND e.community_id = ?4 \
+                 AND d.occurrence_status = 'scheduled' \
+                 AND e.status = 'scheduled' \
+                 AND target.community_id = ?4 AND target.removed_at IS NULL \
+                 AND (s.status IS NULL OR s.status IN ('going','not_going','attended')) \
+             ) \
+             INSERT INTO attendances \
+               (id, event_day_id, membership_id, status, status_updated_at, updated_at) \
+             SELECT lower(hex(randomblob(8))), s.day_id, s.membership_id, s.status, ?2, ?2 \
+             FROM eligible s \
+             WHERE (SELECT COUNT(*) FROM eligible) = (SELECT COUNT(*) FROM submitted) \
+               AND (s.status IS NOT NULL OR EXISTS ( \
+                    SELECT 1 FROM attendances current \
+                    WHERE current.event_day_id = s.day_id \
+                      AND current.membership_id = s.membership_id \
+                      AND current.status IS NOT NULL \
+               )) \
+               AND EXISTS ( \
+                    SELECT 1 FROM community_memberships actor \
+                    WHERE actor.id = ?5 AND actor.community_id = ?4 \
+                      AND actor.role = 'admin' AND actor.removed_at IS NULL \
+               ) \
+             ON CONFLICT(event_day_id, membership_id) DO UPDATE SET \
+               status = excluded.status, \
+               status_updated_at = excluded.status_updated_at, \
+               updated_at = excluded.updated_at \
+             WHERE attendances.status IS NOT excluded.status",
+        )
+        .bind(&[
+            submitted_json.into(),
+            now.as_str().into(),
+            event_id.into(),
+            community_id.into(),
+            admin_membership_id.into(),
+        ])?;
+    // The fixed placeholder is validated by the closed model; the persisted
+    // count is replaced with SQLite changes() by the specialized builder.
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(admin_membership_id),
+        Some(event_id),
+        AuditAction::AttendanceAdminOverride,
+        AuditMetadata::AttendanceOverride { changed_count: 1 },
+    )?;
+    audit::execute_required_attendance_override(db, mutation, &record, submitted_cells as u32).await
 }
 
 /// Set an admin's own past-day attendance to `attended` with its required
