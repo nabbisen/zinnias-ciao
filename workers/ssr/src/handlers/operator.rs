@@ -1,13 +1,14 @@
 //! Operator-only recovery endpoints — RFC-069.
 
 use serde::Deserialize;
-use worker::{Env, Request, Response, Result, console_log};
+use worker::{Env, Request, Response, Result};
 
+use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::crypto::{constant_time_eq, hmac_hex, normalize_invite_code, random_token};
 use crate::db::{community as community_db, membership as membership_db, relink as relink_db};
 use crate::render;
 
-const OPERATOR_LABEL_MAX_CHARS: usize = 80;
+const OPERATOR_LABEL_MAX_BYTES: usize = 32;
 
 #[derive(Deserialize)]
 struct CommunityAccessRecoveryRequest {
@@ -53,16 +54,19 @@ pub async fn post_community_access_recovery(
     let normalized = normalize_invite_code(&code);
     let code_hmac = hmac_hex(&crate::crypto::pepper(env), &normalized);
     let relink_code_id = random_token()[..24].to_owned();
-    let audit_id = random_token()[..16].to_owned();
     let now = crate::db::now_utc();
     let expires_at = relink_db::expires_at();
-    let metadata = serde_json::json!({
-        "operator_label": body.operator_label,
-        "relink_code_id": relink_code_id,
-        "membership_id": target.id,
-        "community_id": target.community_id,
-    })
-    .to_string();
+    let audit = audit::required_record(
+        rid,
+        Some(&target.community_id),
+        Some(&target.id),
+        Some(&target.id),
+        AuditAction::OperatorRecoveryAdminRelinkCreated,
+        AuditMetadata::OperatorRecovery {
+            operator_label: body.operator_label,
+            relink_code_id: relink_code_id.clone(),
+        },
+    )?;
 
     let revoke_stmt = db
         .prepare(
@@ -91,31 +95,7 @@ pub async fn post_community_access_recovery(
             expires_at.as_str().into(),
         ])?;
 
-    let audit_stmt = db
-        .prepare(
-            "INSERT INTO audit_log \
-             (id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at) \
-             VALUES (?1, ?2, ?3, 'membership', ?4, 'operator_recovery.admin_relink_created', ?5, ?6)",
-        )
-        .bind(&[
-            audit_id.as_str().into(),
-            target.community_id.as_str().into(),
-            target.id.as_str().into(),
-            target.id.as_str().into(),
-            metadata.as_str().into(),
-            now.as_str().into(),
-        ])?;
-
-    db.batch(vec![revoke_stmt, insert_relink_stmt, audit_stmt])
-        .await?;
-
-    console_log!(
-        "[{}] audit: action=operator_recovery.admin_relink_created target=membership:{} actor={} community={}",
-        rid,
-        target.id,
-        target.id,
-        target.community_id,
-    );
+    audit::execute_required_batch(&db, vec![revoke_stmt, insert_relink_stmt], &[audit]).await?;
 
     let mut resp = Response::from_json(&serde_json::json!({
         "ok": true,
@@ -161,10 +141,12 @@ fn bearer_token(req: &Request) -> Option<String> {
 }
 
 fn valid_operator_label(label: &str) -> bool {
-    let trimmed = label.trim();
-    !trimmed.is_empty()
-        && trimmed.chars().count() <= OPERATOR_LABEL_MAX_CHARS
-        && trimmed.chars().all(|c| !c.is_control())
+    let bytes = label.as_bytes();
+    (1..=OPERATOR_LABEL_MAX_BYTES).contains(&bytes.len())
+        && bytes[0].is_ascii_lowercase()
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-".contains(byte))
 }
 
 #[cfg(test)]

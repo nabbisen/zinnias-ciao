@@ -3,6 +3,7 @@
 //! Templates are community-scoped, admin-only, soft-deletable.
 //! They store title/location/description/duration as defaults for event creation.
 
+use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::db::now_utc;
 use worker::Result;
 use worker::d1::D1Database;
@@ -96,8 +97,9 @@ pub async fn find_active(
 
 /// Insert a new template.
 #[allow(clippy::too_many_arguments)]
-pub async fn insert(
+pub async fn insert_required(
     db: &D1Database,
+    request_id: &str,
     id: &str,
     community_id: &str,
     membership_id: &str,
@@ -105,7 +107,7 @@ pub async fn insert(
     location: Option<&str>,
     description: Option<&str>,
     duration_minutes: Option<u32>,
-) -> Result<()> {
+) -> Result<bool> {
     let now = now_utc();
     // Build nullable bind values using JsValue directly.
     let loc_js: worker::wasm_bindgen::JsValue = location
@@ -118,36 +120,71 @@ pub async fn insert(
         .map(|d| worker::wasm_bindgen::JsValue::from_f64(d as f64))
         .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
 
-    db.prepare(
-        "INSERT INTO event_templates \
+    let mutation = db
+        .prepare(
+            "INSERT INTO event_templates \
          (id, community_id, created_by_membership_id, title, location, description, \
           duration_minutes, is_active, created_at, updated_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8, ?8)",
-    )
-    .bind(&[
-        id.into(),
-        community_id.into(),
-        membership_id.into(),
-        title.into(),
-        loc_js,
-        desc_js,
-        dur_js,
-        now.as_str().into(),
-    ])?
-    .run()
-    .await?;
-    Ok(())
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8, ?8 \
+         WHERE EXISTS ( \
+           SELECT 1 FROM community_memberships \
+           WHERE id = ?3 AND community_id = ?2 \
+             AND role = 'admin' AND removed_at IS NULL \
+         )",
+        )
+        .bind(&[
+            id.into(),
+            community_id.into(),
+            membership_id.into(),
+            title.into(),
+            loc_js,
+            desc_js,
+            dur_js,
+            now.as_str().into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(membership_id),
+        Some(id),
+        AuditAction::EventTemplateCreated,
+        AuditMetadata::None,
+    )?;
+    audit::execute_required(db, mutation, &record).await
 }
 
 /// Soft-delete (deactivate) a template, scoped to community.
-pub async fn soft_delete(db: &D1Database, template_id: &str, community_id: &str) -> Result<()> {
+pub async fn soft_delete_required(
+    db: &D1Database,
+    request_id: &str,
+    template_id: &str,
+    community_id: &str,
+    actor_membership_id: &str,
+) -> Result<bool> {
     let now = now_utc();
-    db.prepare(
-        "UPDATE event_templates SET is_active = 0, updated_at = ?1 \
-         WHERE id = ?2 AND community_id = ?3",
-    )
-    .bind(&[now.as_str().into(), template_id.into(), community_id.into()])?
-    .run()
-    .await?;
-    Ok(())
+    let mutation = db
+        .prepare(
+            "UPDATE event_templates SET is_active = 0, updated_at = ?1 \
+         WHERE id = ?2 AND community_id = ?3 AND is_active = 1 \
+           AND EXISTS ( \
+             SELECT 1 FROM community_memberships \
+             WHERE id = ?4 AND community_id = ?3 \
+               AND role = 'admin' AND removed_at IS NULL \
+           )",
+        )
+        .bind(&[
+            now.as_str().into(),
+            template_id.into(),
+            community_id.into(),
+            actor_membership_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(actor_membership_id),
+        Some(template_id),
+        AuditAction::EventTemplateDeleted,
+        AuditMetadata::None,
+    )?;
+    audit::execute_required(db, mutation, &record).await
 }

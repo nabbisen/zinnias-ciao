@@ -3,6 +3,7 @@
 //! Codes are stored as HMAC-SHA256(pepper, normalize(code)).
 //! All state changes (used, revoked) are soft — no hard deletes.
 
+use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::db::now_utc;
 use worker::{D1Database, Result};
 
@@ -123,19 +124,41 @@ pub async fn assign_used_membership(
 }
 
 /// Revoke an unused invite code (admin action — sets revoked_at).
-pub async fn revoke(db: &D1Database, invite_id: &str, community_id: &str) -> Result<()> {
+pub async fn revoke_required(
+    db: &D1Database,
+    request_id: &str,
+    invite_id: &str,
+    community_id: &str,
+    actor_membership_id: &str,
+) -> Result<bool> {
     let now = now_utc();
-    // Scoped to community_id to prevent cross-community revocation.
-    db.prepare(
-        "UPDATE invite_codes \
+    let mutation = db
+        .prepare(
+            "UPDATE invite_codes \
          SET revoked_at = ?1 \
          WHERE id = ?2 AND community_id = ?3 \
-           AND used_at IS NULL AND revoked_at IS NULL",
-    )
-    .bind(&[now.as_str().into(), invite_id.into(), community_id.into()])?
-    .run()
-    .await?;
-    Ok(())
+           AND used_at IS NULL AND revoked_at IS NULL \
+           AND EXISTS ( \
+             SELECT 1 FROM community_memberships \
+             WHERE id = ?4 AND community_id = ?3 \
+               AND role = 'admin' AND removed_at IS NULL \
+           )",
+        )
+        .bind(&[
+            now.as_str().into(),
+            invite_id.into(),
+            community_id.into(),
+            actor_membership_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(actor_membership_id),
+        Some(invite_id),
+        AuditAction::InviteCodeRevoked,
+        AuditMetadata::None,
+    )?;
+    audit::execute_required(db, mutation, &record).await
 }
 
 /// Active (unused, unrevoked, unexpired) invite codes for a community.
@@ -185,20 +208,27 @@ pub async fn list_active_for_community(
 }
 
 /// Insert a new invite code (admin action).
-pub async fn insert(
+#[allow(clippy::too_many_arguments)]
+pub async fn insert_required(
     db: &D1Database,
+    request_id: &str,
     id: &str,
     community_id: &str,
     code_hmac: &str,
     created_by_membership_id: &str,
     expires_at: &str,
     grants_role: &str,
-) -> Result<()> {
+) -> Result<bool> {
     let now = now_utc();
-    db.prepare(
+    let mutation = db.prepare(
         "INSERT INTO invite_codes \
          (id, community_id, code_hmac, created_by_membership_id, expires_at, grants_role, created_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7 \
+         WHERE EXISTS ( \
+           SELECT 1 FROM community_memberships \
+           WHERE id = ?4 AND community_id = ?2 \
+             AND role = 'admin' AND removed_at IS NULL \
+         )",
     )
     .bind(&[
         id.into(),
@@ -208,8 +238,14 @@ pub async fn insert(
         expires_at.into(),
         grants_role.into(),
         now.as_str().into(),
-    ])?
-    .run()
-    .await?;
-    Ok(())
+    ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(created_by_membership_id),
+        Some(id),
+        AuditAction::InviteCodeGenerated,
+        AuditMetadata::None,
+    )?;
+    audit::execute_required(db, mutation, &record).await
 }

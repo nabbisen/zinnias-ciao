@@ -4,7 +4,6 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
-use crate::audit;
 use crate::authz::require_admin;
 use crate::db::{self, membership as membership_db};
 use crate::render;
@@ -136,18 +135,16 @@ pub async fn post_remove_member(
         return redirect(&format!("/c/{community_id}/admin/members"));
     }
 
-    match membership_db::soft_remove_guarded(&db, target_membership_id, community_id).await? {
+    match membership_db::soft_remove_guarded_required(
+        &db,
+        rid,
+        target_membership_id,
+        community_id,
+        &membership.membership_id,
+    )
+    .await?
+    {
         membership_db::RemoveMemberResult::Removed => {
-            let _ = audit::write_legacy(
-                &db,
-                rid,
-                Some(community_id),
-                Some(&membership.membership_id),
-                Some(target_membership_id),
-                audit::LegacyAuditAction::MembershipRemoved,
-                audit::LegacyAuditMetadata::None,
-            )
-            .await;
             redirect(&format!("/c/{community_id}/admin/members"))
         }
         membership_db::RemoveMemberResult::LastAdminBlocked => render::page(

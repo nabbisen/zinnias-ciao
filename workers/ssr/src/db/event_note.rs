@@ -3,6 +3,7 @@
 //!
 //! One note per (event, membership). Soft-deleted by note_deleted_at.
 
+use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::db::now_utc;
 use worker::{D1Database, Result};
 
@@ -113,14 +114,50 @@ pub async fn soft_delete(db: &D1Database, event_id: &str, membership_id: &str) -
 }
 
 /// Admin moderation hide (does not copy note body to audit — RFC-014).
-pub async fn admin_hide(db: &D1Database, event_id: &str, membership_id: &str) -> Result<()> {
+pub async fn admin_hide_required(
+    db: &D1Database,
+    request_id: &str,
+    community_id: &str,
+    actor_membership_id: &str,
+    event_id: &str,
+    target_membership_id: &str,
+) -> Result<bool> {
     let now = now_utc();
-    db.prepare(
-        "UPDATE event_notes SET hidden_by_admin_at = ?1 \
-         WHERE event_id = ?2 AND membership_id = ?3",
-    )
-    .bind(&[now.as_str().into(), event_id.into(), membership_id.into()])?
-    .run()
-    .await?;
-    Ok(())
+    let mutation = db
+        .prepare(
+            "UPDATE event_notes SET hidden_by_admin_at = ?1 \
+         WHERE event_id = ?2 AND membership_id = ?3 \
+           AND note_deleted_at IS NULL AND hidden_by_admin_at IS NULL \
+           AND EXISTS ( \
+             SELECT 1 FROM events \
+             WHERE id = ?2 AND community_id = ?4 \
+           ) \
+           AND EXISTS ( \
+             SELECT 1 FROM community_memberships \
+             WHERE id = ?3 AND community_id = ?4 \
+           ) \
+           AND EXISTS ( \
+             SELECT 1 FROM community_memberships \
+             WHERE id = ?5 AND community_id = ?4 \
+               AND role = 'admin' AND removed_at IS NULL \
+           )",
+        )
+        .bind(&[
+            now.as_str().into(),
+            event_id.into(),
+            target_membership_id.into(),
+            community_id.into(),
+            actor_membership_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(actor_membership_id),
+        Some(event_id),
+        AuditAction::EventNoteAdminHidden,
+        AuditMetadata::AdminNoteHidden {
+            target_membership_id: target_membership_id.to_owned(),
+        },
+    )?;
+    audit::execute_required(db, mutation, &record).await
 }

@@ -1,12 +1,12 @@
-//! Closed audit domain model and compatibility writer — RFC-079 Package 1.
+//! Closed audit domain model and required-batch statement builder.
 //!
-//! This package is deliberately non-deployable: required-audit callers still
-//! discard results and several batched flows still contain direct audit SQL.
+//! The tree remains deliberately non-deployable until every later-package
+//! caller has moved off the private compatibility writer.
 
 use crate::crypto::random_token;
 use crate::db::now_utc;
 use serde_json::{Map, Value, json};
-use worker::{D1Database, D1Type, Result, console_log};
+use worker::{D1Database, D1PreparedStatement, D1Result, D1Type, Result, console_log};
 
 const MAX_ID_BYTES: usize = 128;
 const MAX_REQUEST_ID_BYTES: usize = 96;
@@ -487,6 +487,27 @@ impl AuditRecord {
     }
 
     pub(crate) fn statement(&self, db: &D1Database) -> Result<worker::D1PreparedStatement> {
+        self.statement_with_suffix(db, "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)")
+    }
+
+    /// Insert this record only when the immediately preceding statement changed
+    /// exactly one row. Callers must keep the guarded mutation and this
+    /// statement adjacent in the same D1 batch.
+    pub(crate) fn statement_after_one_change(
+        &self,
+        db: &D1Database,
+    ) -> Result<D1PreparedStatement> {
+        self.statement_with_suffix(
+            db,
+            "SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9 WHERE changes() = 1",
+        )
+    }
+
+    fn statement_with_suffix(
+        &self,
+        db: &D1Database,
+        values_sql: &str,
+    ) -> Result<D1PreparedStatement> {
         let community_id = self
             .community_id
             .as_deref()
@@ -513,17 +534,87 @@ impl AuditRecord {
             D1Type::Text(self.metadata_json.as_str()),
             D1Type::Text(self.created_at.as_str()),
         ];
-        db.prepare(
+        db.prepare(format!(
             "INSERT INTO audit_log \
              (id, request_id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-        )
+             {values_sql}"
+        ))
         .bind_refs(&values)
     }
 
     fn success_event(&self) -> String {
         format_event(&self.request_id, self.action, AuditOutcome::Success)
     }
+
+    pub(crate) fn log_success(&self) {
+        console_log!("{}", self.success_event());
+    }
+}
+
+pub(crate) fn required_record(
+    request_id: &str,
+    community_id: Option<&str>,
+    actor_membership_id: Option<&str>,
+    target_id: Option<&str>,
+    action: AuditAction,
+    metadata: AuditMetadata,
+) -> Result<AuditRecord> {
+    AuditRecord::new(
+        request_id,
+        community_id,
+        actor_membership_id,
+        target_id,
+        action,
+        metadata,
+    )
+    .map_err(|error| {
+        worker::Error::RustError(format!("audit construction rejected: {}", error.category()))
+    })
+}
+
+pub(crate) async fn execute_required(
+    db: &D1Database,
+    mutation: D1PreparedStatement,
+    audit: &AuditRecord,
+) -> Result<bool> {
+    let results = db
+        .batch(vec![mutation, audit.statement_after_one_change(db)?])
+        .await?;
+    let mutation_changes = result_changes(&results, 0);
+    let audit_changes = result_changes(&results, 1);
+    match (mutation_changes, audit_changes) {
+        (0, 0) => Ok(false),
+        (1, 1) => {
+            audit.log_success();
+            Ok(true)
+        }
+        _ => Err(worker::Error::RustError(format!(
+            "required audit cardinality mismatch: mutation={mutation_changes} audit={audit_changes}"
+        ))),
+    }
+}
+
+pub(crate) async fn execute_required_batch(
+    db: &D1Database,
+    mut business: Vec<D1PreparedStatement>,
+    audits: &[AuditRecord],
+) -> Result<Vec<D1Result>> {
+    for audit in audits {
+        business.push(audit.statement(db)?);
+    }
+    let results = db.batch(business).await?;
+    for audit in audits {
+        audit.log_success();
+    }
+    Ok(results)
+}
+
+pub(crate) fn result_changes(results: &[D1Result], index: usize) -> usize {
+    results
+        .get(index)
+        .and_then(|result| result.meta().ok().flatten())
+        .and_then(|meta| meta.changes)
+        .unwrap_or(0)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -537,19 +628,16 @@ pub(crate) async fn write_legacy(
     metadata: LegacyAuditMetadata,
 ) -> Result<()> {
     let action = AuditAction::from(action);
-    let record = AuditRecord::new(
+    let record = required_record(
         request_id,
         community_id,
         actor_membership_id,
         target_id,
         action,
         metadata.into(),
-    )
-    .map_err(|error| {
-        worker::Error::RustError(format!("audit construction rejected: {}", error.category()))
-    })?;
+    )?;
     record.statement(db)?.run().await?;
-    console_log!("{}", record.success_event());
+    record.log_success();
     Ok(())
 }
 

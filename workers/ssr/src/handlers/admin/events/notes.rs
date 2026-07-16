@@ -2,7 +2,6 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
-use crate::audit;
 use crate::authz::require_admin;
 use crate::db::{event as event_db, membership as membership_db};
 use crate::render;
@@ -120,20 +119,15 @@ pub async fn post_admin_hide_note(
         return render::not_found();
     }
 
-    crate::db::event_note::admin_hide(&db, event_id, target_membership_id).await?;
-
-    let _ = audit::write_legacy(
+    crate::db::event_note::admin_hide_required(
         &db,
         rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(event_id),
-        audit::LegacyAuditAction::EventNoteAdminHidden,
-        audit::LegacyAuditMetadata::AdminNoteHidden {
-            target_membership_id: target_membership_id.to_owned(),
-        },
+        community_id,
+        &membership.membership_id,
+        event_id,
+        target_membership_id,
     )
-    .await;
+    .await?;
 
     redirect(&format!(
         "/c/{community_id}/events/{event_id}?flash=Note+removed"

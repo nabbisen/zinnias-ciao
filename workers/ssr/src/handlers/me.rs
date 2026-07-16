@@ -1,10 +1,11 @@
 //! Me / profile handler (RFC-005 §6 / external-design §8.6).
 
-use worker::{D1Result, Env, Request, Response, Result, console_log};
+use worker::{D1Result, Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 
+use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::authz::require_membership;
-use crate::crypto::{hmac_hex, random_token};
+use crate::crypto::hmac_hex;
 use crate::db::{self, membership as membership_db};
 use crate::form_token::ConsumeResult;
 use crate::render;
@@ -340,13 +341,15 @@ async fn update_display_name_with_audit_and_result(
     pepper: &str,
     raw_token: &str,
 ) -> Result<()> {
-    let now = db::now_utc();
-    let audit_id = format!("aud_{}", &random_token()[..24]);
     let token_hmac = hmac_hex(pepper, raw_token);
-    let metadata = serde_json::json!({
-        "changed": ["display_name"],
-    })
-    .to_string();
+    let audit = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(membership_id),
+        Some(membership_id),
+        AuditAction::MembershipDisplayNameUpdated,
+        AuditMetadata::DisplayNameChanged,
+    )?;
 
     let update_stmt = db
         .prepare(
@@ -355,7 +358,8 @@ async fn update_display_name_with_audit_and_result(
              WHERE id = ?2 \
                AND community_id = ?3 \
                AND user_id = ?4 \
-               AND removed_at IS NULL",
+               AND removed_at IS NULL \
+               AND display_name != ?1",
         )
         .bind(&[
             display_name.into(),
@@ -364,27 +368,7 @@ async fn update_display_name_with_audit_and_result(
             user_id.into(),
         ])?;
 
-    let audit_stmt = db
-        .prepare(
-            "INSERT INTO audit_log \
-             (id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at) \
-             SELECT ?1, ?2, ?3, 'membership', ?4, 'membership.display_name_updated', ?5, ?6 \
-             WHERE EXISTS ( \
-               SELECT 1 FROM community_memberships \
-               WHERE id = ?4 AND community_id = ?2 AND user_id = ?7 \
-                 AND removed_at IS NULL AND display_name = ?8 \
-             )",
-        )
-        .bind(&[
-            audit_id.as_str().into(),
-            community_id.into(),
-            membership_id.into(),
-            membership_id.into(),
-            metadata.as_str().into(),
-            now.as_str().into(),
-            user_id.into(),
-            display_name.into(),
-        ])?;
+    let audit_stmt = audit.statement_after_one_change(db)?;
 
     let result_stmt = db
         .prepare(
@@ -415,13 +399,7 @@ async fn update_display_name_with_audit_and_result(
     require_changed(&results, 1, "display name audit")?;
     require_changed(&results, 2, "display name replay result")?;
 
-    console_log!(
-        "[{}] audit: action=membership.display_name_updated target=membership:{} actor={} community={}",
-        request_id,
-        membership_id,
-        membership_id,
-        community_id,
-    );
+    audit.log_success();
     Ok(())
 }
 

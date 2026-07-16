@@ -3,6 +3,7 @@
 //!
 //! Status is per (event_day, membership). NULL = No answer — never fabricated.
 
+use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::db::now_utc;
 use worker::{D1Database, Result};
 
@@ -219,6 +220,62 @@ pub async fn upsert(
         }
     }
     Ok(())
+}
+
+/// Set an admin's own past-day attendance to `attended` with its required
+/// audit row. Current authorization, event/day state, and no-op state are
+/// repeated inside the mutation statement.
+pub async fn set_admin_attended_required(
+    db: &D1Database,
+    request_id: &str,
+    community_id: &str,
+    event_id: &str,
+    event_day_id: &str,
+    membership_id: &str,
+) -> Result<bool> {
+    let now = now_utc();
+    let attendance_id = crate::crypto::random_token()[..16].to_owned();
+    let mutation = db
+        .prepare(
+            "INSERT INTO attendances \
+             (id, event_day_id, membership_id, status, status_updated_at, updated_at) \
+             SELECT ?1, ?2, ?3, 'attended', ?4, ?4 \
+             WHERE EXISTS ( \
+               SELECT 1 \
+               FROM event_days d \
+               JOIN events e ON e.id = d.event_id \
+               JOIN community_memberships m ON m.id = ?3 \
+               WHERE d.id = ?2 AND d.event_id = ?5 \
+                 AND d.community_id = ?6 AND e.community_id = ?6 \
+                 AND d.ends_at_utc <= ?4 \
+                 AND d.occurrence_status = 'scheduled' \
+                 AND e.status = 'scheduled' \
+                 AND m.community_id = ?6 AND m.role = 'admin' \
+                 AND m.removed_at IS NULL \
+             ) \
+             ON CONFLICT(event_day_id, membership_id) DO UPDATE SET \
+               status = excluded.status, \
+               status_updated_at = excluded.status_updated_at, \
+               updated_at = excluded.updated_at \
+             WHERE attendances.status IS NOT 'attended'",
+        )
+        .bind(&[
+            attendance_id.as_str().into(),
+            event_day_id.into(),
+            membership_id.into(),
+            now.as_str().into(),
+            event_id.into(),
+            community_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(membership_id),
+        Some(event_day_id),
+        AuditAction::AttendanceAdminSetAttended,
+        AuditMetadata::None,
+    )?;
+    audit::execute_required(db, mutation, &record).await
 }
 
 /// My attendances keyed by day_id, for a list of day IDs (RFC-029: no N+1).

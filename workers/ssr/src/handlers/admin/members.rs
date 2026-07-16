@@ -3,7 +3,6 @@
 use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 
-use crate::audit;
 use crate::authz::require_admin;
 use crate::crypto::random_token;
 use crate::crypto::{hmac_hex, normalize_invite_code};
@@ -208,8 +207,9 @@ pub async fn post_generate_invite(
     let code_hmac = hmac_hex(&pp, &normalized);
     let invite_id = random_token()[..24].to_owned();
     let expires_at = db::add_seconds_to_now(86_400);
-    invite_db::insert(
+    let created = invite_db::insert_required(
         &db,
+        rid,
         &invite_id,
         community_id,
         &code_hmac,
@@ -218,16 +218,9 @@ pub async fn post_generate_invite(
         "member",
     )
     .await?;
-    let _ = audit::write_legacy(
-        &db,
-        rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(&invite_id),
-        audit::LegacyAuditAction::InviteCodeGenerated,
-        audit::LegacyAuditMetadata::None,
-    )
-    .await;
+    if !created {
+        return render::not_found();
+    }
     redirect(&format!("/c/{community_id}/admin/invites?code={code}"))
 }
 
@@ -261,18 +254,8 @@ pub async fn post_revoke_invite(
         return redirect(&format!("/c/{community_id}/admin/invites"));
     }
 
-    crate::codlet::revoke_invite(env, invite_id, community_id).await?;
-
-    let _ = audit::write_legacy(
-        &db,
-        rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(invite_id),
-        audit::LegacyAuditAction::InviteCodeRevoked,
-        audit::LegacyAuditMetadata::None,
-    )
-    .await;
+    invite_db::revoke_required(&db, rid, invite_id, community_id, &membership.membership_id)
+        .await?;
 
     redirect(&format!(
         "/c/{community_id}/admin/invites?flash=Code+revoked"

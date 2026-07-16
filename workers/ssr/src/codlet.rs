@@ -61,9 +61,3 @@ pub async fn list_active_invites(env: &Env, community_id: &str) -> Vec<InviteCod
     }
     result
 }
-
-/// Revoke an invite code by ID, scoped to the community.
-pub async fn revoke_invite(env: &Env, invite_id: &str, community_id: &str) -> Result<()> {
-    let db = env.d1("DB")?;
-    crate::db::invite::revoke(&db, invite_id, community_id).await
-}

@@ -8,7 +8,6 @@
 use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 
-use crate::audit;
 use crate::authz::require_admin;
 use crate::crypto::random_token;
 use crate::db::{event_template as tmpl_db, membership as membership_db};
@@ -245,8 +244,9 @@ pub async fn post_create_template(
         .filter(|&d| d > 0 && d <= 1440);
 
     let template_id = random_token()[..24].to_owned();
-    tmpl_db::insert(
+    let created = tmpl_db::insert_required(
         &db,
+        rid,
         &template_id,
         community_id,
         &membership.membership_id,
@@ -256,17 +256,9 @@ pub async fn post_create_template(
         duration_minutes,
     )
     .await?;
-
-    let _ = audit::write_legacy(
-        &db,
-        rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(&template_id),
-        audit::LegacyAuditAction::EventTemplateCreated,
-        audit::LegacyAuditMetadata::None,
-    )
-    .await;
+    if !created {
+        return render::not_found();
+    }
 
     redirect(&format!(
         "/c/{community_id}/admin/templates?flash=Template+saved"
@@ -303,18 +295,14 @@ pub async fn post_delete_template(
         return redirect(&format!("/c/{community_id}/admin/templates"));
     }
 
-    tmpl_db::soft_delete(&db, template_id, community_id).await?;
-
-    let _ = audit::write_legacy(
+    tmpl_db::soft_delete_required(
         &db,
         rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(template_id),
-        audit::LegacyAuditAction::EventTemplateDeleted,
-        audit::LegacyAuditMetadata::None,
+        template_id,
+        community_id,
+        &membership.membership_id,
     )
-    .await;
+    .await?;
 
     redirect(&format!(
         "/c/{community_id}/admin/templates?flash=Template+deleted"

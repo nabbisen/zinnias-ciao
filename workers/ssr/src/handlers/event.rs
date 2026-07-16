@@ -3,7 +3,6 @@
 use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 
-use crate::audit;
 use crate::authz::require_membership;
 use crate::db::{
     self, attendance as attendance_db, event as event_db, event_note as note_db,
@@ -472,20 +471,18 @@ pub async fn post_my_status(
         Some(AttendanceStatus::Attended) => Some("attended"),
         None => None,
     };
-    attendance_db::upsert(&db, day_id, &membership.membership_id, status_str).await?;
-
-    // Audit admin attendance correction
     if membership.is_admin() && matches!(requested, Some(AttendanceStatus::Attended)) {
-        let _ = audit::write_legacy(
+        attendance_db::set_admin_attended_required(
             &db,
             rid,
-            Some(community_id),
-            Some(&membership.membership_id),
-            Some(day_id),
-            audit::LegacyAuditAction::AttendanceAdminSetAttended,
-            audit::LegacyAuditMetadata::None,
+            community_id,
+            event_id,
+            day_id,
+            &membership.membership_id,
         )
-        .await;
+        .await?;
+    } else {
+        attendance_db::upsert(&db, day_id, &membership.membership_id, status_str).await?;
     }
 
     redirect(&format!("/c/{community_id}/events/{event_id}"))

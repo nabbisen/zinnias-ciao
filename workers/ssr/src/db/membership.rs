@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 //! Membership and user table access — RFC-002 / RFC-004.
 
+use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::db::now_utc;
 use worker::{D1Database, Result};
 
@@ -282,30 +283,42 @@ pub async fn get_role(
     Ok(row.and_then(|v| v.get("role")?.as_str().map(|s| s.to_owned())))
 }
 
-pub async fn promote_to_admin(
+pub async fn promote_to_admin_required(
     db: &D1Database,
+    request_id: &str,
     membership_id: &str,
     community_id: &str,
+    actor_membership_id: &str,
 ) -> Result<RoleUpdateResult> {
-    let res = db
+    let mutation = db
         .prepare(
             "UPDATE community_memberships \
              SET role = 'admin' \
              WHERE id = ?1 \
                AND community_id = ?2 \
                AND removed_at IS NULL \
-               AND role = 'member'",
+               AND role = 'member' \
+               AND id != ?3 \
+               AND EXISTS ( \
+                 SELECT 1 FROM community_memberships \
+                 WHERE id = ?3 AND community_id = ?2 \
+                   AND role = 'admin' AND removed_at IS NULL \
+               )",
         )
-        .bind(&[membership_id.into(), community_id.into()])?
-        .run()
-        .await?;
-    let changed = res
-        .meta()
-        .ok()
-        .flatten()
-        .and_then(|m| m.changes)
-        .unwrap_or(0);
-    if changed == 1 {
+        .bind(&[
+            membership_id.into(),
+            community_id.into(),
+            actor_membership_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(actor_membership_id),
+        Some(membership_id),
+        AuditAction::MembershipPromotedToAdmin,
+        AuditMetadata::None,
+    )?;
+    if audit::execute_required(db, mutation, &record).await? {
         return Ok(RoleUpdateResult::Changed);
     }
 
@@ -315,12 +328,14 @@ pub async fn promote_to_admin(
     }
 }
 
-pub async fn demote_to_member(
+pub async fn demote_to_member_required(
     db: &D1Database,
+    request_id: &str,
     membership_id: &str,
     community_id: &str,
+    actor_membership_id: &str,
 ) -> Result<RoleUpdateResult> {
-    let res = db
+    let mutation = db
         .prepare(
             "UPDATE community_memberships \
              SET role = 'member' \
@@ -328,19 +343,29 @@ pub async fn demote_to_member(
                AND community_id = ?2 \
                AND removed_at IS NULL \
                AND role = 'admin' \
+               AND id != ?3 \
+               AND EXISTS ( \
+                 SELECT 1 FROM community_memberships \
+                 WHERE id = ?3 AND community_id = ?2 \
+                   AND role = 'admin' AND removed_at IS NULL \
+               ) \
                AND (SELECT COUNT(*) FROM community_memberships \
                     WHERE community_id = ?2 AND role = 'admin' AND removed_at IS NULL) > 1",
         )
-        .bind(&[membership_id.into(), community_id.into()])?
-        .run()
-        .await?;
-    let changed = res
-        .meta()
-        .ok()
-        .flatten()
-        .and_then(|m| m.changes)
-        .unwrap_or(0);
-    if changed == 1 {
+        .bind(&[
+            membership_id.into(),
+            community_id.into(),
+            actor_membership_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(actor_membership_id),
+        Some(membership_id),
+        AuditAction::MembershipDemotedToMember,
+        AuditMetadata::None,
+    )?;
+    if audit::execute_required(db, mutation, &record).await? {
         return Ok(RoleUpdateResult::Changed);
     }
 
@@ -354,19 +379,27 @@ pub async fn demote_to_member(
 }
 
 /// Soft-remove a member while preserving the at-least-one-admin invariant.
-pub async fn soft_remove_guarded(
+pub async fn soft_remove_guarded_required(
     db: &D1Database,
+    request_id: &str,
     membership_id: &str,
     community_id: &str,
+    actor_membership_id: &str,
 ) -> Result<RemoveMemberResult> {
     let now = crate::db::now_utc();
-    let res = db
+    let mutation = db
         .prepare(
             "UPDATE community_memberships \
              SET removed_at = ?1 \
              WHERE id = ?2 \
                AND community_id = ?3 \
                AND removed_at IS NULL \
+               AND id != ?4 \
+               AND EXISTS ( \
+                 SELECT 1 FROM community_memberships \
+                 WHERE id = ?4 AND community_id = ?3 \
+                   AND role = 'admin' AND removed_at IS NULL \
+               ) \
                AND (role != 'admin' OR \
                     (SELECT COUNT(*) FROM community_memberships \
                      WHERE community_id = ?3 AND role = 'admin' AND removed_at IS NULL) > 1)",
@@ -375,16 +408,17 @@ pub async fn soft_remove_guarded(
             now.as_str().into(),
             membership_id.into(),
             community_id.into(),
-        ])?
-        .run()
-        .await?;
-    let changed = res
-        .meta()
-        .ok()
-        .flatten()
-        .and_then(|m| m.changes)
-        .unwrap_or(0);
-    if changed == 1 {
+            actor_membership_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(actor_membership_id),
+        Some(membership_id),
+        AuditAction::MembershipRemoved,
+        AuditMetadata::None,
+    )?;
+    if audit::execute_required(db, mutation, &record).await? {
         return Ok(RemoveMemberResult::Removed);
     }
 

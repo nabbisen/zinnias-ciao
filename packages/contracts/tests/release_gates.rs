@@ -1056,9 +1056,9 @@ fn rfc062_role_transfer_uses_guarded_member_management_flow() {
         "RFC-062 handlers must use dedicated token purposes, reviewed copy, and server-side self-target denial"
     );
     assert!(
-        ROLE_TRANSFER_HANDLER_SRC.contains("LegacyAuditAction::MembershipPromotedToAdmin")
-            && ROLE_TRANSFER_HANDLER_SRC.contains("LegacyAuditAction::MembershipDemotedToMember")
-            && ROLE_TRANSFER_HANDLER_SRC.contains("LegacyAuditMetadata::None"),
+        MEMBERSHIP_DB_SRC.contains("AuditAction::MembershipPromotedToAdmin")
+            && MEMBERSHIP_DB_SRC.contains("AuditAction::MembershipDemotedToMember")
+            && MEMBERSHIP_DB_SRC.matches("AuditMetadata::None").count() >= 2,
         "RFC-062 role changes must audit direction by action name without extra metadata"
     );
 }
@@ -1066,7 +1066,7 @@ fn rfc062_role_transfer_uses_guarded_member_management_flow() {
 #[test]
 fn rfc062_role_transfer_writes_are_scoped_and_guarded() {
     assert!(
-        MEMBERSHIP_DB_SRC.contains("pub async fn promote_to_admin")
+        MEMBERSHIP_DB_SRC.contains("pub async fn promote_to_admin_required")
             && MEMBERSHIP_DB_SRC.contains("SET role = 'admin'")
             && MEMBERSHIP_DB_SRC.contains("id = ?1")
             && MEMBERSHIP_DB_SRC.contains("community_id = ?2")
@@ -1075,7 +1075,7 @@ fn rfc062_role_transfer_writes_are_scoped_and_guarded() {
         "RFC-062 promote update must be scoped by membership id, community id, active membership, and current role"
     );
     assert!(
-        MEMBERSHIP_DB_SRC.contains("pub async fn demote_to_member")
+        MEMBERSHIP_DB_SRC.contains("pub async fn demote_to_member_required")
             && MEMBERSHIP_DB_SRC.contains("SET role = 'member'")
             && MEMBERSHIP_DB_SRC.contains("role = 'admin'")
             && MEMBERSHIP_DB_SRC.contains("SELECT COUNT(*) FROM community_memberships")
@@ -1083,7 +1083,7 @@ fn rfc062_role_transfer_writes_are_scoped_and_guarded() {
         "RFC-062 demote update must re-check active admin count in the conditional write"
     );
     assert!(
-        MEMBERSHIP_DB_SRC.contains("pub async fn soft_remove_guarded")
+        MEMBERSHIP_DB_SRC.contains("pub async fn soft_remove_guarded_required")
             && MEMBERSHIP_DB_SRC.contains("role != 'admin'")
             && MEMBERSHIP_DB_SRC.contains("SELECT COUNT(*) FROM community_memberships")
             && MEMBER_REMOVE_HANDLER_SRC.contains("soft_remove_guarded")
@@ -1095,7 +1095,7 @@ fn rfc062_role_transfer_writes_are_scoped_and_guarded() {
 #[test]
 fn rfc062_admin_invites_remain_member_role_only() {
     let insert_start = MEMBERS_HANDLER_SRC
-        .find("invite_db::insert(")
+        .find("invite_db::insert_required(")
         .expect("invite insert call should exist");
     let insert_end = MEMBERS_HANDLER_SRC[insert_start..]
         .find(".await?;")
@@ -1336,10 +1336,10 @@ fn rfc069_operator_recovery_targets_existing_active_admins_only() {
         "RFC-069 endpoint must converge invalid community/membership/non-admin cases on generic not-found"
     );
     assert!(
-        OPERATOR_HANDLER_SRC
-            .contains("db.batch(vec![revoke_stmt, insert_relink_stmt, audit_stmt])")
-            && OPERATOR_HANDLER_SRC.contains("INSERT INTO membership_relink_codes")
-            && OPERATOR_HANDLER_SRC.contains("INSERT INTO audit_log")
+        OPERATOR_HANDLER_SRC.contains(
+            "execute_required_batch(&db, vec![revoke_stmt, insert_relink_stmt], &[audit])"
+        ) && OPERATOR_HANDLER_SRC.contains("INSERT INTO membership_relink_codes")
+            && OPERATOR_HANDLER_SRC.contains("audit::required_record")
             && !OPERATOR_HANDLER_SRC.contains("let _ = audit::write")
             && !OPERATOR_HANDLER_SRC.contains("audit::write("),
         "RFC-069 endpoint must batch relink-code mutation with required audit evidence and must not discard audit errors"
@@ -1349,11 +1349,11 @@ fn rfc069_operator_recovery_targets_existing_active_admins_only() {
 #[test]
 fn rfc069_operator_recovery_audit_correlates_creation_and_redemption() {
     assert!(
-        OPERATOR_HANDLER_SRC.contains("operator_recovery.admin_relink_created")
-            && OPERATOR_HANDLER_SRC.contains("\"operator_label\"")
-            && OPERATOR_HANDLER_SRC.contains("\"relink_code_id\"")
-            && OPERATOR_HANDLER_SRC.contains("\"membership_id\"")
-            && OPERATOR_HANDLER_SRC.contains("\"community_id\""),
+        OPERATOR_HANDLER_SRC.contains("AuditAction::OperatorRecoveryAdminRelinkCreated")
+            && OPERATOR_HANDLER_SRC.contains("AuditMetadata::OperatorRecovery")
+            && OPERATOR_HANDLER_SRC.contains("operator_label: body.operator_label")
+            && OPERATOR_HANDLER_SRC.contains("relink_code_id: relink_code_id.clone()")
+            && !OPERATOR_HANDLER_SRC.contains("let metadata = serde_json::json!"),
         "RFC-069 creation audit must include bounded operator label and relink correlation metadata"
     );
     assert!(
@@ -1433,18 +1433,19 @@ fn rfc057_creation_writes_only_community_membership_and_audit() {
     assert!(
         COMMUNITY_DB_SRC.contains("INSERT INTO communities")
             && COMMUNITY_DB_SRC.contains("INSERT INTO community_memberships")
-            && COMMUNITY_DB_SRC.contains("INSERT INTO audit_log")
-            && COMMUNITY_DB_SRC.contains("db.batch"),
+            && COMMUNITY_DB_SRC.contains("execute_required_batch")
+            && COMMUNITY_DB_SRC.contains("AuditAction::CommunityCreated")
+            && COMMUNITY_DB_SRC.contains("AuditAction::MembershipCreatedFirstAdmin"),
         "Community creation must batch community, first-admin membership, and audit writes"
     );
     assert!(
-        COMMUNITY_DB_SRC.contains("community.created")
-            && COMMUNITY_DB_SRC.contains("membership.created_first_admin"),
+        RFC079_AUDIT_CORE_SRC.contains("community.created")
+            && RFC079_AUDIT_CORE_SRC.contains("membership.created_first_admin"),
         "Community creation must emit the reviewed audit events"
     );
     assert!(
-        COMMUNITY_DB_SRC.contains("metadata_json")
-            && !COMMUNITY_DB_SRC.contains("action, metadata, created_at"),
+        !COMMUNITY_DB_SRC.contains("INSERT INTO audit_log")
+            && COMMUNITY_DB_SRC.matches("AuditMetadata::None").count() == 2,
         "Community creation audit insert must match the D1 schema column metadata_json"
     );
     for forbidden in [
@@ -1539,13 +1540,14 @@ fn rfc070_display_name_update_audit_and_result_are_batched() {
             && ME_HANDLER_SRC.contains("SET display_name = ?1")
             && ME_HANDLER_SRC.contains("AND community_id = ?3")
             && ME_HANDLER_SRC.contains("AND user_id = ?4")
-            && ME_HANDLER_SRC.contains("AND removed_at IS NULL"),
+            && ME_HANDLER_SRC.contains("AND removed_at IS NULL")
+            && ME_HANDLER_SRC.contains("AND display_name != ?1"),
         "RFC-070 display-name update must be scoped to active membership, community, and authenticated user"
     );
     assert!(
-        ME_HANDLER_SRC.contains("INSERT INTO audit_log")
-            && ME_HANDLER_SRC.contains("membership.display_name_updated")
-            && ME_HANDLER_SRC.contains("\"changed\": [\"display_name\"]")
+        ME_HANDLER_SRC.contains("AuditAction::MembershipDisplayNameUpdated")
+            && ME_HANDLER_SRC.contains("AuditMetadata::DisplayNameChanged")
+            && ME_HANDLER_SRC.contains("statement_after_one_change")
             && ME_HANDLER_SRC.contains("UPDATE form_tokens")
             && ME_HANDLER_SRC.contains("result_ref = ?1")
             && ME_HANDLER_SRC.contains("require_changed(&results, 0")
@@ -1558,17 +1560,11 @@ fn rfc070_display_name_update_audit_and_result_are_batched() {
             && !ME_HANDLER_SRC.contains("audit::write("),
         "RFC-070 display-name updates must not use best-effort audit::write"
     );
-    let metadata_start = ME_HANDLER_SRC
-        .find("let metadata = serde_json::json!")
-        .expect("RFC-070 must build explicit display-name audit metadata");
-    let metadata_end = ME_HANDLER_SRC[metadata_start..]
-        .find(".to_string();")
-        .expect("RFC-070 metadata block must be stringified");
-    let metadata_block = &ME_HANDLER_SRC[metadata_start..metadata_start + metadata_end];
     assert!(
-        metadata_block.contains("\"changed\": [\"display_name\"]")
-            && !metadata_block.contains("\"membership_id\"")
-            && !metadata_block.contains("\"community_id\""),
+        RFC079_AUDIT_CORE_SRC
+            .contains("DisplayNameChanged => json!({ \"changed_fields\": [\"display_name\"] })")
+            && !ME_HANDLER_SRC.contains("serde_json::json!")
+            && !ME_HANDLER_SRC.contains("INSERT INTO audit_log"),
         "RFC-070 metadata_json must keep IDs in audit columns and store only the changed field list"
     );
 }
@@ -2123,17 +2119,28 @@ const RFC079_ASSERTION_FIXTURE_SRC: &str =
     include_str!("../../../workers/ssr/tests/fixtures/audit_change_assertion.sql");
 const RFC079_ASSERTION_WORKER_SRC: &str =
     include_str!("../../../workers/ssr/tests/fixtures/audit-assertion-worker.mjs");
-const RFC079_ASSERTION_RUNNER_SRC: &str =
-    include_str!("../../../scripts/test-audit-assertion.mjs");
+const RFC079_ASSERTION_RUNNER_SRC: &str = include_str!("../../../scripts/test-audit-assertion.mjs");
 const RFC079_AUDIT_CORE_SRC: &str = include_str!("../../../workers/ssr/src/audit.rs");
 const RFC079_MIGRATION_SRC: &str = include_str!("../../../migrations/0010_audit_integrity.sql");
-const RFC079_MIGRATION_RUNNER_SRC: &str =
-    include_str!("../../../scripts/test-audit-migration.mjs");
+const RFC079_MIGRATION_RUNNER_SRC: &str = include_str!("../../../scripts/test-audit-migration.mjs");
 const RFC079_AUDIT_POLICY_SRC: &str = include_str!("../../../docs/src/maintainer/audit-policy.md");
 const RFC079_BACKUP_RECOVERY_SRC: &str =
     include_str!("../../../docs/src/maintainer/backup-recovery.md");
 const RFC079_DEPLOYMENT_SRC: &str = include_str!("../../../docs/src/shared/deployment.md");
 const RFC079_OPERATIONS_SRC: &str = include_str!("../../../docs/src/maintainer/operations.md");
+const RFC079_ATTENDANCE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/attendance.rs");
+const RFC079_EVENT_NOTE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event_note.rs");
+const RFC079_EVENT_TEMPLATE_DB_SRC: &str =
+    include_str!("../../../workers/ssr/src/db/event_template.rs");
+const RFC079_TEMPLATES_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/templates.rs");
+const RFC079_NOTE_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/admin/events/notes.rs");
+const RFC079_ATOMICITY_RUNNER_SRC: &str = include_str!("../../../scripts/test-audit-atomicity.mjs");
+const RFC079_ATOMICITY_WORKER_SRC: &str =
+    include_str!("../../../workers/ssr/tests/fixtures/audit-atomicity-worker.mjs");
+const RFC079_ATOMICITY_FIXTURE_SRC: &str =
+    include_str!("../../../workers/ssr/tests/fixtures/audit_atomicity.sql");
 
 #[derive(Default)]
 struct AuditSourceScan {
@@ -2322,20 +2329,14 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
         ("handlers/admin/events/cancel.rs".to_owned(), 1),
         ("handlers/admin/events/create.rs".to_owned(), 1),
         ("handlers/admin/events/edit.rs".to_owned(), 1),
-        ("handlers/admin/events/notes.rs".to_owned(), 1),
         ("handlers/admin/events/occurrence.rs".to_owned(), 1),
         ("handlers/admin/help_signin.rs".to_owned(), 1),
-        ("handlers/admin/member_remove.rs".to_owned(), 1),
-        ("handlers/admin/members.rs".to_owned(), 2),
-        ("handlers/admin/role_transfer.rs".to_owned(), 1),
         ("handlers/auth.rs".to_owned(), 1),
         ("handlers/calendar.rs".to_owned(), 1),
         ("handlers/communities.rs".to_owned(), 1),
-        ("handlers/event.rs".to_owned(), 1),
         ("handlers/export.rs".to_owned(), 1),
         ("handlers/join.rs".to_owned(), 1),
         ("handlers/relink.rs".to_owned(), 1),
-        ("handlers/templates.rs".to_owned(), 2),
     ]);
     let actual_generic_counts = scan
         .generic_calls
@@ -2347,21 +2348,17 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
         "repository-wide generic audit-call distribution changed; reconcile RFC-079 before proceeding"
     );
 
-    let expected_direct_inserts = std::collections::BTreeMap::from([
-        ("audit.rs".to_owned(), 1usize),
-        ("db/community.rs".to_owned(), 2),
-        ("handlers/me.rs".to_owned(), 1),
-        ("handlers/operator.rs".to_owned(), 1),
-    ]);
+    let expected_direct_inserts =
+        std::collections::BTreeMap::from([("audit.rs".to_owned(), 1usize)]);
     assert_eq!(
         scan.direct_inserts, expected_direct_inserts,
-        "repository-wide audit INSERT distribution changed; audit.rs must be the one central insert and exactly four current direct inserts must remain reconciled"
+        "repository-wide audit INSERT distribution changed; audit.rs must remain the sole production audit INSERT owner"
     );
 
     assert_eq!(
         scan.generic_calls.values().map(Vec::len).sum::<usize>(),
-        20,
-        "RFC-079 accepted inventory expects exactly 20 generic audit-writer call sites"
+        12,
+        "RFC-079 Package 3 inventory expects exactly 12 deferred compatibility-writer call sites"
     );
     assert!(
         scan.assertion_table_refs.is_empty() && scan.operation_id_refs.is_empty(),
@@ -2370,7 +2367,7 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
         scan.operation_id_refs
     );
 
-    let expected_call_shapes: [(&str, &[&str]); 18] = [
+    let expected_call_shapes: [(&str, &[&str]); 12] = [
         (
             "handlers/auth.rs",
             &[
@@ -2394,12 +2391,6 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
             ],
         ),
         (
-            "handlers/event.rs",
-            &[
-                "Some(day_id), audit::LegacyAuditAction::AttendanceAdminSetAttended, audit::LegacyAuditMetadata::None",
-            ],
-        ),
-        (
             "handlers/join.rs",
             &[
                 "Some(&invite_id), audit::LegacyAuditAction::InviteCodeRedeemed, audit::LegacyAuditMetadata::None",
@@ -2412,34 +2403,10 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
             ],
         ),
         (
-            "handlers/templates.rs",
-            &[
-                "Some(&template_id), audit::LegacyAuditAction::EventTemplateCreated, audit::LegacyAuditMetadata::None",
-                "Some(template_id), audit::LegacyAuditAction::EventTemplateDeleted, audit::LegacyAuditMetadata::None",
-            ],
-        ),
-        (
             "handlers/admin/help_signin.rs",
             &[
                 "Some(target_membership_id), audit::LegacyAuditAction::MembershipRelinkCodeCreated, audit::LegacyAuditMetadata::RelinkCorrelation",
             ],
-        ),
-        (
-            "handlers/admin/member_remove.rs",
-            &[
-                "Some(target_membership_id), audit::LegacyAuditAction::MembershipRemoved, audit::LegacyAuditMetadata::None",
-            ],
-        ),
-        (
-            "handlers/admin/members.rs",
-            &[
-                "Some(&invite_id), audit::LegacyAuditAction::InviteCodeGenerated, audit::LegacyAuditMetadata::None",
-                "Some(invite_id), audit::LegacyAuditAction::InviteCodeRevoked, audit::LegacyAuditMetadata::None",
-            ],
-        ),
-        (
-            "handlers/admin/role_transfer.rs",
-            &["Some(target_membership_id), audit_action, audit::LegacyAuditMetadata::None"],
         ),
         (
             "handlers/admin/events/attendance.rs",
@@ -2463,12 +2430,6 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
             "handlers/admin/events/edit.rs",
             &[
                 "Some(event_id), audit::LegacyAuditAction::EventEdited, audit::LegacyAuditMetadata::EventEdited",
-            ],
-        ),
-        (
-            "handlers/admin/events/notes.rs",
-            &[
-                "Some(event_id), audit::LegacyAuditAction::EventNoteAdminHidden, audit::LegacyAuditMetadata::AdminNoteHidden",
             ],
         ),
         (
@@ -2527,39 +2488,14 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
         "enumRoleMutation{Promote,Demote,}",
         "RoleMutation variants changed; reconcile the accepted dynamic audit inventory"
     );
-    assert_eq!(
-        compact_brace_block(role_source, "let audit_action = match mutation"),
-        "letaudit_action=matchmutation{RoleMutation::Promote=>audit::LegacyAuditAction::MembershipPromotedToAdmin,RoleMutation::Demote=>audit::LegacyAuditAction::MembershipDemotedToMember,}",
-        "role audit-action mapping changed; reconcile the accepted dynamic audit inventory"
-    );
-
-    let direct_shapes: [(&str, &[&str]); 3] = [
-        (
-            "db/community.rs",
-            &[
-                "'community', ?4, 'community.created', '{}', ?5",
-                "'membership', ?4, 'membership.created_first_admin', '{}', ?5",
-            ],
-        ),
-        (
-            "handlers/me.rs",
-            &["'membership', ?4, 'membership.display_name_updated', ?5, ?6"],
-        ),
-        (
-            "handlers/operator.rs",
-            &["'membership', ?4, 'operator_recovery.admin_relink_created', ?5, ?6"],
-        ),
-    ];
-    for (path, shapes) in direct_shapes {
-        let source = source_by_path
-            .get(path)
-            .unwrap_or_else(|| panic!("missing direct audit source {path}"));
-        for shape in shapes {
-            assert!(
-                source.contains(&compact_source(shape)),
-                "direct audit action shape {shape:?} is missing from {path}"
-            );
-        }
+    for required in [
+        "AuditAction::MembershipPromotedToAdmin",
+        "AuditAction::MembershipDemotedToMember",
+    ] {
+        assert!(
+            source_by_path["db/membership.rs"].contains(&compact_source(required)),
+            "role audit-action mapping is missing {required}"
+        );
     }
 
     let class_a = [
@@ -2748,6 +2684,114 @@ fn rfc079_package2_migration_and_operator_policy_are_pinned() {
             && RFC079_OPERATIONS_SRC.contains("Mixed legacy and canonical audit actions")
             && RFC079_OPERATIONS_SRC.contains("Do not select `metadata_json`"),
         "Package 2 operator policy must cover sensitive backups, non-deployment, compatibility queries, and roll-forward recovery"
+    );
+}
+
+#[test]
+fn rfc079_package3_simple_required_batches_are_pinned() {
+    assert!(
+        RFC079_AUDIT_CORE_SRC.contains("pub(crate) fn statement_after_one_change")
+            && RFC079_AUDIT_CORE_SRC.contains("WHERE changes() = 1")
+            && RFC079_AUDIT_CORE_SRC.contains("pub(crate) async fn execute_required")
+            && RFC079_AUDIT_CORE_SRC
+                .contains("batch(vec![mutation, audit.statement_after_one_change(db)?])")
+            && RFC079_AUDIT_CORE_SRC.contains("(0, 0) => Ok(false)")
+            && RFC079_AUDIT_CORE_SRC.contains("(1, 1)"),
+        "Package 3 conditional required-audit primitive must keep mutation/audit adjacency and zero-or-one cardinality"
+    );
+
+    for (name, source, expected_batches) in [
+        ("templates", RFC079_EVENT_TEMPLATE_DB_SRC, 2usize),
+        ("invites", INVITE_DB_SRC, 2),
+        ("membership", MEMBERSHIP_DB_SRC, 3),
+        ("note moderation", RFC079_EVENT_NOTE_DB_SRC, 1),
+        ("single attendance", RFC079_ATTENDANCE_DB_SRC, 1),
+    ] {
+        assert_eq!(
+            source
+                .matches("audit::execute_required(db, mutation, &record)")
+                .count(),
+            expected_batches,
+            "Package 3 {name} helper count changed"
+        );
+        assert!(
+            source.contains("role = 'admin'") && source.contains("removed_at IS NULL"),
+            "Package 3 {name} mutation must repeat active-admin authorization in SQL"
+        );
+    }
+
+    for (name, source) in [
+        ("community", COMMUNITY_DB_SRC),
+        ("display name", ME_HANDLER_SRC),
+        ("operator recovery", OPERATOR_HANDLER_SRC),
+        ("templates", RFC079_TEMPLATES_HANDLER_SRC),
+        ("note moderation", RFC079_NOTE_HANDLER_SRC),
+        ("single attendance", EVENT_HANDLER_SRC),
+        ("invites", MEMBERS_HANDLER_SRC),
+        ("member removal", MEMBER_REMOVE_HANDLER_SRC),
+        ("role transfer", ROLE_TRANSFER_HANDLER_SRC),
+    ] {
+        assert!(
+            !source.contains("INSERT INTO audit_log")
+                && !source.contains("let _ = audit::write_legacy")
+                && !source.contains("let _ = crate::audit::write_legacy"),
+            "Package 3 {name} surface must use only the central typed audit builder"
+        );
+    }
+
+    assert!(
+        COMMUNITY_DB_SRC.matches("audit::required_record").count() == 2
+            && COMMUNITY_DB_SRC.contains("audit::execute_required_batch")
+            && ME_HANDLER_SRC.contains("AuditMetadata::DisplayNameChanged")
+            && ME_HANDLER_SRC.contains("AND display_name != ?1")
+            && OPERATOR_HANDLER_SRC.contains("AuditMetadata::OperatorRecovery")
+            && OPERATOR_HANDLER_SRC.contains("audit::execute_required_batch"),
+        "Package 3 must centralize the three former direct-insert surfaces without changing their batch boundaries"
+    );
+
+    for (name, source, current_state) in [
+        (
+            "template deletion",
+            RFC079_EVENT_TEMPLATE_DB_SRC,
+            "is_active = 1",
+        ),
+        (
+            "invite revocation",
+            INVITE_DB_SRC,
+            "used_at IS NULL AND revoked_at IS NULL",
+        ),
+        (
+            "note moderation",
+            RFC079_EVENT_NOTE_DB_SRC,
+            "hidden_by_admin_at IS NULL",
+        ),
+        (
+            "attendance",
+            RFC079_ATTENDANCE_DB_SRC,
+            "attendances.status IS NOT 'attended'",
+        ),
+        ("role transfer", MEMBERSHIP_DB_SRC, "role = 'member'"),
+    ] {
+        assert!(
+            source.contains(current_state),
+            "Package 3 {name} mutation must repeat expected current state"
+        );
+    }
+
+    assert!(
+        RFC079_ATOMICITY_RUNNER_SRC.contains("'d1', 'migrations', 'apply'")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("'--local'")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("'--persist-to'")
+            && !RFC079_ATOMICITY_RUNNER_SRC.contains("'--remote'")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("inheritNonAuthorityEnvironment")
+            && RFC079_ATOMICITY_RUNNER_SRC.contains("sentinel authority value was read")
+            && RFC079_ATOMICITY_WORKER_SRC.contains("WHERE changes() = 1")
+            && RFC079_ATOMICITY_WORKER_SRC.contains("db.batch(statements)")
+            && !RFC079_ATOMICITY_WORKER_SRC.contains("console.")
+            && RFC079_ATOMICITY_FIXTURE_SRC.contains("CREATE TRIGGER reject_proof_audit")
+            && RFC079_ATOMICITY_FIXTURE_SRC
+                .contains("RAISE(ABORT, 'synthetic required audit rejection')"),
+        "Package 3 real-D1 proof must remain local-only, authority-isolated, privacy-bounded, and cover audit-trigger rollback"
     );
 }
 

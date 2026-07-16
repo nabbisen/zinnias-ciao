@@ -4,7 +4,6 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
-use crate::audit;
 use crate::authz::require_admin;
 use crate::db::membership as membership_db;
 use crate::render;
@@ -209,10 +208,6 @@ async fn post_role_change(
         RoleMutation::Promote => token_purpose::PROMOTE_MEMBER,
         RoleMutation::Demote => token_purpose::DEMOTE_MEMBER,
     };
-    let audit_action = match mutation {
-        RoleMutation::Promote => audit::LegacyAuditAction::MembershipPromotedToAdmin,
-        RoleMutation::Demote => audit::LegacyAuditAction::MembershipDemotedToMember,
-    };
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let replay = crate::codlet::consume_token(
@@ -229,25 +224,29 @@ async fn post_role_change(
 
     let result = match mutation {
         RoleMutation::Promote => {
-            membership_db::promote_to_admin(&db, target_membership_id, community_id).await?
+            membership_db::promote_to_admin_required(
+                &db,
+                rid,
+                target_membership_id,
+                community_id,
+                &membership.membership_id,
+            )
+            .await?
         }
         RoleMutation::Demote => {
-            membership_db::demote_to_member(&db, target_membership_id, community_id).await?
+            membership_db::demote_to_member_required(
+                &db,
+                rid,
+                target_membership_id,
+                community_id,
+                &membership.membership_id,
+            )
+            .await?
         }
     };
 
     match result {
         membership_db::RoleUpdateResult::Changed => {
-            let _ = audit::write_legacy(
-                &db,
-                rid,
-                Some(community_id),
-                Some(&membership.membership_id),
-                Some(target_membership_id),
-                audit_action,
-                audit::LegacyAuditMetadata::None,
-            )
-            .await;
             redirect(&format!("/c/{community_id}/admin/members"))
         }
         membership_db::RoleUpdateResult::AlreadyApplied => {

@@ -3,7 +3,7 @@
 
 use worker::{D1Database, Result};
 
-use crate::crypto::random_token;
+use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::db::now_utc;
 
 pub struct CommunityRow {
@@ -31,8 +31,10 @@ pub async fn find_active(db: &D1Database, community_id: &str) -> Result<Option<C
     }))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn create_with_first_admin(
     db: &D1Database,
+    request_id: &str,
     community_id: &str,
     name: &str,
     timezone: &str,
@@ -41,8 +43,6 @@ pub async fn create_with_first_admin(
     display_name: &str,
 ) -> Result<()> {
     let now = now_utc();
-    let community_audit_id = format!("aud_{}", &random_token()[..24]);
-    let membership_audit_id = format!("aud_{}", &random_token()[..24]);
 
     let community_stmt = db
         .prepare(
@@ -70,40 +70,24 @@ pub async fn create_with_first_admin(
             now.as_str().into(),
         ])?;
 
-    let community_audit_stmt = db
-        .prepare(
-            "INSERT INTO audit_log \
-             (id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at) \
-             VALUES (?1, ?2, ?3, 'community', ?4, 'community.created', '{}', ?5)",
-        )
-        .bind(&[
-            community_audit_id.as_str().into(),
-            community_id.into(),
-            first_admin_membership_id.into(),
-            community_id.into(),
-            now.as_str().into(),
-        ])?;
-
-    let membership_audit_stmt = db
-        .prepare(
-            "INSERT INTO audit_log \
-             (id, community_id, actor_membership_id, target_kind, target_id, action, metadata_json, created_at) \
-             VALUES (?1, ?2, ?3, 'membership', ?4, 'membership.created_first_admin', '{}', ?5)",
-        )
-        .bind(&[
-            membership_audit_id.as_str().into(),
-            community_id.into(),
-            first_admin_membership_id.into(),
-            first_admin_membership_id.into(),
-            now.as_str().into(),
-        ])?;
-
-    db.batch(vec![
-        community_stmt,
-        membership_stmt,
-        community_audit_stmt,
-        membership_audit_stmt,
-    ])
-    .await?;
+    let audits = [
+        audit::required_record(
+            request_id,
+            Some(community_id),
+            Some(first_admin_membership_id),
+            Some(community_id),
+            AuditAction::CommunityCreated,
+            AuditMetadata::None,
+        )?,
+        audit::required_record(
+            request_id,
+            Some(community_id),
+            Some(first_admin_membership_id),
+            Some(first_admin_membership_id),
+            AuditAction::MembershipCreatedFirstAdmin,
+            AuditMetadata::None,
+        )?,
+    ];
+    audit::execute_required_batch(db, vec![community_stmt, membership_stmt], &audits).await?;
     Ok(())
 }

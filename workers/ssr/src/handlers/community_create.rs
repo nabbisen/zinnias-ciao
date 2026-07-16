@@ -50,7 +50,7 @@ pub async fn get_new_community(req: Request, env: &Env, _rid: &str) -> Result<Re
     )
 }
 
-pub async fn post_new_community(mut req: Request, env: &Env, _rid: &str) -> Result<Response> {
+pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
     let auth = match require_auth(&req, env).await {
         Ok(a) => a,
         Err(_) => return render::session_expired(),
@@ -147,6 +147,7 @@ pub async fn post_new_community(mut req: Request, env: &Env, _rid: &str) -> Resu
     let membership_id = format!("mem_{}", &random_token()[..24]);
     crate::db::community::create_with_first_admin(
         &db,
+        rid,
         &community_id,
         &community_name,
         SUPPORTED_TIMEZONE,
