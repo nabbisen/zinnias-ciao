@@ -4,7 +4,6 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
-use crate::audit;
 use crate::authz::require_admin;
 use crate::crypto::{hmac_hex, normalize_invite_code, random_token};
 use crate::db::{membership as membership_db, relink as relink_db};
@@ -136,30 +135,21 @@ pub async fn post_help_signin(
     let code_id = random_token()[..24].to_owned();
     let expires_at = relink_db::expires_at();
 
-    relink_db::revoke_unused_for_membership(&db, target_membership_id).await?;
-    relink_db::insert(
+    if !relink_db::issue_required(
         &db,
+        rid,
         &code_id,
         &code_hmac,
         community_id,
         target_membership_id,
         &membership.membership_id,
         &expires_at,
+        None,
     )
-    .await?;
-
-    let _ = audit::write_legacy(
-        &db,
-        rid,
-        Some(community_id),
-        Some(&membership.membership_id),
-        Some(target_membership_id),
-        audit::LegacyAuditAction::MembershipRelinkCodeCreated,
-        audit::LegacyAuditMetadata::RelinkCorrelation {
-            relink_code_id: code_id,
-        },
-    )
-    .await;
+    .await?
+    {
+        return render::not_found();
+    }
 
     let nav = render::bottom_nav(community_id, "home");
     let body = format!(

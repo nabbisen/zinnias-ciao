@@ -28,6 +28,12 @@ async function reset(db) {
     db.prepare('DELETE FROM proof_dependents'),
     db.prepare('DELETE FROM audit_change_assertions'),
     db.prepare('DELETE FROM proof_items'),
+    db.prepare('DELETE FROM proof_flow_audits'),
+    db.prepare('DELETE FROM proof_flow_sessions'),
+    db.prepare('DELETE FROM proof_flow_links'),
+    db.prepare('DELETE FROM proof_flow_memberships'),
+    db.prepare('DELETE FROM proof_flow_users'),
+    db.prepare('DELETE FROM proof_flow_claims'),
     db.prepare(
       `INSERT INTO proof_items (id, case_name, eligible, winner) VALUES
        ('zero-1', 'zero', 0, NULL),
@@ -35,9 +41,96 @@ async function reset(db) {
        ('multi-1', 'multi', 1, NULL),
        ('multi-2', 'multi', 1, NULL),
        ('audit-fail-1', 'audit-fail', 1, NULL),
-       ('concurrent-1', 'concurrent', 1, NULL)`,
+      ('concurrent-1', 'concurrent', 1, NULL)`,
+    ),
+    db.prepare(
+      `INSERT INTO proof_flow_claims (flow, winner) VALUES
+       ('join', NULL), ('relink', NULL), ('join-audit-fail', NULL), ('relink-audit-fail', NULL)`,
     ),
   ]);
+}
+
+async function flowSummary(db, flow) {
+  const row = await db.prepare(
+    `SELECT
+       (SELECT count(*) FROM proof_flow_claims WHERE flow=?1 AND winner IS NOT NULL) AS winners,
+       (SELECT count(*) FROM proof_flow_users WHERE flow=?1) AS users,
+       (SELECT count(*) FROM proof_flow_memberships WHERE flow=?1) AS memberships,
+       (SELECT count(*) FROM proof_flow_links WHERE flow=?1) AS links,
+       (SELECT count(*) FROM proof_flow_sessions WHERE flow=?1) AS sessions,
+       (SELECT count(*) FROM proof_flow_audits WHERE flow=?1) AS audits,
+       (SELECT count(*) FROM audit_change_assertions) AS guards`,
+  ).bind(flow).first();
+  return {
+    winners: Number(row?.winners ?? -1),
+    users: Number(row?.users ?? -1),
+    memberships: Number(row?.memberships ?? -1),
+    links: Number(row?.links ?? -1),
+    sessions: Number(row?.sessions ?? -1),
+    audits: Number(row?.audits ?? -1),
+    guards: Number(row?.guards ?? -1),
+  };
+}
+
+async function runFlow(db, flow) {
+  const internalId = operationId();
+  const candidate = crypto.randomUUID().replaceAll('-', '');
+  const statements = [
+    db.prepare('UPDATE proof_flow_claims SET winner=?1 WHERE flow=?2 AND winner IS NULL')
+      .bind(candidate, flow),
+    db.prepare(
+      `INSERT INTO audit_change_assertions (operation_id, changed_count)
+       VALUES (?1, changes())`,
+    ).bind(internalId),
+  ];
+  const pushRequired = (statement) => {
+    statements.push(
+      statement,
+      db.prepare(
+        `UPDATE audit_change_assertions SET changed_count=changes()
+         WHERE operation_id=?1`,
+      ).bind(internalId),
+    );
+  };
+  if (flow.startsWith('join')) {
+    pushRequired(
+      db.prepare('INSERT INTO proof_flow_users (id, flow) VALUES (?1, ?2)')
+        .bind(`user-${candidate}`, flow),
+    );
+    pushRequired(
+      db.prepare('INSERT INTO proof_flow_memberships (id, flow, user_id) VALUES (?1, ?2, ?3)')
+        .bind(`membership-${candidate}`, flow, `user-${candidate}`),
+    );
+    pushRequired(
+      db.prepare('INSERT INTO proof_flow_links (id, flow, membership_id) VALUES (?1, ?2, ?3)')
+        .bind(`link-${candidate}`, flow, `membership-${candidate}`),
+    );
+    pushRequired(
+      db.prepare('INSERT INTO proof_flow_sessions (id, flow, user_id) VALUES (?1, ?2, ?3)')
+        .bind(`session-${candidate}`, flow, `user-${candidate}`),
+    );
+  } else {
+    pushRequired(
+      db.prepare('INSERT INTO proof_flow_sessions (id, flow, user_id) VALUES (?1, ?2, ?3)')
+        .bind(`session-${candidate}`, flow, 'existing-user'),
+    );
+    statements.push(db.prepare("UPDATE proof_flow_sessions SET user_id=user_id WHERE flow='none'"));
+  }
+  statements.push(
+    db.prepare('INSERT INTO proof_flow_audits (id, flow, outcome) VALUES (?1, ?2, ?3)')
+      .bind(`audit-${candidate}`, flow, flow.endsWith('audit-fail') ? 'rejected' : 'ok'),
+    db.prepare('DELETE FROM audit_change_assertions WHERE operation_id=?1').bind(internalId),
+  );
+  try {
+    const results = await db.batch(statements);
+    return {
+      batchSucceeded: true,
+      statementCount: statements.length,
+      statementChanges: results.map((result) => Number(result.meta?.changes ?? -1)),
+    };
+  } catch {
+    return { batchSucceeded: false, statementCount: statements.length, statementChanges: [] };
+  }
 }
 
 async function summary(db, caseName) {
@@ -139,6 +232,26 @@ export default {
     }
     if (url.pathname === '/summary/concurrent') {
       return json(await summary(env.PROOF_DB, 'concurrent'));
+    }
+    if (url.pathname === '/flow/join/concurrent') {
+      return json(await runFlow(env.PROOF_DB, 'join'));
+    }
+    if (url.pathname === '/flow/relink/concurrent') {
+      return json(await runFlow(env.PROOF_DB, 'relink'));
+    }
+    if (url.pathname === '/flow/join/summary') {
+      return json(await flowSummary(env.PROOF_DB, 'join'));
+    }
+    if (url.pathname === '/flow/relink/summary') {
+      return json(await flowSummary(env.PROOF_DB, 'relink'));
+    }
+    if (url.pathname === '/flow/join/audit-failure') {
+      const flow = 'join-audit-fail';
+      return json({ ...(await runFlow(env.PROOF_DB, flow)), state: await flowSummary(env.PROOF_DB, flow) });
+    }
+    if (url.pathname === '/flow/relink/audit-failure') {
+      const flow = 'relink-audit-fail';
+      return json({ ...(await runFlow(env.PROOF_DB, flow)), state: await flowSummary(env.PROOF_DB, flow) });
     }
     return json({ error: 'not found' }, 404);
   },

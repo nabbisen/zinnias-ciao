@@ -3,7 +3,9 @@
 
 use worker::{D1Database, Result};
 use zinnias_ciao_contracts::RELINK_CODE_TTL_SECONDS;
+use zinnias_ciao_contracts::SESSION_TTL_SECONDS;
 
+use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::db::{add_seconds_to_now, now_utc};
 
 pub struct RelinkTargetRow {
@@ -125,4 +127,159 @@ pub async fn mark_used(db: &D1Database, id: &str) -> Result<bool> {
         .and_then(|m| m.changes)
         .unwrap_or(0);
     Ok(changed == 1)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn redeem_required(
+    db: &D1Database,
+    request_id: &str,
+    target: &RelinkTargetRow,
+    session_id: &str,
+    session_hmac: &str,
+) -> Result<()> {
+    let now = now_utc();
+    let session_expires_at = add_seconds_to_now(SESSION_TTL_SECONDS);
+    let claim = db
+        .prepare(
+            "UPDATE membership_relink_codes SET used_at=?1 \
+             WHERE id=?2 AND community_id=?3 AND membership_id=?4 \
+               AND used_at IS NULL AND revoked_at IS NULL AND expires_at>?1 \
+               AND EXISTS (SELECT 1 FROM community_memberships m \
+                           WHERE m.id=?4 AND m.community_id=?3 \
+                             AND m.user_id=?5 AND m.removed_at IS NULL)",
+        )
+        .bind(&[
+            now.as_str().into(),
+            target.id.as_str().into(),
+            target.community_id.as_str().into(),
+            target.membership_id.as_str().into(),
+            target.user_id.as_str().into(),
+        ])?;
+    let session = db
+        .prepare(
+            "INSERT INTO sessions \
+             (id, user_id, session_hmac, created_at, expires_at, last_seen_at) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4 \
+             WHERE EXISTS (SELECT 1 FROM community_memberships m \
+                           WHERE m.id=?6 AND m.community_id=?7 \
+                             AND m.user_id=?2 AND m.removed_at IS NULL)",
+        )
+        .bind(&[
+            session_id.into(),
+            target.user_id.as_str().into(),
+            session_hmac.into(),
+            now.as_str().into(),
+            session_expires_at.as_str().into(),
+            target.membership_id.as_str().into(),
+            target.community_id.as_str().into(),
+        ])?;
+    let revoke_others = db
+        .prepare(
+            "UPDATE sessions SET revoked_at=?1 \
+             WHERE user_id=?2 AND id!=?3 \
+               AND revoked_at IS NULL AND expires_at>?1 \
+               AND EXISTS (SELECT 1 FROM sessions keep \
+                           WHERE keep.id=?3 AND keep.user_id=?2 \
+                             AND keep.revoked_at IS NULL AND keep.expires_at>?1)",
+        )
+        .bind(&[
+            now.as_str().into(),
+            target.user_id.as_str().into(),
+            session_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(&target.community_id),
+        Some(&target.membership_id),
+        Some(&target.membership_id),
+        AuditAction::MembershipRelinkRedeemed,
+        AuditMetadata::RelinkCorrelation {
+            relink_code_id: target.id.clone(),
+        },
+    )?;
+    audit::execute_asserted_required(db, claim, vec![session], vec![revoke_others], &record)
+        .await?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn issue_required(
+    db: &D1Database,
+    request_id: &str,
+    id: &str,
+    code_hmac: &str,
+    community_id: &str,
+    membership_id: &str,
+    actor_membership_id: &str,
+    expires_at: &str,
+    operator_label: Option<String>,
+) -> Result<bool> {
+    let now = now_utc();
+    let operator_mode = operator_label.is_some();
+    let revoke = db
+        .prepare(
+            "UPDATE membership_relink_codes SET revoked_at=?1 \
+             WHERE membership_id=?2 AND community_id=?3 \
+               AND used_at IS NULL AND revoked_at IS NULL AND expires_at>?1 \
+               AND EXISTS (SELECT 1 FROM community_memberships target \
+                           WHERE target.id=?2 AND target.community_id=?3 \
+                             AND target.removed_at IS NULL) \
+               AND EXISTS (SELECT 1 FROM community_memberships actor \
+                           WHERE actor.id=?4 AND actor.community_id=?3 \
+                             AND actor.role='admin' AND actor.removed_at IS NULL)",
+        )
+        .bind(&[
+            now.as_str().into(),
+            membership_id.into(),
+            community_id.into(),
+            actor_membership_id.into(),
+        ])?;
+    let insert = db
+        .prepare(
+            "INSERT INTO membership_relink_codes \
+             (id, code_hmac, community_id, membership_id, created_by_membership_id, created_at, expires_at) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7 \
+             WHERE EXISTS (SELECT 1 FROM community_memberships target \
+                           WHERE target.id=?4 AND target.community_id=?3 \
+                             AND target.removed_at IS NULL \
+                             AND (?8=0 OR target.role='admin')) \
+               AND EXISTS (SELECT 1 FROM community_memberships actor \
+                           WHERE actor.id=?5 AND actor.community_id=?3 \
+                             AND actor.role='admin' AND actor.removed_at IS NULL)",
+        )
+        .bind(&[
+            id.into(),
+            code_hmac.into(),
+            community_id.into(),
+            membership_id.into(),
+            actor_membership_id.into(),
+            now.as_str().into(),
+            expires_at.into(),
+            operator_mode.into(),
+        ])?;
+    let (action, metadata) = if let Some(operator_label) = operator_label {
+        (
+            AuditAction::OperatorRecoveryAdminRelinkCreated,
+            AuditMetadata::OperatorRecovery {
+                operator_label,
+                relink_code_id: id.to_owned(),
+            },
+        )
+    } else {
+        (
+            AuditAction::MembershipRelinkCodeCreated,
+            AuditMetadata::RelinkCorrelation {
+                relink_code_id: id.to_owned(),
+            },
+        )
+    };
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(actor_membership_id),
+        Some(membership_id),
+        action,
+        metadata,
+    )?;
+    audit::execute_required_tail(db, vec![revoke, insert], &record).await
 }

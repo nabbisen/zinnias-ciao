@@ -949,7 +949,6 @@ const RELINK_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers
 const OPERATOR_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/operator.rs");
 const MEMBERSHIP_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/membership.rs");
 const RELINK_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/relink.rs");
-const SESSION_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/session.rs");
 const RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC: &str =
     include_str!("../../../scripts/recover-community-access.mjs");
 const APP_JS_SRC: &str = include_str!("../../../workers/ssr/static/app.js");
@@ -1142,8 +1141,9 @@ fn rfc063_readd_uses_new_identity_without_display_name_merge() {
     assert!(
         JOIN_HANDLER_SRC.contains("let user_id = crate::crypto::random_token();")
             && JOIN_HANDLER_SRC.contains("let membership_id = crate::crypto::random_token();")
-            && JOIN_HANDLER_SRC.contains("membership_db::insert_user(&db, &user_id)")
-            && JOIN_HANDLER_SRC.contains("membership_db::insert_membership("),
+            && JOIN_HANDLER_SRC.contains("crate::db::invite::redeem_required(")
+            && INVITE_DB_SRC.contains("INSERT INTO users")
+            && INVITE_DB_SRC.contains("INSERT INTO community_memberships"),
         "RFC-063 Option A requires invite redemption to create a fresh user and membership"
     );
     assert!(
@@ -1241,9 +1241,9 @@ fn rfc024_relink_codes_are_membership_scoped_hmacs() {
         "RFC-024 codes must be HMAC hashed before storage"
     );
     assert!(
-        RELINK_DB_SRC.contains("revoke_unused_for_membership")
-            && RELINK_DB_SRC.contains("revoked_at = ?1")
-            && HELP_SIGNIN_HANDLER_SRC.contains("revoke_unused_for_membership"),
+        RELINK_DB_SRC.contains("pub async fn issue_required")
+            && RELINK_DB_SRC.contains("revoked_at=?1")
+            && HELP_SIGNIN_HANDLER_SRC.contains("relink_db::issue_required"),
         "RFC-024 must revoke prior unused codes when creating a new code for the same membership"
     );
 }
@@ -1266,7 +1266,7 @@ fn rfc024_redemption_rechecks_active_membership_and_community() {
     assert!(
         JOIN_HANDLER_SRC.contains("let user_id = crate::crypto::random_token();")
             && JOIN_HANDLER_SRC.contains("let membership_id = crate::crypto::random_token();")
-            && JOIN_HANDLER_SRC.contains("membership_db::insert_membership("),
+            && INVITE_DB_SRC.contains("INSERT INTO community_memberships"),
         "RFC-024 invite-era help-signin relies on join minting a fresh user_id and membership per invite redemption"
     );
 }
@@ -1274,9 +1274,9 @@ fn rfc024_redemption_rechecks_active_membership_and_community() {
 #[test]
 fn rfc024_redemption_is_single_use_generic_and_revokes_old_sessions() {
     assert!(
-        RELINK_DB_SRC.contains("pub async fn mark_used")
+        RELINK_DB_SRC.contains("pub async fn redeem_required")
             && RELINK_DB_SRC.contains("used_at IS NULL")
-            && RELINK_HANDLER_SRC.contains("mark_used"),
+            && RELINK_HANDLER_SRC.contains("relink_db::redeem_required"),
         "RFC-024 redemption must mark codes used with a conditional single-use update"
     );
     assert!(
@@ -1286,17 +1286,16 @@ fn rfc024_redemption_is_single_use_generic_and_revokes_old_sessions() {
         "RFC-024 redemption failures must use one generic error"
     );
     assert!(
-        SESSION_DB_SRC.contains("pub async fn revoke_others_for_user")
-            && RELINK_HANDLER_SRC.contains("revoke_others_for_user")
-            && SESSION_DB_SRC.contains("id != ?3"),
+        RELINK_DB_SRC.contains("UPDATE sessions SET revoked_at=?1")
+            && RELINK_DB_SRC.contains("id!=?3")
+            && RELINK_DB_SRC.contains("EXISTS (SELECT 1 FROM sessions keep"),
         "RFC-024 redemption must revoke other active sessions for the target user after inserting the new session"
     );
-    let audit_write_count = RELINK_HANDLER_SRC.matches("audit::write_legacy(").count();
     assert!(
         RELINK_HANDLER_SRC.contains("rate_limit::is_relink_rate_limited")
             && RELINK_HANDLER_SRC.contains("record_relink_failure")
-            && audit_write_count == 1
-            && RELINK_HANDLER_SRC.contains("LegacyAuditAction::MembershipRelinkRedeemed"),
+            && !RELINK_HANDLER_SRC.contains("write_legacy")
+            && RELINK_DB_SRC.contains("AuditAction::MembershipRelinkRedeemed"),
         "RFC-024 failed redemption should be rate-limited, not audited as a membership event"
     );
 }
@@ -1336,10 +1335,10 @@ fn rfc069_operator_recovery_targets_existing_active_admins_only() {
         "RFC-069 endpoint must converge invalid community/membership/non-admin cases on generic not-found"
     );
     assert!(
-        OPERATOR_HANDLER_SRC.contains(
-            "execute_required_batch(&db, vec![revoke_stmt, insert_relink_stmt], &[audit])"
-        ) && OPERATOR_HANDLER_SRC.contains("INSERT INTO membership_relink_codes")
-            && OPERATOR_HANDLER_SRC.contains("audit::required_record")
+        OPERATOR_HANDLER_SRC.contains("relink_db::issue_required")
+            && RELINK_DB_SRC.contains("INSERT INTO membership_relink_codes")
+            && RELINK_DB_SRC.contains("audit::required_record")
+            && RELINK_DB_SRC.contains("audit::execute_required_tail")
             && !OPERATOR_HANDLER_SRC.contains("let _ = audit::write")
             && !OPERATOR_HANDLER_SRC.contains("audit::write("),
         "RFC-069 endpoint must batch relink-code mutation with required audit evidence and must not discard audit errors"
@@ -1349,16 +1348,16 @@ fn rfc069_operator_recovery_targets_existing_active_admins_only() {
 #[test]
 fn rfc069_operator_recovery_audit_correlates_creation_and_redemption() {
     assert!(
-        OPERATOR_HANDLER_SRC.contains("AuditAction::OperatorRecoveryAdminRelinkCreated")
-            && OPERATOR_HANDLER_SRC.contains("AuditMetadata::OperatorRecovery")
-            && OPERATOR_HANDLER_SRC.contains("operator_label: body.operator_label")
-            && OPERATOR_HANDLER_SRC.contains("relink_code_id: relink_code_id.clone()")
-            && !OPERATOR_HANDLER_SRC.contains("let metadata = serde_json::json!"),
+        RELINK_DB_SRC.contains("AuditAction::OperatorRecoveryAdminRelinkCreated")
+            && RELINK_DB_SRC.contains("AuditMetadata::OperatorRecovery")
+            && OPERATOR_HANDLER_SRC.contains("Some(body.operator_label)")
+            && RELINK_DB_SRC.contains("relink_code_id: id.to_owned()")
+            && !RELINK_DB_SRC.contains("let metadata = serde_json::json!"),
         "RFC-069 creation audit must include bounded operator label and relink correlation metadata"
     );
     assert!(
-        RELINK_HANDLER_SRC.contains("LegacyAuditAction::MembershipRelinkRedeemed")
-            && RELINK_HANDLER_SRC.contains("relink_code_id: target.id.clone()"),
+        RELINK_DB_SRC.contains("AuditAction::MembershipRelinkRedeemed")
+            && RELINK_DB_SRC.contains("relink_code_id: target.id.clone()"),
         "RFC-069 redemption audit must include the relink_code_id created by the operator endpoint"
     );
 }
@@ -2322,12 +2321,9 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
     let scan = scan_audit_sources(&sources);
 
     let expected_generic_counts = std::collections::BTreeMap::from([
-        ("handlers/admin/help_signin.rs".to_owned(), 1usize),
-        ("handlers/auth.rs".to_owned(), 1),
+        ("handlers/auth.rs".to_owned(), 1usize),
         ("handlers/communities.rs".to_owned(), 1),
         ("handlers/export.rs".to_owned(), 1),
-        ("handlers/join.rs".to_owned(), 1),
-        ("handlers/relink.rs".to_owned(), 1),
     ]);
     let actual_generic_counts = scan
         .generic_calls
@@ -2348,17 +2344,18 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
 
     assert_eq!(
         scan.generic_calls.values().map(Vec::len).sum::<usize>(),
-        6,
-        "RFC-079 Package 4 inventory expects exactly 6 deferred compatibility-writer call sites"
+        3,
+        "RFC-079 Package 5 inventory expects exactly 3 deferred compatibility-writer call sites"
     );
     assert!(
-        scan.assertion_table_refs.is_empty() && scan.operation_id_refs.is_empty(),
-        "Package 0A assertion table/operation ID must not appear in production Rust sources: table={:?}, operation_id={:?}",
+        scan.assertion_table_refs == vec!["audit.rs".to_owned()]
+            && scan.operation_id_refs == vec!["audit.rs".to_owned()],
+        "Package 5 assertion table/operation IDs must be owned only by audit.rs: table={:?}, operation_id={:?}",
         scan.assertion_table_refs,
         scan.operation_id_refs
     );
 
-    let expected_call_shapes: [(&str, &[&str]); 6] = [
+    let expected_call_shapes: [(&str, &[&str]); 3] = [
         (
             "handlers/auth.rs",
             &[
@@ -2375,24 +2372,6 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
             "handlers/export.rs",
             &[
                 "Some(community_id), crate::audit::LegacyAuditAction::CommunityExportAuthorized, crate::audit::LegacyAuditMetadata::None",
-            ],
-        ),
-        (
-            "handlers/join.rs",
-            &[
-                "Some(&invite_id), audit::LegacyAuditAction::InviteCodeRedeemed, audit::LegacyAuditMetadata::None",
-            ],
-        ),
-        (
-            "handlers/relink.rs",
-            &[
-                "Some(&target.membership_id), audit::LegacyAuditAction::MembershipRelinkRedeemed, audit::LegacyAuditMetadata::RelinkCorrelation",
-            ],
-        ),
-        (
-            "handlers/admin/help_signin.rs",
-            &[
-                "Some(target_membership_id), audit::LegacyAuditAction::MembershipRelinkCodeCreated, audit::LegacyAuditMetadata::RelinkCorrelation",
             ],
         ),
     ];
@@ -2690,9 +2669,9 @@ fn rfc079_package3_simple_required_batches_are_pinned() {
             && COMMUNITY_DB_SRC.contains("audit::execute_required_batch")
             && ME_HANDLER_SRC.contains("AuditMetadata::DisplayNameChanged")
             && ME_HANDLER_SRC.contains("AND display_name != ?1")
-            && OPERATOR_HANDLER_SRC.contains("AuditMetadata::OperatorRecovery")
-            && OPERATOR_HANDLER_SRC.contains("audit::execute_required_batch"),
-        "Package 3 must centralize the three former direct-insert surfaces without changing their batch boundaries"
+            && RELINK_DB_SRC.contains("AuditMetadata::OperatorRecovery")
+            && OPERATOR_HANDLER_SRC.contains("relink_db::issue_required"),
+        "former direct-insert surfaces must remain centralized after the Package 5 operator boundary move"
     );
 
     for (name, source, current_state) in [
@@ -2815,6 +2794,93 @@ fn rfc079_package4_event_calendar_and_attendance_batches_are_pinned() {
             && RFC079_ATOMICITY_FIXTURE_SRC.contains("proof_occurrence_exceptions")
             && RFC079_ATOMICITY_FIXTURE_SRC.contains("proof_calendar_tokens"),
         "Package 4 real-D1 proof must cover edit eligibility loss, occurrence success/no-op/rollback, multi-write rollback, database-derived attendance count/no-op, and calendar predecessor restoration"
+    );
+}
+
+#[test]
+fn rfc079_package5_one_winner_batches_and_correlation_are_pinned() {
+    for required in [
+        "pub(crate) async fn execute_asserted_required",
+        "format!(\"ast_{}\", &random_token()[..22])",
+        "INSERT INTO audit_change_assertions (operation_id, changed_count)",
+        "VALUES (?1, changes())",
+        "UPDATE audit_change_assertions SET changed_count=changes()",
+        "statements.push(audit.statement(db)?)",
+        "DELETE FROM audit_change_assertions WHERE operation_id=?1",
+        "assertion_changes,",
+        "cleanup_changes,",
+        ") != (1, 1, 1, 1)",
+    ] {
+        assert!(
+            RFC079_AUDIT_CORE_SRC.contains(required),
+            "Package 5 central assertion executor is missing {required:?}"
+        );
+    }
+    assert!(
+        INVITE_DB_SRC.contains("pub async fn redeem_required")
+            && INVITE_DB_SRC.contains("audit::execute_asserted_required")
+            && INVITE_DB_SRC.contains("INSERT INTO users")
+            && INVITE_DB_SRC.contains("INSERT INTO community_memberships")
+            && INVITE_DB_SRC.contains("UPDATE invite_codes SET used_by_membership_id=?1")
+            && INVITE_DB_SRC.contains("INSERT INTO sessions")
+            && INVITE_DB_SRC.contains("AuditAction::InviteCodeRedeemed"),
+        "Package 5 join claim, candidate identities/session, linkage, and audit must share one asserted batch"
+    );
+    assert!(
+        RELINK_DB_SRC.contains("pub async fn redeem_required")
+            && RELINK_DB_SRC.contains("audit::execute_asserted_required")
+            && RELINK_DB_SRC.contains("INSERT INTO sessions")
+            && RELINK_DB_SRC.contains("UPDATE sessions SET revoked_at=?1")
+            && RELINK_DB_SRC.contains("AuditAction::MembershipRelinkRedeemed")
+            && RELINK_DB_SRC.contains("relink_code_id: target.id.clone()"),
+        "Package 5 relink claim, replacement session, predecessor revocation, and correlated audit must share one asserted batch"
+    );
+    assert!(
+        HELP_SIGNIN_HANDLER_SRC.contains("relink_db::issue_required")
+            && OPERATOR_HANDLER_SRC.contains("relink_db::issue_required")
+            && RELINK_DB_SRC.contains("AuditAction::MembershipRelinkCodeCreated")
+            && RELINK_DB_SRC.contains("AuditAction::OperatorRecoveryAdminRelinkCreated")
+            && RELINK_DB_SRC.contains("AuditMetadata::RelinkCorrelation")
+            && RELINK_DB_SRC.contains("AuditMetadata::OperatorRecovery")
+            && RELINK_DB_SRC.contains("audit::execute_required_tail"),
+        "help-signin and operator relink-code issuance must share guarded typed correlation"
+    );
+    let help_signin_post = HELP_SIGNIN_HANDLER_SRC
+        .split("pub async fn post_help_signin")
+        .nth(1)
+        .expect("help-signin POST handler must exist");
+    let guarded_issuance = help_signin_post
+        .find("if !relink_db::issue_required(")
+        .expect("help-signin must inspect guarded issuance success");
+    let rejected_issuance = help_signin_post[guarded_issuance..]
+        .find("return render::not_found();")
+        .map(|offset| guarded_issuance + offset)
+        .expect("help-signin must reject a zero-row guarded issuance");
+    let code_response = help_signin_post
+        .find("data-copy-code-value")
+        .expect("help-signin success must render the generated code");
+    assert!(
+        help_signin_post.contains(".await?\n    {\n        return render::not_found();\n    }")
+            && guarded_issuance < rejected_issuance
+            && rejected_issuance < code_response,
+        "help-signin must reject a zero-row guarded issuance before rendering the generated code"
+    );
+    assert!(
+        RFC079_ASSERTION_RUNNER_SRC.contains("/flow/join/concurrent")
+            && RFC079_ASSERTION_RUNNER_SRC.contains("/flow/relink/concurrent")
+            && RFC079_ASSERTION_RUNNER_SRC.contains("/flow/join/audit-failure")
+            && RFC079_ASSERTION_RUNNER_SRC.contains("/flow/relink/audit-failure")
+            && RFC079_ASSERTION_RUNNER_SRC
+                .contains("users: 1, memberships: 1, links: 1, sessions: 1, audits: 1, guards: 0")
+            && RFC079_ASSERTION_RUNNER_SRC
+                .contains("users: 0, memberships: 0, links: 0, sessions: 1, audits: 1, guards: 0")
+            && RFC079_ASSERTION_WORKER_SRC.contains("async function runFlow")
+            && RFC079_ASSERTION_FIXTURE_SRC.contains("proof_flow_users")
+            && RFC079_ASSERTION_FIXTURE_SRC.contains("proof_flow_memberships")
+            && RFC079_ASSERTION_FIXTURE_SRC.contains("proof_flow_links")
+            && RFC079_ASSERTION_FIXTURE_SRC.contains("proof_flow_sessions")
+            && RFC079_ASSERTION_FIXTURE_SRC.contains("proof_flow_audits"),
+        "Package 5 local D1 proof must show one winner/one audit, no losing candidate identity/session residue, and full audit-failure rollback"
     );
 }
 
@@ -2974,18 +3040,22 @@ fn invite_code_generator_uses_rejection_sampling() {
 
 #[test]
 fn join_profile_backfills_invite_membership_after_membership_exists() {
-    let mark_used = JOIN_HANDLER_SRC
-        .find("crate::db::invite::mark_used(&db, &invite_id)")
-        .expect("join profile must atomically mark invite used");
-    let insert_user = JOIN_HANDLER_SRC
-        .find("membership_db::insert_user(&db, &user_id)")
-        .expect("join profile must insert user");
-    let insert_membership = JOIN_HANDLER_SRC
-        .find("membership_db::insert_membership(")
-        .expect("join profile must insert membership");
-    let assign_used_membership = JOIN_HANDLER_SRC
-        .find("crate::db::invite::assign_used_membership(&db, &invite_id, &membership_id)")
-        .expect("join profile must backfill invite used_by_membership_id");
+    let redeem = INVITE_DB_SRC
+        .split("pub async fn redeem_required")
+        .nth(1)
+        .expect("join profile required redemption helper must exist");
+    let mark_used = redeem
+        .find("UPDATE invite_codes SET used_at=?1")
+        .expect("join profile must atomically claim the invite");
+    let insert_user = redeem
+        .find("INSERT INTO users")
+        .expect("join profile must insert user in the asserted batch");
+    let insert_membership = redeem
+        .find("INSERT INTO community_memberships")
+        .expect("join profile must insert membership in the asserted batch");
+    let assign_used_membership = redeem
+        .find("UPDATE invite_codes SET used_by_membership_id=?1")
+        .expect("join profile must link the claimed invite to its membership");
 
     assert!(
         mark_used < insert_user && mark_used < insert_membership,
@@ -3000,17 +3070,18 @@ fn join_profile_backfills_invite_membership_after_membership_exists() {
 
 #[test]
 fn invite_mark_used_does_not_write_membership_fk() {
-    let mark_start = INVITE_DB_SRC
-        .find("pub async fn mark_used(")
-        .expect("invite::mark_used must exist");
-    let assign_start = INVITE_DB_SRC
-        .find("pub async fn assign_used_membership(")
-        .expect("invite::assign_used_membership must exist");
-    let mark_body = &INVITE_DB_SRC[mark_start..assign_start];
-    let assign_body = &INVITE_DB_SRC[assign_start..];
+    let redeem = INVITE_DB_SRC
+        .split("pub async fn redeem_required")
+        .nth(1)
+        .expect("invite::redeem_required must exist");
+    let claim_end = redeem
+        .find("let user =")
+        .expect("asserted claim must precede candidate creation");
+    let mark_body = &redeem[..claim_end];
+    let assign_body = &redeem[claim_end..];
 
     assert!(
-        mark_body.contains("SET used_at = ?1"),
+        mark_body.contains("SET used_at=?1"),
         "mark_used should perform the atomic one-winner claim"
     );
     assert!(
@@ -3018,7 +3089,7 @@ fn invite_mark_used_does_not_write_membership_fk() {
         "mark_used must not write used_by_membership_id before the membership FK target exists"
     );
     assert!(
-        assign_body.contains("SET used_by_membership_id = ?1"),
+        assign_body.contains("SET used_by_membership_id=?1"),
         "assign_used_membership should perform the post-membership FK backfill"
     );
 }

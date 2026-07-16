@@ -4,7 +4,6 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
-use crate::audit;
 use crate::crypto::{hmac_hex, normalize_invite_code, random_token};
 use crate::db::relink as relink_db;
 use crate::render::{self, escape_html};
@@ -62,31 +61,23 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
         return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
     };
 
-    if !relink_db::mark_used(&db, &target.id).await? {
-        crate::rate_limit::record_relink_failure(env, &client_ip).await;
-        worker::console_log!("[{}] relink rejected: reason=mark_used_lost", rid);
-        return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
-    }
-
     let session_secret = random_token();
     let session_hmac = hmac_hex(&pepper, &session_secret);
     let session_id = random_token();
-    crate::db::session::insert(&db, &session_id, &target.user_id, &session_hmac).await?;
-    crate::db::session::revoke_others_for_user(&db, &target.user_id, &session_id).await?;
+    if let Err(error) =
+        relink_db::redeem_required(&db, rid, &target, &session_id, &session_hmac).await
+    {
+        if relink_db::find_valid_by_hmac(&db, &code_hmac)
+            .await?
+            .is_none()
+        {
+            crate::rate_limit::record_relink_failure(env, &client_ip).await;
+            worker::console_log!("[{}] relink rejected: reason=claim_lost", rid);
+            return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
+        }
+        return Err(error);
+    }
     crate::rate_limit::clear_relink_failures(env, &client_ip).await;
-
-    let _ = audit::write_legacy(
-        &db,
-        rid,
-        Some(&target.community_id),
-        Some(&target.membership_id),
-        Some(&target.membership_id),
-        audit::LegacyAuditAction::MembershipRelinkRedeemed,
-        audit::LegacyAuditMetadata::RelinkCorrelation {
-            relink_code_id: target.id.clone(),
-        },
-    )
-    .await;
 
     let cookie_domain = env
         .var("SESSION_COOKIE_DOMAIN")

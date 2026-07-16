@@ -759,6 +759,72 @@ pub(crate) async fn execute_required_tail(
     }
 }
 
+/// Execute a one-winner transition using the accepted Package 0 assertion
+/// primitive. The private operation ID exists only in the assertion table and
+/// is deleted in the same transaction after the required audit is inserted.
+pub(crate) async fn execute_asserted_required(
+    db: &D1Database,
+    claim: D1PreparedStatement,
+    required: Vec<D1PreparedStatement>,
+    optional: Vec<D1PreparedStatement>,
+    audit: &AuditRecord,
+) -> Result<Vec<D1Result>> {
+    let operation_id = format!("ast_{}", &random_token()[..22]);
+    let assertion = db
+        .prepare(
+            "INSERT INTO audit_change_assertions (operation_id, changed_count) \
+             VALUES (?1, changes())",
+        )
+        .bind(&[operation_id.as_str().into()])?;
+    let cleanup = db
+        .prepare("DELETE FROM audit_change_assertions WHERE operation_id=?1")
+        .bind(&[operation_id.as_str().into()])?;
+
+    let mut statements = Vec::with_capacity(required.len() * 2 + optional.len() + 4);
+    statements.push(claim);
+    statements.push(assertion);
+    let mut verification_indices = Vec::with_capacity(required.len());
+    for statement in required {
+        statements.push(statement);
+        verification_indices.push(statements.len());
+        statements.push(
+            db.prepare(
+                "UPDATE audit_change_assertions SET changed_count=changes() \
+                 WHERE operation_id=?1",
+            )
+            .bind(&[operation_id.as_str().into()])?,
+        );
+    }
+    statements.extend(optional);
+    let audit_index = statements.len();
+    statements.push(audit.statement(db)?);
+    let cleanup_index = statements.len();
+    statements.push(cleanup);
+
+    let results = db.batch(statements).await?;
+    let claim_changes = result_changes(&results, 0);
+    let assertion_changes = result_changes(&results, 1);
+    let audit_changes = result_changes(&results, audit_index);
+    let cleanup_changes = result_changes(&results, cleanup_index);
+    let required_verified = verification_indices
+        .iter()
+        .all(|index| result_changes(&results, *index) == 1);
+    if (
+        claim_changes,
+        assertion_changes,
+        audit_changes,
+        cleanup_changes,
+    ) != (1, 1, 1, 1)
+        || !required_verified
+    {
+        return Err(worker::Error::RustError(format!(
+            "asserted audit cardinality mismatch: claim={claim_changes} assertion={assertion_changes} audit={audit_changes} cleanup={cleanup_changes}"
+        )));
+    }
+    audit.log_success();
+    Ok(results)
+}
+
 pub(crate) fn result_changes(results: &[D1Result], index: usize) -> usize {
     results
         .get(index)

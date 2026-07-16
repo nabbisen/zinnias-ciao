@@ -201,6 +201,46 @@ try {
   const concurrent = await request(baseUrl, '/summary/concurrent');
   expectState(concurrent, { winners: 1, dependents: 1, audits: 1, guards: 0 }, 'concurrent');
 
+  const joinContenders = await Promise.all([
+    request(baseUrl, '/flow/join/concurrent'),
+    request(baseUrl, '/flow/join/concurrent'),
+  ]);
+  assert(joinContenders.filter((result) => result.batchSucceeded).length === 1,
+    'join claim did not produce exactly one batch winner');
+  assert(joinContenders.every((result) => result.statementCount === 12),
+    'join assertion batch statement budget changed');
+  const joinFlow = await request(baseUrl, '/flow/join/summary');
+  expectState(joinFlow, {
+    winners: 1, users: 1, memberships: 1, links: 1, sessions: 1, audits: 1, guards: 0,
+  }, 'join flow');
+
+  const relinkContenders = await Promise.all([
+    request(baseUrl, '/flow/relink/concurrent'),
+    request(baseUrl, '/flow/relink/concurrent'),
+  ]);
+  assert(relinkContenders.filter((result) => result.batchSucceeded).length === 1,
+    'relink claim did not produce exactly one batch winner');
+  assert(relinkContenders.every((result) => result.statementCount === 7),
+    'relink assertion batch statement budget changed');
+  const relinkFlow = await request(baseUrl, '/flow/relink/summary');
+  expectState(relinkFlow, {
+    winners: 1, users: 0, memberships: 0, links: 0, sessions: 1, audits: 1, guards: 0,
+  }, 'relink flow');
+
+  const joinAuditFailure = await request(baseUrl, '/flow/join/audit-failure');
+  assert(joinAuditFailure.batchSucceeded === false,
+    'join audit rejection unexpectedly committed');
+  expectState(joinAuditFailure.state, {
+    winners: 0, users: 0, memberships: 0, links: 0, sessions: 0, audits: 0, guards: 0,
+  }, 'join audit failure');
+
+  const relinkAuditFailure = await request(baseUrl, '/flow/relink/audit-failure');
+  assert(relinkAuditFailure.batchSucceeded === false,
+    'relink audit rejection unexpectedly committed');
+  expectState(relinkAuditFailure.state, {
+    winners: 0, users: 0, memberships: 0, links: 0, sessions: 0, audits: 0, guards: 0,
+  }, 'relink audit failure');
+
   process.stdout.write(`${JSON.stringify({
     wrangler: wranglerVersion,
     mode: 'local-only',
@@ -211,6 +251,10 @@ try {
       multiple: { committed: false, statements: multi.statementCount, state: multi.state },
       laterAuditFailure: { committed: false, statements: auditFailure.statementCount, state: auditFailure.state },
       concurrent: { winners: 1, statementsPerAttempt: contenders.map((result) => result.statementCount), state: concurrent },
+      joinOneWinner: { winners: 1, statementsPerAttempt: joinContenders.map((result) => result.statementCount), state: joinFlow },
+      relinkOneWinner: { winners: 1, statementsPerAttempt: relinkContenders.map((result) => result.statementCount), state: relinkFlow },
+      joinAuditFailure: { committed: false, state: joinAuditFailure.state },
+      relinkAuditFailure: { committed: false, state: relinkAuditFailure.state },
     },
     privacy: { internalIdsInResponses: false, workerConsoleCalls: 0, assertionIdAuditColumns: 0 },
   }, null, 2)}\n`);

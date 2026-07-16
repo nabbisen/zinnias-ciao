@@ -3,7 +3,6 @@
 use serde::Deserialize;
 use worker::{Env, Request, Response, Result};
 
-use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::crypto::{constant_time_eq, hmac_hex, normalize_invite_code, random_token};
 use crate::db::{community as community_db, membership as membership_db, relink as relink_db};
 use crate::render;
@@ -54,48 +53,22 @@ pub async fn post_community_access_recovery(
     let normalized = normalize_invite_code(&code);
     let code_hmac = hmac_hex(&crate::crypto::pepper(env), &normalized);
     let relink_code_id = random_token()[..24].to_owned();
-    let now = crate::db::now_utc();
     let expires_at = relink_db::expires_at();
-    let audit = audit::required_record(
+    if !relink_db::issue_required(
+        &db,
         rid,
-        Some(&target.community_id),
-        Some(&target.id),
-        Some(&target.id),
-        AuditAction::OperatorRecoveryAdminRelinkCreated,
-        AuditMetadata::OperatorRecovery {
-            operator_label: body.operator_label,
-            relink_code_id: relink_code_id.clone(),
-        },
-    )?;
-
-    let revoke_stmt = db
-        .prepare(
-            "UPDATE membership_relink_codes \
-             SET revoked_at = ?1 \
-             WHERE membership_id = ?2 \
-               AND used_at IS NULL \
-               AND revoked_at IS NULL \
-               AND expires_at > ?1",
-        )
-        .bind(&[now.as_str().into(), target.id.as_str().into()])?;
-
-    let insert_relink_stmt = db
-        .prepare(
-            "INSERT INTO membership_relink_codes \
-             (id, code_hmac, community_id, membership_id, created_by_membership_id, created_at, expires_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        )
-        .bind(&[
-            relink_code_id.as_str().into(),
-            code_hmac.as_str().into(),
-            target.community_id.as_str().into(),
-            target.id.as_str().into(),
-            target.id.as_str().into(),
-            now.as_str().into(),
-            expires_at.as_str().into(),
-        ])?;
-
-    audit::execute_required_batch(&db, vec![revoke_stmt, insert_relink_stmt], &[audit]).await?;
+        &relink_code_id,
+        &code_hmac,
+        &target.community_id,
+        &target.id,
+        &target.id,
+        &expires_at,
+        Some(body.operator_label),
+    )
+    .await?
+    {
+        return render::not_found();
+    }
 
     let mut resp = Response::from_json(&serde_json::json!({
         "ok": true,

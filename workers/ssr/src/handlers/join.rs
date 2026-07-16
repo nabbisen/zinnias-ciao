@@ -14,8 +14,6 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::{validate_display_name, validate_invite_input};
 
-use crate::audit;
-use crate::db::membership as membership_db;
 use crate::render::{self, escape_html};
 
 // ── GET /join ─────────────────────────────────────────────────────────────
@@ -171,35 +169,30 @@ async fn legacy_post_profile(
         .unwrap_or_else(|| "member".to_owned());
     let user_id = crate::crypto::random_token();
     let membership_id = crate::crypto::random_token();
-    let won = crate::db::invite::mark_used(&db, &invite_id).await?;
-    if !won {
-        return redirect("/join");
-    }
-    membership_db::insert_user(&db, &user_id).await?;
-    membership_db::insert_membership(
-        &db,
-        &membership_id,
-        &community_id,
-        &user_id,
-        &grants_role,
-        &display_name,
-    )
-    .await?;
-    crate::db::invite::assign_used_membership(&db, &invite_id, &membership_id).await?;
     let session_secret = crate::crypto::random_token();
     let session_hmac = crate::crypto::hmac_hex(&pepper, &session_secret);
     let session_id = crate::crypto::random_token();
-    crate::db::session::insert(&db, &session_id, &user_id, &session_hmac).await?;
-    let _ = audit::write_legacy(
+    if let Err(error) = crate::db::invite::redeem_required(
         &db,
         rid,
-        Some(&community_id),
-        Some(&membership_id),
-        Some(&invite_id),
-        audit::LegacyAuditAction::InviteCodeRedeemed,
-        audit::LegacyAuditMetadata::None,
+        &invite_id,
+        &community_id,
+        &grants_role,
+        &user_id,
+        &membership_id,
+        &display_name,
+        &session_id,
+        &session_hmac,
     )
-    .await;
+    .await
+    {
+        if !crate::db::invite::claim_is_still_eligible(&db, &invite_id, &community_id, &grants_role)
+            .await?
+        {
+            return redirect("/join");
+        }
+        return Err(error);
+    }
     let cookie_domain = env
         .var("SESSION_COOKIE_DOMAIN")
         .ok()

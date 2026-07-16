@@ -6,6 +6,12 @@ DROP TABLE IF EXISTS proof_audits;
 DROP TABLE IF EXISTS proof_dependents;
 DROP TABLE IF EXISTS audit_change_assertions;
 DROP TABLE IF EXISTS proof_items;
+DROP TABLE IF EXISTS proof_flow_audits;
+DROP TABLE IF EXISTS proof_flow_sessions;
+DROP TABLE IF EXISTS proof_flow_links;
+DROP TABLE IF EXISTS proof_flow_memberships;
+DROP TABLE IF EXISTS proof_flow_users;
+DROP TABLE IF EXISTS proof_flow_claims;
 
 CREATE TABLE proof_items (
     id         TEXT PRIMARY KEY,
@@ -33,4 +39,38 @@ CREATE TABLE proof_audits (
     id         TEXT PRIMARY KEY,
     case_name  TEXT NOT NULL UNIQUE,
     outcome    TEXT NOT NULL CHECK (outcome = 'ok')
+) STRICT;
+
+CREATE TABLE proof_flow_claims (
+    flow   TEXT PRIMARY KEY,
+    winner TEXT
+) STRICT;
+
+CREATE TABLE proof_flow_users (
+    id   TEXT PRIMARY KEY,
+    flow TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE proof_flow_memberships (
+    id      TEXT PRIMARY KEY,
+    flow    TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES proof_flow_users(id)
+) STRICT;
+
+CREATE TABLE proof_flow_sessions (
+    id      TEXT PRIMARY KEY,
+    flow    TEXT NOT NULL,
+    user_id TEXT
+) STRICT;
+
+CREATE TABLE proof_flow_links (
+    id            TEXT PRIMARY KEY,
+    flow          TEXT NOT NULL,
+    membership_id TEXT NOT NULL REFERENCES proof_flow_memberships(id)
+) STRICT;
+
+CREATE TABLE proof_flow_audits (
+    id      TEXT PRIMARY KEY,
+    flow    TEXT NOT NULL UNIQUE,
+    outcome TEXT NOT NULL CHECK(outcome = 'ok')
 ) STRICT;

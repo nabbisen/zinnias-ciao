@@ -6,6 +6,7 @@
 use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::db::now_utc;
 use worker::{D1Database, Result};
+use zinnias_ciao_contracts::SESSION_TTL_SECONDS;
 
 pub struct InviteRow {
     pub id: String,
@@ -79,6 +80,32 @@ pub async fn find_by_id(db: &D1Database, invite_id: &str) -> Result<Option<Invit
     }))
 }
 
+pub async fn claim_is_still_eligible(
+    db: &D1Database,
+    invite_id: &str,
+    community_id: &str,
+    grants_role: &str,
+) -> Result<bool> {
+    let now = now_utc();
+    let row = db
+        .prepare(
+            "SELECT 1 AS eligible FROM invite_codes i \
+             JOIN communities c ON c.id=i.community_id \
+             WHERE i.id=?1 AND i.community_id=?2 AND i.grants_role=?3 \
+               AND i.used_at IS NULL AND i.revoked_at IS NULL AND i.expires_at>?4 \
+               AND c.is_active=1 LIMIT 1",
+        )
+        .bind(&[
+            invite_id.into(),
+            community_id.into(),
+            grants_role.into(),
+            now.as_str().into(),
+        ])?
+        .first::<serde_json::Value>(None)
+        .await?;
+    Ok(row.is_some())
+}
+
 /// Atomically mark an invite used, but only if it is still valid (unused,
 /// unrevoked, unexpired). Returns `true` if THIS call performed the transition
 /// (changed exactly one row), `false` if the invite was already used/revoked/
@@ -104,6 +131,110 @@ pub async fn mark_used(db: &D1Database, invite_id: &str) -> Result<bool> {
         .and_then(|m| m.changes)
         .unwrap_or(0);
     Ok(changed == 1)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn redeem_required(
+    db: &D1Database,
+    request_id: &str,
+    invite_id: &str,
+    community_id: &str,
+    grants_role: &str,
+    user_id: &str,
+    membership_id: &str,
+    display_name: &str,
+    session_id: &str,
+    session_hmac: &str,
+) -> Result<()> {
+    let now = now_utc();
+    let session_expires_at = crate::db::add_seconds_to_now(SESSION_TTL_SECONDS);
+    let claim = db
+        .prepare(
+            "UPDATE invite_codes SET used_at=?1 \
+             WHERE id=?2 AND community_id=?3 AND grants_role=?4 \
+               AND used_at IS NULL AND revoked_at IS NULL AND expires_at>?1 \
+               AND EXISTS (SELECT 1 FROM communities c \
+                           WHERE c.id=?3 AND c.is_active=1)",
+        )
+        .bind(&[
+            now.as_str().into(),
+            invite_id.into(),
+            community_id.into(),
+            grants_role.into(),
+        ])?;
+    let user = db
+        .prepare("INSERT INTO users (id, created_at) VALUES (?1, ?2)")
+        .bind(&[user_id.into(), now.as_str().into()])?;
+    let membership = db
+        .prepare(
+            "INSERT INTO community_memberships \
+             (id, community_id, user_id, role, display_name, joined_at) \
+             SELECT ?1, i.community_id, ?2, i.grants_role, ?3, ?4 \
+             FROM invite_codes i \
+             WHERE i.id=?5 AND i.community_id=?6 AND i.grants_role=?7 \
+               AND i.used_at=?4 AND i.revoked_at IS NULL \
+               AND EXISTS (SELECT 1 FROM users u WHERE u.id=?2)",
+        )
+        .bind(&[
+            membership_id.into(),
+            user_id.into(),
+            display_name.into(),
+            now.as_str().into(),
+            invite_id.into(),
+            community_id.into(),
+            grants_role.into(),
+        ])?;
+    let link = db
+        .prepare(
+            "UPDATE invite_codes SET used_by_membership_id=?1 \
+             WHERE id=?2 AND community_id=?3 AND used_at=?4 \
+               AND used_by_membership_id IS NULL \
+               AND EXISTS (SELECT 1 FROM community_memberships m \
+                           WHERE m.id=?1 AND m.community_id=?3 \
+                             AND m.user_id=?5 AND m.removed_at IS NULL)",
+        )
+        .bind(&[
+            membership_id.into(),
+            invite_id.into(),
+            community_id.into(),
+            now.as_str().into(),
+            user_id.into(),
+        ])?;
+    let session = db
+        .prepare(
+            "INSERT INTO sessions \
+             (id, user_id, session_hmac, created_at, expires_at, last_seen_at) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4 \
+             WHERE EXISTS (SELECT 1 FROM community_memberships m \
+                           WHERE m.id=?6 AND m.community_id=?7 \
+                             AND m.user_id=?2 AND m.removed_at IS NULL)",
+        )
+        .bind(&[
+            session_id.into(),
+            user_id.into(),
+            session_hmac.into(),
+            now.as_str().into(),
+            session_expires_at.as_str().into(),
+            membership_id.into(),
+            community_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(membership_id),
+        Some(invite_id),
+        AuditAction::InviteCodeRedeemed,
+        AuditMetadata::None,
+    )?;
+    audit::execute_asserted_required(
+        db,
+        claim,
+        vec![user, membership, link, session],
+        vec![],
+        &record,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Link a claimed invite to the membership created by the winning join flow.
