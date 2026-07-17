@@ -506,7 +506,7 @@ try {
       replayDidNotAddAudit: auditCount() === 1,
       tokenStoresUpdatedResult: firstReplayRow.result_ref === 'display_name_updated',
       metadataMinimal: auditMetadataRows().every((metadata) => (
-        metadata.includes('"changed":["display_name"]') &&
+        metadata.includes('"changed_fields":["display_name"]') &&
         !metadata.includes('membership_id') &&
         !metadata.includes('community_id')
       )),

@@ -341,6 +341,7 @@ async function collect(cdp) {
         hrefs: links.map((link) => link.href),
         links,
         labels: [...document.querySelectorAll('[aria-label]')].map((el) => el.getAttribute('aria-label')),
+        hasExportButton: Boolean(document.querySelector('[data-calendar-matrix-export-button]')),
         noPageHorizontalScroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
         matrixScrollerHasHorizontalScroll: scroller ? scroller.scrollWidth > scroller.clientWidth : false,
       };
@@ -434,7 +435,7 @@ try {
     checks: {
       adminCanOpenMatrix: adminMatrix.path === `/c/${primaryCommunityId}/communities?month=2026-07&view=matrix`,
       includesModeSwitcher: adminMatrix.hrefs.includes(`/c/${primaryCommunityId}/communities?month=2026-07`),
-      noCsvOrExport: !adminMatrix.text.toLowerCase().includes('csv') && !adminMatrix.text.includes('エクスポート'),
+      hasAdminCsvExport: adminMatrix.hasExportButton,
       pageDoesNotOverflow: adminMatrix.noPageHorizontalScroll,
     },
   });
@@ -500,7 +501,7 @@ try {
       'cancelled occurrence marker',
       'mobile 390px viewport with 200% text scaling',
       'matrix-only horizontal scrolling',
-      'CSV/export absence from rendered matrix',
+      'admin-only CSV export contract added by RFC-068',
     ],
     results,
     passed: results.every((result) => result.passed),

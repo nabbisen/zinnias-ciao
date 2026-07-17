@@ -403,7 +403,7 @@ try {
     observed: nonAdminDenied,
     checks: {
       noHorizontalScroll: nonAdminDenied.noHorizontalScroll,
-      deniedWithGenericCopy: nonAdminDenied.text.includes('問題が発生しました'),
+      deniedWithGenericCopy: nonAdminDenied.text.includes('見つかりませんでした'),
       noPromoteLinks: !nonAdminDenied.hrefs.some((href) => href.includes('/promote')),
       noDemoteLinks: !nonAdminDenied.hrefs.some((href) => href.includes('/demote')),
     },
@@ -500,7 +500,7 @@ try {
     observed: memberOnlyDenied,
     checks: {
       noHorizontalScroll: memberOnlyDenied.noHorizontalScroll,
-      deniedWithGenericCopy: memberOnlyDenied.text.includes('問題が発生しました'),
+      deniedWithGenericCopy: memberOnlyDenied.text.includes('見つかりませんでした'),
       noPromoteLinks: !memberOnlyDenied.hrefs.some((href) => href.includes('/promote')),
       noDemoteLinks: !memberOnlyDenied.hrefs.some((href) => href.includes('/demote')),
     },

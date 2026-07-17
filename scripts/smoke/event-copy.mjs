@@ -409,7 +409,7 @@ function eventDayIds(eventId) {
 
 function latestCopyAudit(eventId) {
   return query(
-    `SELECT metadata_json FROM audit_log WHERE target_kind='event' AND target_id='${esc(eventId)}' AND action='created' ORDER BY created_at DESC LIMIT 1`,
+    `SELECT metadata_json FROM audit_log WHERE target_kind='event' AND target_id='${esc(eventId)}' AND action='event.created' ORDER BY created_at DESC LIMIT 1`,
   )[0]?.metadata_json ?? '';
 }
 
@@ -564,8 +564,8 @@ try {
       noNotesCopied: copiedNoteCount === 0,
       noExceptionsCopied: copiedExceptionCount === 0,
       auditMetadataMinimal:
-        auditMetadata.includes('"copy_source_event_id":"evt_rfc066_single"') &&
-        auditMetadata.includes('"copy_mode":"event_copy"') &&
+        auditMetadata.includes('"source_event_id":"evt_rfc066_single"') &&
+        auditMetadata.includes('"creation_mode":"event_copy"') &&
         !auditMetadata.includes('description') &&
         !auditMetadata.includes('Do not copy this note'),
       noHorizontalScroll: afterSingleCopy.noHorizontalScroll,

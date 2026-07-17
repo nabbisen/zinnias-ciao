@@ -29,6 +29,9 @@ const materializeEventId = 'evt_rfc065_materialize';
 const materializeDayId = 'day_rfc065_materialize_base';
 const materializeSeriesId = 'ser_rfc065_materialize';
 const uiCreatedTitle = 'RFC065 UI Open Recurrence';
+const uiCreatedDayDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .slice(0, 10);
 const materializeTitle = 'RFC065 Rolling Materialization';
 
 assertLocalOnly();
@@ -345,7 +348,7 @@ async function fillCreateRecurrenceForm(cdp) {
         el.dispatchEvent(new Event('change', { bubbles: true }));
       };
       set('title', ${JSON.stringify(uiCreatedTitle)});
-      set('day_date', '2026-07-16');
+      set('day_date', ${JSON.stringify(uiCreatedDayDate)});
       set('starts_at', '09:00');
       set('ends_at', '10:00');
       set('location', 'Smoke room');
