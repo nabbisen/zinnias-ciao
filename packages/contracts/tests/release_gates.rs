@@ -2153,10 +2153,13 @@ const RFC079_ATOMICITY_WORKER_SRC: &str =
 const RFC079_ATOMICITY_FIXTURE_SRC: &str =
     include_str!("../../../workers/ssr/tests/fixtures/audit_atomicity.sql");
 const RFC079_BOUNDARY_RUNNER_SRC: &str = include_str!("../../../scripts/test-audit-boundaries.mjs");
+const RFC079_CLASS_A_FAILURE_RUNNER_SRC: &str =
+    include_str!("../../../scripts/test-audit-class-a-failures.mjs");
 const RFC079_BOUNDARY_WORKER_SRC: &str =
     include_str!("../../../workers/ssr/tests/fixtures/audit-boundaries-worker.mjs");
 const RFC079_BOUNDARY_FIXTURE_SRC: &str =
     include_str!("../../../workers/ssr/tests/fixtures/audit_response_boundaries.sql");
+const RFC079_COMMUNITY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/community.rs");
 const PACKAGE_JSON_SRC: &str = include_str!("../../../package.json");
 
 #[derive(Default)]
@@ -2274,6 +2277,222 @@ fn audit_action_owners<'a>(sources: &'a [(String, String)], variant: &str) -> Ve
         })
         .map(|(path, _)| path.as_str())
         .collect()
+}
+
+#[test]
+fn rfc079_class_a_failure_telemetry_is_centrally_and_exhaustively_owned() {
+    let production_core = RFC079_AUDIT_CORE_SRC
+        .split("#[cfg(test)]\nmod tests")
+        .next()
+        .expect("audit.rs production source must precede its test module");
+    assert_eq!(
+        production_core
+            .matches("audit.required_batch_failed")
+            .count(),
+        1,
+        "audit.rs must own exactly one production Class A event literal"
+    );
+    for required in [
+        "RequiredBatch",
+        "\"class_a\"",
+        "INVALID_REQUEST_ID",
+        "\"invalid_request_id\"",
+        "safe_event_request_id",
+        "required_record_with_sink",
+        "owned_record_with_sink",
+        "emit_failure_with",
+        "log_class_a_failure",
+    ] {
+        assert!(
+            production_core.contains(required),
+            "Class A failure owner is missing {required}"
+        );
+    }
+
+    let classification = compact_brace_block(production_core, "pub(crate) const fn is_class_a");
+    let class_a_actions = [
+        "CommunityCreated",
+        "MembershipCreatedFirstAdmin",
+        "MembershipDisplayNameUpdated",
+        "InviteCodeGenerated",
+        "InviteCodeRevoked",
+        "InviteCodeRedeemed",
+        "MembershipRelinkCodeCreated",
+        "MembershipRelinkRedeemed",
+        "OperatorRecoveryAdminRelinkCreated",
+        "MembershipRemoved",
+        "MembershipPromotedToAdmin",
+        "MembershipDemotedToMember",
+        "EventCreated",
+        "EventEdited",
+        "EventCancelled",
+        "EventOccurrenceCancelled",
+        "AttendanceAdminOverride",
+        "AttendanceAdminSetAttended",
+        "EventNoteAdminHidden",
+        "CalendarFeedTokenGenerated",
+        "CalendarFeedTokenRevoked",
+        "EventTemplateCreated",
+        "EventTemplateDeleted",
+    ];
+    for action in class_a_actions {
+        assert!(
+            classification.contains(&format!("Self::{action}")),
+            "Class A classification lost {action}"
+        );
+    }
+    for action in [
+        "CommunityExportAuthorized",
+        "CalendarMatrixCsvExportRequested",
+        "SessionLogout",
+    ] {
+        assert!(
+            !classification.contains(&format!("Self::{action}")),
+            "Class B/C action {action} must not classify as Class A"
+        );
+    }
+
+    let executors = [
+        "execute_required(",
+        "execute_required_bounded(",
+        "execute_required_attendance_override(",
+        "execute_required_batch(",
+        "execute_required_tail(",
+        "execute_asserted_required(",
+    ];
+    assert_eq!(
+        production_core
+            .matches("pub(crate) async fn execute_")
+            .count(),
+        executors.len(),
+        "a new central audit executor must be added to the exhaustive failure-ownership gate"
+    );
+    for executor in executors {
+        let block = compact_brace_block(production_core, executor);
+        assert!(
+            block.contains("log_class_a_failure"),
+            "{executor} must route failures through the central Class A owner"
+        );
+        assert!(
+            block.contains("AuditFailureCategory::Construction")
+                && block.contains("AuditFailureCategory::Storage")
+                && block.contains("db.batch"),
+            "{executor} must cover setup, D1, and post-D1 failure phases"
+        );
+        assert!(
+            !block.contains("?;"),
+            "{executor} contains a bare fallible escape that can bypass telemetry"
+        );
+    }
+
+    let class_b = compact_brace_block(production_core, "pub(crate) async fn write_pre_disclosure");
+    let class_c = compact_brace_block(
+        production_core,
+        "pub(crate) async fn write_logout_secondary",
+    );
+    assert!(
+        class_b.contains("owned_record_with_sink")
+            && class_b.contains("AuditFailureEvent::PreDisclosure")
+            && !class_b.contains("RequiredBatch"),
+        "Class B must retain exclusive PreDisclosure failure ownership"
+    );
+    assert!(
+        class_c.contains("owned_record_with_sink")
+            && class_c.contains("AuditFailureEvent::SecondaryWrite")
+            && !class_c.contains("RequiredBatch"),
+        "Class C must retain exclusive SecondaryWrite failure ownership"
+    );
+
+    let formatter = compact_brace_block(production_core, "fn format_failure_event");
+    assert!(
+        formatter.contains("safe_event_request_id(request_id)")
+            && !formatter.contains("metadata")
+            && !formatter.contains("community_id")
+            && !formatter.contains("actor_membership_id")
+            && !formatter.contains("target_id")
+            && !formatter.contains("error")
+            && !formatter.contains("sql")
+            && !formatter.contains("bind"),
+        "failure formatter must use the safe request-ID boundary and only bounded fields"
+    );
+
+    let source_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../workers/ssr/src")
+        .canonicalize()
+        .expect("workers/ssr/src must exist for the Class A ownership scan");
+    let mut sources = Vec::new();
+    collect_rust_sources(&source_root, &source_root, &mut sources);
+    let outside_owners = sources
+        .iter()
+        .filter(|(path, source)| {
+            path != "audit.rs"
+                && (source.contains("audit.required_batch_failed")
+                    || source.contains("AuditFailureEvent::RequiredBatch")
+                    || source.contains("log_class_a_failure"))
+        })
+        .map(|(path, _)| path.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        outside_owners.is_empty(),
+        "Class A failure telemetry escaped audit.rs: {outside_owners:?}"
+    );
+
+    let community = compact_source(RFC079_COMMUNITY_DB_SRC);
+    assert!(
+        community.contains("letprimary_audit=audit::required_record(")
+            && community.contains("AuditAction::CommunityCreated")
+            && community.contains("letmembership_audit=audit::required_record(")
+            && community.contains("AuditAction::MembershipCreatedFirstAdmin")
+            && community.contains("&primary_audit,&[membership_audit]"),
+        "community creation must pin community.created as primary and membership.created_first_admin as additional"
+    );
+
+    let runner = compact_source(RFC079_CLASS_A_FAILURE_RUNNER_SRC);
+    for required in [
+        "mkdtemp(",
+        "--persist-to",
+        "wrangler.toml",
+        "'dev'",
+        "'--local'",
+        "'127.0.0.1'",
+        "/c/${communityId}/admin/invites",
+        "/communities/new",
+        "/join/profile",
+        "audit.required_batch_failed",
+        "DROPTRIGGERIFEXISTS",
+        "awaitrm(tempRoot,{recursive:true,force:true})",
+    ] {
+        assert!(
+            runner.contains(required),
+            "compiled Class A proof runner lost containment or route evidence: {required}"
+        );
+    }
+    for forbidden in [
+        "--remote",
+        "audit-atomicity-worker.mjs",
+        "audit-assertion-worker.mjs",
+        "writeFile(",
+        "copyFile(",
+    ] {
+        if forbidden == "--remote" {
+            assert_eq!(
+                RFC079_CLASS_A_FAILURE_RUNNER_SRC.matches(forbidden).count(),
+                1,
+                "the only --remote occurrence must remain the refusal guard"
+            );
+        } else {
+            assert!(
+                !RFC079_CLASS_A_FAILURE_RUNNER_SRC.contains(forbidden),
+                "compiled Class A proof must not create or reuse a synthetic Worker: {forbidden}"
+            );
+        }
+    }
+    assert!(
+        PACKAGE_JSON_SRC.contains(
+            "\"test:audit-class-a-failures\": \"node scripts/test-audit-class-a-failures.mjs\""
+        ),
+        "package.json must expose the domain-named Class A proof command"
+    );
 }
 
 #[test]
@@ -2574,7 +2793,10 @@ fn rfc079_package3_simple_required_batches_are_pinned() {
             && RFC079_AUDIT_CORE_SRC.contains("WHERE changes() = 1")
             && RFC079_AUDIT_CORE_SRC.contains("pub(crate) async fn execute_required")
             && RFC079_AUDIT_CORE_SRC
-                .contains("batch(vec![mutation, audit.statement_after_one_change(db)?])")
+                .contains("let audit_statement = match audit.statement_after_one_change(db)")
+            && RFC079_AUDIT_CORE_SRC.contains("db.batch(vec![mutation, audit_statement])")
+            && RFC079_AUDIT_CORE_SRC
+                .contains("log_class_a_failure(audit, AuditFailureCategory::Construction)")
             && RFC079_AUDIT_CORE_SRC.contains("(0, 0) => Ok(false)")
             && RFC079_AUDIT_CORE_SRC.contains("(1, 1)"),
         "Package 3 conditional required-audit primitive must keep mutation/audit adjacency and zero-or-one cardinality"
@@ -2760,7 +2982,8 @@ fn rfc079_package5_one_winner_batches_and_correlation_are_pinned() {
         "INSERT INTO audit_change_assertions (operation_id, changed_count)",
         "VALUES (?1, changes())",
         "UPDATE audit_change_assertions SET changed_count=changes()",
-        "statements.push(audit.statement(db)?)",
+        "let audit_statement = match audit.statement(db)",
+        "statements.push(audit_statement)",
         "DELETE FROM audit_change_assertions WHERE operation_id=?1",
         "assertion_changes,",
         "cleanup_changes,",

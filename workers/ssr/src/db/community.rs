@@ -70,24 +70,28 @@ pub async fn create_with_first_admin(
             now.as_str().into(),
         ])?;
 
-    let audits = [
-        audit::required_record(
-            request_id,
-            Some(community_id),
-            Some(first_admin_membership_id),
-            Some(community_id),
-            AuditAction::CommunityCreated,
-            AuditMetadata::None,
-        )?,
-        audit::required_record(
-            request_id,
-            Some(community_id),
-            Some(first_admin_membership_id),
-            Some(first_admin_membership_id),
-            AuditAction::MembershipCreatedFirstAdmin,
-            AuditMetadata::None,
-        )?,
-    ];
-    audit::execute_required_batch(db, vec![community_stmt, membership_stmt], &audits).await?;
+    let primary_audit = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(first_admin_membership_id),
+        Some(community_id),
+        AuditAction::CommunityCreated,
+        AuditMetadata::None,
+    )?;
+    let membership_audit = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(first_admin_membership_id),
+        Some(first_admin_membership_id),
+        AuditAction::MembershipCreatedFirstAdmin,
+        AuditMetadata::None,
+    )?;
+    audit::execute_required_batch(
+        db,
+        vec![community_stmt, membership_stmt],
+        &primary_audit,
+        &[membership_audit],
+    )
+    .await?;
     Ok(())
 }

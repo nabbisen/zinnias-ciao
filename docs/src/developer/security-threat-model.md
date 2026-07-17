@@ -87,7 +87,7 @@ Status:
 | Invite/relink brute force | Failed code redemption is rate-limited and returns generic errors; plaintext codes are not logged. | RFC-012, RFC-024, RFC-041, RFC-063, smoke scripts and release gates. | KV failure behavior should be reviewed before production pilot. |
 | Session theft impact | Session cookies are HttpOnly, Secure, SameSite=Strict, host-only by default, and revocable. | RFC-038, `session.rs`, release checklist. | Account-wide session management UI is not implemented. |
 | Cache privacy leak | Authenticated HTML is not stored in service-worker cache; offline fallback does not expose stale private content. | RFC-042, RFC-055, release checklist offline gates. | Browser-specific cache behavior should remain part of staging smoke. |
-| Audit loss or leakage | RFC-079 uses a closed 26-action model, typed action-specific metadata, recursive sanitation, atomic Class A batches, fail-before-disclosure Class B writes, and identifier-free safety-first logout audit. Bearer secrets, plaintext codes/HMACs, session IDs, export contents, raw subject IDs in Worker events, and unnecessary personal labels are excluded. | RFC-014, RFC-052, RFC-079, audit source gates, local real-D1 rollback/concurrency/boundary proofs. | Exact-candidate hosted negative tests and persistent incident delivery remain required by RFC-050; new actions must be classified and added to the closed inventory. |
+| Audit loss or leakage | RFC-079 uses a closed 26-action model, typed action-specific metadata, recursive sanitation, atomic Class A batches, bounded exactly-once Class A failure events, fail-before-disclosure Class B writes, and identifier-free safety-first logout audit. Bearer secrets, plaintext codes/HMACs, session IDs, export contents, raw subject IDs in Worker events, and unnecessary personal labels are excluded. | RFC-014, RFC-052, RFC-079, audit source gates, local compiled-SSR/D1 rollback, concurrency, and boundary proofs. | Exact-candidate hosted negative tests and persistent incident delivery remain required by RFC-050; new actions must be classified and added to the closed inventory. |
 | Deployment/config leakage | Environment-specific D1/KV IDs and secrets live in ignored local config or Cloudflare secrets, not committed shared config. | Deployment docs, staging runtime prototype docs, `.gitignore` policy. | Developers must still avoid committing copied local config files. |
 | Staging exposure | Hosted staging is public while deployed; it uses non-production data, separate resources, and explicit close-down steps. | Staging runtime prototype docs and deployment docs. | Staging close-down and resource cleanup remain operator tasks. |
 
@@ -134,6 +134,9 @@ Every new or materially changed form should be reviewed against this baseline.
 - Audit security-relevant writes unless the RFC explicitly explains why audit
   is unnecessary.
 - Class A business mutations and required audit evidence must commit atomically.
+- Class A construction, D1, or impossible post-batch failure must emit exactly
+  one bounded `audit.required_batch_failed` event from the central audit module;
+  rejected request IDs are replaced wholesale with `invalid_request_id`.
 - Class B must persist audit evidence before protected disclosure or
   acknowledgement and return generic `503` on failure.
 - Logout is the only secondary-audit exception: revoke first, await the audit

@@ -246,9 +246,12 @@ RFC-079 structured audit/Worker events must also exclude raw actor, community,
 target, membership, and session identifiers; metadata JSON; SQL/binds; D1 error
 bodies; exported content; and user-authored text. Expected bounded events are
 `audit.write`, `audit.pre_disclosure_failed`,
-`audit.secondary_write_failed`, and `worker.request_failed`. Use request ID,
-canonical action/outcome or closed failure category, and route class for
-correlation. Do not restore raw `Debug` formatting for unhandled Worker errors.
+`audit.required_batch_failed`, `audit.secondary_write_failed`, and
+`worker.request_failed`. Use request ID, canonical action/outcome or closed
+failure category, and route class for correlation. A Class A failure event is
+one operation-level incident; for community creation its stable primary action
+is `community.created`, not the later membership audit. Do not restore raw
+`Debug` formatting for unhandled Worker errors.
 
 `wrangler tail` is diagnostic only. Persistent incident evidence requires an
 owner-approved sink, documented retention/access, canary delivery, and RFC-050

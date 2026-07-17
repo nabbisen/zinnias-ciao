@@ -12,6 +12,7 @@ use worker::{
 
 const MAX_ID_BYTES: usize = 128;
 const MAX_REQUEST_ID_BYTES: usize = 96;
+const INVALID_REQUEST_ID: &str = "invalid_request_id";
 const MAX_METADATA_DEPTH: usize = 8;
 const MAX_METADATA_NODES: usize = 128;
 const MAX_METADATA_BYTES: usize = 2_048;
@@ -109,6 +110,35 @@ impl AuditAction {
             Self::CalendarMatrixCsvExportRequested => "calendar_matrix_csv.export_requested",
             Self::SessionLogout => "session.logout",
         }
+    }
+
+    pub(crate) const fn is_class_a(self) -> bool {
+        matches!(
+            self,
+            Self::CommunityCreated
+                | Self::MembershipCreatedFirstAdmin
+                | Self::MembershipDisplayNameUpdated
+                | Self::InviteCodeGenerated
+                | Self::InviteCodeRevoked
+                | Self::InviteCodeRedeemed
+                | Self::MembershipRelinkCodeCreated
+                | Self::MembershipRelinkRedeemed
+                | Self::OperatorRecoveryAdminRelinkCreated
+                | Self::MembershipRemoved
+                | Self::MembershipPromotedToAdmin
+                | Self::MembershipDemotedToMember
+                | Self::EventCreated
+                | Self::EventEdited
+                | Self::EventCancelled
+                | Self::EventOccurrenceCancelled
+                | Self::AttendanceAdminOverride
+                | Self::AttendanceAdminSetAttended
+                | Self::EventNoteAdminHidden
+                | Self::CalendarFeedTokenGenerated
+                | Self::CalendarFeedTokenRevoked
+                | Self::EventTemplateCreated
+                | Self::EventTemplateDeleted
+        )
     }
 
     const fn target_kind(self) -> &'static str {
@@ -298,6 +328,10 @@ impl AuditRecord {
         action: AuditAction,
         metadata: AuditMetadata,
     ) -> std::result::Result<Self, AuditBuildError> {
+        // Reject untrusted request IDs before invoking the runtime RNG. This
+        // also keeps construction-failure tests on the production path without
+        // requiring a WASM host.
+        validate_request_id(request_id)?;
         Self::build(
             format!("aud_{}", &random_token()[..24]),
             now_utc(),
@@ -473,6 +507,63 @@ pub(crate) fn required_record(
     action: AuditAction,
     metadata: AuditMetadata,
 ) -> Result<AuditRecord> {
+    let mut sink = console_failure_sink;
+    required_record_with_sink(
+        request_id,
+        community_id,
+        actor_membership_id,
+        target_id,
+        action,
+        metadata,
+        &mut sink,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn required_record_with_sink(
+    request_id: &str,
+    community_id: Option<&str>,
+    actor_membership_id: Option<&str>,
+    target_id: Option<&str>,
+    action: AuditAction,
+    metadata: AuditMetadata,
+    sink: &mut dyn FnMut(&str),
+) -> Result<AuditRecord> {
+    if !action.is_class_a() {
+        emit_failure_with(
+            sink,
+            request_id,
+            action,
+            AuditFailureEvent::RequiredBatch,
+            AuditFailureCategory::Construction,
+        );
+        return Err(worker::Error::RustError(
+            "non-Class-A required audit rejected".to_owned(),
+        ));
+    }
+    owned_record_with_sink(
+        request_id,
+        community_id,
+        actor_membership_id,
+        target_id,
+        action,
+        metadata,
+        AuditFailureEvent::RequiredBatch,
+        sink,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn owned_record_with_sink(
+    request_id: &str,
+    community_id: Option<&str>,
+    actor_membership_id: Option<&str>,
+    target_id: Option<&str>,
+    action: AuditAction,
+    metadata: AuditMetadata,
+    event: AuditFailureEvent,
+    sink: &mut dyn FnMut(&str),
+) -> Result<AuditRecord> {
     AuditRecord::new(
         request_id,
         community_id,
@@ -482,6 +573,13 @@ pub(crate) fn required_record(
         metadata,
     )
     .map_err(|error| {
+        emit_failure_with(
+            sink,
+            request_id,
+            action,
+            event,
+            AuditFailureCategory::Construction,
+        );
         worker::Error::RustError(format!("audit construction rejected: {}", error.category()))
     })
 }
@@ -491,9 +589,20 @@ pub(crate) async fn execute_required(
     mutation: D1PreparedStatement,
     audit: &AuditRecord,
 ) -> Result<bool> {
-    let results = db
-        .batch(vec![mutation, audit.statement_after_one_change(db)?])
-        .await?;
+    let audit_statement = match audit.statement_after_one_change(db) {
+        Ok(statement) => statement,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Construction);
+            return Err(error);
+        }
+    };
+    let results = match db.batch(vec![mutation, audit_statement]).await {
+        Ok(results) => results,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Storage);
+            return Err(error);
+        }
+    };
     let mutation_changes = result_changes(&results, 0);
     let audit_changes = result_changes(&results, 1);
     match (mutation_changes, audit_changes) {
@@ -502,9 +611,12 @@ pub(crate) async fn execute_required(
             audit.log_success();
             Ok(true)
         }
-        _ => Err(worker::Error::RustError(format!(
-            "required audit cardinality mismatch: mutation={mutation_changes} audit={audit_changes}"
-        ))),
+        _ => {
+            log_class_a_failure(audit, AuditFailureCategory::Storage);
+            Err(worker::Error::RustError(format!(
+                "required audit cardinality mismatch: mutation={mutation_changes} audit={audit_changes}"
+            )))
+        }
     }
 }
 
@@ -515,16 +627,25 @@ pub(crate) async fn execute_required_bounded(
     max_changes: u32,
 ) -> Result<usize> {
     if max_changes == 0 || max_changes > MAX_CHANGED_COUNT {
+        log_class_a_failure(audit, AuditFailureCategory::Construction);
         return Err(worker::Error::RustError(
             "required audit change bound rejected".to_owned(),
         ));
     }
-    let results = db
-        .batch(vec![
-            mutation,
-            audit.statement_after_bounded_changes(db, max_changes)?,
-        ])
-        .await?;
+    let audit_statement = match audit.statement_after_bounded_changes(db, max_changes) {
+        Ok(statement) => statement,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Construction);
+            return Err(error);
+        }
+    };
+    let results = match db.batch(vec![mutation, audit_statement]).await {
+        Ok(results) => results,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Storage);
+            return Err(error);
+        }
+    };
     let mutation_changes = result_changes(&results, 0);
     let audit_changes = result_changes(&results, 1);
     if mutation_changes == 0 && audit_changes == 0 {
@@ -534,6 +655,7 @@ pub(crate) async fn execute_required_bounded(
         audit.log_success();
         return Ok(mutation_changes);
     }
+    log_class_a_failure(audit, AuditFailureCategory::Storage);
     Err(worker::Error::RustError(format!(
         "required bounded audit cardinality mismatch: mutation={mutation_changes} audit={audit_changes}"
     )))
@@ -546,16 +668,25 @@ pub(crate) async fn execute_required_attendance_override(
     max_changes: u32,
 ) -> Result<usize> {
     if max_changes == 0 || max_changes > MAX_CHANGED_COUNT {
+        log_class_a_failure(audit, AuditFailureCategory::Construction);
         return Err(worker::Error::RustError(
             "attendance override change bound rejected".to_owned(),
         ));
     }
-    let results = db
-        .batch(vec![
-            mutation,
-            audit.attendance_statement_after_bounded_changes(db, max_changes)?,
-        ])
-        .await?;
+    let audit_statement = match audit.attendance_statement_after_bounded_changes(db, max_changes) {
+        Ok(statement) => statement,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Construction);
+            return Err(error);
+        }
+    };
+    let results = match db.batch(vec![mutation, audit_statement]).await {
+        Ok(results) => results,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Storage);
+            return Err(error);
+        }
+    };
     let mutation_changes = result_changes(&results, 0);
     let audit_changes = result_changes(&results, 1);
     if mutation_changes == 0 && audit_changes == 0 {
@@ -565,6 +696,7 @@ pub(crate) async fn execute_required_attendance_override(
         audit.log_success();
         return Ok(mutation_changes);
     }
+    log_class_a_failure(audit, AuditFailureCategory::Storage);
     Err(worker::Error::RustError(format!(
         "attendance audit cardinality mismatch: mutation={mutation_changes} audit={audit_changes}"
     )))
@@ -573,13 +705,45 @@ pub(crate) async fn execute_required_attendance_override(
 pub(crate) async fn execute_required_batch(
     db: &D1Database,
     mut business: Vec<D1PreparedStatement>,
-    audits: &[AuditRecord],
+    primary: &AuditRecord,
+    additional: &[AuditRecord],
 ) -> Result<Vec<D1Result>> {
-    for audit in audits {
-        business.push(audit.statement(db)?);
+    if !primary.action.is_class_a()
+        || additional
+            .iter()
+            .any(|audit| !audit.action.is_class_a() || audit.request_id != primary.request_id)
+    {
+        log_class_a_failure(primary, AuditFailureCategory::Construction);
+        return Err(worker::Error::RustError(
+            "required audit batch ownership rejected".to_owned(),
+        ));
     }
-    let results = db.batch(business).await?;
-    for audit in audits {
+    let primary_statement = match primary.statement(db) {
+        Ok(statement) => statement,
+        Err(error) => {
+            log_class_a_failure(primary, AuditFailureCategory::Construction);
+            return Err(error);
+        }
+    };
+    business.push(primary_statement);
+    for audit in additional {
+        match audit.statement(db) {
+            Ok(statement) => business.push(statement),
+            Err(error) => {
+                log_class_a_failure(primary, AuditFailureCategory::Construction);
+                return Err(error);
+            }
+        }
+    }
+    let results = match db.batch(business).await {
+        Ok(results) => results,
+        Err(error) => {
+            log_class_a_failure(primary, AuditFailureCategory::Storage);
+            return Err(error);
+        }
+    };
+    primary.log_success();
+    for audit in additional {
         audit.log_success();
     }
     Ok(results)
@@ -594,13 +758,27 @@ pub(crate) async fn execute_required_tail(
     audit: &AuditRecord,
 ) -> Result<bool> {
     if business.is_empty() {
+        log_class_a_failure(audit, AuditFailureCategory::Construction);
         return Err(worker::Error::RustError(
             "required audit business batch is empty".to_owned(),
         ));
     }
     let tail_index = business.len() - 1;
-    business.push(audit.statement_after_one_change(db)?);
-    let results = db.batch(business).await?;
+    let audit_statement = match audit.statement_after_one_change(db) {
+        Ok(statement) => statement,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Construction);
+            return Err(error);
+        }
+    };
+    business.push(audit_statement);
+    let results = match db.batch(business).await {
+        Ok(results) => results,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Storage);
+            return Err(error);
+        }
+    };
     let tail_changes = result_changes(&results, tail_index);
     let audit_changes = result_changes(&results, tail_index + 1);
     match (tail_changes, audit_changes) {
@@ -609,9 +787,12 @@ pub(crate) async fn execute_required_tail(
             audit.log_success();
             Ok(true)
         }
-        _ => Err(worker::Error::RustError(format!(
-            "required tail audit cardinality mismatch: mutation={tail_changes} audit={audit_changes}"
-        ))),
+        _ => {
+            log_class_a_failure(audit, AuditFailureCategory::Storage);
+            Err(worker::Error::RustError(format!(
+                "required tail audit cardinality mismatch: mutation={tail_changes} audit={audit_changes}"
+            )))
+        }
     }
 }
 
@@ -626,15 +807,29 @@ pub(crate) async fn execute_asserted_required(
     audit: &AuditRecord,
 ) -> Result<Vec<D1Result>> {
     let operation_id = format!("ast_{}", &random_token()[..22]);
-    let assertion = db
+    let assertion = match db
         .prepare(
             "INSERT INTO audit_change_assertions (operation_id, changed_count) \
              VALUES (?1, changes())",
         )
-        .bind(&[operation_id.as_str().into()])?;
-    let cleanup = db
+        .bind(&[operation_id.as_str().into()])
+    {
+        Ok(statement) => statement,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Construction);
+            return Err(error);
+        }
+    };
+    let cleanup = match db
         .prepare("DELETE FROM audit_change_assertions WHERE operation_id=?1")
-        .bind(&[operation_id.as_str().into()])?;
+        .bind(&[operation_id.as_str().into()])
+    {
+        Ok(statement) => statement,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Construction);
+            return Err(error);
+        }
+    };
 
     let mut statements = Vec::with_capacity(required.len() * 2 + optional.len() + 4);
     statements.push(claim);
@@ -643,21 +838,41 @@ pub(crate) async fn execute_asserted_required(
     for statement in required {
         statements.push(statement);
         verification_indices.push(statements.len());
-        statements.push(
-            db.prepare(
+        let verification = match db
+            .prepare(
                 "UPDATE audit_change_assertions SET changed_count=changes() \
                  WHERE operation_id=?1",
             )
-            .bind(&[operation_id.as_str().into()])?,
-        );
+            .bind(&[operation_id.as_str().into()])
+        {
+            Ok(statement) => statement,
+            Err(error) => {
+                log_class_a_failure(audit, AuditFailureCategory::Construction);
+                return Err(error);
+            }
+        };
+        statements.push(verification);
     }
     statements.extend(optional);
     let audit_index = statements.len();
-    statements.push(audit.statement(db)?);
+    let audit_statement = match audit.statement(db) {
+        Ok(statement) => statement,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Construction);
+            return Err(error);
+        }
+    };
+    statements.push(audit_statement);
     let cleanup_index = statements.len();
     statements.push(cleanup);
 
-    let results = db.batch(statements).await?;
+    let results = match db.batch(statements).await {
+        Ok(results) => results,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Storage);
+            return Err(error);
+        }
+    };
     let claim_changes = result_changes(&results, 0);
     let assertion_changes = result_changes(&results, 1);
     let audit_changes = result_changes(&results, audit_index);
@@ -673,6 +888,7 @@ pub(crate) async fn execute_asserted_required(
     ) != (1, 1, 1, 1)
         || !required_verified
     {
+        log_class_a_failure(audit, AuditFailureCategory::Storage);
         return Err(worker::Error::RustError(format!(
             "asserted audit cardinality mismatch: claim={claim_changes} assertion={assertion_changes} audit={audit_changes} cleanup={cleanup_changes}"
         )));
@@ -708,24 +924,19 @@ pub(crate) async fn write_pre_disclosure(
             "non-Class-B pre-disclosure audit rejected".to_owned(),
         ));
     }
-    let record = match required_record(
+    let mut sink = console_failure_sink;
+    let record = match owned_record_with_sink(
         request_id,
         Some(community_id),
         Some(actor_membership_id),
         Some(target_id),
         action,
         metadata,
+        AuditFailureEvent::PreDisclosure,
+        &mut sink,
     ) {
         Ok(record) => record,
-        Err(error) => {
-            log_failure(
-                request_id,
-                action,
-                AuditFailureEvent::PreDisclosure,
-                AuditFailureCategory::Construction,
-            );
-            return Err(error);
-        }
+        Err(error) => return Err(error),
     };
     let statement = match record.statement(db) {
         Ok(statement) => statement,
@@ -757,17 +968,19 @@ pub(crate) async fn write_pre_disclosure(
 /// incident so the caller can always continue to cookie clearing.
 pub(crate) async fn write_logout_secondary(db: &D1Database, request_id: &str) {
     let action = AuditAction::SessionLogout;
-    let record = match required_record(request_id, None, None, None, action, AuditMetadata::None) {
+    let mut sink = console_failure_sink;
+    let record = match owned_record_with_sink(
+        request_id,
+        None,
+        None,
+        None,
+        action,
+        AuditMetadata::None,
+        AuditFailureEvent::SecondaryWrite,
+        &mut sink,
+    ) {
         Ok(record) => record,
-        Err(_) => {
-            log_failure(
-                request_id,
-                action,
-                AuditFailureEvent::SecondaryWrite,
-                AuditFailureCategory::Construction,
-            );
-            return;
-        }
+        Err(_) => return,
     };
     let statement = match record.statement(db) {
         Ok(statement) => statement,
@@ -1117,6 +1330,7 @@ enum AuditOutcome {
 
 #[derive(Clone, Copy)]
 enum AuditFailureEvent {
+    RequiredBatch,
     PreDisclosure,
     SecondaryWrite,
 }
@@ -1124,6 +1338,7 @@ enum AuditFailureEvent {
 impl AuditFailureEvent {
     const fn as_str(self) -> &'static str {
         match self {
+            Self::RequiredBatch => "audit.required_batch_failed",
             Self::PreDisclosure => "audit.pre_disclosure_failed",
             Self::SecondaryWrite => "audit.secondary_write_failed",
         }
@@ -1131,6 +1346,7 @@ impl AuditFailureEvent {
 
     const fn route_class(self) -> &'static str {
         match self {
+            Self::RequiredBatch => "class_a",
             Self::PreDisclosure => "class_b",
             Self::SecondaryWrite => "class_c",
         }
@@ -1178,11 +1394,34 @@ fn format_failure_event(
     format!(
         "event={} request_id={} action={} failure_category={} route_class={}",
         event.as_str(),
-        request_id,
+        safe_event_request_id(request_id),
         action.canonical(),
         category.as_str(),
         event.route_class(),
     )
+}
+
+fn safe_event_request_id(candidate: &str) -> &str {
+    if validate_request_id(candidate).is_ok() {
+        candidate
+    } else {
+        INVALID_REQUEST_ID
+    }
+}
+
+fn emit_failure_with(
+    sink: &mut dyn FnMut(&str),
+    request_id: &str,
+    action: AuditAction,
+    event: AuditFailureEvent,
+    category: AuditFailureCategory,
+) {
+    let output = format_failure_event(request_id, action, event, category);
+    sink(&output);
+}
+
+fn console_failure_sink(output: &str) {
+    console_error!("{}", output);
 }
 
 fn log_failure(
@@ -1191,9 +1430,26 @@ fn log_failure(
     event: AuditFailureEvent,
     category: AuditFailureCategory,
 ) {
-    console_error!(
-        "{}",
-        format_failure_event(request_id, action, event, category)
+    let mut sink = console_failure_sink;
+    emit_failure_with(&mut sink, request_id, action, event, category);
+}
+
+fn log_class_a_failure(audit: &AuditRecord, category: AuditFailureCategory) {
+    let mut sink = console_failure_sink;
+    emit_class_a_failure_with(&mut sink, audit, category);
+}
+
+fn emit_class_a_failure_with(
+    sink: &mut dyn FnMut(&str),
+    audit: &AuditRecord,
+    category: AuditFailureCategory,
+) {
+    emit_failure_with(
+        sink,
+        &audit.request_id,
+        audit.action,
+        AuditFailureEvent::RequiredBatch,
+        category,
     );
 }
 
@@ -1242,6 +1498,18 @@ mod tests {
             AuditAction::from_canonical("membership.unknown"),
             Err(AuditBuildError::UnknownAction)
         ));
+    }
+
+    #[test]
+    fn class_a_action_inventory_is_closed_at_twenty_three() {
+        let class_a: Vec<_> = AuditAction::ALL
+            .into_iter()
+            .filter(|action| action.is_class_a())
+            .collect();
+        assert_eq!(class_a.len(), 23);
+        assert!(!AuditAction::CommunityExportAuthorized.is_class_a());
+        assert!(!AuditAction::CalendarMatrixCsvExportRequested.is_class_a());
+        assert!(!AuditAction::SessionLogout.is_class_a());
     }
 
     #[test]
@@ -1579,6 +1847,16 @@ mod tests {
 
     #[test]
     fn failure_events_contain_only_bounded_operational_fields() {
+        let required = format_failure_event(
+            "0123456789abcdef",
+            AuditAction::InviteCodeGenerated,
+            AuditFailureEvent::RequiredBatch,
+            AuditFailureCategory::Storage,
+        );
+        assert_eq!(
+            required,
+            "event=audit.required_batch_failed request_id=0123456789abcdef action=invite_code.generated failure_category=storage route_class=class_a"
+        );
         let pre_disclosure = format_failure_event(
             "0123456789abcdef",
             AuditAction::CommunityExportAuthorized,
@@ -1599,7 +1877,7 @@ mod tests {
             secondary,
             "event=audit.secondary_write_failed request_id=0123456789abcdef action=session.logout failure_category=construction route_class=class_c"
         );
-        for event in [pre_disclosure, secondary] {
+        for event in [required, pre_disclosure, secondary] {
             for forbidden in [
                 "community_id",
                 "actor_membership_id",
@@ -1613,5 +1891,145 @@ mod tests {
                 assert!(!event.contains(forbidden));
             }
         }
+    }
+
+    #[test]
+    fn invalid_request_ids_are_replaced_wholesale_for_every_failure_class() {
+        assert!(validate_request_id(INVALID_REQUEST_ID).is_ok());
+        let invalid = [
+            "".to_owned(),
+            "x x".to_owned(),
+            "x\tx".to_owned(),
+            "x\ry".to_owned(),
+            "x\ny".to_owned(),
+            "x\r\ny".to_owned(),
+            "x\u{0000}y".to_owned(),
+            "x雪y".to_owned(),
+            "forbidden_marker_DO_NOT_RETAIN!".to_owned(),
+            "x".repeat(MAX_REQUEST_ID_BYTES + 1),
+        ];
+        for candidate in invalid {
+            for (action, event, route_class) in [
+                (
+                    AuditAction::InviteCodeGenerated,
+                    AuditFailureEvent::RequiredBatch,
+                    "class_a",
+                ),
+                (
+                    AuditAction::CommunityExportAuthorized,
+                    AuditFailureEvent::PreDisclosure,
+                    "class_b",
+                ),
+                (
+                    AuditAction::SessionLogout,
+                    AuditFailureEvent::SecondaryWrite,
+                    "class_c",
+                ),
+            ] {
+                let output = format_failure_event(
+                    &candidate,
+                    action,
+                    event,
+                    AuditFailureCategory::Construction,
+                );
+                assert!(output.contains("request_id=invalid_request_id"));
+                assert!(output.contains(&format!("route_class={route_class}")));
+                assert!(!output.contains("forbidden_marker_DO_NOT_RETAIN"));
+                assert_eq!(output.lines().count(), 1);
+                assert!(!output.contains('\r'));
+                assert!(!output.contains('\n'));
+            }
+        }
+        assert_eq!(
+            safe_event_request_id("request_0123456789"),
+            "request_0123456789"
+        );
+    }
+
+    #[test]
+    fn construction_helpers_emit_once_through_the_production_shared_seam() {
+        let mut class_a_events = Vec::new();
+        let result = required_record_with_sink(
+            "forbidden_marker_DO_NOT_RETAIN!\n",
+            Some("community_1"),
+            Some("membership_1"),
+            Some("invite_1"),
+            AuditAction::InviteCodeGenerated,
+            AuditMetadata::None,
+            &mut |event| class_a_events.push(event.to_owned()),
+        );
+        assert!(result.is_err());
+        assert_eq!(class_a_events.len(), 1);
+        assert_eq!(
+            class_a_events[0],
+            "event=audit.required_batch_failed request_id=invalid_request_id action=invite_code.generated failure_category=construction route_class=class_a"
+        );
+
+        let mut rejected_class_events = Vec::new();
+        let result = required_record_with_sink(
+            "request_1",
+            Some("community_1"),
+            Some("membership_1"),
+            Some("community_1"),
+            AuditAction::CommunityExportAuthorized,
+            AuditMetadata::None,
+            &mut |event| rejected_class_events.push(event.to_owned()),
+        );
+        assert!(result.is_err());
+        assert_eq!(rejected_class_events.len(), 1);
+        assert_eq!(
+            rejected_class_events[0],
+            "event=audit.required_batch_failed request_id=request_1 action=community.export_authorized failure_category=construction route_class=class_a"
+        );
+
+        for (action, event, expected) in [
+            (
+                AuditAction::CommunityExportAuthorized,
+                AuditFailureEvent::PreDisclosure,
+                "event=audit.pre_disclosure_failed request_id=invalid_request_id action=community.export_authorized failure_category=construction route_class=class_b",
+            ),
+            (
+                AuditAction::SessionLogout,
+                AuditFailureEvent::SecondaryWrite,
+                "event=audit.secondary_write_failed request_id=invalid_request_id action=session.logout failure_category=construction route_class=class_c",
+            ),
+        ] {
+            let mut events = Vec::new();
+            let result = owned_record_with_sink(
+                "forbidden_marker_DO_NOT_RETAIN!\r\n",
+                None,
+                None,
+                None,
+                action,
+                AuditMetadata::None,
+                event,
+                &mut |output| events.push(output.to_owned()),
+            );
+            assert!(result.is_err());
+            assert_eq!(events, [expected]);
+        }
+    }
+
+    #[test]
+    fn storage_emission_uses_the_multi_audit_primary_action_exactly_once() {
+        let primary = record(AuditAction::CommunityCreated, AuditMetadata::None).unwrap();
+        let additional = record(
+            AuditAction::MembershipCreatedFirstAdmin,
+            AuditMetadata::None,
+        )
+        .unwrap();
+        let mut events = Vec::new();
+        emit_class_a_failure_with(
+            &mut |event| events.push(event.to_owned()),
+            &primary,
+            AuditFailureCategory::Storage,
+        );
+        assert_eq!(
+            events,
+            [
+                "event=audit.required_batch_failed request_id=0123456789abcdef action=community.created failure_category=storage route_class=class_a"
+            ]
+        );
+        assert!(!events[0].contains(additional.action.canonical()));
     }
 }

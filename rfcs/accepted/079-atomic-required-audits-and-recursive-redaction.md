@@ -1,7 +1,9 @@
 # RFC 079 — Atomic Required Audits and Recursive Metadata Redaction
 
 **Status.** Accepted — architecture review accepted with notes on 2026-07-14;
-explicit owner acceptance recorded on 2026-07-15; implementation is authorized
+explicit owner acceptance recorded on 2026-07-15; local Packages 0A–8 are
+implemented and reviewed. A locally implemented Class A failure-telemetry
+correction awaits architecture implementation review.
 
 **Priority.** Architect-review remediation B5; blocks every public or production
 pilot
@@ -505,6 +507,14 @@ floating promise or background task.
 
 Any required-audit failure in hosted staging or production is a security-
 control incident and keeps RFC-050 E7/B5 evidence open.
+
+The local correction centralizes `audit.required_batch_failed` ownership in
+`audit.rs`. A failed Class A operation emits exactly one line containing only a
+validated-or-sentinel request ID, canonical action, closed failure category,
+and `route_class=class_a`. Invalid request IDs are replaced wholesale with
+`invalid_request_id`. Class B and C keep their own event ownership and do not
+also emit the Class A event. This local console/Worker emission is not
+persistent delivery and does not close B5.
 
 ## Implementation Slices
 

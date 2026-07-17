@@ -153,6 +153,12 @@ on construction or storage failure. Logout revokes first and awaits its audit;
 failure emits `audit.secondary_write_failed` and cannot prevent cookie clearing.
 `audit.pre_disclosure_failed` and `audit.secondary_write_failed` contain only
 request ID, canonical action, closed failure category, and route class.
+`audit.required_batch_failed` has the same bounded field set with
+`route_class=class_a` and is emitted exactly once for a Class A construction,
+storage, or impossible post-batch failure. Invalid request-ID candidates are
+replaced wholesale with `invalid_request_id`; they are never truncated or
+partially retained. These Worker console events are not persistent incident
+delivery.
 
 ## Schema reference
 

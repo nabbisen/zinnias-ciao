@@ -44,7 +44,7 @@ resumes only after the remediation hold is explicitly lifted in this roadmap.
 | RFC | Theme | Current note |
 |-----|-------|--------------|
 | 076 | One-time invite code response isolation | Architecture-approved and owner-accepted on 2026-07-17. Implementation must follow a reviewed handoff; RFC-050 exact-candidate hosted evidence remains required before B1 closes for a public or production pilot. |
-| 079 | Atomic required audits and recursive metadata redaction | Architecture reviewed and owner-accepted on 2026-07-15. Local Packages 1–6 are reviewed and committed; Package 7 removal/documentation work is authorized. Package 8 review, RFC-050 exact-candidate hosted evidence, persistent incident delivery, and every public/production pilot gate remain open. |
+| 079 | Atomic required audits and recursive metadata redaction | Architecture reviewed and owner-accepted on 2026-07-15. Local Packages 0A–8 are reviewed and committed. The locally implemented Class A failure-telemetry correction awaits architecture implementation review; RFC-050 exact-candidate hosted evidence, persistent incident delivery, and every public/production pilot gate remain open. |
 
 ## Proposed Work
 
