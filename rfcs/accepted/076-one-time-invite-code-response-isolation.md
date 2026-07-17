@@ -1,10 +1,11 @@
 # RFC 076 — One-Time Invite Code Response Isolation
 
-**Status.** Proposed — design review required; implementation is not authorized  
+**Status.** Accepted — architecture-approved and owner-accepted 2026-07-17;
+implementation must follow a reviewed handoff
 **Priority.** Architect-review remediation; blocks controlled hosted staging unless
 risk-accepted and blocks any public or production pilot  
 **Source finding.** 2026-07-14 architecture preparation review B1  
-**Tracks.** RFC-003, RFC-010, RFC-041, RFC-048, RFC-071  
+**Tracks.** RFC-003, RFC-010, RFC-041, RFC-048, RFC-071, RFC-079
 **Touches.** `workers/ssr/src/handlers/admin/members.rs`, shared response/render
 helpers if needed, contracts release gates, SSR tests, release checklist, hosted
 staging evidence
@@ -26,8 +27,9 @@ That places a bearer credential in a request URL, browser history, and
 potential access-log and referrer surfaces. This RFC replaces that handoff with
 a direct, non-cacheable HTML response to the consumed POST.
 
-This is a remediation design, not implementation approval. It may move to
-`rfcs/accepted/` only after architecture review and explicit owner acceptance.
+This remediation design was architecture-approved and explicitly
+owner-accepted on 2026-07-17. Implementation must follow a separately reviewed
+handoff.
 
 ## Problem and Security Invariant
 
@@ -70,7 +72,9 @@ the recipient's later manual entry at `/join` are allowed surfaces.
   or recoverable display after leaving the response.
 - No broad refactor of member management.
 - No resolution of B2 pepper configuration, B3 abuse-control availability, or
-  B5 audit atomicity/redaction; those require their own reviewed remediation.
+  the remaining B5 hosted/persistent-incident evidence. RFC-079 already governs
+  local audit atomicity and redaction; this RFC preserves that accepted
+  contract.
 - No claim that this RFC alone permits controlled staging or a public pilot.
 
 ## Decision
@@ -81,8 +85,9 @@ the recipient's later manual entry at `/join` are allowed surfaces.
 community-admin authorization, purpose-bound form-token consumption, random
 generation, HMAC persistence, expiry, and safe audit identity.
 
-After the insert succeeds, the handler returns the invite administration page
-directly:
+Invite generation and the required `invite_code.generated` audit row remain
+one RFC-079 Class A batch. Only after that batch succeeds does the handler
+return the invite administration page directly:
 
 ```text
 HTTP/1.1 200 OK
@@ -103,9 +108,10 @@ The response:
 - gives the admin clear Japanese copy equivalent to: “Copy this code now. It
   will not be shown again after you leave or reload this page.”
 
-An optional copy button may progressively enhance the page, but selectable
-plain text remains the baseline. Copying must be an explicit user action; the
-app must not write the code to the clipboard automatically.
+The code is selectable plain text. This remediation adds no copy-button script:
+no application script reads or receives the reveal value, and the app does not
+write it to the clipboard. An admin may use the browser or operating system's
+normal text-selection and copy interaction.
 
 ### Rendering boundary
 
@@ -125,6 +131,12 @@ the response is built. It must not be added to a generic flash-message type.
 The shared renderer may query the active-invite list and issue a fresh generate
 form token so the returned page remains usable. The active list continues to
 show metadata only, never plaintext codes.
+
+An authorization or guarded-insert `false` result reveals no code. Construction,
+D1, or required-audit failure follows RFC-079: return the accepted generic
+`503 Service Unavailable` response with normal security headers and disclose no
+code, success redirect, or success page. A failed Class A batch persists
+neither the invite row nor its audit row.
 
 ### Replay, refresh, and double submit
 
@@ -149,16 +161,33 @@ its non-secret identifier/metadata and generate a replacement.
 
 ### GET and legacy query behavior
 
-`GET /c/:community_id/admin/invites` must not read or render a `code` query
-parameter. A legacy, bookmarked, or attacker-supplied `?code=...` value must
-never be reflected into HTML, headers, logs added by application code, or
-audit metadata.
+At handler entry, before authentication, authorization, D1/KV or other binding
+access, page/form-token issuance, rendering, or any other application
+subrequest, `GET /c/:community_id/admin/invites` must detect whether the query
+contains a `code` parameter. An empty or repeated parameter also matches. When
+it matches, the handler must immediately return:
 
-The implementation may canonicalize a legacy query-bearing request to the
-clean route, but this is cleanup only: the incoming request URL may already
-have reached browser or platform logs. The release guarantee is that current
-application code never creates such a URL. Operators must not use legacy URLs
-as evidence fixtures.
+```text
+HTTP/1.1 303 See Other
+Location: /c/:community_id/admin/invites
+Referrer-Policy: no-referrer
+```
+
+`community_id` at this point is route-matched request input, not an already
+authorized value. The handler must construct `Location` through the route's
+bounded community-identifier grammar or an equivalent safe canonical-path
+builder. Apart from that validated/encoded path segment, `Location` is fixed
+and contains no query-derived data. The branch must not authenticate, authorize,
+access application bindings, issue a page/form token, render an invite page,
+or initiate an application subrequest. It must never reflect the query value
+into HTML, headers, logs added by application code, or audit metadata.
+
+Canonicalization is containment, not erasure: the incoming unsafe URL may
+already have reached browser or platform records. The fixed redirect prevents
+the application from retaining it as a rendered document or propagating it as
+a same-origin referrer. The release guarantee also remains that current
+application code never creates such a URL. Retained evidence must use synthetic
+non-credential query values, not real or legacy invite codes.
 
 Unrelated fixed-code flash behavior may remain if it does not accept or reflect
 arbitrary text. It must not become an alternate invite-code channel.
@@ -173,9 +202,11 @@ arbitrary text. It must not become an alternate invite-code channel.
 | Browser/intermediary caches reveal HTML | Reveal response explicitly sends `Cache-Control: no-store, private`. |
 | Replay generates additional invites | Single-use generation token; replay redirects without mutation. |
 | Generic flash/session store retains plaintext | No server-side handoff or plaintext persistence is introduced. |
-| Audit or diagnostic metadata captures plaintext | Audit identifies the invite row only; metadata contains neither code nor HMAC. |
+| Required audit fails after invite mutation | RFC-079 Class A batch rolls back the invite and audit together; generic `503` reveals no code. |
+| Audit or diagnostic metadata captures plaintext | Typed RFC-079 audit identifies the invite row only; metadata contains neither code nor HMAC. |
 | HTML or attribute injection | Generated code is escaped at the render boundary and appears only as text. |
-| JavaScript/third-party asset exfiltration | No third-party resources; no script receives the reveal value. |
+| JavaScript/third-party asset exfiltration | No third-party resources or copy-button enhancement; no script receives the reveal value. |
+| Legacy query propagates through a same-origin referrer | Handler-entry detection returns a safe canonical-path `303` with `no-referrer` before authentication, authorization, bindings, rendering, or token issuance. |
 | Reviewer mistakes source gates for hosted proof | Hosted request inspection remains a distinct acceptance item. |
 
 The response body necessarily exists in the intended admin browser and can be
@@ -189,6 +220,11 @@ No schema change is required.
 
 - D1 continues to store only `HMAC(pepper, normalize(code))` and non-secret
   invite metadata.
+- Invite insertion and the typed `invite_code.generated` audit row remain one
+  RFC-079 Class A required batch.
+- An authorization/guard `false` result reveals no code.
+- Construction, D1, or audit failure returns the accepted generic `503`,
+  persists no invite, and reveals no code.
 - The audit event continues to target the non-secret invite identifier.
 - Audit metadata must not contain the plaintext code, normalized code, HMAC,
   form token, request body, or rendered HTML.
@@ -197,9 +233,10 @@ No schema change is required.
 - Error reports must not attach local variables or response bodies containing
   the code.
 
-B5 will decide whether generation and its audit row must be one fail-closed
-unit. RFC-076 neither blesses the current best-effort audit write nor makes
-audit durability a precondition for verifying the URL-leak fix.
+RFC-079's local audit atomicity and redaction contract is settled and is a
+precondition of successful disclosure. Remaining B5 exact-candidate hosted and
+persistent-incident evidence stays open for public/production pilot closure
+and is not claimed by this RFC's local implementation evidence.
 
 ## Implementation Slices
 
@@ -207,10 +244,14 @@ Implementation should remain one reviewable security patch after acceptance:
 
 1. Extract or adapt the invite-page rendering path so GET renders without a
    reveal and successful POST can render with one.
-2. Remove query parsing and reflection of `code` from the GET path.
+2. Replace query parsing/reflection with the mandatory fixed clean `303` and
+   `no-referrer` canonicalization at handler entry, before authentication,
+   authorization, binding access, rendering, token issuance, or application
+   subrequests.
 3. Replace the success redirect containing `?code=` with direct HTML.
 4. Set reveal-response cache and referrer headers explicitly.
-5. Add focused handler/render tests and a source-level release regression gate.
+5. Add focused handler/render, legacy-query, and RFC-079 failure-path tests plus
+   a source-level release regression gate.
 6. Update the threat model and release checklist from “known B1 gap” to a
    precise local-evidence statement; do not mark hosted evidence complete yet.
 7. Capture isolated hosted-staging evidence under RFC-050 after B2 and B3 make
@@ -218,7 +259,8 @@ Implementation should remain one reviewable security patch after acceptance:
 
 No developer handoff is required at Proposed status. If the RFC is Accepted
 and implementation is delegated, a companion handoff should name exact test
-locations and keep B2/B3/B5 out of the patch unless separately accepted.
+locations and keep B2/B3 and remaining hosted/persistent-incident B5 work out
+of the patch unless separately accepted.
 
 ## Test and Release Evidence
 
@@ -226,9 +268,19 @@ locations and keep B2/B3/B5 out of the patch unless separately accepted.
 
 - A source release gate rejects application-created invite URLs containing a
   plaintext-code query handoff, including the prior `invites?code=` pattern.
-- GET with an attacker-supplied `code` query does not render that value.
+- GET with an attacker-supplied, empty, or repeated `code` query immediately
+  returns `303` to the fixed clean canonical route with `no-referrer`, does not
+  render or reflect the value, and proves through focused spies/counters that
+  authentication, authorization, D1/KV or other binding access, page-token
+  issuance, rendering, and application subrequests are not reached.
+- The canonical redirect path accepts only the route's bounded
+  community-identifier grammar or uses an equivalent safe path builder; no
+  query-derived value enters `Location`.
 - Successful generation returns `200`, has no `Location`, displays the code in
   body text, and sends `no-store, private` plus `no-referrer`.
+- A forced required-audit failure returns the generic `503`, persists neither
+  invite nor audit row, and discloses no plaintext in its body, headers, or
+  redirect.
 - The stored invite value is an HMAC and the plaintext is absent from database
   parameters retained beyond the insert call, audit metadata, and response
   headers.
@@ -248,6 +300,9 @@ handler interpolates invite plaintext into `Location` or a generated href.
 - Generate an invite with DevTools Network open and confirm no request URL or
   redirect `Location` contains the displayed code.
 - Confirm the code is visible and selectable with JavaScript disabled.
+- Open a synthetic `?code=` URL and confirm the first response is the fixed
+  clean `303` with `no-referrer`; confirm the following application request
+  does not carry the unsafe query in `Referer`.
 - Reload/resubmit and confirm no additional invite is created and the old code
   is not redisplayed.
 - Navigate away/back and confirm the application does not intentionally
@@ -280,13 +335,19 @@ RFC-076 implementation is complete only when:
    analytics event, or log contains a generated plaintext invite code.
 2. The first successful POST reveals the code only in non-cacheable HTML and
    returns no redirect.
-3. GET never reflects a query-supplied code.
+3. A query-bearing GET is immediately canonicalized through a fixed clean
+   `303` with `no-referrer` at handler entry, before authentication,
+   authorization, binding access, rendering, token issuance, reflection, or an
+   application subrequest. Its route-matched community identifier is handled
+   through a bounded grammar or equivalent safe canonical-path builder.
 4. Replay creates no invite and reveals no prior code.
-5. Admin authorization, form-token, HMAC-only storage, expiry, revocation, and
+5. Authorization/guard rejection reveals no code, and an RFC-079 required-audit
+   failure persists no invite and returns generic `503` without disclosure.
+6. Admin authorization, form-token, HMAC-only storage, expiry, revocation, and
    redemption behavior remain unchanged.
-6. The automated regression gate and focused tests pass.
-7. Manual no-JS and browser-network evidence passes.
-8. Hosted staging evidence is recorded under RFC-050 before B1 is closed for a
+7. The automated regression gate and focused tests pass.
+8. Manual no-JS and browser-network evidence passes.
+9. Hosted staging evidence is recorded under RFC-050 before B1 is closed for a
    public or production pilot.
 
 Architecture approval may accept this design and move it to `accepted/` before
@@ -343,16 +404,21 @@ POST response.
 Rejected. Same-origin referrer policy does not keep the URL out of browser or
 platform request records and can forward the full URL to same-origin routes.
 
-## Review Questions
+## Resolved Architecture Review Decisions
 
-1. Does direct POST rendering satisfy the one-time reveal requirement without
-   introducing a new persistence or bearer-handoff surface?
-2. Should the reveal page omit normal navigation as defense in depth, or are
-   `no-referrer`, same-origin assets, and a code-free URL sufficient?
-3. Is explicit `no-store, private` preferable to the current global
-   `no-store` default for this security-critical response?
-4. Is legacy query canonicalization worth implementing, given that the first
-   incoming legacy request may already be logged?
-5. Are the local gate and hosted evidence separated clearly enough to prevent
-   a premature pilot-ready claim?
+The initial architecture review retained the central direct POST-response
+design and resolved these supporting decisions:
 
+1. Normal same-origin navigation may remain because the reveal response has a
+   code-free URL, explicit `no-referrer`, no third-party resources, and no
+   code-bearing links or attributes. Copy warns that leaving or reloading makes
+   the plaintext unrecoverable.
+2. `Cache-Control: no-store, private` remains explicit at the handler boundary
+   even though the global response hook currently supplies `no-store`.
+3. Legacy query-bearing GETs require immediate fixed clean canonicalization
+   with `no-referrer` at handler entry, before authentication, authorization,
+   binding access, token issuance, rendering, or application subrequests.
+   Ignoring a query at the unsafe URL is insufficient.
+4. The remediation uses selectable text only and adds no copy-button script.
+5. RFC-079 required-audit atomicity/redaction is settled locally; remaining
+   hosted/persistent-incident evidence stays distinct and open.

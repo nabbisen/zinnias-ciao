@@ -43,6 +43,7 @@ resumes only after the remediation hold is explicitly lifted in this roadmap.
 
 | RFC | Theme | Current note |
 |-----|-------|--------------|
+| 076 | One-time invite code response isolation | Architecture-approved and owner-accepted on 2026-07-17. Implementation must follow a reviewed handoff; RFC-050 exact-candidate hosted evidence remains required before B1 closes for a public or production pilot. |
 | 079 | Atomic required audits and recursive metadata redaction | Architecture reviewed and owner-accepted on 2026-07-15. Local Packages 1–6 are reviewed and committed; Package 7 removal/documentation work is authorized. Package 8 review, RFC-050 exact-candidate hosted evidence, persistent incident delivery, and every public/production pilot gate remain open. |
 
 ## Proposed Work
@@ -66,7 +67,6 @@ The active proposed backlog is:
 | 073 | Calendar events list and day detail UX | Design remains proposed; implementation is paused by the architect remediation hold. |
 | 074 | Community switch route preservation | Design remains proposed; implementation is paused by the architect remediation hold. |
 | 075 | Render style system and inline style reduction | Design remains proposed; implementation is paused by the architect remediation hold. |
-| 076 | One-time invite code response isolation | B1 remediation design; Proposed pending architecture review and owner acceptance. |
 | 077 | Fail-closed HMAC pepper configuration | B2 remediation design; Proposed pending architecture review and owner acceptance. |
 | 078 | Fail-closed strongly consistent abuse controls | B3 remediation design; Proposed pending architecture review and owner acceptance. |
 
