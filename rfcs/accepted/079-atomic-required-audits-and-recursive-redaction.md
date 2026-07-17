@@ -651,9 +651,11 @@ required audit behavior. If the new path fails, protected mutations/exports
 return `503` while the operator rolls forward. Logout continues its safety-first
 revocation behavior.
 
-D1 backups before migration remain access-controlled. A code rollback may need
-to retain the new table schema and compatibility adapter temporarily, but it
-must not re-enable arbitrary metadata or shallow redaction.
+D1 backups before migration remain access-controlled. After Package 7, code
+rollback retains the new table schema and must not restore the removed
+compatibility adapter, arbitrary metadata, shallow redaction, ignored audit
+results, or raw-identifier logging. Recovery rolls forward from the closed
+boundary.
 
 ## Alternatives Rejected
 

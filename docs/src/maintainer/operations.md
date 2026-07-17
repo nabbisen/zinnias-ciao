@@ -242,6 +242,20 @@ For persistent log storage, configure Logpush (see `docs/src/maintainer/launch-r
 Logs should never contain plaintext invite codes, session tokens, or note content —
 this is enforced by the audit writer (RFC-014).
 
+RFC-079 structured audit/Worker events must also exclude raw actor, community,
+target, membership, and session identifiers; metadata JSON; SQL/binds; D1 error
+bodies; exported content; and user-authored text. Expected bounded events are
+`audit.write`, `audit.pre_disclosure_failed`,
+`audit.secondary_write_failed`, and `worker.request_failed`. Use request ID,
+canonical action/outcome or closed failure category, and route class for
+correlation. Do not restore raw `Debug` formatting for unhandled Worker errors.
+
+`wrangler tail` is diagnostic only. Persistent incident evidence requires an
+owner-approved sink, documented retention/access, canary delivery, and RFC-050
+exact-candidate observation. If required-audit failure occurs in hosted staging
+or production, treat it as a security-control incident and keep B5/pilot gates
+open.
+
 ## Mixed legacy and canonical audit actions
 
 Migration 0010 preserves raw historical action values. Use the compatibility

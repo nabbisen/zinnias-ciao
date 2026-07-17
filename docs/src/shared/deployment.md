@@ -411,9 +411,11 @@ pre-0010 export is potentially sensitive and must be handled under the
 copying legacy metadata into evidence.
 
 Do not apply 0010 to hosted staging or production merely because the migration
-exists in the repository. Package 2 is non-deployable; hosted application waits
-for the later RFC-079 packages and architecture approval of an exact candidate.
-When authorized, apply to isolated staging first and verify only bounded values:
+exists in the repository. Package 7 removal/source gates establish only the
+earliest deployable code boundary; hosted application still waits for Package 8
+implementation review, RFC-050 exact-candidate authorization, and separately
+approved resources. When authorized, apply to isolated staging first and verify
+only bounded values:
 
 - migration ledger contains `0010_audit_integrity.sql` once;
 - audit row count and core-column comparison match the approved preflight;
@@ -424,7 +426,7 @@ When authorized, apply to isolated staging first and verify only bounded values:
 
 Migration recovery is roll-forward only. Worker rollback does not restore the
 old audit schema and must never re-enable arbitrary metadata or best-effort
-required audits.
+required audits, including through the removed compatibility adapter.
 
 ## Runtime Smoke
 

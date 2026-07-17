@@ -5,6 +5,9 @@
 **Project:** ciao.zinnias  
 **Date:** June 11, 2026  
 **Reconciled:** adds a request_id correlation ID propagated across Service Bindings (the multi-worker gap).
+**RFC-079 reconciliation (2026-07-16):** the original best-effort/stringly
+typed design below is historical. Current required behavior is the closed,
+atomic, recursively sanitized model in RFC-079 and the maintainer audit policy.
 **Related roadmap milestone:** M5 / UX and Release Hardening  
 
 ---
@@ -94,6 +97,22 @@ audit_log (
 
 Metadata must be structured and redacted. For status override, metadata may include previous/new status but not private note content.
 
+### Current RFC-079 boundary
+
+- Class A mutations and their audit evidence commit in one D1 batch; no-op or
+  replay transitions do not manufacture success audits.
+- Class B export authorization/acknowledgement is audited before protected
+  disclosure and returns generic `503` when audit construction or storage
+  fails.
+- `session.logout` is the only Class C exception: revocation completes first,
+  the audit attempt is awaited without a session identifier, failure emits a
+  bounded incident, and the cookie is still cleared.
+- Actions and metadata are closed Rust enums. Arbitrary strings/JSON and direct
+  audit inserts outside `workers/ssr/src/audit.rs` are forbidden.
+- Structured Worker events contain request ID, canonical action/outcome or
+  bounded failure category/route class only. Raw actor, community, target,
+  session, metadata, SQL/bind, content, and credential material are forbidden.
+
 ---
 
 ## 7. Security, Privacy, and Safety
@@ -110,7 +129,7 @@ Metadata must be structured and redacted. For status override, metadata may incl
 - Admin/security-sensitive actions create audit records.
 - Production logs do not contain invite codes or session values.
 - Note bodies are absent from logs.
-- Errors include external code and enough context for debugging.
+- Errors use bounded categories rather than raw platform/SQL/debug output.
 - Log level policy is documented.
 - Every log line for a request carries the same `request_id`; logs persist via Logpush to R2/S3 (isolates have no filesystem — RFC-016).
 
@@ -122,6 +141,10 @@ Metadata must be structured and redacted. For status override, metadata may incl
 - Integration tests verifying audit records.
 - Log snapshot tests for sensitive actions.
 - Manual incident simulation: non-member event access denied and logged safely.
+
+RFC-079 source gates, local real-D1 rollback/concurrency proofs, and RFC-050
+exact-candidate hosted negative evidence supersede the original generic test
+language. Local passing gates do not prove persistent Logpush delivery.
 
 ---
 

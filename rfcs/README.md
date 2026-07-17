@@ -16,7 +16,7 @@ authorize implementation.
 
 | ID | Title | Accepted | Note |
 |----|-------|----------|------|
-| 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | B5 remediation architecture accepted; implementation authorized, with local and exact-candidate hosted evidence still required |
+| 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 1–6 reviewed/committed; Package 7 removal/docs authorized. Package 8 review and exact-candidate hosted B5 evidence remain required |
 
 ## Done — MVP core (001–019)
 

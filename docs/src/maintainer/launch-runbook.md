@@ -424,7 +424,8 @@ bunx wrangler rollback --env production
 The deployed Worker version and the migration state are independent. Rollback
 reverts the code; it does not revert the database. Write forward migrations only.
 After migration 0010, never roll back to code that accepts arbitrary audit
-metadata, omits required request IDs, or treats required audits as best effort.
+metadata, restores the removed RFC-079 compatibility adapter, omits required
+request IDs, or treats required audits as best effort.
 
 ---
 

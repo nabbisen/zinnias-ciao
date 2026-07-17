@@ -41,7 +41,7 @@ workers/
       session.rs             Session cookie middleware
       form_token.rs          Server-issued CSRF + idempotency tokens (AD-4)
       authz.rs               Community-scoped and active-admin-somewhere authorization guards
-      audit.rs               Structured audit log writer (RFC-014)
+      audit.rs               Closed typed audit model, atomic helpers, bounded events (RFC-079)
       rate_limit.rs          KV-backed invite failure and community-creation counters
       crypto.rs              HMAC-SHA256 helpers (AD-3)
     static/
@@ -58,6 +58,10 @@ migrations/
   0004_calendar_tokens.sql
   0005_event_templates.sql   event_templates table (RFC-032)
   0006_event_recurrence.sql  repeat_rule / repeat_count columns on events (RFC-022)
+  0007_codlet_tables.sql     codlet codes, sessions, and form-token auth tables
+  0008_membership_relink_codes.sql
+  0009_recurrence_v2.sql
+  0010_audit_integrity.sql   closed audit schema, legacy metadata reset, assertion table (RFC-079)
 scripts/
   setup.mjs                  Dev bootstrap: D1 migrations + seed data
 docs/src/                    mdbook documentation (SUMMARY.md is the index)
@@ -106,25 +110,45 @@ The ≤200-char note is per `(event, membership)`, not per day.
 - **Resource enumeration**: 404 and 403 return identical user-facing messages.
 - **Rate limiting**: invite code failures counted in KV, hard-capped per IP window.
 
+## Audit integrity boundary
+
+RFC-079 classifies 23 mutation actions as Class A, two export authorization
+actions as Class B, and logout as the sole Class C action. Class A helpers keep
+business writes and typed audit records in one D1 batch. Class B writes audit
+evidence before returning protected data or acknowledgement and fails with a
+generic `503`. Logout revokes first, awaits an audit attempt carrying no
+session/subject identifier, emits a bounded incident on failure, and always
+continues to cookie clearing.
+
+Only `workers/ssr/src/audit.rs` owns production audit INSERT SQL. Callers use
+closed `AuditAction`/`AuditMetadata` variants; arbitrary JSON, compatibility
+writers, ignored results, raw-ID audit logs, and background required-audit work
+are prohibited by repository-wide release gates. Passing these removal gates
+is the earliest deployable code boundary, not release or deployment approval.
+
 For the durable security map and form-review baseline, see
 [Application Threat Model](security-threat-model.md).
 
 ## Test strategy
 
 ```
-packages/domain/   — 96 pure-Rust unit tests (validation, status transitions, recurrence)
-packages/contracts/ — tests for token uniqueness, i18n parity, session gates, error model, and release gates
+packages/domain/    — pure-Rust validation, status, and recurrence tests
+packages/contracts/ — token/i18n/session/error contracts and repository-wide release gates
+workers/ssr/        — native handler/helper unit tests plus WASM compilation
+scripts/            — disposable local-D1 migration, rollback, concurrency, and response-boundary proofs
 ```
 
-SSR handlers are not unit-tested (WASM environment); integration testing is via
-the dev server (`bun run dev`) and browser-based smoke tests documented in the
-release checklist.
+Worker-independent SSR helpers and render/handler logic have native unit tests.
+Worker/D1 transaction semantics use disposable local Wrangler fixtures; hosted
+and browser behavior remains part of the release checklist and RFC-050.
 
 The mandatory local verification command:
 
 ```sh
-cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts
+cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr
+cargo clippy --workspace --all-targets -- -D warnings
 cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown
+mdbook build docs
 ```
 
-Both must pass with zero warnings before any commit.
+All applicable gates must pass with zero warnings before a release review.

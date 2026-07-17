@@ -79,13 +79,16 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             attach_security_headers(&mut resp, &request_id)?;
             Ok(resp)
         }
-        Err(e) => {
-            if is_not_found_error(&e) {
+        Err(error) => {
+            if is_not_found_error(&error) {
                 let mut resp = render::not_found()?;
                 attach_security_headers(&mut resp, &request_id)?;
                 return Ok(resp);
             }
-            console_error!("[{}] unhandled error: {:?}", request_id, e);
+            console_error!(
+                "event=worker.request_failed request_id={} failure_category=unhandled route_class=request",
+                request_id
+            );
             let mut resp = render::internal_error()?;
             attach_security_headers(&mut resp, &request_id)?;
             Ok(resp)

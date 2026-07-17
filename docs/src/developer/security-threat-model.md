@@ -87,7 +87,7 @@ Status:
 | Invite/relink brute force | Failed code redemption is rate-limited and returns generic errors; plaintext codes are not logged. | RFC-012, RFC-024, RFC-041, RFC-063, smoke scripts and release gates. | KV failure behavior should be reviewed before production pilot. |
 | Session theft impact | Session cookies are HttpOnly, Secure, SameSite=Strict, host-only by default, and revocable. | RFC-038, `session.rs`, release checklist. | Account-wide session management UI is not implemented. |
 | Cache privacy leak | Authenticated HTML is not stored in service-worker cache; offline fallback does not expose stale private content. | RFC-042, RFC-055, release checklist offline gates. | Browser-specific cache behavior should remain part of staging smoke. |
-| Audit leakage | Audit rows use action names and minimal metadata; bearer secrets, plaintext codes, session IDs, CSV contents, and unnecessary old/new personal labels are excluded. | RFC-014, RFC-052, RFC-053, RFC-068, RFC-069, RFC-070. | Any new audit action should state allowed metadata in its RFC. |
+| Audit loss or leakage | RFC-079 uses a closed 26-action model, typed action-specific metadata, recursive sanitation, atomic Class A batches, fail-before-disclosure Class B writes, and identifier-free safety-first logout audit. Bearer secrets, plaintext codes/HMACs, session IDs, export contents, raw subject IDs in Worker events, and unnecessary personal labels are excluded. | RFC-014, RFC-052, RFC-079, audit source gates, local real-D1 rollback/concurrency/boundary proofs. | Exact-candidate hosted negative tests and persistent incident delivery remain required by RFC-050; new actions must be classified and added to the closed inventory. |
 | Deployment/config leakage | Environment-specific D1/KV IDs and secrets live in ignored local config or Cloudflare secrets, not committed shared config. | Deployment docs, staging runtime prototype docs, `.gitignore` policy. | Developers must still avoid committing copied local config files. |
 | Staging exposure | Hosted staging is public while deployed; it uses non-production data, separate resources, and explicit close-down steps. | Staging runtime prototype docs and deployment docs. | Staging close-down and resource cleanup remain operator tasks. |
 
@@ -133,10 +133,17 @@ Every new or materially changed form should be reviewed against this baseline.
   flags.
 - Audit security-relevant writes unless the RFC explicitly explains why audit
   is unnecessary.
-- Critical audit writes must not be best-effort when returning success would
-  misrepresent system state.
+- Class A business mutations and required audit evidence must commit atomically.
+- Class B must persist audit evidence before protected disclosure or
+  acknowledgement and return generic `503` on failure.
+- Logout is the only secondary-audit exception: revoke first, await the audit
+  attempt without session/subject identifiers, emit bounded failure telemetry,
+  and clear the credential even when auditing fails.
+- No required audit may be ignored, floated, queued, or placed in
+  `waitUntil()`.
 - Audit metadata must exclude raw submitted secrets, plaintext codes, bearer
-  links, session IDs, full CSV contents, and unnecessary personal data.
+  links, session IDs, full CSV/export contents, and unnecessary personal data;
+  callers cannot supply arbitrary actions or JSON.
 
 ### Rendering and Response
 
@@ -187,8 +194,8 @@ must say what is required and why.
   rather than durable shared docs.
 - Full hosted staging evidence remains operator-dependent.
 - No automated scanner or fuzzing harness is required today.
-- No formal incident-response playbook exists beyond operational recovery and
-  audit notes.
+- Persistent `audit.*_failed` incident delivery has not yet been demonstrated
+  against an owner-approved sink; `console`/tail observation is diagnostic only.
 - KV rate-limit failure behavior should be reviewed before first production
   pilot.
 - Older destructive/admin forms should be checked against the replay-result

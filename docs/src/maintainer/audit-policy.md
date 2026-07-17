@@ -12,9 +12,13 @@ metadata inputs, and recursively sanitizes the typed metadata before storage.
 The migration resets all historical metadata to `{}` because the old arbitrary
 JSON writer and direct inserts could not prove that legacy values were safe.
 
-Package 2 defines the final schema and policy, but it is not itself deployable.
-Do not apply migration 0010 to a hosted database until the later implementation
-packages and architecture review establish the earliest deployable boundary.
+RFC-079 Package 7 removal/source gates establish the earliest deployable code
+boundary by removing the temporary compatibility adapter and proving there are
+no ignored/background required audits or direct production INSERTs outside the
+audit module. This is not deployment approval: Package 8 review, RFC-050 hosted
+negative evidence, persistent incident delivery, and owner release approval
+remain separate gates. Do not apply migration 0010 to a hosted database without
+that explicit authorization.
 
 ## Access policy
 
@@ -142,6 +146,13 @@ event_template.deleted
 Class B contains `community.export_authorized` and
 `calendar_matrix_csv.export_requested`. Class C contains only `session.logout`
 and carries no session, actor, community, or target identifier.
+
+Class A commits business state and audit evidence in one batch. Class B writes
+the audit before payload/acknowledgement construction and returns generic `503`
+on construction or storage failure. Logout revokes first and awaits its audit;
+failure emits `audit.secondary_write_failed` and cannot prevent cookie clearing.
+`audit.pre_disclosure_failed` and `audit.secondary_write_failed` contain only
+request ID, canonical action, closed failure category, and route class.
 
 ## Schema reference
 

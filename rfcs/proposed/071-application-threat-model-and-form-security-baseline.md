@@ -231,10 +231,17 @@ Every new or changed form must be reviewed against this baseline.
   flags as applicable.
 - Security-relevant writes must be audited unless the RFC explicitly explains
   why audit is unnecessary.
-- Audit writes for critical actions must not be best-effort if returning
-  success would misrepresent the system state.
+- RFC-079 Class A writes require one atomic business/audit D1 batch. Class B
+  requires durable audit evidence before protected disclosure or authorization
+  acknowledgement and returns generic `503` on audit failure.
+- `session.logout` is the sole Class C exception: require revocation first,
+  await an identifier-free audit attempt, emit bounded failure telemetry, and
+  clear the cookie even if that audit fails. No other action may discard or
+  background required audit work.
 - Audit metadata must exclude raw submitted secrets, plaintext codes, bearer
-  links, session IDs, full CSV contents, and unnecessary personal data.
+  links, session IDs, full CSV/export contents, and unnecessary personal data.
+  Production inputs are closed typed variants; recursive sanitation is defense
+  in depth, not permission for arbitrary JSON.
 
 ### Rendering and response
 

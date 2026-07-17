@@ -333,4 +333,15 @@ materially changed form against the
 - [ ] Production bootstrap invite generated for initial release. *(operator task: `bun run bootstrap:production -- --community "Production Community" --admin "Admin"`; this sets production `HMAC_PEPPER`; keep the printed invite code private)*
 - [ ] `SESSION_COOKIE_DOMAIN` is configured as a **`[vars]` binding** in the target environment's ignored local Wrangler config if needed; leave unset for a host-only cookie. *(operator task — RFC-038)*
 - [ ] Logpush configured for production. *(operator task: Cloudflare dashboard)*
+
+## RFC-079 audit integrity and redaction
+
+- [x] Production audit actions use the closed 23 Class A + 2 Class B + 1 Class C inventory; no compatibility writer or arbitrary action/JSON entry point remains. *(audit.rs + repository-wide release gate)*
+- [x] Class A required business writes and audit evidence use reviewed D1 batches; local forced-audit-failure proofs cover simple, multi-write, one-winner, attendance, occurrence, and token paths. *(local audit atomicity/assertion proofs)*
+- [x] Community JSON and matrix-export acknowledgement return generic `503` without disclosure when audit storage fails. *(audit-boundary proof + source ordering gates)*
+- [x] Logout is the sole secondary-audit exception: revocation is awaited first, the audit carries no session/subject identifier, and audit failure still clears the cookie. *(audit-boundary proof + ownership gate)*
+- [x] Production Rust has one audit INSERT owner (`audit.rs`), no ignored/background required audit, and no raw-ID/Debug error logging path. *(Package 7 removal gates)*
+- [x] Migration 0010 locally preserves legacy core chronology, resets every legacy metadata value to `{}`, enforces closed schema bounds, and creates the reviewed assertion table. *(migration proof; local only)*
+- [~] Package 7 is only the earliest deployable code boundary. Package 8 implementation review and RFC-050 exact-candidate hosted rollback, disclosure, concurrency, migration, and teardown evidence remain open.
+- [~] `audit.pre_disclosure_failed` and `audit.secondary_write_failed` delivery through an owner-approved persistent sink, with retention/access and canary retrieval observed, remains open. `wrangler tail` is not sufficient.
 - [ ] No critical open security issues. *(final security review before go-live)*

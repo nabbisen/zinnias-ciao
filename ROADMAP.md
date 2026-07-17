@@ -43,7 +43,7 @@ resumes only after the remediation hold is explicitly lifted in this roadmap.
 
 | RFC | Theme | Current note |
 |-----|-------|--------------|
-| 079 | Atomic required audits and recursive metadata redaction | Architecture reviewed and owner-accepted on 2026-07-15; implementation is authorized. B5 and every public/production pilot gate remain open pending implementation, local real-D1 evidence, and RFC-050 exact-candidate hosted evidence. |
+| 079 | Atomic required audits and recursive metadata redaction | Architecture reviewed and owner-accepted on 2026-07-15. Local Packages 1–6 are reviewed and committed; Package 7 removal/documentation work is authorized. Package 8 review, RFC-050 exact-candidate hosted evidence, persistent incident delivery, and every public/production pilot gate remain open. |
 
 ## Proposed Work
 

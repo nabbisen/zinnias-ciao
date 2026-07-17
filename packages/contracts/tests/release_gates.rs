@@ -60,7 +60,7 @@ fn not_found_and_forbidden_same_message() {
         RENDER_SRC.contains("fn recovery_links()")
             && RENDER_SRC.contains("href=\\\"/\\\"")
             && RENDER_SRC.contains("href=\\\"/join\\\"")
-            && LIB_SRC.contains("is_not_found_error(&e)")
+            && LIB_SRC.contains("is_not_found_error(&error)")
             && LIB_SRC.contains("render::not_found()"),
         "Generic not-found/forbidden and error pages must be recoverable and expected authorization denial must not render as internal error"
     );
@@ -2124,6 +2124,20 @@ const RFC079_BACKUP_RECOVERY_SRC: &str =
     include_str!("../../../docs/src/maintainer/backup-recovery.md");
 const RFC079_DEPLOYMENT_SRC: &str = include_str!("../../../docs/src/shared/deployment.md");
 const RFC079_OPERATIONS_SRC: &str = include_str!("../../../docs/src/maintainer/operations.md");
+const RFC079_RFC014_SRC: &str =
+    include_str!("../../../rfcs/done/014-observability-audit-and-privacy-logging.md");
+const RFC079_RFC052_SRC: &str =
+    include_str!("../../../rfcs/done/052-audit-retention-and-operator-access-policy.md");
+const RFC079_RFC071_SRC: &str = include_str!(
+    "../../../rfcs/proposed/071-application-threat-model-and-form-security-baseline.md"
+);
+const RFC079_RFC050_SRC: &str =
+    include_str!("../../../rfcs/proposed/050-staging-runtime-verification-evidence-pack.md");
+const RFC079_THREAT_MODEL_SRC: &str =
+    include_str!("../../../docs/src/developer/security-threat-model.md");
+const RFC079_ARCHITECTURE_SRC: &str = include_str!("../../../docs/src/developer/architecture.md");
+const RFC079_RELEASE_CHECKLIST_SRC: &str =
+    include_str!("../../../docs/src/tester/release-checklist.md");
 const RFC079_ATTENDANCE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/attendance.rs");
 const RFC079_EVENT_WRITE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event_write.rs");
 const RFC079_EVENT_NOTE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event_note.rs");
@@ -2147,73 +2161,16 @@ const PACKAGE_JSON_SRC: &str = include_str!("../../../package.json");
 
 #[derive(Default)]
 struct AuditSourceScan {
-    generic_calls: std::collections::BTreeMap<String, Vec<String>>,
     direct_inserts: std::collections::BTreeMap<String, usize>,
     assertion_table_refs: Vec<String>,
     operation_id_refs: Vec<String>,
+    compatibility_refs: Vec<String>,
+    ignored_audit_results: Vec<String>,
+    background_audit_refs: Vec<String>,
 }
 
 fn compact_source(value: &str) -> String {
     value.split_whitespace().collect()
-}
-
-fn named_call_blocks(source: &str, needle: &str) -> Vec<String> {
-    assert!(
-        needle.ends_with('('),
-        "call needle must end with an opening parenthesis"
-    );
-    let mut blocks = Vec::new();
-    let mut cursor = 0usize;
-
-    while let Some(relative_start) = source[cursor..].find(needle) {
-        let start = cursor + relative_start;
-        let open = start + needle.len() - 1;
-        let preceding_token = source[..start].split_whitespace().last();
-        if preceding_token == Some("fn") {
-            cursor = open + 1;
-            continue;
-        }
-        let mut depth = 0usize;
-        let mut in_string = false;
-        let mut escaped = false;
-        let mut end = None;
-
-        for (offset, ch) in source[open..].char_indices() {
-            if in_string {
-                if escaped {
-                    escaped = false;
-                } else if ch == '\\' {
-                    escaped = true;
-                } else if ch == '"' {
-                    in_string = false;
-                }
-                continue;
-            }
-            if ch == '"' {
-                in_string = true;
-            } else if ch == '(' {
-                depth += 1;
-            } else if ch == ')' {
-                depth = depth
-                    .checked_sub(1)
-                    .expect("audit call parser encountered an unmatched closing parenthesis");
-                if depth == 0 {
-                    end = Some(open + offset + ch.len_utf8());
-                    break;
-                }
-            }
-        }
-
-        let end = end.expect("named call must have balanced parentheses");
-        blocks.push(compact_source(&source[start..end]));
-        cursor = end;
-    }
-
-    blocks
-}
-
-fn audit_call_blocks(source: &str) -> Vec<String> {
-    named_call_blocks(source, "audit::write_legacy(")
 }
 
 fn compact_brace_block(source: &str, marker: &str) -> String {
@@ -2277,10 +2234,6 @@ fn collect_rust_sources(
 fn scan_audit_sources(sources: &[(String, String)]) -> AuditSourceScan {
     let mut scan = AuditSourceScan::default();
     for (path, source) in sources {
-        let calls = audit_call_blocks(source);
-        if !calls.is_empty() {
-            scan.generic_calls.insert(path.clone(), calls);
-        }
         let direct_count = source.matches("INSERT INTO audit_log").count();
         if direct_count > 0 {
             scan.direct_inserts.insert(path.clone(), direct_count);
@@ -2291,26 +2244,36 @@ fn scan_audit_sources(sources: &[(String, String)]) -> AuditSourceScan {
         if source.contains("operation_id") {
             scan.operation_id_refs.push(path.clone());
         }
+        if source.contains("LegacyAuditAction")
+            || source.contains("LegacyAuditMetadata")
+            || source.contains("write_legacy")
+        {
+            scan.compatibility_refs.push(path.clone());
+        }
+        if source.contains("let _ = audit::") || source.contains("let _ = crate::audit::") {
+            scan.ignored_audit_results.push(path.clone());
+        }
+        let compact = compact_source(source);
+        if (compact.contains("waitUntil")
+            || compact.contains("wait_until")
+            || compact.contains("spawn_local"))
+            && compact.contains("audit")
+        {
+            scan.background_audit_refs.push(path.clone());
+        }
     }
     scan
 }
 
-fn call_shapes_match(actual: &[String], expected_shapes: &[&str]) -> bool {
-    actual.len() == expected_shapes.len()
-        && expected_shapes.iter().all(|expected| {
-            actual
-                .iter()
-                .filter(|call| call.contains(&compact_source(expected)))
-                .count()
-                == 1
+fn audit_action_owners<'a>(sources: &'a [(String, String)], variant: &str) -> Vec<&'a str> {
+    let needle = format!("AuditAction::{variant}");
+    sources
+        .iter()
+        .filter(|(path, source)| {
+            path != "audit.rs" && !source.contains("LegacyAuditAction") && source.contains(&needle)
         })
-        && actual.iter().all(|call| {
-            expected_shapes
-                .iter()
-                .filter(|expected| call.contains(&compact_source(expected)))
-                .count()
-                == 1
-        })
+        .map(|(path, _)| path.as_str())
+        .collect()
 }
 
 #[test]
@@ -2327,17 +2290,6 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
     );
     let scan = scan_audit_sources(&sources);
 
-    let expected_generic_counts = std::collections::BTreeMap::new();
-    let actual_generic_counts = scan
-        .generic_calls
-        .iter()
-        .map(|(path, calls)| (path.clone(), calls.len()))
-        .collect::<std::collections::BTreeMap<_, _>>();
-    assert_eq!(
-        actual_generic_counts, expected_generic_counts,
-        "repository-wide generic audit-call distribution changed; reconcile RFC-079 before proceeding"
-    );
-
     let expected_direct_inserts =
         std::collections::BTreeMap::from([("audit.rs".to_owned(), 1usize)]);
     assert_eq!(
@@ -2345,15 +2297,19 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
         "repository-wide audit INSERT distribution changed; audit.rs must remain the sole production audit INSERT owner"
     );
 
-    assert_eq!(
-        scan.generic_calls.values().map(Vec::len).sum::<usize>(),
-        0,
-        "RFC-079 Package 6 inventory expects no remaining compatibility-writer call sites"
+    assert!(
+        scan.compatibility_refs.is_empty()
+            && scan.ignored_audit_results.is_empty()
+            && scan.background_audit_refs.is_empty(),
+        "Package 7 removal boundary rejects compatibility, ignored-result, and background audit surfaces: compatibility={:?}, ignored={:?}, background={:?}",
+        scan.compatibility_refs,
+        scan.ignored_audit_results,
+        scan.background_audit_refs,
     );
     assert!(
         scan.assertion_table_refs == vec!["audit.rs".to_owned()]
             && scan.operation_id_refs == vec!["audit.rs".to_owned()],
-        "Package 6 assertion table/operation IDs must be owned only by audit.rs: table={:?}, operation_id={:?}",
+        "Package 7 assertion table/operation IDs must be owned only by audit.rs: table={:?}, operation_id={:?}",
         scan.assertion_table_refs,
         scan.operation_id_refs
     );
@@ -2423,17 +2379,51 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
         26,
         "RFC-079 inventory must remain 23 Class A + 2 Class B + 1 Class C"
     );
+    for (variant, expected_owners) in [
+        ("CommunityCreated", &["db/community.rs"][..]),
+        ("MembershipCreatedFirstAdmin", &["db/community.rs"][..]),
+        ("MembershipDisplayNameUpdated", &["handlers/me.rs"][..]),
+        ("InviteCodeGenerated", &["db/invite.rs"][..]),
+        ("InviteCodeRevoked", &["db/invite.rs"][..]),
+        ("InviteCodeRedeemed", &["db/invite.rs"][..]),
+        ("MembershipRelinkCodeCreated", &["db/relink.rs"][..]),
+        ("MembershipRelinkRedeemed", &["db/relink.rs"][..]),
+        ("OperatorRecoveryAdminRelinkCreated", &["db/relink.rs"][..]),
+        ("MembershipRemoved", &["db/membership.rs"][..]),
+        ("MembershipPromotedToAdmin", &["db/membership.rs"][..]),
+        ("MembershipDemotedToMember", &["db/membership.rs"][..]),
+        ("EventCreated", &["db/event_write.rs"][..]),
+        ("EventEdited", &["db/event_write.rs"][..]),
+        ("EventCancelled", &["db/event_write.rs"][..]),
+        ("EventOccurrenceCancelled", &["db/event_write.rs"][..]),
+        ("AttendanceAdminOverride", &["db/attendance.rs"][..]),
+        ("AttendanceAdminSetAttended", &["db/attendance.rs"][..]),
+        ("EventNoteAdminHidden", &["db/event_note.rs"][..]),
+        ("CalendarFeedTokenGenerated", &["db/calendar.rs"][..]),
+        ("CalendarFeedTokenRevoked", &["db/calendar.rs"][..]),
+        ("EventTemplateCreated", &["db/event_template.rs"][..]),
+        ("EventTemplateDeleted", &["db/event_template.rs"][..]),
+        ("CommunityExportAuthorized", &["handlers/export.rs"][..]),
+        (
+            "CalendarMatrixCsvExportRequested",
+            &["handlers/communities.rs"][..],
+        ),
+        ("SessionLogout", &[][..]),
+    ] {
+        assert_eq!(
+            audit_action_owners(&sources, variant),
+            expected_owners,
+            "typed audit action ownership changed for {variant}; reconcile the RFC-079 inventory"
+        );
+    }
 }
 
 #[test]
-fn rfc079_package1_closed_core_and_nondeployable_boundary_are_pinned() {
+fn rfc079_closed_core_and_package7_removal_boundary_are_pinned() {
     for required in [
         "pub(crate) enum AuditAction",
         "pub(crate) enum AuditMetadata",
         "pub(crate) struct AuditRecord",
-        "pub(crate) enum LegacyAuditAction",
-        "pub(crate) enum LegacyAuditMetadata",
-        "pub(crate) async fn write_legacy",
         "fn sanitize_and_serialize",
         "fn format_event",
         "const MAX_METADATA_DEPTH: usize = 8",
@@ -2442,7 +2432,7 @@ fn rfc079_package1_closed_core_and_nondeployable_boundary_are_pinned() {
     ] {
         assert!(
             RFC079_AUDIT_CORE_SRC.contains(required),
-            "RFC-079 Package 1 closed-core contract is missing {required:?}"
+            "RFC-079 closed-core contract is missing {required:?}"
         );
     }
     assert!(
@@ -2450,19 +2440,20 @@ fn rfc079_package1_closed_core_and_nondeployable_boundary_are_pinned() {
             && !RFC079_AUDIT_CORE_SRC.contains("pub(crate) async fn write(")
             && !RFC079_AUDIT_CORE_SRC.contains("action: &str")
             && !RFC079_AUDIT_CORE_SRC.contains("metadata: Option<serde_json::Value>"),
-        "Package 1 must not restore the arbitrary string/Value audit writer"
+        "Package 7 must not restore an arbitrary string/Value audit writer"
     );
     assert!(
         RFC079_AUDIT_CORE_SRC.contains("event=audit.write request_id={}")
             && !RFC079_AUDIT_CORE_SRC.contains("target={}:{}")
             && !RFC079_AUDIT_CORE_SRC.contains("actor={} community={}"),
-        "Package 1 structured audit events must exclude raw actor/community/target identifiers"
+        "Package 7 structured audit events must exclude raw actor/community/target identifiers"
     );
     assert!(
-        RFC079_AUDIT_CORE_SRC.contains("deliberately non-deployable")
-            && RFC079_AUDIT_CORE_SRC.contains("LegacyAuditAction")
-            && RFC079_AUDIT_CORE_SRC.contains("LegacyAuditMetadata"),
-        "the private compatibility adapter must keep Package 1 explicitly non-deployable"
+        RFC079_AUDIT_CORE_SRC.contains("earliest deployable code")
+            && !RFC079_AUDIT_CORE_SRC.contains("LegacyAuditAction")
+            && !RFC079_AUDIT_CORE_SRC.contains("LegacyAuditMetadata")
+            && !RFC079_AUDIT_CORE_SRC.contains("write_legacy"),
+        "Package 7 must remove the compatibility adapter while preserving the separately reviewed release boundary"
     );
 }
 
@@ -2567,7 +2558,8 @@ fn rfc079_package2_migration_and_operator_policy_are_pinned() {
         RFC079_BACKUP_RECOVERY_SRC.contains("pre-0010")
             && RFC079_BACKUP_RECOVERY_SRC.contains("potentially sensitive")
             && RFC079_BACKUP_RECOVERY_SRC.contains("Roll-forward recovery")
-            && RFC079_DEPLOYMENT_SRC.contains("Package 2 is non-deployable")
+            && RFC079_DEPLOYMENT_SRC.contains("earliest deployable code boundary")
+            && RFC079_DEPLOYMENT_SRC.contains("Package 8")
             && RFC079_DEPLOYMENT_SRC.contains("roll-forward only")
             && RFC079_OPERATIONS_SRC.contains("Mixed legacy and canonical audit actions")
             && RFC079_OPERATIONS_SRC.contains("Do not select `metadata_json`"),
@@ -2968,6 +2960,145 @@ fn rfc079_package6_disclosure_and_logout_boundaries_are_pinned() {
 }
 
 #[test]
+fn rfc079_package7_removal_and_documentation_boundary_are_pinned() {
+    let migration_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations");
+    let mut migration_filenames = std::fs::read_dir(&migration_root)
+        .expect("migration directory must be readable")
+        .map(|entry| entry.expect("migration entry must be readable").path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "sql"))
+        .map(|path| {
+            path.file_name()
+                .expect("migration must have a filename")
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect::<Vec<_>>();
+    migration_filenames.sort();
+    let expected_migration_filenames = [
+        "0001_initial.sql",
+        "0002_form_tokens_nullable_user.sql",
+        "0003_invite_grants_role.sql",
+        "0004_calendar_tokens.sql",
+        "0005_event_templates.sql",
+        "0006_event_recurrence.sql",
+        "0007_codlet_tables.sql",
+        "0008_membership_relink_codes.sql",
+        "0009_recurrence_v2.sql",
+        "0010_audit_integrity.sql",
+    ];
+    assert_eq!(
+        migration_filenames, expected_migration_filenames,
+        "architecture migration inventory gate must be updated with the actual SQL ledger"
+    );
+    for filename in expected_migration_filenames {
+        assert!(
+            RFC079_ARCHITECTURE_SRC.contains(filename),
+            "architecture migration inventory is missing actual ledger entry {filename}"
+        );
+    }
+    assert!(
+        !RFC079_ARCHITECTURE_SRC.contains("0007_event_day_attendance_grain.sql"),
+        "architecture must not name the nonexistent migration 0007 entry"
+    );
+
+    for forbidden in [
+        "pub(crate) enum LegacyAuditAction",
+        "pub(crate) enum LegacyAuditMetadata",
+        "pub(crate) async fn write_legacy",
+        "metadata: Option<serde_json::Value>",
+        "action: &str",
+    ] {
+        assert!(
+            !RFC079_AUDIT_CORE_SRC.contains(forbidden),
+            "Package 7 must remove forbidden audit surface {forbidden:?}"
+        );
+    }
+    assert!(
+        LIB_SRC.contains("event=worker.request_failed request_id={}")
+            && LIB_SRC.contains("failure_category=unhandled route_class=request")
+            && !LIB_SRC.contains("unhandled error: {:?}"),
+        "unhandled Worker errors must use bounded categories rather than raw Debug output"
+    );
+    for (name, source, required) in [
+        ("RFC-014", RFC079_RFC014_SRC, "Current RFC-079 boundary"),
+        (
+            "RFC-052",
+            RFC079_RFC052_SRC,
+            "RFC-079 reconciliation (2026-07-16)",
+        ),
+        ("RFC-071", RFC079_RFC071_SRC, "sole Class C exception"),
+        (
+            "RFC-050",
+            RFC079_RFC050_SRC,
+            "earliest deployable **code** boundary",
+        ),
+        (
+            "threat model",
+            RFC079_THREAT_MODEL_SRC,
+            "closed 26-action model",
+        ),
+        (
+            "architecture",
+            RFC079_ARCHITECTURE_SRC,
+            "Audit integrity boundary",
+        ),
+        (
+            "operations",
+            RFC079_OPERATIONS_SRC,
+            "audit.secondary_write_failed",
+        ),
+        (
+            "backup/recovery",
+            RFC079_BACKUP_RECOVERY_SRC,
+            "removed compatibility adapter",
+        ),
+        (
+            "release checklist",
+            RFC079_RELEASE_CHECKLIST_SRC,
+            "RFC-079 audit integrity and redaction",
+        ),
+        (
+            "audit/operator query policy",
+            RFC079_AUDIT_POLICY_SRC,
+            "Raw-history compatibility query",
+        ),
+    ] {
+        assert!(
+            source.contains(required),
+            "Package 7 {name} reconciliation is missing {required:?}"
+        );
+    }
+    for source in [
+        RFC079_RFC014_SRC,
+        RFC079_RFC071_SRC,
+        RFC079_THREAT_MODEL_SRC,
+        RFC079_ARCHITECTURE_SRC,
+        RFC079_AUDIT_POLICY_SRC,
+        RFC079_BACKUP_RECOVERY_SRC,
+        RFC079_RELEASE_CHECKLIST_SRC,
+    ] {
+        assert!(
+            source.contains("Class A") || source.contains("Class A/B/C"),
+            "Package 7 durable audit documents must preserve the Class A/B/C model"
+        );
+    }
+    assert!(
+        RFC079_AUDIT_POLICY_SRC.contains("not deployment approval")
+            && RFC079_DEPLOYMENT_SRC.contains("Package 8")
+            && RFC079_RELEASE_CHECKLIST_SRC.contains("exact-candidate hosted")
+            && RFC079_RFC050_SRC.contains("local fixture success"),
+        "Package 7 must distinguish earliest deployable code from release/hosted authorization"
+    );
+    assert!(
+        RFC079_BACKUP_RECOVERY_SRC.contains("D1 Time Travel")
+            && RFC079_BACKUP_RECOVERY_SRC.contains("7 days on Workers Free")
+            && RFC079_BACKUP_RECOVERY_SRC.contains("30 days on Workers Paid")
+            && !RFC079_BACKUP_RECOVERY_SRC.contains("30 days on all plans"),
+        "backup/recovery must pin plan-aware D1 Time Travel retention without a plan-independent guarantee"
+    );
+}
+
+#[test]
 fn rfc079_package0a_assertion_fixture_is_bounded_and_outside_the_ledger() {
     assert!(
         RFC079_ASSERTION_FIXTURE_SRC.contains("CREATE TABLE audit_change_assertions")
@@ -3008,17 +3139,15 @@ fn rfc079_package0a_assertion_fixture_is_bounded_and_outside_the_ledger() {
 }
 
 #[test]
-fn rfc079_inventory_scanner_detects_new_files_and_action_substitution() {
+fn rfc079_removal_scanner_detects_forbidden_surfaces_and_action_substitution() {
     let synthetic_sources = vec![
         (
             "known.rs".to_owned(),
-            "fn known() { audit::write_legacy(db, LegacyAuditAction::MembershipRemoved); }"
-                .to_owned(),
+            "fn known() { let action = AuditAction::MembershipRemoved; }".to_owned(),
         ),
         (
-            "new_handler.rs".to_owned(),
-            "fn added() { audit::write_legacy(db, LegacyAuditAction::EventUnexpected); }"
-                .to_owned(),
+            "compatibility.rs".to_owned(),
+            "fn old() { write_legacy(db, LegacyAuditAction::MembershipRemoved); }".to_owned(),
         ),
         (
             "new_direct.rs".to_owned(),
@@ -3028,54 +3157,29 @@ fn rfc079_inventory_scanner_detects_new_files_and_action_substitution() {
             "new_privacy_ref.rs".to_owned(),
             "fn leaked(operation_id: &str) { let _ = audit_change_assertions; }".to_owned(),
         ),
+        (
+            "ignored.rs".to_owned(),
+            "fn ignored() { let _ = audit::execute_required(db, mutation, audit); }".to_owned(),
+        ),
+        (
+            "background.rs".to_owned(),
+            "fn background() { spawn_local(async move { audit_required().await; }); }".to_owned(),
+        ),
     ];
     let scan = scan_audit_sources(&synthetic_sources);
-    assert_eq!(scan.generic_calls["new_handler.rs"].len(), 1);
     assert_eq!(scan.direct_inserts["new_direct.rs"], 1);
     assert_eq!(scan.assertion_table_refs, ["new_privacy_ref.rs"]);
     assert_eq!(scan.operation_id_refs, ["new_privacy_ref.rs"]);
-
-    let substituted = &scan.generic_calls["known.rs"];
-    assert!(
-        !call_shapes_match(
-            substituted,
-            &["LegacyAuditAction::MembershipPromotedToAdmin"]
-        ),
-        "a substituted expected action must fail exact call-shape matching"
+    assert_eq!(scan.compatibility_refs, ["compatibility.rs"]);
+    assert_eq!(scan.ignored_audit_results, ["ignored.rs"]);
+    assert_eq!(scan.background_audit_refs, ["background.rs"]);
+    assert_eq!(
+        audit_action_owners(&synthetic_sources, "MembershipRemoved"),
+        ["known.rs"]
     );
     assert!(
-        !call_shapes_match(&[], &["LegacyAuditAction::MembershipRemoved"]),
-        "removing an expected audit call must fail exact call-shape matching"
-    );
-
-    let calendar_with_extra = r#"
-        write_calendar_token_audit(db, LegacyAuditAction::CalendarFeedTokenGenerated);
-        write_calendar_token_audit(db, LegacyAuditAction::CalendarFeedTokenRevoked);
-        write_calendar_token_audit(db, LegacyAuditAction::CalendarFeedTokenUnexpected);
-    "#;
-    let calendar_calls = named_call_blocks(calendar_with_extra, "write_calendar_token_audit(");
-    assert!(
-        !call_shapes_match(
-            &calendar_calls,
-            &[
-                "write_calendar_token_audit(db, LegacyAuditAction::CalendarFeedTokenGenerated)",
-                "write_calendar_token_audit(db, LegacyAuditAction::CalendarFeedTokenRevoked)",
-            ]
-        ),
-        "an additional calendar audit-wrapper invocation must fail the exhaustive expansion gate"
-    );
-
-    let role_with_extra = r#"
-        let audit_action = match mutation {
-            RoleMutation::Promote => audit::LegacyAuditAction::MembershipPromotedToAdmin,
-            RoleMutation::Demote => audit::LegacyAuditAction::MembershipDemotedToMember,
-            RoleMutation::Suspend => audit::LegacyAuditAction::MembershipSuspended,
-        };
-    "#;
-    assert_ne!(
-        compact_brace_block(role_with_extra, "let audit_action = match mutation"),
-        "letaudit_action=matchmutation{RoleMutation::Promote=>audit::LegacyAuditAction::MembershipPromotedToAdmin,RoleMutation::Demote=>audit::LegacyAuditAction::MembershipDemotedToMember,}",
-        "an additional dynamic role/action branch must fail the exhaustive mapping gate"
+        audit_action_owners(&synthetic_sources, "MembershipPromotedToAdmin").is_empty(),
+        "a substituted expected action owner must fail the exact inventory gate"
     );
 }
 

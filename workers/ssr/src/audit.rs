@@ -1,7 +1,7 @@
 //! Closed audit domain model and required-batch statement builder.
 //!
-//! The tree remains deliberately non-deployable until every later-package
-//! caller has moved off the private compatibility writer.
+//! RFC-079 Package 7 removal gates establish the earliest deployable code
+//! boundary. Deployment still requires separately reviewed release evidence.
 
 use crate::crypto::random_token;
 use crate::db::now_utc;
@@ -243,152 +243,6 @@ impl AuditMetadata {
                 target_membership_id,
             } => json!({ "target_membership_id": target_membership_id }),
             Self::MatrixExportRequested { month } => json!({ "month": month }),
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-#[allow(dead_code)]
-pub(crate) enum LegacyAuditAction {
-    CommunityCreated,
-    MembershipCreatedFirstAdmin,
-    MembershipDisplayNameUpdated,
-    InviteCodeGenerated,
-    InviteCodeRevoked,
-    InviteCodeRedeemed,
-    MembershipRelinkCodeCreated,
-    MembershipRelinkRedeemed,
-    OperatorRecoveryAdminRelinkCreated,
-    MembershipRemoved,
-    MembershipPromotedToAdmin,
-    MembershipDemotedToMember,
-    EventCreated,
-    EventEdited,
-    EventCancelled,
-    EventOccurrenceCancelled,
-    AttendanceAdminOverride,
-    AttendanceAdminSetAttended,
-    EventNoteAdminHidden,
-    CalendarFeedTokenGenerated,
-    CalendarFeedTokenRevoked,
-    EventTemplateCreated,
-    EventTemplateDeleted,
-    CommunityExportAuthorized,
-    CalendarMatrixCsvExportRequested,
-    SessionLogout,
-}
-
-impl From<LegacyAuditAction> for AuditAction {
-    fn from(value: LegacyAuditAction) -> Self {
-        match value {
-            LegacyAuditAction::CommunityCreated => Self::CommunityCreated,
-            LegacyAuditAction::MembershipCreatedFirstAdmin => Self::MembershipCreatedFirstAdmin,
-            LegacyAuditAction::MembershipDisplayNameUpdated => Self::MembershipDisplayNameUpdated,
-            LegacyAuditAction::InviteCodeGenerated => Self::InviteCodeGenerated,
-            LegacyAuditAction::InviteCodeRevoked => Self::InviteCodeRevoked,
-            LegacyAuditAction::InviteCodeRedeemed => Self::InviteCodeRedeemed,
-            LegacyAuditAction::MembershipRelinkCodeCreated => Self::MembershipRelinkCodeCreated,
-            LegacyAuditAction::MembershipRelinkRedeemed => Self::MembershipRelinkRedeemed,
-            LegacyAuditAction::OperatorRecoveryAdminRelinkCreated => {
-                Self::OperatorRecoveryAdminRelinkCreated
-            }
-            LegacyAuditAction::MembershipRemoved => Self::MembershipRemoved,
-            LegacyAuditAction::MembershipPromotedToAdmin => Self::MembershipPromotedToAdmin,
-            LegacyAuditAction::MembershipDemotedToMember => Self::MembershipDemotedToMember,
-            LegacyAuditAction::EventCreated => Self::EventCreated,
-            LegacyAuditAction::EventEdited => Self::EventEdited,
-            LegacyAuditAction::EventCancelled => Self::EventCancelled,
-            LegacyAuditAction::EventOccurrenceCancelled => Self::EventOccurrenceCancelled,
-            LegacyAuditAction::AttendanceAdminOverride => Self::AttendanceAdminOverride,
-            LegacyAuditAction::AttendanceAdminSetAttended => Self::AttendanceAdminSetAttended,
-            LegacyAuditAction::EventNoteAdminHidden => Self::EventNoteAdminHidden,
-            LegacyAuditAction::CalendarFeedTokenGenerated => Self::CalendarFeedTokenGenerated,
-            LegacyAuditAction::CalendarFeedTokenRevoked => Self::CalendarFeedTokenRevoked,
-            LegacyAuditAction::EventTemplateCreated => Self::EventTemplateCreated,
-            LegacyAuditAction::EventTemplateDeleted => Self::EventTemplateDeleted,
-            LegacyAuditAction::CommunityExportAuthorized => Self::CommunityExportAuthorized,
-            LegacyAuditAction::CalendarMatrixCsvExportRequested => {
-                Self::CalendarMatrixCsvExportRequested
-            }
-            LegacyAuditAction::SessionLogout => Self::SessionLogout,
-        }
-    }
-}
-
-#[allow(dead_code)]
-pub(crate) enum LegacyAuditMetadata {
-    None,
-    DisplayNameChanged,
-    RelinkCorrelation {
-        relink_code_id: String,
-    },
-    OperatorRecovery {
-        operator_label: String,
-        relink_code_id: String,
-    },
-    EventCreated {
-        creation_mode: EventCreationMode,
-        source_event_id: Option<String>,
-    },
-    EventEdited {
-        edit_scope: EventEditScope,
-    },
-    OccurrenceCancelled {
-        series_id: String,
-        day_date: String,
-    },
-    AttendanceOverride {
-        changed_count: u32,
-    },
-    AdminNoteHidden {
-        target_membership_id: String,
-    },
-    MatrixExportRequested {
-        month: String,
-    },
-}
-
-impl From<LegacyAuditMetadata> for AuditMetadata {
-    fn from(value: LegacyAuditMetadata) -> Self {
-        match value {
-            LegacyAuditMetadata::None => Self::None,
-            LegacyAuditMetadata::DisplayNameChanged => Self::DisplayNameChanged,
-            LegacyAuditMetadata::RelinkCorrelation { relink_code_id } => {
-                Self::RelinkCorrelation { relink_code_id }
-            }
-            LegacyAuditMetadata::OperatorRecovery {
-                operator_label,
-                relink_code_id,
-            } => Self::OperatorRecovery {
-                operator_label,
-                relink_code_id,
-            },
-            LegacyAuditMetadata::EventCreated {
-                creation_mode,
-                source_event_id,
-            } => Self::EventCreated {
-                creation_mode,
-                source_event_id,
-            },
-            LegacyAuditMetadata::EventEdited { edit_scope } => Self::EventEdited { edit_scope },
-            LegacyAuditMetadata::OccurrenceCancelled {
-                series_id,
-                day_date,
-            } => Self::OccurrenceCancelled {
-                series_id,
-                day_date,
-            },
-            LegacyAuditMetadata::AttendanceOverride { changed_count } => {
-                Self::AttendanceOverride { changed_count }
-            }
-            LegacyAuditMetadata::AdminNoteHidden {
-                target_membership_id,
-            } => Self::AdminNoteHidden {
-                target_membership_id,
-            },
-            LegacyAuditMetadata::MatrixExportRequested { month } => {
-                Self::MatrixExportRequested { month }
-            }
         }
     }
 }
@@ -945,31 +799,6 @@ pub(crate) fn result_changes(results: &[D1Result], index: usize) -> usize {
         .and_then(|result| result.meta().ok().flatten())
         .and_then(|meta| meta.changes)
         .unwrap_or(0)
-}
-
-#[allow(clippy::too_many_arguments)]
-#[allow(dead_code)]
-pub(crate) async fn write_legacy(
-    db: &D1Database,
-    request_id: &str,
-    community_id: Option<&str>,
-    actor_membership_id: Option<&str>,
-    target_id: Option<&str>,
-    action: LegacyAuditAction,
-    metadata: LegacyAuditMetadata,
-) -> Result<()> {
-    let action = AuditAction::from(action);
-    let record = required_record(
-        request_id,
-        community_id,
-        actor_membership_id,
-        target_id,
-        action,
-        metadata.into(),
-    )?;
-    record.statement(db)?.run().await?;
-    record.log_success();
-    Ok(())
 }
 
 fn validate_pairing(

@@ -136,6 +136,12 @@ are implemented. The final B4 evidence campaign must not begin until:
 Controlled infrastructure preparation may occur earlier, but it cannot be
 reported as completed B4 evidence.
 
+For B5, passing RFC-079 Package 7 removal/source gates establishes only the
+earliest deployable **code** boundary. Package 8 must still complete the local
+evidence and implementation review. The hosted campaign must then exercise the
+accepted exact candidate and separately identified external state; neither
+Package 7 nor local fixture success discharges E5/E7 or authorizes deployment.
+
 ## Decision
 
 ### Candidate identity tuple
@@ -452,6 +458,14 @@ Prove at minimum:
 - wrong/missing D1 binding is not reported healthy and cannot partially mutate;
 - malformed version metadata cannot pass the exact-candidate collector; and
 - audit failure behavior matches the accepted B5 policy.
+
+The B5 negative candidate must additionally demonstrate representative Class A
+rollback, both Class B no-disclosure/no-acknowledgement outcomes, the Class C
+logout revocation/cookie-clearing outcome, one-winner audit cardinality, and
+bounded `audit.pre_disclosure_failed` / `audit.secondary_write_failed` delivery.
+Evidence must use aggregate outcomes and campaign aliases, never raw resource
+IDs, business content, credentials, legacy metadata, SQL/binds, or D1 error
+bodies.
 
 After negative testing, confirm the canonical Worker still serves its expected
 version ID at 100 percent and that its E1 identity/readiness checks still pass.

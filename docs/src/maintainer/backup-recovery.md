@@ -9,23 +9,34 @@ Two types of protection:
 
 | Type | Tool | When |
 |------|------|------|
-| Automated point-in-time | Cloudflare D1 built-in (30-day retention) | Continuous |
+| Automated point-in-time | Cloudflare D1 Time Travel (7 days on Workers Free; 30 days on Workers Paid; verify current limits) | Continuous |
 | Manual export | `wrangler d1 export` | Before every migration; on demand |
 
 ---
 
-## D1 built-in backups
+## D1 Time Travel
 
-Cloudflare D1 automatically retains point-in-time snapshots for 30 days on all
-plans. To restore from a snapshot:
+Time Travel is D1's built-in point-in-time recovery mechanism for databases on
+the production storage backend. It is always enabled, but retention depends on
+the Workers plan: up to 7 days on Workers Free and up to 30 days on Workers
+Paid, subject to the current Cloudflare D1 limits. Confirm the active plan,
+database backend, and current limits in the
+[Cloudflare D1 Time Travel documentation](https://developers.cloudflare.com/d1/reference/time-travel/)
+before relying on a restore point.
 
-1. Open the Cloudflare dashboard → **Workers & Pages → D1**.
-2. Select the `zinnias-ciao` database.
-3. Click **Backups** and choose a restore point.
-4. Confirm the restore — this overwrites the current database.
+To restore with Time Travel:
 
-> **Note:** D1 point-in-time restore is eventual; it may take a few minutes to
-> propagate. Verify with `GET /healthz` and a test sign-in after restore completes.
+1. Run `wrangler d1 info zinnias-ciao` and confirm the database reports the
+   production backend.
+2. Retrieve the bookmark for the required timestamp with
+   `wrangler d1 time-travel info zinnias-ciao --timestamp=<RFC3339-or-Unix>`.
+3. Confirm the selected point is inside the plan's available retention window.
+4. Restore with
+   `wrangler d1 time-travel restore zinnias-ciao --bookmark=<bookmark>`.
+   This destructively overwrites the current database and cancels in-flight
+   queries.
+
+After the command completes, verify with `GET /healthz` and a test sign-in.
 
 ---
 
@@ -57,7 +68,7 @@ policy to the backup as a whole.
 
 ## Restore from a manual export
 
-If a migration must be reversed and D1's point-in-time restore is unavailable:
+If a migration must be reversed and D1 Time Travel is unavailable:
 
 ```sh
 # 1. Create a new replacement database
@@ -132,10 +143,16 @@ this will cause the migration to re-apply and may cause data loss.
 
 Migration 0010 is a destructive privacy boundary. Roll-forward recovery must
 not restore arbitrary legacy metadata, the shallow redactor, stringly typed
-actions, or best-effort required-audit behavior. If a post-0010 problem occurs,
+actions, the removed compatibility adapter, or best-effort required-audit
+behavior. If a post-0010 problem occurs,
 keep traffic stopped, write a new reviewed forward migration or restore into an
 isolated replacement database, then apply 0010 before verification. Do not use
 schema rollback to make old metadata live again.
+
+A code rollback must remain compatible with the post-0010 schema and preserve
+the RFC-079 Class A/B/C failure rules. Do not roll back to Packages 1–6 merely
+because Package 7 is the earliest deployable code boundary; release/deployment
+still requires exact-candidate evidence and explicit owner approval.
 
 ---
 
