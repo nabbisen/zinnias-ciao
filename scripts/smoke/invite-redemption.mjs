@@ -26,6 +26,10 @@ const newMemberDisplayName = `Invite Smoke ${runSuffix}`;
 assertLocalOnly();
 await mkdir(outDir, { recursive: true });
 await rm(userDataDir, { recursive: true, force: true });
+await rm(
+  `${outDir}/admin-generated-invite-is-stored-and-shown-once.png`,
+  { force: true },
+);
 
 function hmac(secret) {
   return createHmac('sha256', pepper).update(secret).digest('hex');
@@ -96,6 +100,7 @@ function esc(value) {
 function seed() {
   runWrangler(['d1', 'migrations', 'apply', 'zinnias-ciao-dev', '--local', '--env', 'dev']);
   const statements = [
+    'DROP TRIGGER IF EXISTS proof_fail_invite_generation_audit',
     `INSERT OR IGNORE INTO communities (id, name, timezone, is_active, created_at) VALUES ('${communityId}', 'Invite Redemption Smoke Community', 'Asia/Tokyo', 1, '${now}')`,
     `UPDATE communities SET name='Invite Redemption Smoke Community', timezone='Asia/Tokyo', is_active=1 WHERE id='${communityId}'`,
     `INSERT OR IGNORE INTO users (id, created_at) VALUES ('${adminUserId}', '${now}')`,
@@ -211,6 +216,21 @@ class Cdp {
     });
   }
 
+  onceMatching(method, predicate) {
+    return new Promise((resolve) => {
+      const cb = (params) => {
+        if (!predicate(params)) return;
+        const list = this.events.get(method) ?? [];
+        this.events.set(
+          method,
+          list.filter((item) => item !== cb),
+        );
+        resolve(params);
+      };
+      this.events.set(method, [...(this.events.get(method) ?? []), cb]);
+    });
+  }
+
   close() {
     this.ws.close();
   }
@@ -294,7 +314,6 @@ async function collect(cdp) {
   return await evalExpr(
     cdp,
     `(() => {
-      const fields = [...document.querySelectorAll('input[name], textarea[name], select[name]')];
       const links = [...document.querySelectorAll('a[href]')].map((a) => ({
         href: a.getAttribute('href'),
         text: a.innerText,
@@ -304,7 +323,7 @@ async function collect(cdp) {
         text: document.body.innerText,
         hrefs: links.map((link) => link.href),
         links,
-        values: Object.fromEntries(fields.map((el) => [el.getAttribute('name'), el.value])),
+        hasFormToken: Boolean(document.querySelector('input[name="_token"][value]')),
         noHorizontalScroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
       };
     })()`,
@@ -317,6 +336,21 @@ function allChecksPass(checks) {
 
 async function submitFormByAction(cdp, action) {
   const loaded = cdp.once('Page.loadEventFired');
+  const responseReceived = cdp.onceMatching(
+    'Network.responseReceived',
+    ({ response, type }) => type === 'Document' && response?.url === `${baseUrl}${action}`,
+  );
+  const redirectRequest = cdp.onceMatching(
+    'Network.requestWillBeSent',
+    ({ request, redirectResponse, type }) =>
+      type === 'Document'
+      && request?.url === `${baseUrl}${action}`
+      && redirectResponse?.url === `${baseUrl}${action}`,
+  );
+  const networkOutcome = Promise.race([
+    responseReceived.then(({ response }) => response),
+    redirectRequest.then(({ redirectResponse }) => redirectResponse),
+  ]);
   const submitted = await evalExpr(
     cdp,
     `(() => {
@@ -328,7 +362,18 @@ async function submitFormByAction(cdp, action) {
   );
   if (!submitted) throw new Error(`Form not found: ${action}`);
   await withTimeout(loaded, `submit form to ${action}`);
+  const response = await withTimeout(networkOutcome, `response from ${action}`);
   await sleep(150);
+  return {
+    status: response.status,
+    url: response.url,
+    headers: Object.fromEntries(
+      Object.entries(response.headers ?? {}).map(([key, value]) => [
+        key.toLowerCase(),
+        String(value),
+      ]),
+    ),
+  };
 }
 
 async function fillAndSubmitJoin(cdp, code) {
@@ -367,23 +412,63 @@ async function fillAndSubmitProfile(cdp, displayName) {
   await sleep(250);
 }
 
-async function inviteCodeFromLocation(cdp) {
+async function formToken(cdp) {
   return await evalExpr(
     cdp,
-    `(() => new URLSearchParams(location.search).get('code') || '')()`,
+    `(() => document.querySelector('input[name="_token"]')?.value || '')()`,
   );
 }
 
-function latestInviteRows() {
-  return query(
-    `SELECT id, community_id, grants_role, used_at, revoked_at, expires_at FROM invite_codes WHERE community_id='${communityId}' ORDER BY expires_at DESC LIMIT 5`,
+async function inviteReveal(cdp) {
+  return await evalExpr(
+    cdp,
+    `(() => {
+      const panel = document.querySelector('#invite-code-reveal');
+      if (!panel) return { present: false, code: '', codeOccurrences: 0, warning: false };
+      const code = panel.querySelector('div[aria-label]')?.innerText.trim() || '';
+      return {
+        present: true,
+        code,
+        codeOccurrences: code ? document.documentElement.innerHTML.split(code).length - 1 : 0,
+        warning: panel.innerText.includes('二度と表示されません'),
+      };
+    })()`,
   );
+}
+
+function countRows(statement) {
+  return Number(query(statement)[0]?.count ?? 0);
+}
+
+function inviteCounts() {
+  return {
+    invites: countRows(
+      `SELECT COUNT(*) AS count FROM invite_codes WHERE community_id='${communityId}'`,
+    ),
+    generatedAudits: countRows(
+      `SELECT COUNT(*) AS count FROM audit_log WHERE community_id='${communityId}' AND action='invite_code.generated'`,
+    ),
+  };
+}
+
+function failureEvents(stderr, offset) {
+  return stderr
+    .slice(offset)
+    .split(/\r?\n/u)
+    .map((line) => {
+      const start = line.indexOf('event=audit.required_batch_failed');
+      return start >= 0
+        ? line.slice(start).replaceAll(/\u001b\[[0-9;]*m/gu, '').trim()
+        : '';
+    })
+    .filter(Boolean);
 }
 
 let dev;
 let chrome;
 let devStderr = '';
 let chromeStderr = '';
+let failureTriggerInstalled = false;
 const results = [];
 
 try {
@@ -422,49 +507,206 @@ try {
 
   const adminPage = await newPage(adminSessionSecret);
 
+  logStep('checking legacy query containment before authentication');
+  const legacyPage = await newPage();
+  const legacyPath = `/c/${communityId}/admin/invites?code=synthetic-marker`;
+  const cleanInviteUrl = `${baseUrl}/c/${communityId}/admin/invites`;
+  const cleanRedirectRequestPromise = legacyPage.onceMatching(
+    'Network.requestWillBeSent',
+    ({ request, redirectResponse, type }) =>
+      type === 'Document'
+      && request?.url === cleanInviteUrl
+      && redirectResponse?.url === `${baseUrl}${legacyPath}`,
+  );
+  await navigate(legacyPage, legacyPath);
+  const cleanRedirectRequest = await withTimeout(
+    cleanRedirectRequestPromise,
+    'legacy-query canonical redirect request',
+  );
+  const legacyResponse = cleanRedirectRequest.redirectResponse;
+  const legacyFinal = await collect(legacyPage);
+  const legacyHeaders = Object.fromEntries(
+    Object.entries(legacyResponse.headers ?? {}).map(([key, value]) => [
+      key.toLowerCase(),
+      String(value),
+    ]),
+  );
+  results.push({
+    name: 'legacy-code-query-is-contained-before-authentication',
+    checks: {
+      redirectStatus: legacyResponse.status === 303,
+      canonicalLocation:
+        legacyHeaders.location === `/c/${communityId}/admin/invites`,
+      noReferrerPolicy: legacyHeaders['referrer-policy'] === 'no-referrer',
+      redirectRequestHasNoReferrer:
+        !Object.keys(cleanRedirectRequest.request.headers ?? {}).some(
+          (key) => key.toLowerCase() === 'referer',
+        ),
+      finalPathClean: legacyFinal.path === `/c/${communityId}/admin/invites`,
+      authenticationReachedOnlyAfterRedirect:
+        legacyFinal.text.includes('もう一度入る必要があります'),
+      markerNotRendered: !legacyFinal.text.includes('synthetic-marker'),
+    },
+  });
+
   logStep('checking invite page before generation');
   await navigate(adminPage, `/c/${communityId}/admin/invites`, { textScale: 2 });
   const inviteStart = await collect(adminPage);
+  const originalGenerateToken = await formToken(adminPage);
   results.push({
     name: 'admin-can-open-invite-page',
     screenshotPath: await screenshot(adminPage, 'admin-can-open-invite-page'),
-    observed: inviteStart,
     checks: {
       noHorizontalScroll: inviteStart.noHorizontalScroll,
       onInvitePage: inviteStart.path === `/c/${communityId}/admin/invites`,
-      hasGenerateForm: inviteStart.values._token?.length > 0,
+      hasGenerateForm: inviteStart.hasFormToken && originalGenerateToken.length > 0,
       generateCopyVisible: inviteStart.text.includes('コードを生成'),
     },
   });
 
   logStep('generating invite code');
-  await submitFormByAction(adminPage, `/c/${communityId}/admin/invites`);
+  const beforeGeneration = inviteCounts();
+  const generationResponse = await submitFormByAction(
+    adminPage,
+    `/c/${communityId}/admin/invites`,
+  );
   const inviteGenerated = await collect(adminPage);
-  const inviteCode = await inviteCodeFromLocation(adminPage);
-  const generatedRows = latestInviteRows();
+  const reveal = await inviteReveal(adminPage);
+  const inviteCode = reveal.code;
+  const generatedCounts = inviteCounts();
   results.push({
     name: 'admin-generated-invite-is-stored-and-shown-once',
-    screenshotPath: await screenshot(adminPage, 'admin-generated-invite-is-stored-and-shown-once'),
-    observed: {
-      ...inviteGenerated,
-      codeLength: inviteCode.length,
-      inviteRows: generatedRows.map((row) => ({
-        id: row.id,
-        community_id: row.community_id,
-        grants_role: row.grants_role,
-        used_at: row.used_at,
-        revoked_at: row.revoked_at,
-        expires_at: row.expires_at,
-      })),
-    },
     checks: {
       noHorizontalScroll: inviteGenerated.noHorizontalScroll,
+      directStatus: generationResponse.status === 200,
+      canonicalUrl: generationResponse.url === cleanInviteUrl,
+      noLocation: !Object.hasOwn(generationResponse.headers, 'location'),
+      noStorePrivate:
+        generationResponse.headers['cache-control'] === 'no-store, private',
+      noReferrer:
+        generationResponse.headers['referrer-policy'] === 'no-referrer',
+      htmlContentType:
+        /^text\/html;\s*charset=utf-8$/iu.test(
+          generationResponse.headers['content-type'] ?? '',
+        ),
+      codeFreeBrowserUrl:
+        inviteGenerated.path === `/c/${communityId}/admin/invites`,
       codeLooksPresent: /^[A-Z2-9]{6}$/.test(inviteCode),
-      storedOneInvite: generatedRows.length === 1,
-      storedForCommunity: generatedRows[0]?.community_id === communityId,
-      storedAsMemberInvite: generatedRows[0]?.grants_role === 'member',
-      storedUnused: generatedRows[0]?.used_at == null,
-      storedUnrevoked: generatedRows[0]?.revoked_at == null,
+      codeAppearsOnce: reveal.codeOccurrences === 1,
+      warningVisible: reveal.warning,
+      storedOneInvite:
+        generatedCounts.invites === beforeGeneration.invites + 1,
+      storedOneAudit:
+        generatedCounts.generatedAudits ===
+        beforeGeneration.generatedAudits + 1,
+      storedAsMemberInvite:
+        countRows(
+          `SELECT COUNT(*) AS count FROM invite_codes WHERE community_id='${communityId}' AND grants_role='member' AND used_at IS NULL AND revoked_at IS NULL`,
+        ) === 1,
+    },
+  });
+
+  logStep('checking replay redirects cleanly without regeneration or redisplay');
+  const tokenReplaced = await evalExpr(
+    adminPage,
+    `(() => {
+      const token = document.querySelector('input[name="_token"]');
+      if (!token) return false;
+      token.value = ${JSON.stringify(originalGenerateToken)};
+      return true;
+    })()`,
+  );
+  const beforeReplay = inviteCounts();
+  const replayResponse = await submitFormByAction(
+    adminPage,
+    `/c/${communityId}/admin/invites`,
+  );
+  const afterReplay = inviteCounts();
+  const replayPage = await collect(adminPage);
+  const replayReveal = await inviteReveal(adminPage);
+  results.push({
+    name: 'consumed-generation-token-replay-is-clean-and-non-mutating',
+    checks: {
+      originalTokenRestored: tokenReplaced === true,
+      redirectStatus: replayResponse.status === 303,
+      canonicalLocation:
+        replayResponse.headers.location === `/c/${communityId}/admin/invites`,
+      finalPathClean: replayPage.path === `/c/${communityId}/admin/invites`,
+      revealAbsent: replayReveal.present === false,
+      inviteCountUnchanged: afterReplay.invites === beforeReplay.invites,
+      auditCountUnchanged:
+        afterReplay.generatedAudits === beforeReplay.generatedAudits,
+    },
+  });
+
+  logStep('forcing required audit failure at the real generation boundary');
+  sql(
+    "CREATE TRIGGER proof_fail_invite_generation_audit BEFORE INSERT ON audit_log WHEN NEW.action='invite_code.generated' BEGIN SELECT RAISE(ABORT,'proof failure'); END",
+  );
+  failureTriggerInstalled = true;
+  const beforeFailure = inviteCounts();
+  const failureOffset = devStderr.length;
+  const failureResponse = await submitFormByAction(
+    adminPage,
+    `/c/${communityId}/admin/invites`,
+  );
+  await sleep(150);
+  const afterFailure = inviteCounts();
+  const failurePage = await collect(adminPage);
+  const failureReveal = await inviteReveal(adminPage);
+  const boundedFailureEvents = failureEvents(devStderr, failureOffset);
+  const failureRequestId = failureResponse.headers['x-request-id'] ?? '';
+  const expectedFailureEvent =
+    `event=audit.required_batch_failed request_id=${failureRequestId} ` +
+    'action=invite_code.generated failure_category=storage route_class=class_a';
+  results.push({
+    name: 'required-audit-failure-rolls-back-and-discloses-nothing',
+    checks: {
+      serviceUnavailable: failureResponse.status === 503,
+      noLocation: !Object.hasOwn(failureResponse.headers, 'location'),
+      normalCacheControl: failureResponse.headers['cache-control'] === 'no-store',
+      normalReferrerPolicy:
+        failureResponse.headers['referrer-policy'] === 'same-origin',
+      boundedRequestId: /^[A-Za-z0-9_-]{1,96}$/u.test(failureRequestId),
+      exactlyOneCentralEvent:
+        boundedFailureEvents.length === 1 &&
+        boundedFailureEvents[0] === expectedFailureEvent,
+      inviteRolledBack: afterFailure.invites === beforeFailure.invites,
+      auditRolledBack:
+        afterFailure.generatedAudits === beforeFailure.generatedAudits,
+      revealAbsent:
+        failureReveal.present === false &&
+        !failurePage.text.includes('二度と表示されません'),
+    },
+  });
+  sql('DROP TRIGGER proof_fail_invite_generation_audit');
+  failureTriggerInstalled = false;
+
+  logStep('checking normal generation after trigger cleanup');
+  await navigate(adminPage, `/c/${communityId}/admin/invites`);
+  const beforeCleanupSuccess = inviteCounts();
+  const cleanupSuccessResponse = await submitFormByAction(
+    adminPage,
+    `/c/${communityId}/admin/invites`,
+  );
+  const cleanupReveal = await inviteReveal(adminPage);
+  const afterCleanupSuccess = inviteCounts();
+  results.push({
+    name: 'generation-recovers-after-local-trigger-cleanup',
+    checks: {
+      directStatus: cleanupSuccessResponse.status === 200,
+      strictCache:
+        cleanupSuccessResponse.headers['cache-control'] === 'no-store, private',
+      strictReferrer:
+        cleanupSuccessResponse.headers['referrer-policy'] === 'no-referrer',
+      revealPresentOnce:
+        /^[A-Z2-9]{6}$/u.test(cleanupReveal.code) &&
+        cleanupReveal.codeOccurrences === 1,
+      oneInviteAdded:
+        afterCleanupSuccess.invites === beforeCleanupSuccess.invites + 1,
+      oneAuditAdded:
+        afterCleanupSuccess.generatedAudits ===
+        beforeCleanupSuccess.generatedAudits + 1,
     },
   });
 
@@ -475,7 +717,6 @@ try {
   results.push({
     name: 'session-expired-page-links-sign-in-again-flow',
     screenshotPath: await screenshot(freshPage, 'session-expired-page-links-sign-in-again-flow'),
-    observed: sessionExpired,
     checks: {
       noHorizontalScroll: sessionExpired.noHorizontalScroll,
       sessionExpiredCopyVisible: sessionExpired.text.includes('もう一度入る必要があります'),
@@ -488,7 +729,6 @@ try {
   results.push({
     name: 'join-page-links-sign-in-again-flow',
     screenshotPath: await screenshot(freshPage, 'join-page-links-sign-in-again-flow'),
-    observed: joinStart,
     checks: {
       noHorizontalScroll: joinStart.noHorizontalScroll,
       onJoinPage: joinStart.path === '/join',
@@ -501,11 +741,10 @@ try {
   results.push({
     name: 'fresh-context-invite-opens-profile-step',
     screenshotPath: await screenshot(freshPage, 'fresh-context-invite-opens-profile-step'),
-    observed: profilePage,
     checks: {
       noHorizontalScroll: profilePage.noHorizontalScroll,
       onProfileStep: profilePage.path === '/join/profile',
-      hasProfileToken: profilePage.values._token?.length > 0,
+      hasProfileToken: profilePage.hasFormToken,
       noInviteError: !profilePage.text.includes('招待コードはコミュニティの管理者にお問い合わせください'),
     },
   });
@@ -513,30 +752,20 @@ try {
   logStep('completing join profile');
   await fillAndSubmitProfile(freshPage, newMemberDisplayName);
   const joinedHome = await collect(freshPage);
-  const redeemedRows = latestInviteRows();
+  const redeemedInvite = query(
+    `SELECT used_at FROM invite_codes WHERE code_hmac='${hmac(inviteCode)}' LIMIT 1`,
+  );
   const joinedMembershipRows = query(
     `SELECT id, community_id, role, display_name, removed_at FROM community_memberships WHERE community_id='${communityId}' AND display_name='${esc(newMemberDisplayName)}'`,
   );
   results.push({
     name: 'fresh-context-completes-profile-and-lands-signed-in',
     screenshotPath: await screenshot(freshPage, 'fresh-context-completes-profile-and-lands-signed-in'),
-    observed: {
-      ...joinedHome,
-      inviteRows: redeemedRows.map((row) => ({
-        id: row.id,
-        community_id: row.community_id,
-        grants_role: row.grants_role,
-        used_at: row.used_at,
-        revoked_at: row.revoked_at,
-        expires_at: row.expires_at,
-      })),
-      joinedMembershipRows,
-    },
     checks: {
       noHorizontalScroll: joinedHome.noHorizontalScroll,
       landedInCommunity: joinedHome.path === `/c/${communityId}/home`,
       communityVisible: joinedHome.text.includes('Invite Redemption Smoke Community'),
-      inviteMarkedUsed: Boolean(redeemedRows[0]?.used_at),
+      inviteMarkedUsed: Boolean(redeemedInvite[0]?.used_at),
       membershipCreated: joinedMembershipRows.length === 1,
       membershipRoleMember: joinedMembershipRows[0]?.role === 'member',
       membershipActive: joinedMembershipRows[0]?.removed_at == null,
@@ -551,7 +780,6 @@ try {
   results.push({
     name: 'reused-invite-shows-generic-join-error',
     screenshotPath: await screenshot(reusePage, 'reused-invite-shows-generic-join-error'),
-    observed: reusedJoin,
     checks: {
       noHorizontalScroll: reusedJoin.noHorizontalScroll,
       stillOnJoin: reusedJoin.path === '/join',
@@ -561,6 +789,7 @@ try {
   });
 
   adminPage.close();
+  legacyPage.close();
   freshPage.close();
   reusePage.close();
 
@@ -569,11 +798,6 @@ try {
   }
 
   const report = {
-    generatedAt: new Date().toISOString(),
-    chromium,
-    baseUrl,
-    userDataDir,
-    flags,
     note: 'Chromium launched with --incognito and without --no-sandbox. Local wrangler dev only. Plain invite code is not stored in the report.',
     localOnlyGuard: true,
     results,
@@ -598,16 +822,21 @@ try {
 
   if (!report.passed) process.exitCode = 1;
 } catch (error) {
-  if (devStderr.trim()) {
-    console.error('[invite-redemption-smoke] wrangler stderr follows:');
-    console.error(devStderr.trim());
-  }
-  if (chromeStderr.trim()) {
-    console.error('[invite-redemption-smoke] chromium stderr follows:');
-    console.error(chromeStderr.trim());
-  }
-  throw error;
+  throw new Error(
+    `invite-redemption smoke failed; bounded diagnostics=${JSON.stringify({
+      message: error instanceof Error ? error.message : String(error),
+      workerStderrBytes: devStderr.length,
+      chromiumStderrBytes: chromeStderr.length,
+    })}`,
+  );
 } finally {
+  if (failureTriggerInstalled) {
+    try {
+      sql('DROP TRIGGER IF EXISTS proof_fail_invite_generation_audit');
+    } catch {
+      // The local database may already be unavailable during teardown.
+    }
+  }
   if (chrome) chrome.kill('SIGTERM');
   if (dev) dev.kill('SIGTERM');
 }

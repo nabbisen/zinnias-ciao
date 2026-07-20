@@ -336,6 +336,10 @@ fn i18n_en_ja_parity_count() {
             EN_ADMIN_INVITES_NEW_CODE_HINT,
             JA_ADMIN_INVITES_NEW_CODE_HINT,
         ),
+        (
+            EN_ADMIN_INVITES_REVEAL_WARNING,
+            JA_ADMIN_INVITES_REVEAL_WARNING,
+        ),
         (EN_ADMIN_INVITES_REVOKE, JA_ADMIN_INVITES_REVOKE),
         (EN_ADMIN_INVITES_REVOKED, JA_ADMIN_INVITES_REVOKED),
         (
@@ -2108,6 +2112,152 @@ const MEMBERS_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/admin/members.rs");
 const JOIN_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/join.rs");
 const INVITE_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/invite.rs");
+const INVITE_SMOKE_SRC: &str = include_str!("../../../scripts/smoke/invite-redemption.mjs");
+
+#[test]
+fn rfc076_one_time_invite_response_isolation_is_pinned() {
+    let production = MEMBERS_HANDLER_SRC
+        .split("#[cfg(test)]\nmod tests")
+        .next()
+        .expect("members handler production source must precede tests");
+    assert!(
+        !production.contains("invites?code=")
+            && !production.contains("query_pairs().find(|(k, _)| k == \"code\")"),
+        "production must never create or render a plaintext invite-code query handoff"
+    );
+
+    let get = compact_brace_block(production, "pub async fn get_invites");
+    assert!(
+        get.contains("leturl=req.url()?")
+            && get.contains("run_invite_get_preflight(invite_get_preflight(")
+            && get.contains("ControlFlow::Break(location)=>legacy_query_redirect(&location)")
+            && get.contains("get_invites_authenticated(req,env,community_id,flash)")
+            && !get.contains("require_auth")
+            && !get.contains("require_admin")
+            && !get.contains("env.d1")
+            && !get.contains("issue_token")
+            && !get.contains("render_invites_page"),
+        "legacy code-query containment must run before every authenticated/application continuation"
+    );
+    let authenticated = compact_brace_block(production, "async fn get_invites_authenticated");
+    assert!(
+        authenticated.contains("require_auth")
+            && authenticated.contains("require_admin")
+            && authenticated.contains("render_invites_page"),
+        "clean invite GET must delegate all authenticated work to the private continuation"
+    );
+    let legacy_redirect = compact_brace_block(production, "fn legacy_query_redirect");
+    assert!(
+        legacy_redirect.contains("with_status(303)")
+            && legacy_redirect.contains("set(\"Location\",location)")
+            && legacy_redirect.contains("set(\"Referrer-Policy\",\"no-referrer\")"),
+        "legacy query containment must emit a clean 303 with no-referrer"
+    );
+
+    let canonical = compact_brace_block(production, "fn canonical_invites_path");
+    assert!(
+        canonical.contains("byte.is_ascii_alphanumeric()")
+            && canonical.contains("matches!(byte,b'_'|b'-')")
+            && canonical.contains("\"%{byte:02X}\"")
+            && canonical.contains("\"/c/{encoded}/admin/invites\""),
+        "canonical invite path must use the reviewed byte allowlist and uppercase percent encoding"
+    );
+    let runner = compact_brace_block(production, "fn run_invite_get_preflight");
+    assert!(
+        runner.contains("InviteGetPreflight::Continue=>ControlFlow::Continue(continuation())")
+            && runner.contains(
+                "InviteGetPreflight::CanonicalRedirect(location)=>ControlFlow::Break(location)"
+            ),
+        "preflight runner must make the early-return continuation boundary executable"
+    );
+
+    assert!(
+        production.contains("struct InviteCodeReveal(String);")
+            && !production.contains("derive(Debug")
+            && !production.contains("impl std::fmt::Display for InviteCodeReveal")
+            && !production.contains("Serialize for InviteCodeReveal"),
+        "plaintext reveal must remain a narrow private non-formatting/non-serializing type"
+    );
+    let reveal = compact_brace_block(production, "fn invite_reveal_html");
+    assert!(
+        reveal.contains("render::escape_html(reveal.as_str())")
+            && reveal.contains("JA_ADMIN_INVITES_REVEAL_WARNING")
+            && !reveal.contains("data-")
+            && !reveal.contains("<script"),
+        "reveal renderer must place escaped plaintext only in the dedicated text panel"
+    );
+
+    let post = compact_brace_block(production, "pub async fn post_generate_invite");
+    assert!(
+        post.contains("returnredirect(&canonical_invites_path(community_id))")
+            && post.contains("letcreated=matchinvite_db::insert_required(")
+            && post.contains("Err(_)=>returnrender::service_unavailable()")
+            && post.contains("consume_detailed(")
+            && post.contains("matches!(consume,ConsumeResult::Replay(_))")
+            && post.contains("InviteCodeReveal::new(code)")
+            && post.contains("letmutresponse=matchrender_invites_page(")
+            && post
+                .matches("Err(_)=>returnrender::service_unavailable()")
+                .count()
+                == 2
+            && post.contains("set(\"Cache-Control\",\"no-store,private\")")
+            && post.contains("set(\"Referrer-Policy\",\"no-referrer\")")
+            && !post.contains("Location")
+            && !post.contains("?code="),
+        "first generation must render directly with strict headers; replay must use a clean canonical 303"
+    );
+    assert!(
+        INVITE_DB_SRC.contains("AuditAction::InviteCodeGenerated")
+            && INVITE_DB_SRC.contains("audit::execute_required(db, mutation, &record)")
+            && post.contains("\"member\""),
+        "RFC-076 must preserve the central RFC-079 Class A batch and member-only grant"
+    );
+    assert!(
+        MEMBERS_HANDLER_SRC
+            .contains("legacy_query_preflight_never_invokes_authenticated_continuation")
+            && MEMBERS_HANDLER_SRC
+                .contains("code_query_preflight_matches_empty_repeated_and_encoded_keys")
+            && MEMBERS_HANDLER_SRC
+                .contains("canonical_invite_path_encodes_every_non_allowlisted_byte")
+            && MEMBERS_HANDLER_SRC.contains("reveal_html_contains_code_once_and_only_as_text"),
+        "focused native tests must pin early ordering, query decoding, path containment, and reveal placement"
+    );
+
+    for required in [
+        "legacy-code-query-is-contained-before-authentication",
+        "redirectRequestHasNoReferrer",
+        "admin-generated-invite-is-stored-and-shown-once",
+        "directStatus",
+        "noStorePrivate",
+        "codeFreeBrowserUrl",
+        "codeAppearsOnce",
+        "consumed-generation-token-replay-is-clean-and-non-mutating",
+        "required-audit-failure-rolls-back-and-discloses-nothing",
+        "proof_fail_invite_generation_audit",
+        "exactlyOneCentralEvent",
+        "audit.required_batch_failed",
+        "failure_category=storage route_class=class_a",
+        "generation-recovers-after-local-trigger-cleanup",
+        "DROP TRIGGER IF EXISTS proof_fail_invite_generation_audit",
+    ] {
+        assert!(
+            INVITE_SMOKE_SRC.contains(required),
+            "RFC-076 smoke must retain required assertion/evidence marker: {required}"
+        );
+    }
+    for forbidden in [
+        "inviteCodeFromLocation",
+        "screenshot(adminPage, 'admin-generated-invite-is-stored-and-shown-once')",
+        "observed:",
+        "inviteRows:",
+        "values:",
+    ] {
+        assert!(
+            !INVITE_SMOKE_SRC.contains(forbidden),
+            "RFC-076 smoke/report must not retain plaintext-sensitive marker: {forbidden}"
+        );
+    }
+}
 
 // ── RFC-079 Package 0A audit inventory gate ─────────────────────────────
 

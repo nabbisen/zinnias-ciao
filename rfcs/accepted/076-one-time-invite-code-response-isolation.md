@@ -1,7 +1,8 @@
 # RFC 076 — One-Time Invite Code Response Isolation
 
 **Status.** Accepted — architecture-approved and owner-accepted 2026-07-17;
-implementation must follow a reviewed handoff
+locally implemented from the reviewed handoff on 2026-07-18 and awaiting
+architecture implementation review
 **Priority.** Architect-review remediation; blocks controlled hosted staging unless
 risk-accepted and blocks any public or production pilot  
 **Source finding.** 2026-07-14 architecture preparation review B1  
@@ -422,3 +423,30 @@ design and resolved these supporting decisions:
 4. The remediation uses selectable text only and adds no copy-button script.
 5. RFC-079 required-audit atomicity/redaction is settled locally; remaining
    hosted/persistent-incident evidence stays distinct and open.
+
+## Local Implementation Evidence — 2026-07-18
+
+The source implementation now uses a private reveal type and a shared
+GET/direct-POST renderer. A successful generation returns `200` at the clean
+canonical URL with `Cache-Control: no-store, private`,
+`Referrer-Policy: no-referrer`, no `Location`, and the escaped code once in
+body text. Every consumed generation-token replay, including a replay without
+a stored result reference, returns a clean `303` without mutation or redisplay.
+
+The handler-entry preflight recognizes empty, repeated, and percent-encoded
+`code` query keys before authentication, authorization, binding access, token
+issuance, or rendering. Its canonical path builder percent-encodes every
+community-ID byte outside ASCII alphanumeric, `_`, and `-`.
+
+Focused native tests and contracts gates pin the early-return seam, hostile
+path/query cases, reveal placement, replay classification, response headers,
+required-audit boundary, and retained smoke constraints. The local
+`smoke:invite` browser/D1 scenario observed the direct reveal, code-free URL,
+clean replay, anonymous legacy-query containment with no redirect referrer,
+HMAC-only one-invite/one-audit deltas, forced required-audit rollback with
+generic `503` and exactly one bounded Class A event, trigger cleanup, recovery,
+normal redemption, and generic reuse failure.
+
+This evidence is local and does not establish manual no-JS behavior, hosted
+Cloudflare request/log behavior, RFC-050 exact-candidate evidence, B1 closure,
+pilot readiness, deployment authorization, or lifecycle completion.
