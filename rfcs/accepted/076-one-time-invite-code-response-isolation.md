@@ -1,8 +1,9 @@
 # RFC 076 — One-Time Invite Code Response Isolation
 
 **Status.** Accepted — architecture-approved and owner-accepted 2026-07-17;
-locally implemented from the reviewed handoff on 2026-07-18 and awaiting
-architecture implementation review
+local implementation reviewed, owner-accepted, and committed at `b72f22b`;
+corrected automated and bounded human no-JS/browser-network evidence were
+architecture-reviewed and owner-accepted 2026-07-21, closing criterion 8 locally
 **Priority.** Architect-review remediation; blocks controlled hosted staging unless
 risk-accepted and blocks any public or production pilot  
 **Source finding.** 2026-07-14 architecture preparation review B1  
@@ -450,3 +451,39 @@ normal redemption, and generic reuse failure.
 This evidence is local and does not establish manual no-JS behavior, hosted
 Cloudflare request/log behavior, RFC-050 exact-candidate evidence, B1 closure,
 pilot readiness, deployment authorization, or lifecycle completion.
+
+## Automated Visible-Browser No-JS Evidence — 2026-07-21
+
+A fresh ignored `--persist-to` root was shared by migrations, synthetic seed,
+count queries, Wrangler dev, and Chromium in the active Niri desktop. CDP
+disabled page JavaScript before loading the authenticated invite page. A new-
+document marker proved that page script execution did not occur. The bounded
+observer drove the ordinary HTML form through DOM geometry and mouse input,
+not application JavaScript, while retaining the generated code only in process
+memory.
+
+All 22 bounded assertions passed: direct `200`, clean canonical URL, no
+`Location`, exact cache/referrer headers, visible/selectable reveal, one body
+occurrence, native mouse-drag selection with non-empty selected length, no code
+in observed request URLs/headers, no third-party request, clean non-mutating
+replay, no reveal after replay or away/back, and legacy query `303` containment
+with no unsafe follow-up `Referer`. The fail-closed wrapper parsed an exact
+assertion inventory, rejected false/missing/extra results, captured direct D1
+deltas from `0/0` to `1/1`, required trigger count zero, and wrote the retained
+JSON only after deleting the fresh D1/browser root.
+
+No code, HMAC, form/session token, request body, HTML body, raw D1 row, reveal
+screenshot, or raw network capture is retained. No isolated root or loopback
+listener remained.
+
+The owner then completed the bounded human checklist with DevTools Network open
+and JavaScript visibly disabled. Sections A–C passed: the reveal was visibly
+rendered and selected without retention; direct status/headers, same-origin
+requests, and absence of third-party requests were confirmed; replay produced
+`POST 303` followed by canonical `GET 200` with no `POST 200`; no-store Back
+rendered no application page and Reload recovered cleanly without reveal or
+fetch/reconstruction; and the synthetic legacy-query redirect, headers,
+follow-up referrer, clean URL, and absent marker/reveal were confirmed.
+
+Architecture review and owner acceptance close criterion 8 locally. RFC-050
+hosted evidence and B1 closure remain open regardless.

@@ -16,7 +16,7 @@ authorize implementation.
 
 | ID | Title | Accepted | Note |
 |----|-------|----------|------|
-| 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Locally implemented from the reviewed handoff on 2026-07-18; awaiting architecture implementation review. RFC-050 hosted and manual no-JS evidence remain required before public/production B1 closure |
+| 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Local implementation reviewed/accepted/committed at `b72f22b`; corrected isolated automation and bounded human no-JS/network evidence were architecture-reviewed and owner-accepted, closing criterion 8 locally. RFC-050 hosted evidence remains required before public/production B1 closure |
 | 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 0A–8 and the Class A telemetry correction reviewed/committed. Persistent delivery and exact-candidate hosted B5 evidence remain required |
 
 ## Done — MVP core (001–019)
