@@ -1,6 +1,7 @@
 # RFC 077 — Fail-Closed HMAC Pepper Configuration
 
-**Status.** Proposed — design review required; implementation is not authorized  
+**Status.** Accepted — architecture-reviewed and owner-accepted on 2026-07-21;
+implementation requires a reviewed handoff and explicit owner authorization  
 **Priority.** Architect-review remediation; blocks controlled hosted staging unless
 risk-accepted and blocks any public or production pilot  
 **Source finding.** 2026-07-14 architecture preparation review B2  
@@ -32,8 +33,9 @@ RFC-077 introduces two independent enforcement layers:
 Local development uses a developer-specific ignored `.dev.vars.dev` secret.
 There is no built-in, committed, deterministic, or plain-variable fallback.
 
-This is a remediation design, not implementation approval. It may move to
-`rfcs/accepted/` only after architecture review and explicit owner acceptance.
+This remediation design is accepted. Runtime and configuration implementation
+remain unauthorized until a bounded implementation handoff is architecture-
+reviewed and the owner explicitly authorizes implementation.
 
 ## Problem and Security Invariant
 
