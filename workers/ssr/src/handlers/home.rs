@@ -5,14 +5,10 @@ use worker::{Env, Request, Response, Result};
 use crate::authz::require_membership;
 use crate::db::{self, event as event_db, membership as membership_db};
 use crate::render;
-use crate::session::require_auth;
 use zinnias_ciao_contracts::i18n;
 
 pub async fn redirect_to_home(req: Request, env: &Env, _rid: &str) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return crate::render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, crate::render::session_expired());
     let db = env.d1("DB")?;
     let memberships = membership_db::list_active_for_user(&db, &auth.user_id).await?;
     if memberships.is_empty() {
@@ -27,10 +23,7 @@ pub async fn redirect_to_home(req: Request, env: &Env, _rid: &str) -> Result<Res
 }
 
 pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 

@@ -12,7 +12,6 @@ use crate::db::invite as invite_db;
 use crate::db::{self, membership as membership_db};
 use crate::form_token::ConsumeResult;
 use crate::render;
-use crate::session::require_auth;
 use zinnias_ciao_contracts::i18n;
 
 fn redirect(url: &str) -> Result<Response> {
@@ -140,10 +139,7 @@ async fn get_invites_authenticated(
     community_id: &str,
     flash: Option<&'static str>,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let _membership = require_admin(env, &auth, community_id).await?;
     render_invites_page(env, community_id, &auth.user_id, flash, None).await
 }
@@ -157,7 +153,7 @@ async fn render_invites_page(
 ) -> Result<Response> {
     let db = env.d1("DB")?;
     let gen_token =
-        crate::codlet::issue_token(env, user_id, token_purpose::GENERATE_INVITE, None).await;
+        crate::codlet::issue_token(env, user_id, token_purpose::GENERATE_INVITE, None).await?;
 
     let communities_for_switcher = membership_db::list_communities_for_user(&db, user_id)
         .await
@@ -181,7 +177,7 @@ async fn render_invites_page(
     for inv in &active_codes {
         let revoke_tok =
             crate::codlet::issue_token(env, user_id, token_purpose::REVOKE_INVITE, Some(&inv.id))
-                .await;
+                .await?;
         let role_label = if inv.grants_role == "admin" {
             i18n::JA_ROLE_ADMIN
         } else {
@@ -285,19 +281,16 @@ pub async fn post_generate_invite(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
+    let pp = crate::crypto::pepper(env)?;
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let consume = crate::form_token::consume_detailed(
         &db,
-        &pp,
+        pp.as_str(),
         &auth.user_id,
         token_purpose::GENERATE_INVITE,
         &raw_token,
@@ -322,7 +315,7 @@ pub async fn post_generate_invite(
         }
     }
     let normalized = normalize_invite_code(&code);
-    let code_hmac = hmac_hex(&pp, &normalized);
+    let code_hmac = hmac_hex(pp.as_str(), &normalized);
     let invite_id = random_token()[..24].to_owned();
     let expires_at = db::add_seconds_to_now(86_400);
     let created = match invite_db::insert_required(
@@ -367,10 +360,7 @@ pub async fn post_revoke_invite(
     community_id: &str,
     invite_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
@@ -404,10 +394,7 @@ pub async fn get_members(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let community = db::community::find_active(&db, community_id).await?;

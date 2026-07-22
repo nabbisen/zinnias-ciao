@@ -8,7 +8,6 @@ use crate::authz::require_admin;
 use crate::db::{self, event as event_db, event_write, membership as membership_db};
 use crate::handlers::event::classify_day;
 use crate::render;
-use crate::session::require_auth;
 
 use super::forms::{render_details_only_event_edit_fields, render_single_day_edit_fields};
 use super::policy::{
@@ -24,10 +23,7 @@ pub async fn get_edit_event(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
@@ -67,7 +63,7 @@ pub async fn get_edit_event(
         token_purpose::EDIT_EVENT,
         Some(event_id),
     )
-    .await;
+    .await?;
 
     let community_tz = db::community::find_active(&db, community_id)
         .await?
@@ -159,10 +155,7 @@ pub async fn post_edit_event(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 

@@ -4,7 +4,6 @@ use zinnias_ciao_contracts::{auth::token_purpose, i18n};
 use crate::authz::require_admin;
 use crate::db::{event as event_db, event_write};
 use crate::render;
-use crate::session::require_auth;
 
 use super::support::redirect;
 
@@ -16,10 +15,7 @@ pub async fn get_cancel_occurrence(
     event_id: &str,
     day_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&_req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&_req, env, render::session_expired());
     let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -37,7 +33,7 @@ pub async fn get_cancel_occurrence(
         token_purpose::CANCEL_OCCURRENCE,
         Some(day_id),
     )
-    .await;
+    .await?;
     let body = format!(
         "<main style=\"padding:1rem 1rem 5rem;max-width:42rem;margin:0 auto\">\
          <h1 style=\"font-size:1.25rem;font-weight:700;margin:0 0 .75rem\">{title}</h1>\
@@ -74,10 +70,7 @@ pub async fn post_cancel_occurrence(
     event_id: &str,
     day_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let body = req.form_data().await?;

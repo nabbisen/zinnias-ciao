@@ -5,7 +5,7 @@
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "dev": "bunx wrangler dev --env dev --local",
-    "build": "worker-build --release",
+    "build": "worker-build --release workers/ssr",
     "migrate:dev": "bunx wrangler d1 migrations apply zinnias-ciao-dev --local --env dev",
     "migrate:staging": "bunx wrangler d1 migrations apply zinnias-ciao-staging --remote --env staging --config wrangler.staging.local.toml",
     "migrate:prod": "bunx wrangler d1 migrations apply zinnias-ciao --remote --env production --config wrangler.production.local.toml",
@@ -25,6 +25,9 @@
     "test:audit-boundaries": "node scripts/test-audit-boundaries.mjs",
     "test:audit-class-a-failures": "node scripts/test-audit-class-a-failures.mjs",
     "test:audit-migration": "node scripts/test-audit-migration.mjs",
+    "test:local-secret-setup": "node scripts/test-local-secret-setup.mjs",
+    "test:bootstrap-safety": "node scripts/test-bootstrap-cloudflare.mjs",
+    "test:hmac-pepper-configuration": "node scripts/test-hmac-pepper-configuration.mjs",
     "smoke:display-name": "node scripts/smoke/self-display-name-editing.mjs",
     "smoke:matrix": "node scripts/smoke/monthly-attendance-matrix.mjs",
     "smoke:matrix-csv": "node scripts/smoke/calendar-matrix-csv-export.mjs"

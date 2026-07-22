@@ -44,6 +44,17 @@ pub fn service_unavailable() -> Result<Response> {
     Ok(Response::from_html(shell(i18n::JA_GENERAL_ERROR, &body))?.with_status(503))
 }
 
+/// Fixed RFC-077 response for unavailable security configuration.
+/// It intentionally contains no recovery links or configuration details.
+pub fn configuration_unavailable() -> Result<Response> {
+    let body = format!(
+        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+         <p>{}</p></main>",
+        i18n::JA_CONFIGURATION_UNAVAILABLE,
+    );
+    Ok(Response::from_html(shell(i18n::JA_CONFIGURATION_UNAVAILABLE, &body))?.with_status(503))
+}
+
 pub fn session_expired() -> Result<Response> {
     let body = format!(
         "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\

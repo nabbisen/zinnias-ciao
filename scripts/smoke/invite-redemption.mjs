@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Scenario smoke for admin-generated invite redemption. Local wrangler dev only.
 
+import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+
 import { createHmac } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
@@ -12,7 +14,8 @@ const outDir = process.env.EVIDENCE_DIR ?? '.git-exclude/evidence/invite-redempt
 const reportName = process.env.REPORT_NAME ?? 'invite-redemption-smoke-results.json';
 const userDataDir = `.git-exclude/tmp/chrome-invite-redemption-sandboxed-${Date.now()}`;
 const chromium = process.env.CHROMIUM ?? '/usr/bin/chromium';
-const pepper = 'dev-pepper-change-in-production';
+const isolated = await prepareIsolatedWorkerTest("invite-redemption");
+const pepper = isolated.pepper;
 const now = '2026-07-12T00:00:00.000Z';
 
 const communityId = 'com_smoke_invite_redemption';
@@ -52,7 +55,7 @@ function runWrangler(args) {
     throw new Error('invite-redemption smoke refuses remote D1 operations');
   }
   try {
-    return execFileSync('bunx', ['wrangler', ...args], {
+    return isolated.runWranglerSync(args, {
       cwd: process.cwd(),
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
@@ -475,10 +478,7 @@ try {
   logStep('seeding local D1 fixtures');
   seed();
   logStep(`starting local wrangler dev on ${baseUrl}`);
-  dev = spawn('bun', ['run', 'dev', '--', '--port', String(port)], {
-    cwd: process.cwd(),
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
+  dev = isolated.spawnDev(port);
   dev.stderr.on('data', (chunk) => {
     devStderr += chunk.toString();
   });
@@ -839,4 +839,5 @@ try {
   }
   if (chrome) chrome.kill('SIGTERM');
   if (dev) dev.kill('SIGTERM');
+  await isolated.cleanup();
 }

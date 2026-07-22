@@ -1,7 +1,8 @@
 # RFC 077 — Fail-Closed HMAC Pepper Configuration
 
 **Status.** Accepted — architecture-reviewed and owner-accepted on 2026-07-21;
-implementation requires a reviewed handoff and explicit owner authorization  
+bounded local implementation is complete and awaiting architecture
+implementation review
 **Priority.** Architect-review remediation; blocks controlled hosted staging unless
 risk-accepted and blocks any public or production pilot  
 **Source finding.** 2026-07-14 architecture preparation review B2  
@@ -33,13 +34,14 @@ RFC-077 introduces two independent enforcement layers:
 Local development uses a developer-specific ignored `.dev.vars.dev` secret.
 There is no built-in, committed, deterministic, or plain-variable fallback.
 
-This remediation design is accepted. Runtime and configuration implementation
-remain unauthorized until a bounded implementation handoff is architecture-
-reviewed and the owner explicitly authorizes implementation.
+This remediation design is accepted. Its handoff was architecture-reviewed and
+the owner authorized the bounded local implementation at checkpoint `91f3a39`.
+The resulting patch and local gate evidence still require architecture
+implementation review. Hosted criteria 8–9 remain separate and unauthorized.
 
 ## Problem and Security Invariant
 
-`crypto::pepper(env)` currently checks:
+Before this implementation patch, `crypto::pepper(env)` checked:
 
 1. a non-empty secret binding;
 2. a non-empty plain variable binding;
@@ -501,6 +503,28 @@ cannot enforce runtime configuration.
 
 Rejected. Alternate deployment paths, later secret deletion, and configuration
 drift still require a runtime security boundary.
+
+## Local Implementation Evidence
+
+The authorized local patch now contains the secret-only opaque resolver,
+validated route preflight and readiness behavior, four required-secret scopes,
+safe developer secret-file setup, fresh-only hosted bootstrap with a distinct
+destructive-rotation contract, and a shared isolated Worker harness for every
+affected executable smoke/audit gate.
+
+The complete local command set required by the reviewed implementation handoff
+was observed passing on 2026-07-21: Rust formatting/tests/Clippy/wasm check,
+release Worker build, local secret/bootstrap/configuration behavioral tests,
+all listed browser/domain smokes, the compiled Class A audit-failure proof,
+the documentation build, and `git diff --check`. Two initially parallelized
+browser runs collided on shared legacy ports and passed when rerun
+sequentially; only the uncontested reruns are treated as gate evidence.
+
+This evidence is local and awaits architecture implementation review. It does
+not establish deployment-time required-secret rejection, hosted
+runtime-negative behavior, exact-candidate hosted validity, B2 closure,
+production/pilot readiness, or release authorization. RFC-077 therefore
+remains in `accepted/`.
 
 ## Review Questions
 

@@ -14,7 +14,6 @@ use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::authz::require_admin;
 use crate::db::{self, community as community_db, membership as membership_db};
 use crate::render;
-use crate::session::require_auth;
 use zinnias_ciao_contracts::i18n;
 
 // ── GET /c/:cid/admin/export ──────────────────────────────────────────────
@@ -25,10 +24,7 @@ pub async fn get_export_page(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
@@ -39,7 +35,7 @@ pub async fn get_export_page(
         token_purpose::COMMUNITY_EXPORT,
         Some(community_id),
     )
-    .await;
+    .await?;
 
     let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
         .await
@@ -110,10 +106,7 @@ pub async fn get_export_json(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 

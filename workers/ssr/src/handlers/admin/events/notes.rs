@@ -5,7 +5,6 @@ use zinnias_ciao_contracts::i18n;
 use crate::authz::require_admin;
 use crate::db::{event as event_db, membership as membership_db};
 use crate::render;
-use crate::session::require_auth;
 
 use super::support::redirect;
 
@@ -17,10 +16,7 @@ pub async fn get_admin_hide_note_confirm(
     event_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
@@ -30,7 +26,7 @@ pub async fn get_admin_hide_note_confirm(
         token_purpose::ADMIN_HIDE_NOTE,
         Some(event_id),
     )
-    .await;
+    .await?;
 
     let all = membership_db::list_all_active(&db, community_id).await?;
     let target_name = all
@@ -91,10 +87,7 @@ pub async fn post_admin_hide_note(
     event_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 

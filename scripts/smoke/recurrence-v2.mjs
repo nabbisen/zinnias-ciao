@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Scenario smoke for recurrence v2 workflows. Local wrangler dev only.
 
+import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+
 import { createHmac } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
@@ -12,7 +14,8 @@ const outDir = process.env.EVIDENCE_DIR ?? '.git-exclude/evidence/rfc065';
 const reportName = process.env.REPORT_NAME ?? 'rfc065-recurrence-v2-smoke-results.json';
 const userDataDir = `.git-exclude/tmp/chrome-recurrence-v2-sandboxed-${Date.now()}`;
 const chromium = process.env.CHROMIUM ?? '/usr/bin/chromium';
-const pepper = 'dev-pepper-change-in-production';
+const isolated = await prepareIsolatedWorkerTest("recurrence-v2");
+const pepper = isolated.pepper;
 const now = '2026-07-09T00:00:00.000Z';
 
 const communityId = 'com_rfc065_primary';
@@ -55,7 +58,7 @@ function runWrangler(args, options = {}) {
     throw new Error('recurrence-v2 smoke refuses remote D1 operations');
   }
   try {
-    return execFileSync('bunx', ['wrangler', ...args], {
+    return isolated.runWranglerSync(args, {
       cwd: process.cwd(),
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
@@ -426,10 +429,7 @@ try {
   seed();
 
   logStep(`starting local wrangler dev on ${baseUrl}`);
-  dev = spawn('bun', ['run', 'dev', '--', '--port', String(port)], {
-    cwd: process.cwd(),
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
+  dev = isolated.spawnDev(port);
   dev.stderr.on('data', (chunk) => {
     devStderr += chunk.toString();
   });
@@ -632,4 +632,5 @@ try {
   if (dev && dev.exitCode === null) dev.kill('SIGTERM');
   if (chrome && chrome.exitCode === null) chrome.kill('SIGTERM');
   await rm(userDataDir, { recursive: true, force: true }).catch(() => {});
+  await isolated.cleanup();
 }

@@ -53,6 +53,7 @@ materially changed form against the
 ## Auth storage gates (v0.38.6)
 
 - [ ] `HMAC_PEPPER` secret is set in the target environment, either by bootstrap seeding or by `wrangler secret put` with the target environment's ignored local config.
+- [ ] Root and the selected Wrangler environment declare `HMAC_PEPPER` required; the exact candidate returns a fixed non-mutating `503` for missing/invalid configuration and ready `/healthz` only for the preserved valid secret. *(RFC-077; hosted evidence remains required)*
 - [ ] `RATE_LIMIT` KV namespace is created and bound in ignored local Wrangler config for the target environment.
 - [ ] New invite code generation writes to `invite_codes` only (verify: `SELECT COUNT(*) FROM invite_codes` increases after admin generates a code).
 - [ ] New session issuance writes to `sessions` (verify: `SELECT COUNT(*) FROM sessions` increases after a successful join).
@@ -325,14 +326,14 @@ materially changed form against the
 
 ## Operational gates
 
-- [x] `GET /healthz` returns `{"ok":true}`. *(health.rs get_health)*
+- [x] Local implementation makes `GET /healthz` return `{"ok":true,"ready":true,"service":"ciao.zinnias"}` only with a valid pepper and a generic not-ready `503` otherwise. *(RFC-077 health handler and isolated local configuration gate; hosted exact-candidate evidence remains open)*
 - [x] `GET /version` returns build version. *(health.rs get_version reads BUILD_VERSION var)*
 - [x] Rollback procedure documented and understood. *(docs/src/shared/deployment.md §Rollback: `wrangler rollback --env production`)*
 - [x] Log persistence approach documented. *(docs/src/shared/deployment.md §Log persistence: Cloudflare Logpush to R2/S3)*
 - [x] Tracked `wrangler.toml` is release-gated to contain only placeholder D1/KV IDs. *(release_gates.rs: `tracked_wrangler_template_contains_only_placeholder_resource_ids`)*
 - [ ] D1 migration applied to remote staging and rehearsed. *(operator task: `bun run migrate:staging`, which uses `wrangler d1 migrations apply --remote`)*
 - [ ] Production commands use ignored `wrangler.production.local.toml`; staging commands use ignored `wrangler.staging.local.toml`. *(operator task — hosted config isolation)*
-- [ ] Production bootstrap invite generated for initial release. *(operator task: `bun run bootstrap:production -- --community "Production Community" --admin "Admin"`; this sets production `HMAC_PEPPER`; keep the printed invite code private)*
+- [ ] On a proven-fresh, dark production target, bootstrap invite generated; then exact candidate identity and ready `/healthz` verified before `/join` or traffic. *(operator task: `bun run bootstrap:production -- --community "Production Community" --admin "Admin"`; keep the printed invite private)*
 - [ ] `SESSION_COOKIE_DOMAIN` is configured as a **`[vars]` binding** in the target environment's ignored local Wrangler config if needed; leave unset for a host-only cookie. *(operator task — RFC-038)*
 - [ ] Logpush configured for production. *(operator task: Cloudflare dashboard)*
 

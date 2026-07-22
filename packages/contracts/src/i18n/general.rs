@@ -10,12 +10,16 @@ pub const JA_LOGOUT_CONFIRM: &str = "ログアウトしますか？";
 
 // ── General ───────────────────────────────────────────────────────────────
 pub const EN_GENERAL_ERROR: &str = "Something went wrong. Please try again.";
+pub const EN_CONFIGURATION_UNAVAILABLE: &str =
+    "The service is temporarily unavailable. Please try again later.";
 pub const EN_OFFLINE_BANNER: &str = "Offline — showing last loaded";
 pub const EN_EMPTY_EVENTS: &str = "No events yet.";
 pub const EN_EMPTY_EVENTS_HINT: &str = "Ask your community admin to add one.";
 pub const EN_EMPTY_EVENTS_ADMIN: &str = "No events yet. Create the first event for this community.";
 
 pub const JA_GENERAL_ERROR: &str = "エラーが発生しました。もう一度お試しください。";
+pub const JA_CONFIGURATION_UNAVAILABLE: &str =
+    "ただいまサービスを利用できません。しばらくしてから、もう一度お試しください。";
 pub const EN_NOT_FOUND: &str = "Not found.";
 pub const JA_NOT_FOUND: &str = "見つかりませんでした。";
 pub const EN_INTERNAL_ERROR: &str = "Something went wrong. Please try again.";

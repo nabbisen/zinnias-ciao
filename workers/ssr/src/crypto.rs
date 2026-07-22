@@ -7,37 +7,87 @@
 
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
+use std::fmt;
 
 type HmacSha256 = Hmac<Sha256>;
 
-/// The single source of truth for the HMAC pepper (AD-3).
-///
-/// `HMAC_PEPPER` is set per-environment via `wrangler secret put`. We read it
-/// as a secret. The dev fallback is only used when neither a secret nor a var
-/// is bound (i.e. local `wrangler dev` without a configured secret).
-///
-/// In staging/production the deploy must set the secret. The `LOG_LEVEL` var
-/// distinguishes environments: when it is `warn` (production) or `info`
-/// (staging) and no pepper is bound, we still return the fallback but the
-/// caller is expected to have configured the secret — a release gate and the
-/// launch runbook enforce this. Centralizing here bans the previous mix of
-/// `env.var`/`env.secret` with divergent fallbacks across handlers.
-pub fn pepper(env: &worker::Env) -> String {
-    if let Ok(s) = env.secret("HMAC_PEPPER") {
-        let v = s.to_string();
-        if !v.is_empty() {
-            return v;
+const MIN_HMAC_PEPPER_BYTES: usize = 32;
+const MAX_HMAC_PEPPER_BYTES: usize = 4096;
+
+const LEGACY_SENTINELS: [&str; 2] = ["dev-pepper-change-in-production", "dev-pepper"];
+
+/// Validated HMAC key material. Deliberately has no `Debug`, `Display`,
+/// serialization, or owned-string conversion surface.
+pub struct HmacPepper(String);
+
+impl HmacPepper {
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PepperConfigError {
+    Missing,
+    Empty,
+    SurroundingWhitespace,
+    LegacySentinel,
+    TooShort,
+    TooLong,
+}
+
+impl PepperConfigError {
+    pub const fn category(self) -> &'static str {
+        match self {
+            Self::Missing => "missing",
+            Self::Empty => "empty",
+            Self::SurroundingWhitespace => "surrounding_whitespace",
+            Self::LegacySentinel => "legacy_sentinel",
+            Self::TooShort => "too_short",
+            Self::TooLong => "too_long",
         }
     }
-    // Fall back to a var binding (some local setups bind it as a plain var),
-    // then to the dev sentinel as a last resort for `wrangler dev`.
-    if let Ok(v) = env.var("HMAC_PEPPER") {
-        let v = v.to_string();
-        if !v.is_empty() {
-            return v;
-        }
+}
+
+impl fmt::Display for PepperConfigError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.category())
     }
-    "dev-pepper-change-in-production".to_string()
+}
+
+impl From<PepperConfigError> for worker::Error {
+    fn from(error: PepperConfigError) -> Self {
+        Self::RustError(format!("security configuration unavailable: {error}"))
+    }
+}
+
+fn validate_pepper(value: &str) -> Result<HmacPepper, PepperConfigError> {
+    if value.is_empty() || value.trim().is_empty() {
+        return Err(PepperConfigError::Empty);
+    }
+    if value.trim() != value {
+        return Err(PepperConfigError::SurroundingWhitespace);
+    }
+    if LEGACY_SENTINELS.contains(&value) {
+        return Err(PepperConfigError::LegacySentinel);
+    }
+    if value.len() < MIN_HMAC_PEPPER_BYTES {
+        return Err(PepperConfigError::TooShort);
+    }
+    if value.len() > MAX_HMAC_PEPPER_BYTES {
+        return Err(PepperConfigError::TooLong);
+    }
+    Ok(HmacPepper(value.to_owned()))
+}
+
+/// The single source of truth for the HMAC pepper (AD-3 / RFC-077).
+/// Only a Worker secret binding is accepted. Missing or invalid configuration
+/// is never replaced with a local or plain-variable fallback.
+pub fn pepper(env: &worker::Env) -> Result<HmacPepper, PepperConfigError> {
+    let secret = env
+        .secret("HMAC_PEPPER")
+        .map_err(|_| PepperConfigError::Missing)?;
+    validate_pepper(&secret.to_string())
 }
 
 /// Compute HMAC-SHA256(key=pepper, msg=value) and return lowercase hex.

@@ -9,7 +9,6 @@ use crate::db::{
     self, attendance as attendance_db, event as event_db, membership as membership_db,
 };
 use crate::render;
-use crate::session::require_auth;
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::{i18n, tz};
 use zinnias_ciao_domain::{
@@ -22,10 +21,7 @@ pub async fn get_communities(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let db = env.d1("DB")?;
 
     let summaries = membership_db::list_communities_for_user(&db, &auth.user_id).await?;
@@ -164,7 +160,7 @@ pub async fn get_communities(
                         token_purpose::CALENDAR_MATRIX_CSV_EXPORT,
                         Some(&export_bound_resource),
                     )
-                    .await,
+                    .await?,
                 )
             } else {
                 None
@@ -223,10 +219,7 @@ pub async fn post_matrix_export_audit(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return json_error(401, i18n::JA_SESSION_EXPIRED),
-    };
+    let auth = crate::require_auth_or!(&req, env, json_error(401, i18n::JA_SESSION_EXPIRED));
     let membership = crate::authz::require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let form = req.form_data().await?;
@@ -249,9 +242,14 @@ pub async fn post_matrix_export_audit(
     if token.is_empty() || replay.is_some() {
         return json_error(400, i18n::JA_GENERAL_ERROR);
     }
-    let pepper = crate::crypto::pepper(env);
-    crate::form_token::set_result(&db, &pepper, &token, "calendar_matrix_csv.export_requested")
-        .await?;
+    let pepper = crate::crypto::pepper(env)?;
+    crate::form_token::set_result(
+        &db,
+        pepper.as_str(),
+        &token,
+        "calendar_matrix_csv.export_requested",
+    )
+    .await?;
 
     if crate::audit::write_pre_disclosure(
         &db,

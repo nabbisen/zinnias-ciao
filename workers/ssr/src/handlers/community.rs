@@ -2,7 +2,6 @@
 
 use crate::db::membership as membership_db;
 use crate::render;
-use crate::session::require_auth;
 use worker::{Env, Request, Response, Result};
 
 /// GET /switch?community=:id — no-JS community switcher target.
@@ -10,10 +9,7 @@ use worker::{Env, Request, Response, Result};
 /// community before redirecting (prevents open-redirect / cross-community
 /// access). Falls back to the member home on any mismatch.
 pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
 
     let url = req.url()?;
     let target: Option<String> = url

@@ -9,8 +9,15 @@ operator-only recovery, and audit/log access.
 
 ```sh
 curl https://<your-worker>.workers.dev/healthz
-# {"ok":true,"service":"ciao.zinnias"}
+# ready:     {"ok":true,"ready":true,"service":"ciao.zinnias"}
+# not ready: {"ok":false,"ready":false,"service":"ciao.zinnias"} (HTTP 503)
 ```
+
+Readiness currently validates the secret-only `HMAC_PEPPER` configuration. A
+missing, empty, whitespace-damaged, legacy, too-short, or oversized value keeps
+health not ready and makes every dynamic request return a fixed non-mutating
+`503`. Restore the exact previous valid secret when possible. Do not generate a
+replacement as an incidental recovery step.
 
 ## Version
 
@@ -203,8 +210,10 @@ not-found response, and review `audit_log` for
 `membership.relink_redeemed` row with the same `relink_code_id`.
 
 Do not use `scripts/bootstrap-cloudflare.mjs` for routine community access
-recovery. Bootstrap rotates `HMAC_PEPPER`, which invalidates existing sessions,
-invite codes, relink codes, and form tokens for the whole environment.
+recovery. Default bootstrap accepts only a proven-fresh target. Its separate
+destructive-rotation mode replaces `HMAC_PEPPER`, invalidating sessions,
+invite codes, relink/help-signin codes, form tokens, calendar tokens, and
+outstanding recovery codes for the whole environment.
 
 ## Returning removed members
 

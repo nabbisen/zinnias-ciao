@@ -140,7 +140,7 @@ printing it or storing it in shell history.
 ### 2.2 Set secrets for staging
 
 For hosted staging with bootstrap login testing, `bun run bootstrap:staging`
-will generate and set a fresh staging `HMAC_PEPPER` later in §4.3. Use the
+will generate and set a fresh staging `HMAC_PEPPER` later in §4.2. Use the
 standalone command below only when running unauthenticated staging checks without
 bootstrap seeding.
 
@@ -171,7 +171,7 @@ exact deployment host. Only set it if you need cross-subdomain cookie sharing.
 
 For initial production release with first-admin bootstrap, `bun run
 bootstrap:production` will generate and set a fresh production `HMAC_PEPPER`
-later in §4.7. Use the standalone command below only when production bootstrap
+later in §4.6. Use the standalone command below only when production bootstrap
 seeding is not being run, or during a planned key rotation:
 
 ```sh
@@ -180,7 +180,9 @@ openssl rand -hex 32 | bunx wrangler secret put HMAC_PEPPER --env production \
 ```
 
 Rotating production `HMAC_PEPPER` invalidates existing sessions, invite codes,
-and form tokens.
+relink/help-signin codes, form tokens, calendar tokens, and outstanding
+recovery codes. Restoring the same missing value is recovery; generating a
+replacement on a non-fresh environment is destructive rotation.
 
 Set `SESSION_COOKIE_DOMAIN` in `wrangler.production.local.toml` under
 `[env.production]` (same as staging — it is a var, not a secret):
@@ -245,15 +247,7 @@ bun install
 
 - [ ] Done.
 
-### 4.2 Deploy to staging
-
-```sh
-bunx wrangler deploy --env staging --config wrangler.staging.local.toml
-```
-
-- [ ] Done.
-
-### 4.3 Bootstrap the first staging community and admin invite
+### 4.2 Bootstrap fresh staging while it is dark
 
 `wrangler deploy` only publishes the Worker. It does not seed D1 and does not
 print an admin invite code. Bootstrap staging explicitly:
@@ -262,11 +256,28 @@ print an admin invite code. Bootstrap staging explicitly:
 bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"
 ```
 
-This command applies remote staging migrations, rotates staging `HMAC_PEPPER`,
-inserts one staging community and seed admin, and prints the admin invite code
-for `/join`. Keep the printed code private; it is a staging login credential.
+The command proves the recognized application tables are empty before creating
+random material. It then sets one staging `HMAC_PEPPER`, inserts the matching
+community/admin seed, prints the private admin invite, and ends
+`provisioned-not-ready`. `--yes` can skip only the fresh-target prompt; it
+cannot authorize rotation. Wrangler secret provisioning can publish a Worker
+version, so keep the target dark: no custom route, public test traffic, or user
+data.
 
 - [ ] Staging community and admin invite seeded.
+
+### 4.3 Deploy the exact candidate and verify readiness
+
+Immediately deploy the reviewed exact candidate:
+
+```sh
+bunx wrangler deploy --env staging --config wrangler.staging.local.toml
+```
+
+Confirm candidate identity with `/version`, then require ready `/healthz`
+before using the invite, `/join`, or any public test traffic.
+
+- [ ] Exact candidate deployed without replacing the provisioned pepper.
 
 ### 4.4 Smoke-test staging
 
@@ -274,7 +285,7 @@ for `/join`. Keep the printed code private; it is a staging login credential.
 STAGING_URL="https://zinnias-ciao-ssr-stg.<account>.workers.dev"
 
 curl "$STAGING_URL/healthz"
-# Expected: {"ok":true,"service":"ciao.zinnias"}
+# Expected: {"ok":true,"ready":true,"service":"ciao.zinnias"}
 
 curl "$STAGING_URL/version"
 # Expected: {"ok":true,"version":"staging"}
@@ -313,35 +324,29 @@ Work through all `[~]` items in `docs/src/tester/release-checklist.md`:
 
 - [ ] All `[~]` QA items passed on staging.
 
-### 4.6 Deploy to production
+### 4.6 Bootstrap fresh production while it is dark
 
-Only after staging QA passes:
-
-```sh
-bunx wrangler deploy --env production --config wrangler.production.local.toml
-```
-
-- [ ] Done.
-
-### 4.7 Bootstrap the first production community and admin invite
-
-`wrangler deploy --env production --config wrangler.production.local.toml` only
-publishes the Worker. It does not seed D1 and does not print an admin invite
-code. Bootstrap production explicitly:
+Only after staging QA passes, keep the new production target dark and bootstrap
+production explicitly:
 
 ```sh
 bun run bootstrap:production -- --community "Production Community" --admin "Admin"
 ```
 
-This command applies remote production migrations, rotates production
-`HMAC_PEPPER`, inserts one production community and seed admin, and prints the
-admin invite code for `/join`. Use it for initial production release setup only,
-or for a planned production credential rotation. Keep the printed code private;
-it is a production login credential.
+This is for a proven-fresh first release. It creates one pepper and matching
+seed and ends `provisioned-not-ready`; it is not a routine deploy command. Keep
+the printed invite private and unused.
 
 - [ ] Production community and admin invite seeded.
 
-### 4.8 Smoke-test production
+### 4.7 Deploy the exact candidate and smoke-test production
+
+Immediately deploy the reviewed candidate without replacing the provisioned
+pepper:
+
+```sh
+bunx wrangler deploy --env production --config wrangler.production.local.toml
+```
 
 ```sh
 PROD_URL="https://your-production-domain.com"
@@ -353,6 +358,13 @@ curl "$PROD_URL/version"
 - [ ] Health check passes.
 - [ ] Version check passes.
 - [ ] Join form loads in a browser.
+
+On any non-fresh target, default bootstrap stops. A separately approved
+interactive rotation requires `--rotate-hmac-pepper` and typing exactly
+`ROTATE staging` or `ROTATE production`. Non-interactive rotation also requires
+`--yes --confirm-rotation "ROTATE <target>"`. Rotation invalidates sessions,
+invites, relink/help-signin codes, form tokens, calendar tokens, and outstanding
+recovery codes.
 
 ---
 

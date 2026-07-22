@@ -19,8 +19,10 @@ use crate::render::{self, escape_html};
 // ── GET /join ─────────────────────────────────────────────────────────────
 
 pub async fn get_join(req: Request, env: &Env, _rid: &str) -> Result<Response> {
-    if crate::session::require_auth(&req, env).await.is_ok() {
-        return redirect("/");
+    match crate::session::require_auth(&req, env).await {
+        Ok(_) => return redirect("/"),
+        Err(crate::session::AuthError::Unauthenticated) => {}
+        Err(error) => return Err(error.into_worker_error()),
     }
     let token = anon_token(env).await?;
     render_join_form(&token, None)
@@ -83,11 +85,11 @@ async fn legacy_post_join(
         worker::console_log!("[{}] join invite rejected: reason=rate_limited", rid);
         return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
     }
-    let pepper = crate::crypto::pepper(env);
+    let pepper = crate::crypto::pepper(env)?;
     let db = env.d1("DB")?;
     let _ = crate::form_token::consume(
         &db,
-        &pepper,
+        pepper.as_str(),
         "",
         token_purpose::REDEEM_INVITE,
         &raw_token,
@@ -95,7 +97,7 @@ async fn legacy_post_join(
     )
     .await?;
     let normalized = crate::crypto::normalize_invite_code(&raw_code);
-    let code_hmac = crate::crypto::hmac_hex(&pepper, &normalized);
+    let code_hmac = crate::crypto::hmac_hex(pepper.as_str(), &normalized);
     let invite = crate::db::invite::find_valid(&db, &code_hmac).await?;
     if invite.is_none() {
         crate::rate_limit::record_failure(env, &client_ip).await;
@@ -106,10 +108,10 @@ async fn legacy_post_join(
     crate::rate_limit::clear_failures(env, &client_ip).await;
     let ticket = crate::crypto::random_token();
     let ticket_value = format!("{}:{}", invite.id, invite.community_id);
-    let ticket_hmac = crate::crypto::hmac_hex(&pepper, &ticket_value);
+    let ticket_hmac = crate::crypto::hmac_hex(pepper.as_str(), &ticket_value);
     let profile_token = crate::form_token::issue(
         &db,
-        &pepper,
+        pepper.as_str(),
         &ticket,
         token_purpose::JOIN_PROFILE,
         Some(&ticket_hmac),
@@ -142,12 +144,12 @@ async fn legacy_post_profile(
     if ticket.is_empty() || ticket_value.is_empty() {
         return redirect("/join");
     }
-    let pepper = crate::crypto::pepper(env);
-    let ticket_hmac = crate::crypto::hmac_hex(&pepper, &ticket_value);
+    let pepper = crate::crypto::pepper(env)?;
+    let ticket_hmac = crate::crypto::hmac_hex(pepper.as_str(), &ticket_value);
     let db = env.d1("DB")?;
     let replay = crate::form_token::consume(
         &db,
-        &pepper,
+        pepper.as_str(),
         &ticket,
         token_purpose::JOIN_PROFILE,
         &raw_token,
@@ -170,7 +172,7 @@ async fn legacy_post_profile(
     let user_id = crate::crypto::random_token();
     let membership_id = crate::crypto::random_token();
     let session_secret = crate::crypto::random_token();
-    let session_hmac = crate::crypto::hmac_hex(&pepper, &session_secret);
+    let session_hmac = crate::crypto::hmac_hex(pepper.as_str(), &session_secret);
     let session_id = crate::crypto::random_token();
     if let Err(error) = crate::db::invite::redeem_required(
         &db,
@@ -213,9 +215,9 @@ async fn legacy_post_profile(
 
 async fn anon_token(env: &Env) -> Result<String> {
     use zinnias_ciao_contracts::auth::token_purpose;
-    let pepper = crate::crypto::pepper(env);
+    let pepper = crate::crypto::pepper(env)?;
     let db = env.d1("DB")?;
-    crate::form_token::issue(&db, &pepper, "", token_purpose::REDEEM_INVITE, None).await
+    crate::form_token::issue(&db, pepper.as_str(), "", token_purpose::REDEEM_INVITE, None).await
 }
 
 async fn refresh_join_form(env: &Env, error: Option<&'static str>) -> Result<Response> {

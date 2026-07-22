@@ -51,7 +51,8 @@ pub async fn post_community_access_recovery(
 
     let code = random_token()[..16].to_ascii_uppercase();
     let normalized = normalize_invite_code(&code);
-    let code_hmac = hmac_hex(&crate::crypto::pepper(env), &normalized);
+    let pepper = crate::crypto::pepper(env)?;
+    let code_hmac = hmac_hex(pepper.as_str(), &normalized);
     let relink_code_id = random_token()[..24].to_owned();
     let expires_at = relink_db::expires_at();
     if !relink_db::issue_required(

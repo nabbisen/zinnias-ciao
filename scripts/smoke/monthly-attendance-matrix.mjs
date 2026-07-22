@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Scenario smoke for RFC-067 monthly attendance matrix. Local wrangler dev only.
 
+import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+
 import { createHmac } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
@@ -12,7 +14,8 @@ const outDir = process.env.EVIDENCE_DIR ?? '.git-exclude/evidence/rfc067';
 const reportName = process.env.REPORT_NAME ?? 'rfc067-monthly-attendance-matrix-smoke-results.json';
 const userDataDir = `.git-exclude/tmp/chrome-rfc067-matrix-sandboxed-${Date.now()}`;
 const chromium = process.env.CHROMIUM ?? '/usr/bin/chromium';
-const pepper = 'dev-pepper-change-in-production';
+const isolated = await prepareIsolatedWorkerTest("monthly-attendance-matrix");
+const pepper = isolated.pepper;
 const now = '2026-07-10T00:00:00.000Z';
 
 const primaryCommunityId = 'com_rfc067_primary';
@@ -54,7 +57,7 @@ function assertLocalOnly() {
 function runWrangler(args) {
   if (args.includes('--remote')) throw new Error('RFC-067 smoke refuses remote D1 operations');
   try {
-    return execFileSync('bunx', ['wrangler', ...args], {
+    return isolated.runWranglerSync(args, {
       cwd: process.cwd(),
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
@@ -364,10 +367,7 @@ try {
   seed();
 
   logStep(`starting local wrangler dev on ${baseUrl}`);
-  dev = spawn('bun', ['run', 'dev', '--', '--port', String(port)], {
-    cwd: process.cwd(),
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
+  dev = isolated.spawnDev(port);
   dev.stderr.on('data', (chunk) => {
     devStderr += chunk.toString();
   });
@@ -517,4 +517,5 @@ try {
   if (chrome) chrome.kill();
   if (dev) dev.kill();
   await rm(userDataDir, { recursive: true, force: true }).catch(() => {});
+  await isolated.cleanup();
 }

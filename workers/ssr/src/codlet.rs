@@ -12,15 +12,10 @@ pub async fn issue_token(
     user_id: &str,
     purpose: &str,
     bound_resource: Option<&str>,
-) -> String {
-    let pepper = crate::crypto::pepper(env);
-    if let Ok(db) = env.d1("DB") {
-        crate::form_token::issue(&db, &pepper, user_id, purpose, bound_resource)
-            .await
-            .unwrap_or_default()
-    } else {
-        String::new()
-    }
+) -> Result<String> {
+    let pepper = crate::crypto::pepper(env)?;
+    let db = env.d1("DB")?;
+    crate::form_token::issue(&db, pepper.as_str(), user_id, purpose, bound_resource).await
 }
 
 /// Validate and consume a single-use CSRF form token.
@@ -31,9 +26,17 @@ pub async fn consume_token(
     raw_token: &str,
     bound_resource: Option<&str>,
 ) -> Result<Option<String>> {
+    let pepper = crate::crypto::pepper(env)?;
     let db = env.d1("DB")?;
-    let pepper = crate::crypto::pepper(env);
-    crate::form_token::consume(&db, &pepper, user_id, purpose, raw_token, bound_resource).await
+    crate::form_token::consume(
+        &db,
+        pepper.as_str(),
+        user_id,
+        purpose,
+        raw_token,
+        bound_resource,
+    )
+    .await
 }
 
 /// Metadata for one active invite code.

@@ -30,7 +30,9 @@ before the detailed commands.
 
 Important distinction: `wrangler deploy` only publishes a Worker. It does not
 seed D1 and does not print an admin invite code. Bootstrap commands seed the
-first community/admin data and print the invite code.
+first community/admin data and print the invite code. Default bootstrap is
+fresh-target provisioning, not a routine deploy command and not an implicit
+pepper rotation command.
 
 ## Environments
 
@@ -116,24 +118,33 @@ id      = "PASTE_PRODUCTION_RATE_LIMIT_KV_ID_HERE"
 
 | Step | Command | Expected result |
 |------|---------|-----------------|
-| 1. Deploy staging Worker | `bunx wrangler deploy --env staging --config wrangler.staging.local.toml` | Public staging URL is published. |
-| 2. Bootstrap staging data | `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"` | Remote staging D1 is migrated and an admin invite code is printed. |
-| 3. Run runtime smoke | `bun run smoke:runtime -- https://<deployed-worker-url>` | Public runtime evidence is written under `.git-exclude/evidence/`. |
-| 4. Close staging when done | `bunx wrangler delete --env staging --config wrangler.staging.local.toml` | Public staging Worker stops serving. |
+| 1. Bootstrap a proven-fresh target while dark | `bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"` | Remote D1 is migrated, freshness is proven, one secret and matching seed are created, and the state is `provisioned-not-ready`. |
+| 2. Deploy the exact candidate | `bunx wrangler deploy --env staging --config wrangler.staging.local.toml` | The reviewed candidate is attached to the provisioned resources. |
+| 3. Verify identity and readiness, then enable traffic | Inspect `/version`, then `/healthz`. | Candidate identity matches and health is `ok: true, ready: true` before `/join` or other user traffic. |
+| 4. Run runtime smoke | `bun run smoke:runtime -- https://<deployed-worker-url>` | Public runtime evidence is written under `.git-exclude/evidence/`. |
+| 5. Close staging when done | `bunx wrangler delete --env staging --config wrangler.staging.local.toml` | Public staging Worker stops serving. |
 
-The admin invite code appears in step 2, not step 1.
+The admin invite code appears during bootstrap. Keep it private and do not use
+it until exact-candidate identity and readiness have been verified.
 
 ### Steps
 
-Deploy `[env.staging]`:
+For a new empty staging target, keep it dark: do not attach a custom route,
+send public test traffic, or insert user data outside bootstrap. Bootstrap first:
 
 ```sh
-bunx wrangler deploy --env staging --config wrangler.staging.local.toml
+bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"
 ```
 
-Refresh the hosted staging Worker with the same command after changing source,
-release labels, static asset cache-busters, `wrangler.staging.local.toml`, or
-any D1/KV binding IDs:
+Bootstrap stops before random generation or secret replacement unless the
+schema is exactly recognized and every application table is empty. `--yes`
+only skips the fresh-target prompt. Wrangler secret provisioning can publish a
+Worker version, so the command deliberately ends at `provisioned-not-ready`.
+
+Immediately deploy the exact candidate, verify its `/version`, and require
+`/healthz` to return
+`{"ok":true,"ready":true,"service":"ciao.zinnias"}` before `/join`, smoke,
+or traffic is enabled:
 
 ```sh
 bunx wrangler deploy --env staging --config wrangler.staging.local.toml
@@ -144,15 +155,12 @@ If a staging D1 or KV resource is deleted and recreated, update
 `wrangler.staging.local.toml` with the new resource ID and redeploy before
 testing the hosted URL.
 
-Bootstrap staging login data:
-
-```sh
-bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"
-```
-
-This command applies remote staging migrations, rotates staging `HMAC_PEPPER`,
-inserts one staging community and seed admin, and prints the admin invite code
-for `/join`. Keep the printed code private; it is a staging login credential.
+For later candidate deployments, preserve the existing valid pepper and do not
+run bootstrap. A non-fresh bootstrap target stops unless destructive rotation
+is separately authorized with `--rotate-hmac-pepper` and the exact typed
+`ROTATE staging` confirmation. Rotation invalidates sessions, invites,
+relink/help-signin codes, form tokens, calendar tokens, and outstanding
+recovery codes.
 
 Run runtime smoke against the URL reported by Wrangler:
 
@@ -267,39 +275,37 @@ After deleting D1 or KV, remove or replace the deleted staging IDs in
 
 | Step | Command | Expected result |
 |------|---------|-----------------|
-| 1. Apply production migrations | `bun run migrate:prod` | Remote production D1 schema is current. |
-| 2. Deploy production Worker | `bunx wrangler deploy --env production --config wrangler.production.local.toml` | Production Worker is published. |
-| 3. Bootstrap first admin, initial release only | `bun run bootstrap:production -- --community "Production Community" --admin "Admin"` | First production community/admin is seeded and an admin invite code is printed. |
+| 1. Bootstrap proven-fresh production while dark | `bun run bootstrap:production -- --community "Production Community" --admin "Admin"` | Migrations, freshness proof, secret, and matching first-admin seed complete at `provisioned-not-ready`. |
+| 2. Deploy the exact candidate | `bunx wrangler deploy --env production --config wrangler.production.local.toml` | The reviewed candidate is attached without rotating its pepper. |
+| 3. Verify identity/readiness, then enable traffic | Inspect `/version`, then `/healthz`. | Candidate identity matches and health is ready before `/join` or user traffic. |
 
 `wrangler deploy --env production --config wrangler.production.local.toml`
 publishes the Worker, but does not seed D1 or print an admin invite code.
 
 ### Steps
 
-Apply production migrations after staging has been verified:
-
-```sh
-bun run migrate:prod
-```
-
-Deploy production:
-
-```sh
-bunx wrangler deploy --env production --config wrangler.production.local.toml
-```
-
-For initial production release setup, bootstrap the first community and admin
-invite explicitly:
+After staging has been verified, keep a new production target dark and
+bootstrap the first community and admin invite explicitly:
 
 ```sh
 bun run bootstrap:production -- --community "Production Community" --admin "Admin"
 ```
 
-This command applies remote production migrations, rotates production
-`HMAC_PEPPER`, inserts one production community and seed admin, and prints the
-admin invite code for `/join`. Keep the printed code private; it is a production
-login credential. Do not run it on an active production database unless a
-planned credential rotation is approved.
+For a proven-fresh production target, this command applies migrations, creates
+one `HMAC_PEPPER`, inserts the matching first community/admin seed, prints the
+admin invite code, and ends `provisioned-not-ready`. Keep the target dark,
+immediately deploy the exact candidate, verify candidate identity and ready
+`/healthz`, and only then permit `/join` or traffic. Keep the invite private.
+
+```sh
+bunx wrangler deploy --env production --config wrangler.production.local.toml
+```
+
+Do not run default bootstrap on a non-fresh target. An approved destructive
+rotation requires `--rotate-hmac-pepper` and the exact typed `ROTATE production`
+confirmation; non-interactive rotation additionally requires `--yes
+--confirm-rotation "ROTATE production"`. Normal candidate deployment preserves
+the current secret.
 
 ## Local Development Smoke
 
@@ -338,11 +344,14 @@ openssl rand -hex 32 | bunx wrangler secret put HMAC_PEPPER --env production \
 
 For hosted bootstrap, `bun run bootstrap:staging` and `bun run
 bootstrap:production` generate and set a fresh environment-specific
-`HMAC_PEPPER` as part of seeding. Use the standalone secret command only when
-bootstrap seeding is not being run.
+`HMAC_PEPPER` only after proving that the target is fresh. Use the standalone
+secret command only when bootstrap seeding is not being run. Restoring the
+same missing secret is recovery; generating a replacement for a non-fresh
+environment is destructive rotation.
 
 Use a different pepper for each environment. Rotating the pepper invalidates
-existing sessions, invite codes, and form tokens for that environment.
+sessions, invite codes, relink/help-signin codes, form tokens, calendar tokens,
+and outstanding recovery codes for that environment.
 
 ## Vars
 

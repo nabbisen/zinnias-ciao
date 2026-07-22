@@ -44,7 +44,7 @@ resumes only after the remediation hold is explicitly lifted in this roadmap.
 | RFC | Theme | Current note |
 |-----|-------|--------------|
 | 076 | One-time invite code response isolation | Local implementation reviewed, owner-accepted, and committed at `b72f22b`. Corrected isolated automated evidence and bounded human no-JS/network observation were architecture-reviewed and owner-accepted on 2026-07-21, closing criterion 8 locally; RFC-050 exact-candidate hosted evidence remains required before B1 closes for a public or production pilot. |
-| 077 | Fail-closed HMAC pepper configuration | Design architecture-reviewed and owner-accepted on 2026-07-21. Implementation requires a reviewed handoff and explicit owner authorization; hosted deployment-time, runtime-negative, and exact-candidate evidence remain required before B2 closes for a public or production pilot. |
+| 077 | Fail-closed HMAC pepper configuration | Bounded local implementation and the complete reviewed-handoff local gate set were completed on 2026-07-21; architecture implementation review is pending. Hosted deployment-time, runtime-negative, and exact-candidate evidence remain unauthorized and required before B2 closes for a public or production pilot. |
 | 079 | Atomic required audits and recursive metadata redaction | Architecture reviewed and owner-accepted on 2026-07-15. Local Packages 0A–8 and the Class A failure-telemetry correction are reviewed and committed. RFC-050 exact-candidate hosted evidence, persistent incident delivery, and every public/production pilot gate remain open. |
 
 ## Proposed Work

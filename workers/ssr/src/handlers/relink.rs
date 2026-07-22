@@ -17,8 +17,10 @@ fn redirect(url: &str) -> Result<Response> {
 // ── GET /relink ──────────────────────────────────────────────────────────
 
 pub async fn get_relink(req: Request, env: &Env, _rid: &str) -> Result<Response> {
-    if crate::session::require_auth(&req, env).await.is_ok() {
-        return redirect("/");
+    match crate::session::require_auth(&req, env).await {
+        Ok(_) => return redirect("/"),
+        Err(crate::session::AuthError::Unauthenticated) => {}
+        Err(error) => return Err(error.into_worker_error()),
     }
     let token = relink_form_token(env).await?;
     render_relink_form(&token, None)
@@ -36,12 +38,12 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
     let body = req.form_data().await?;
     let raw_code = body.get_field("code").unwrap_or_default();
     let raw_token = body.get_field("_token").unwrap_or_default();
-    let pepper = crate::crypto::pepper(env);
+    let pepper = crate::crypto::pepper(env)?;
     let db = env.d1("DB")?;
 
     let replay = crate::form_token::consume(
         &db,
-        &pepper,
+        pepper.as_str(),
         "",
         token_purpose::REDEEM_RELINK,
         &raw_token,
@@ -54,7 +56,7 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
     }
 
     let normalized = normalize_invite_code(&raw_code);
-    let code_hmac = hmac_hex(&pepper, &normalized);
+    let code_hmac = hmac_hex(pepper.as_str(), &normalized);
     let Some(target) = relink_db::find_valid_by_hmac(&db, &code_hmac).await? else {
         crate::rate_limit::record_relink_failure(env, &client_ip).await;
         worker::console_log!("[{}] relink rejected: reason=no_valid_relink", rid);
@@ -62,7 +64,7 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
     };
 
     let session_secret = random_token();
-    let session_hmac = hmac_hex(&pepper, &session_secret);
+    let session_hmac = hmac_hex(pepper.as_str(), &session_secret);
     let session_id = random_token();
     if let Err(error) =
         relink_db::redeem_required(&db, rid, &target, &session_id, &session_hmac).await
@@ -92,9 +94,9 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
 }
 
 async fn relink_form_token(env: &Env) -> Result<String> {
-    let pepper = crate::crypto::pepper(env);
+    let pepper = crate::crypto::pepper(env)?;
     let db = env.d1("DB")?;
-    crate::form_token::issue(&db, &pepper, "", token_purpose::REDEEM_RELINK, None).await
+    crate::form_token::issue(&db, pepper.as_str(), "", token_purpose::REDEEM_RELINK, None).await
 }
 
 async fn refresh_relink_form(env: &Env, error: Option<&'static str>) -> Result<Response> {

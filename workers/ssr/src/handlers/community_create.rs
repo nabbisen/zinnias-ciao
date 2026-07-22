@@ -11,7 +11,6 @@ use crate::authz::{MembershipContext, require_active_admin_somewhere};
 use crate::crypto::random_token;
 use crate::rate_limit;
 use crate::render::{self, escape_html};
-use crate::session::require_auth;
 
 const COMMUNITY_CREATE_PATH: &str = "/communities/new";
 const SUPPORTED_TIMEZONE: &str = "Asia/Tokyo";
@@ -28,10 +27,7 @@ pub(crate) fn community_creation_enabled(env: &Env) -> bool {
 }
 
 pub async fn get_new_community(req: Request, env: &Env, _rid: &str) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let admin = require_active_admin_somewhere(env, &auth).await?;
 
     if !community_creation_enabled(env) {
@@ -39,7 +35,8 @@ pub async fn get_new_community(req: Request, env: &Env, _rid: &str) -> Result<Re
     }
 
     let token =
-        crate::codlet::issue_token(env, &auth.user_id, token_purpose::CREATE_COMMUNITY, None).await;
+        crate::codlet::issue_token(env, &auth.user_id, token_purpose::CREATE_COMMUNITY, None)
+            .await?;
     render_form(
         &admin,
         &token,
@@ -51,10 +48,7 @@ pub async fn get_new_community(req: Request, env: &Env, _rid: &str) -> Result<Re
 }
 
 pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let admin = require_active_admin_somewhere(env, &auth).await?;
 
     if !community_creation_enabled(env) {
@@ -157,8 +151,8 @@ pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Resul
     )
     .await?;
 
-    let pepper = crate::crypto::pepper(env);
-    crate::form_token::set_result(&db, &pepper, &raw_token, &community_id).await?;
+    let pepper = crate::crypto::pepper(env)?;
+    crate::form_token::set_result(&db, pepper.as_str(), &raw_token, &community_id).await?;
     rate_limit::record_community_creation(env, &auth.user_id, &auth.session_id, &client_ip).await;
 
     redirect(&format!("/c/{community_id}/home"))
@@ -174,7 +168,7 @@ async fn refresh_form(
     error: Option<&str>,
 ) -> Result<Response> {
     let token =
-        crate::codlet::issue_token(env, user_id, token_purpose::CREATE_COMMUNITY, None).await;
+        crate::codlet::issue_token(env, user_id, token_purpose::CREATE_COMMUNITY, None).await?;
     render_form(admin, &token, community_name, display_name, timezone, error)
 }
 

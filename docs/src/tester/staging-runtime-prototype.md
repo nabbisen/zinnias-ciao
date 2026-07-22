@@ -14,7 +14,7 @@ start, deploy, seed, or mutate D1.
 
 It verifies:
 
-- `/healthz` returns JSON with `ok: true`;
+- `/healthz` returns JSON with `ok: true` and `ready: true`;
 - `/version` returns the expected staging build label;
 - public HTML routes such as `/join` and `/offline` return security headers and
   no-store caching;
@@ -146,27 +146,31 @@ it. If a staging D1 or KV resource is recreated and
 `wrangler.staging.local.toml` is updated, hosted staging will still use the old
 resource ID until this deploy command is run again.
 
-If staging D1 was recreated, run remote migrations and bootstrap again after
-updating `wrangler.staging.local.toml`:
+If staging D1 was recreated, use the fresh-target bootstrap procedure after
+updating `wrangler.staging.local.toml` and while the target remains dark:
 
 ```sh
-bun run migrate:staging
 bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"
 ```
 
 ### Bootstrap Remote Resources
 
-Before hosted smoke, create or refresh staging bootstrap data. This step applies
-remote staging migrations, rotates staging `HMAC_PEPPER`, inserts one staging
-community and seed admin, and prints the admin invite code for `/join`:
+Before hosted smoke on a new target, bootstrap while it is dark. This step
+applies remote migrations, proves the exact recognized application tables are
+empty, creates one staging `HMAC_PEPPER`, inserts the matching community/admin
+seed, prints the private admin invite, and ends `provisioned-not-ready`:
 
 ```sh
 bun run bootstrap:staging -- --community "Staging Community" --admin "Admin"
 ```
 
-Keep the printed invite code private. It is a staging login credential. The
+Keep the printed invite code private and unused until the exact candidate is
+deployed and both `/version` identity and ready `/healthz` are verified. The
 command targets only `[env.staging]`; production has a separate bootstrap
-command.
+command. Do not use default bootstrap to refresh a non-fresh target: normal
+candidate redeploy preserves its valid pepper. Destructive rotation requires
+the explicit rotation flag and exact target-bound confirmation described in
+the shared deployment guide.
 
 After bootstrap, confirm staging uses remote Cloudflare resources. A local or
 preview D1 check is not evidence for the deployed Worker:
@@ -262,6 +266,7 @@ Use this template after the prototype smoke passes.
 
 - [ ] Staging D1 migrations applied.
 - [ ] `HMAC_PEPPER` secret set for staging.
+- [ ] Exact candidate identity verified and `/healthz` returns `ok: true, ready: true` before `/join` or other user traffic.
 - [ ] `RATE_LIMIT` KV namespace bound for staging.
 - [ ] First staging community and admin seeded with non-production data.
 - [ ] Join flow succeeds with a staging invite code.

@@ -14,7 +14,6 @@ use crate::authz::require_membership;
 use crate::crypto::{hmac_hex, random_token};
 use crate::db::{self, calendar as cal_db};
 use crate::render;
-use crate::session::require_auth;
 
 // ── GET /c/:cid/me/calendar ───────────────────────────────────────────────
 
@@ -24,19 +23,17 @@ pub async fn get_me_calendar(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
+    let pp = crate::crypto::pepper(env)?;
 
     let regen_token =
         crate::codlet::issue_token(env, &auth.user_id, token_purpose::CALENDAR_REGENERATE, None)
-            .await;
+            .await?;
     let revoke_token =
-        crate::codlet::issue_token(env, &auth.user_id, token_purpose::CALENDAR_REVOKE, None).await;
+        crate::codlet::issue_token(env, &auth.user_id, token_purpose::CALENDAR_REVOKE, None)
+            .await?;
 
     let active = cal_db::find_active_for_membership(&db, &membership.membership_id, community_id)
         .await
@@ -82,7 +79,7 @@ pub async fn get_me_calendar(
         let feed_url = format!(
             "{origin}/c/{cid}/cal/{hmac}",
             cid = render::escape_html(community_id),
-            hmac = render::escape_html(&hmac_hex(&pp, &tok.id)),
+            hmac = render::escape_html(&hmac_hex(pp.as_str(), &tok.id)),
         );
         format!(
             "<div style=\"background:#f5f5f7;border-radius:12px;padding:1rem;margin:1rem 0\">\
@@ -173,13 +170,10 @@ pub async fn post_regenerate_calendar(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
-    let pp = crate::crypto::pepper(env);
+    let pp = crate::crypto::pepper(env)?;
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -198,7 +192,7 @@ pub async fn post_regenerate_calendar(
     let now = db::now_utc();
     // Generate new token — the ID is stored; HMAC(pepper, id) is the bearer secret.
     let token_id = random_token()[..32].to_owned();
-    let token_hmac = hmac_hex(&pp, &token_id);
+    let token_hmac = hmac_hex(pp.as_str(), &token_id);
     cal_db::rotate_required(
         &db,
         rid,
@@ -221,10 +215,7 @@ pub async fn post_revoke_calendar(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 

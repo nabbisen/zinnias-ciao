@@ -15,7 +15,10 @@ mod status;
 mod time;
 
 #[allow(unused_imports)]
-pub use errors::{internal_error, not_found, placeholder, service_unavailable, session_expired};
+pub use errors::{
+    configuration_unavailable, internal_error, not_found, placeholder, service_unavailable,
+    session_expired,
+};
 #[allow(unused_imports)]
 pub use event_card::{CardDay, event_card};
 pub use nav::{bottom_nav, header, header_with_switcher, header_with_switcher_next};

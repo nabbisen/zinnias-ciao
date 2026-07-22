@@ -8,13 +8,15 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { prepareIsolatedWorkerTest } from './lib/isolated-worker-test.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const isolated = await prepareIsolatedWorkerTest('audit-class-a-failures');
 const wranglerBin = join(root, 'node_modules/.bin/wrangler');
 const wranglerPackage = join(root, 'node_modules/wrangler/package.json');
 const database = 'zinnias-ciao-dev';
-const config = join(root, 'wrangler.toml');
-const pepper = 'dev-pepper-change-in-production';
+const config = isolated.configPath;
+const pepper = isolated.pepper;
 const now = '2026-07-17T00:00:00.000Z';
 const communityId = 'com_class_a_proof';
 const adminUserId = 'usr_class_a_proof';
@@ -48,20 +50,10 @@ function sqlString(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
-function inheritNonAuthorityEnvironment(source) {
-  const authority =
-    /^(?:CLOUDFLARE_|CF_(?:API_TOKEN|API_KEY|EMAIL|ACCOUNT_ID|ZONE_ID)$|WRANGLER_(?:API_TOKEN|OAUTH_TOKEN)$)/u;
-  const allowed = {};
-  for (const [key, value] of Object.entries(source)) {
-    if (!authority.test(key) && value !== undefined) allowed[key] = value;
-  }
-  return allowed;
-}
-
 function run(command, args, env) {
   return new Promise((accept, reject) => {
     const child = spawn(command, args, {
-      cwd: root,
+      cwd: isolated.root,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -259,20 +251,10 @@ function assertExactEvent(events, requestId, action) {
 }
 
 assertLocalOnly();
-const disposableRoot = join(root, '.git-exclude/tmp');
-await mkdir(disposableRoot, { recursive: true });
-const tempRoot = await mkdtemp(join(disposableRoot, 'audit-class-a-failures-'));
-const persistTo = join(tempRoot, 'state');
-const xdgConfig = join(tempRoot, 'xdg');
-await mkdir(persistTo);
-await mkdir(xdgConfig);
-assert(resolve(persistTo).startsWith(resolve(tempRoot)), 'disposable D1 path escaped its root');
+const persistTo = isolated.persistTo;
+assert(resolve(persistTo).startsWith(resolve(isolated.root)), 'disposable D1 path escaped its root');
 
-const env = {
-  ...inheritNonAuthorityEnvironment(process.env),
-  XDG_CONFIG_HOME: xdgConfig,
-  NO_COLOR: '1',
-};
+const env = isolated.env;
 
 let dev;
 let stderr = '';
@@ -306,27 +288,7 @@ try {
 
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
-  dev = spawn(
-    wranglerBin,
-    [
-      'dev',
-      '--env',
-      'dev',
-      '--local',
-      '--ip',
-      '127.0.0.1',
-      '--port',
-      String(port),
-      '--persist-to',
-      persistTo,
-      '--config',
-      config,
-      '--log-level',
-      'error',
-      '--show-interactive-dev-session=false',
-    ],
-    { cwd: root, env, stdio: ['ignore', 'ignore', 'pipe'] },
-  );
+  dev = isolated.spawnDev(port);
   dev.stderr.on('data', (chunk) => {
     stderr += chunk.toString();
   });
@@ -499,7 +461,10 @@ try {
     form: { _token: hiddenToken(successPage.text) },
   });
   await new Promise((accept) => setTimeout(accept, 100));
-  assert(success.status === 303, 'post-trigger success control failed');
+  assert(
+    success.status === 200,
+    `post-trigger RFC-076 reveal success control failed with status ${success.status}; worker stderr tail: ${stderr.slice(-1200)}`,
+  );
   assert(failureEvents(stderr, successOffset).length === 0, 'success control emitted a failure');
   summary.successControl = {
     failureEvents: 0,
@@ -533,5 +498,5 @@ try {
     await new Promise((accept) => dev.once('exit', accept));
   }
   stderr = '';
-  await rm(tempRoot, { recursive: true, force: true });
+  await isolated.cleanup();
 }

@@ -8,7 +8,6 @@ use crate::authz::require_admin;
 use crate::crypto::{hmac_hex, normalize_invite_code, random_token};
 use crate::db::{membership as membership_db, relink as relink_db};
 use crate::render;
-use crate::session::require_auth;
 
 fn redirect(url: &str) -> Result<Response> {
     let mut r = Response::empty()?;
@@ -34,10 +33,7 @@ pub async fn get_help_signin(
     community_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let target =
@@ -51,7 +47,7 @@ pub async fn get_help_signin(
         token_purpose::HELP_SIGNIN,
         Some(target_membership_id),
     )
-    .await;
+    .await?;
     let community_pairs = community_pairs_for_user(&db, &auth.user_id).await;
     let nav = render::bottom_nav(community_id, "home");
 
@@ -102,10 +98,7 @@ pub async fn post_help_signin(
     community_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
@@ -131,7 +124,8 @@ pub async fn post_help_signin(
 
     let code = random_token()[..16].to_ascii_uppercase();
     let normalized = normalize_invite_code(&code);
-    let code_hmac = hmac_hex(&crate::crypto::pepper(env), &normalized);
+    let pepper = crate::crypto::pepper(env)?;
+    let code_hmac = hmac_hex(pepper.as_str(), &normalized);
     let code_id = random_token()[..24].to_owned();
     let expires_at = relink_db::expires_at();
 

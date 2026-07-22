@@ -3,7 +3,7 @@
 //! Extracts and validates the session cookie on every authenticated request.
 //! Identity derives from the session row; never from client-supplied headers.
 
-use worker::{Env, Request, Result};
+use worker::{Env, Request};
 use zinnias_ciao_contracts::{AppError, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS};
 
 use crate::crypto::hmac_hex;
@@ -16,22 +16,64 @@ pub struct AuthContext {
     pub user_id: String,
 }
 
+/// Authentication failure keeps configuration unavailability distinct from
+/// ordinary missing/expired credentials until the handler boundary.
+pub enum AuthError {
+    Configuration(crate::crypto::PepperConfigError),
+    Unauthenticated,
+    Runtime(worker::Error),
+}
+
+impl AuthError {
+    pub fn into_worker_error(self) -> worker::Error {
+        match self {
+            Self::Configuration(error) => error.into(),
+            Self::Unauthenticated => {
+                worker::Error::RustError(AppError::session_expired().user_message.to_string())
+            }
+            Self::Runtime(error) => error,
+        }
+    }
+}
+
+impl From<crate::crypto::PepperConfigError> for AuthError {
+    fn from(error: crate::crypto::PepperConfigError) -> Self {
+        Self::Configuration(error)
+    }
+}
+
+impl From<worker::Error> for AuthError {
+    fn from(error: worker::Error) -> Self {
+        Self::Runtime(error)
+    }
+}
+
+#[macro_export]
+macro_rules! require_auth_or {
+    ($req:expr, $env:expr, $unauthenticated:expr) => {{
+        match $crate::session::require_auth($req, $env).await {
+            Ok(auth) => auth,
+            Err($crate::session::AuthError::Unauthenticated) => return $unauthenticated,
+            Err(error) => return Err(error.into_worker_error()),
+        }
+    }};
+}
+
 /// Extract the session cookie, hash it, look it up in D1.
 /// Returns `Ok(AuthContext)` on success, `Err(AppError)` otherwise.
 ///
-pub async fn require_auth(req: &Request, env: &Env) -> Result<AuthContext> {
-    let pepper = crate::crypto::pepper(env);
+pub async fn require_auth(req: &Request, env: &Env) -> std::result::Result<AuthContext, AuthError> {
+    let pepper = crate::crypto::pepper(env)?;
 
-    let cookie_secret = extract_cookie(req, SESSION_COOKIE_NAME).ok_or_else(|| {
-        worker::Error::RustError(AppError::session_expired().user_message.to_string())
-    })?;
+    let cookie_secret =
+        extract_cookie(req, SESSION_COOKIE_NAME).ok_or(AuthError::Unauthenticated)?;
 
     let db = env.d1("DB")?;
 
-    let hmac = hmac_hex(&pepper, &cookie_secret);
-    let session = session_db::find_active(&db, &hmac).await?.ok_or_else(|| {
-        worker::Error::RustError(AppError::session_expired().user_message.to_string())
-    })?;
+    let hmac = hmac_hex(pepper.as_str(), &cookie_secret);
+    let session = session_db::find_active(&db, &hmac)
+        .await?
+        .ok_or(AuthError::Unauthenticated)?;
 
     Ok(AuthContext {
         session_id: session.id,

@@ -17,3 +17,7 @@ style/tailwindcss/bin
 wrangler.*.local.toml
 # retired ambiguous staging filename, kept ignored defensively
 wrangler.local.toml
+
+# local Worker secrets and environment files (never commit populated values)
+.dev.vars*
+.env*

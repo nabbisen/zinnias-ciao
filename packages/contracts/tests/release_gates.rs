@@ -164,6 +164,7 @@ fn i18n_en_ja_parity_count() {
         (EN_LOGOUT, JA_LOGOUT),
         (EN_LOGOUT_CONFIRM, JA_LOGOUT_CONFIRM),
         (EN_GENERAL_ERROR, JA_GENERAL_ERROR),
+        (EN_CONFIGURATION_UNAVAILABLE, JA_CONFIGURATION_UNAVAILABLE),
         (EN_OFFLINE_BANNER, JA_OFFLINE_BANNER),
         (EN_EMPTY_EVENTS, JA_EMPTY_EVENTS),
         (EN_EMPTY_EVENTS_HINT, JA_EMPTY_EVENTS_HINT),
@@ -679,6 +680,505 @@ const GITIGNORE_SRC: &str = include_str!("../../../.gitignore");
 const MIGRATION_0009_SRC: &str = include_str!("../../../migrations/0009_recurrence_v2.sql");
 const EVENT_SERIES_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event_series.rs");
 const EVENT_ADMIN_DOMAIN_SRC: &str = include_str!("../../../packages/domain/src/event_admin.rs");
+const CRYPTO_SRC: &str = include_str!("../../../workers/ssr/src/crypto.rs");
+const CRYPTO_TESTS_SRC: &str = include_str!("../../../workers/ssr/src/crypto/tests.rs");
+const CODLET_SRC: &str = include_str!("../../../workers/ssr/src/codlet.rs");
+const SESSION_SRC: &str = include_str!("../../../workers/ssr/src/session.rs");
+const HEALTH_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/health.rs");
+const SETUP_SCRIPT_SRC: &str = include_str!("../../../scripts/setup.mjs");
+const SETUP_CORE_SRC: &str = include_str!("../../../scripts/lib/setup-core.mjs");
+const LOCAL_SECRET_FILE_SRC: &str = include_str!("../../../scripts/lib/local-secret-file.mjs");
+const LOCAL_SECRET_TEST_SRC: &str = include_str!("../../../scripts/test-local-secret-setup.mjs");
+const ISOLATED_WORKER_TEST_SRC: &str =
+    include_str!("../../../scripts/lib/isolated-worker-test.mjs");
+const BOOTSTRAP_SCRIPT_SRC: &str = include_str!("../../../scripts/bootstrap-cloudflare.mjs");
+const BOOTSTRAP_CORE_SRC: &str = include_str!("../../../scripts/lib/bootstrap-cloudflare-core.mjs");
+const BOOTSTRAP_TEST_SRC: &str = include_str!("../../../scripts/test-bootstrap-cloudflare.mjs");
+const PEPPER_CONFIGURATION_TEST_SRC: &str =
+    include_str!("../../../scripts/test-hmac-pepper-configuration.mjs");
+const RFC077_DIRECT_PEPPER_CALLERS: &[(&str, &str, usize)] = &[
+    ("codlet", CODLET_SRC, 2),
+    ("session", SESSION_SRC, 1),
+    ("health", HEALTH_HANDLER_SRC, 1),
+    (
+        "join",
+        include_str!("../../../workers/ssr/src/handlers/join.rs"),
+        3,
+    ),
+    (
+        "relink",
+        include_str!("../../../workers/ssr/src/handlers/relink.rs"),
+        2,
+    ),
+    ("calendar", CALENDAR_HANDLER_SRC, 2),
+    (
+        "communities",
+        include_str!("../../../workers/ssr/src/handlers/communities.rs"),
+        1,
+    ),
+    ("community-create", COMMUNITY_CREATE_HANDLER_SRC, 1),
+    ("me", ME_HANDLER_SRC, 1),
+    (
+        "operator",
+        include_str!("../../../workers/ssr/src/handlers/operator.rs"),
+        1,
+    ),
+    (
+        "admin-help-signin",
+        include_str!("../../../workers/ssr/src/handlers/admin/help_signin.rs"),
+        1,
+    ),
+    (
+        "admin-members",
+        include_str!("../../../workers/ssr/src/handlers/admin/members.rs"),
+        1,
+    ),
+];
+const RFC077_CODLET_ISSUE_CALLERS: &[(&str, &str, usize)] = &[
+    (
+        "templates",
+        include_str!("../../../workers/ssr/src/handlers/templates.rs"),
+        2,
+    ),
+    ("me", ME_HANDLER_SRC, 3),
+    ("export", EXPORT_HANDLER_SRC, 1),
+    ("event", EVENT_HANDLER_SRC, 3),
+    ("community-create", COMMUNITY_CREATE_HANDLER_SRC, 2),
+    (
+        "communities",
+        include_str!("../../../workers/ssr/src/handlers/communities.rs"),
+        1,
+    ),
+    ("calendar", CALENDAR_HANDLER_SRC, 2),
+    (
+        "admin-help-signin",
+        include_str!("../../../workers/ssr/src/handlers/admin/help_signin.rs"),
+        1,
+    ),
+    (
+        "admin-role-transfer",
+        include_str!("../../../workers/ssr/src/handlers/admin/role_transfer.rs"),
+        1,
+    ),
+    (
+        "admin-member-remove",
+        include_str!("../../../workers/ssr/src/handlers/admin/member_remove.rs"),
+        1,
+    ),
+    (
+        "admin-members",
+        include_str!("../../../workers/ssr/src/handlers/admin/members.rs"),
+        2,
+    ),
+    (
+        "event-attendance",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/attendance.rs"),
+        1,
+    ),
+    (
+        "event-cancel",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/cancel.rs"),
+        1,
+    ),
+    (
+        "event-copy",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/copy.rs"),
+        1,
+    ),
+    (
+        "event-create",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/create.rs"),
+        1,
+    ),
+    (
+        "event-edit",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/edit.rs"),
+        1,
+    ),
+    (
+        "event-notes",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/notes.rs"),
+        1,
+    ),
+    (
+        "event-occurrence",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/occurrence.rs"),
+        1,
+    ),
+    (
+        "event-recreate",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/recreate.rs"),
+        1,
+    ),
+];
+const RFC077_AUTH_HANDLER_SOURCES: &[(&str, &str)] = &[
+    (
+        "templates",
+        include_str!("../../../workers/ssr/src/handlers/templates.rs"),
+    ),
+    ("me", ME_HANDLER_SRC),
+    ("export", EXPORT_HANDLER_SRC),
+    ("event", EVENT_HANDLER_SRC),
+    ("community-create", COMMUNITY_CREATE_HANDLER_SRC),
+    (
+        "communities",
+        include_str!("../../../workers/ssr/src/handlers/communities.rs"),
+    ),
+    ("calendar", CALENDAR_HANDLER_SRC),
+    (
+        "community",
+        include_str!("../../../workers/ssr/src/handlers/community.rs"),
+    ),
+    (
+        "join",
+        include_str!("../../../workers/ssr/src/handlers/join.rs"),
+    ),
+    (
+        "relink",
+        include_str!("../../../workers/ssr/src/handlers/relink.rs"),
+    ),
+    ("auth", AUTH_HANDLER_SRC),
+    ("home", HOME_HANDLER_SRC),
+    (
+        "admin-help-signin",
+        include_str!("../../../workers/ssr/src/handlers/admin/help_signin.rs"),
+    ),
+    (
+        "admin-role-transfer",
+        include_str!("../../../workers/ssr/src/handlers/admin/role_transfer.rs"),
+    ),
+    (
+        "admin-member-remove",
+        include_str!("../../../workers/ssr/src/handlers/admin/member_remove.rs"),
+    ),
+    (
+        "admin-members",
+        include_str!("../../../workers/ssr/src/handlers/admin/members.rs"),
+    ),
+    (
+        "event-attendance",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/attendance.rs"),
+    ),
+    (
+        "event-cancel",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/cancel.rs"),
+    ),
+    (
+        "event-copy",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/copy.rs"),
+    ),
+    (
+        "event-create",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/create.rs"),
+    ),
+    (
+        "event-edit",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/edit.rs"),
+    ),
+    (
+        "event-notes",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/notes.rs"),
+    ),
+    (
+        "event-occurrence",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/occurrence.rs"),
+    ),
+    (
+        "event-recreate",
+        include_str!("../../../workers/ssr/src/handlers/admin/events/recreate.rs"),
+    ),
+];
+const RFC077_EXECUTABLE_GATE_SOURCES: &[(&str, &str)] = &[
+    (
+        "admin-role-transfer",
+        include_str!("../../../scripts/smoke/admin-role-transfer.mjs"),
+    ),
+    (
+        "calendar-matrix-csv-export",
+        include_str!("../../../scripts/smoke/calendar-matrix-csv-export.mjs"),
+    ),
+    (
+        "event-copy",
+        include_str!("../../../scripts/smoke/event-copy.mjs"),
+    ),
+    (
+        "help-signin",
+        include_str!("../../../scripts/smoke/help-signin.mjs"),
+    ),
+    (
+        "invite-redemption",
+        include_str!("../../../scripts/smoke/invite-redemption.mjs"),
+    ),
+    (
+        "member-management",
+        include_str!("../../../scripts/smoke/member-management.mjs"),
+    ),
+    (
+        "monthly-attendance-matrix",
+        include_str!("../../../scripts/smoke/monthly-attendance-matrix.mjs"),
+    ),
+    (
+        "recurrence-v2",
+        include_str!("../../../scripts/smoke/recurrence-v2.mjs"),
+    ),
+    (
+        "self-display-name-editing",
+        include_str!("../../../scripts/smoke/self-display-name-editing.mjs"),
+    ),
+    (
+        "audit-class-a-failures",
+        include_str!("../../../scripts/test-audit-class-a-failures.mjs"),
+    ),
+];
+
+#[test]
+fn rfc077_has_one_secret_only_pepper_resolver() {
+    assert_eq!(
+        CRYPTO_SRC.matches(".secret(\"HMAC_PEPPER\")").count(),
+        1,
+        "RFC-077 requires exactly one HMAC_PEPPER secret-binding read"
+    );
+    assert!(
+        !CRYPTO_SRC.contains(".var(\"HMAC_PEPPER\")")
+            && !LIB_SRC.contains(".secret(\"HMAC_PEPPER\")")
+            && !LIB_SRC.contains(".var(\"HMAC_PEPPER\")"),
+        "RFC-077 forbids a plain-var fallback and binding reads outside crypto.rs"
+    );
+    assert!(
+        CRYPTO_SRC.contains("pub struct HmacPepper(String)")
+            && CRYPTO_SRC.contains("pub(crate) fn as_str(&self) -> &str")
+            && !CRYPTO_SRC.contains("impl fmt::Debug for HmacPepper")
+            && !CRYPTO_SRC.contains("impl fmt::Display for HmacPepper"),
+        "validated pepper material must retain its narrow opaque interface"
+    );
+    assert!(
+        CRYPTO_TESTS_SRC.contains("pepper_validation_uses_utf8_byte_length_and_preserves_input")
+            && CRYPTO_TESTS_SRC.contains("repeat(4097)")
+            && CRYPTO_TESTS_SRC.contains("for sentinel in LEGACY_SENTINELS"),
+        "pepper validation boundary cases must remain covered"
+    );
+}
+
+#[test]
+fn rfc077_preflight_and_health_remain_fail_closed() {
+    let classify = LIB_SRC
+        .find("let security_class = request_security_class")
+        .expect("request classification must exist");
+    let preflight = LIB_SRC
+        .find("crypto::pepper(&env)")
+        .expect("protected request preflight must exist");
+    let dispatch = LIB_SRC
+        .find("|| dispatch_request(req")
+        .expect("route dispatch must exist");
+    assert!(classify < preflight && preflight < dispatch);
+    for path in [
+        "/manifest.webmanifest",
+        "/sw.js",
+        "/static/app.css",
+        "/static/app.js",
+        "/offline",
+        "/version",
+    ] {
+        assert_eq!(
+            LIB_SRC.matches(&format!("\"{path}\"")).count(),
+            3,
+            "{path} must occur only in dispatch, classifier, and classifier tests"
+        );
+    }
+    assert!(
+        HEALTH_HANDLER_SRC.contains("crate::crypto::pepper(env).is_ok()")
+            && HEALTH_HANDLER_SRC.contains("\"ready\": true")
+            && HEALTH_HANDLER_SRC.contains("\"ready\": false")
+            && HEALTH_HANDLER_SRC.contains(".with_status(503)"),
+        "health must report readiness from the same validated pepper resolver"
+    );
+    assert!(
+        CODLET_SRC.contains("pub async fn issue_token(")
+            && CODLET_SRC.contains(") -> Result<String>")
+            && !CODLET_SRC.contains("unwrap_or_default")
+            && CODLET_SRC.find("crate::crypto::pepper(env)") < CODLET_SRC.find("env.d1(\"DB\")"),
+        "codlet issuance must propagate pepper failures without empty substitution"
+    );
+    assert!(
+        LIB_SRC.contains("rejected_configuration_never_invokes_binding_continuation")
+            && LIB_SRC.contains("D1 continuation was invoked")
+            && LIB_SRC.contains("KV continuation was invoked"),
+        "the native pre-binding spy must pin zero D1 and KV continuation access"
+    );
+}
+
+#[test]
+fn rfc077_pepper_codlet_and_auth_caller_inventories_are_closed() {
+    assert_eq!(
+        LIB_SRC.matches("crypto::pepper(&env)").count(),
+        1,
+        "main must have exactly one direct protected-request preflight"
+    );
+    let direct_count: usize = RFC077_DIRECT_PEPPER_CALLERS
+        .iter()
+        .map(|(name, source, expected)| {
+            let actual = source.matches("crate::crypto::pepper(").count();
+            assert_eq!(
+                actual, *expected,
+                "direct pepper caller inventory drifted: {name}"
+            );
+            actual
+        })
+        .sum();
+    assert_eq!(direct_count, 17, "direct pepper caller total drifted");
+
+    let issue_count: usize = RFC077_CODLET_ISSUE_CALLERS
+        .iter()
+        .map(|(name, source, expected)| {
+            let actual = source.matches("crate::codlet::issue_token(").count();
+            assert_eq!(
+                actual, *expected,
+                "codlet issuance caller inventory drifted: {name}"
+            );
+            actual
+        })
+        .sum();
+    assert_eq!(issue_count, 27, "codlet issuance caller total drifted");
+
+    assert!(
+        SESSION_SRC.contains("pub enum AuthError")
+            && SESSION_SRC.contains("AuthError::Unauthenticated")
+            && SESSION_SRC.contains("Err(error) => return Err(error.into_worker_error())"),
+        "configuration and runtime errors must remain distinguishable from unauthenticated"
+    );
+    for (name, source) in RFC077_AUTH_HANDLER_SOURCES {
+        if source.contains("require_auth_or!") {
+            assert!(
+                !source.contains("match crate::session::require_auth"),
+                "macro-managed handler retained an untyped auth match: {name}"
+            );
+        } else {
+            assert!(
+                source.contains("AuthError::Unauthenticated")
+                    && source.contains("Err(error) => return Err(error.into_worker_error())")
+                    && !source.contains("Err(_) =>"),
+                "explicit auth handler is outside the typed propagation inventory: {name}"
+            );
+        }
+    }
+}
+
+#[test]
+fn rfc077_configuration_and_local_harness_are_pinned() {
+    assert_eq!(
+        WRANGLER_TOML_SRC
+            .matches("required = [\"HMAC_PEPPER\"]")
+            .count(),
+        4,
+        "root, dev, staging, and production must each require HMAC_PEPPER"
+    );
+    for pattern in [".dev.vars*", ".env*"] {
+        assert!(
+            GITIGNORE_SRC.lines().any(|line| line.trim() == pattern),
+            "local secret files must remain ignored: {pattern}"
+        );
+    }
+    assert!(
+        SETUP_SCRIPT_SRC.contains("loadOrCreateLocalPepper")
+            && SETUP_SCRIPT_SRC.contains("runDeveloperSetup")
+            && SETUP_CORE_SRC.contains("const pepper = await adapter.loadPepper(projectRoot)")
+            && LOCAL_SECRET_FILE_SRC.contains("fs.open(path, 'wx', 0o600)")
+            && LOCAL_SECRET_FILE_SRC.contains("await handle.chmod(0o600)")
+            && !LOCAL_SECRET_FILE_SRC.contains("fs.chmod(path")
+            && !LOCAL_SECRET_FILE_SRC.contains("fs.unlink(path")
+            && LOCAL_SECRET_FILE_SRC.contains("O_NOFOLLOW")
+            && LOCAL_SECRET_FILE_SRC.contains("DOTENV_LINE")
+            && LOCAL_SECRET_TEST_SRC.contains("exclusive-create collision was not injected")
+            && LOCAL_SECRET_TEST_SRC.contains("replacement path was modified")
+            && LOCAL_SECRET_TEST_SRC.contains("injected_close_failure")
+            && LOCAL_SECRET_TEST_SRC.contains("injected_close_after_release_failure")
+            && LOCAL_SECRET_TEST_SRC.contains("closeAfterReleaseSanitization")
+            && LOCAL_SECRET_TEST_SRC.contains("seed HMAC disagreed"),
+        "local setup must use handle-safe permissions/cleanup, exact dotenv parsing, and the adversarial matrix"
+    );
+    assert!(
+        LOCAL_SECRET_FILE_SRC.find("if (originalHandle)")
+            < LOCAL_SECRET_FILE_SRC.find("reopened = await fs.open")
+            && LOCAL_SECRET_FILE_SRC.contains("if (await sanitizeHandle(originalHandle)) return")
+            && LOCAL_SECRET_FILE_SRC.contains("await sanitizeHandle(reopened)"),
+        "close failure cleanup must fall back from an unusable original handle to an identity-checked non-following reopen"
+    );
+    assert!(
+        ISOLATED_WORKER_TEST_SRC.contains("CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'")
+            && ISOLATED_WORKER_TEST_SRC.contains("CLOUDFLARE_INCLUDE_PROCESS_ENV: 'false'")
+            && ISOLATED_WORKER_TEST_SRC.contains("const environment = {")
+            && ISOLATED_WORKER_TEST_SRC.contains("mkdtemp")
+            && ISOLATED_WORKER_TEST_SRC.contains("randomBytes(32)")
+            && ISOLATED_WORKER_TEST_SRC
+                .contains("cp(join(repositoryRoot, 'workers', 'ssr', 'build')")
+            && ISOLATED_WORKER_TEST_SRC
+                .contains("const canaryPath = join(container, '.dev.vars.dev')")
+            && ISOLATED_WORKER_TEST_SRC.contains("wrangler-child-wrapper.mjs")
+            && ISOLATED_WORKER_TEST_SRC.contains("child-environment-keys.json")
+            && ISOLATED_WORKER_TEST_SRC.contains("rm(container, { recursive: true"),
+        "runtime tests must copy artifacts and use a sanitized, canaried, child-audited fixture"
+    );
+    assert!(
+        PEPPER_CONFIGURATION_TEST_SRC.contains("assert.equal(result.text, unavailableBody)")
+            && PEPPER_CONFIGURATION_TEST_SRC.contains("optionalRecoverySecret")
+            && PEPPER_CONFIGURATION_TEST_SRC.contains("COMMUNITY_RECOVERY_TOKEN")
+            && PEPPER_CONFIGURATION_TEST_SRC.contains("assertChildEnvironmentAudit"),
+        "runtime evidence must pin the exact body, optional recovery, and child environment audit"
+    );
+}
+
+#[test]
+fn rfc077_bootstrap_and_executable_gates_remain_safe() {
+    assert!(
+        BOOTSTRAP_SCRIPT_SRC.contains("runBootstrap")
+            && BOOTSTRAP_CORE_SRC.contains("Missing --target; choose staging or production explicitly.")
+            && BOOTSTRAP_CORE_SRC.contains("parsed.length !== 1")
+            && BOOTSTRAP_CORE_SRC.contains("rejectDuplicateJsonKeys(stdout)")
+            && BOOTSTRAP_CORE_SRC.contains("if (keys.has(key)) throw new DuplicateJsonKeyError")
+            && BOOTSTRAP_CORE_SRC.contains("--rotate-hmac-pepper")
+            && BOOTSTRAP_CORE_SRC.contains("--confirm-rotation")
+            && BOOTSTRAP_CORE_SRC.contains("ROTATE ${targetName}")
+            && BOOTSTRAP_CORE_SRC.contains("provisioned-not-ready")
+            && BOOTSTRAP_CORE_SRC.contains("Keep this Worker dark")
+            && BOOTSTRAP_CORE_SRC.contains("sessions, invites, relink/help-signin codes, form tokens, calendar tokens, and recovery codes"),
+        "bootstrap must distinguish fresh provisioning from explicit destructive rotation"
+    );
+    assert!(
+        BOOTSTRAP_TEST_SRC.contains("missingTargetStops")
+            && BOOTSTRAP_TEST_SRC.contains("strictSingleResultEnvelope")
+            && BOOTSTRAP_TEST_SRC.contains("duplicateResultKeysStop")
+            && BOOTSTRAP_TEST_SRC.contains("escaped-duplicate-second")
+            && BOOTSTRAP_TEST_SRC.contains("escaped-duplicate-first")
+            && BOOTSTRAP_TEST_SRC.contains("exactCommandAdapter")
+            && BOOTSTRAP_TEST_SRC.contains("fake adapter rejected unexpected SQL"),
+        "bootstrap fake adapter must reject unexpected commands and ambiguous result forms"
+    );
+    assert_eq!(
+        BOOTSTRAP_CORE_SRC.matches("'d1_migrations'").count(),
+        1,
+        "only the D1 migration ledger may be exempt from application freshness checks"
+    );
+    assert!(
+        PEPPER_CONFIGURATION_TEST_SRC.contains("invalidPhase('missing'")
+            && PEPPER_CONFIGURATION_TEST_SRC.contains("rotationInvalidates")
+            && PEPPER_CONFIGURATION_TEST_SRC.contains("nonMutation"),
+        "the isolated runtime gate must cover missing/invalid secrets, mutation safety, and key-change semantics"
+    );
+    for (name, source) in RFC077_EXECUTABLE_GATE_SOURCES {
+        assert!(
+            source.contains("prepareIsolatedWorkerTest"),
+            "{name} must use the shared isolated Worker fixture"
+        );
+        assert!(
+            !source.contains("dev-pepper-change-in-production") && !source.contains("dev-pepper"),
+            "{name} must not embed a legacy pepper sentinel"
+        );
+    }
+    assert!(
+        !PACKAGE_JSON_SRC.contains("rfc077") && !PACKAGE_JSON_SRC.contains("rfc-077"),
+        "development commands must use domain/role/function names, not RFC numbers"
+    );
+}
 
 #[test]
 fn tracked_wrangler_template_contains_only_placeholder_resource_ids() {
@@ -1242,7 +1742,8 @@ fn rfc024_relink_codes_are_membership_scoped_hmacs() {
     assert!(
         RELINK_DB_SRC.contains("HMAC")
             || HELP_SIGNIN_HANDLER_SRC.contains("hmac_hex(&crate::crypto::pepper(env)")
-            || HELP_SIGNIN_HANDLER_SRC.contains("hmac_hex(&pepper"),
+            || HELP_SIGNIN_HANDLER_SRC.contains("hmac_hex(&pepper")
+            || HELP_SIGNIN_HANDLER_SRC.contains("hmac_hex(pepper.as_str()"),
         "RFC-024 codes must be HMAC hashed before storage"
     );
     assert!(
@@ -2599,22 +3100,33 @@ fn rfc079_class_a_failure_telemetry_is_centrally_and_exhaustively_owned() {
 
     let runner = compact_source(RFC079_CLASS_A_FAILURE_RUNNER_SRC);
     for required in [
+        "prepareIsolatedWorkerTest(",
+        "isolated.spawnDev(",
+        "/c/${communityId}/admin/invites",
+        "/communities/new",
+        "/join/profile",
+        "audit.required_batch_failed",
+        "DROPTRIGGERIFEXISTS",
+        "awaitisolated.cleanup()",
+    ] {
+        assert!(
+            runner.contains(required),
+            "compiled Class A proof runner lost containment or route evidence: {required}"
+        );
+    }
+    let isolated = compact_source(ISOLATED_WORKER_TEST_SRC);
+    for required in [
         "mkdtemp(",
         "--persist-to",
         "wrangler.toml",
         "'dev'",
         "'--local'",
         "'127.0.0.1'",
-        "/c/${communityId}/admin/invites",
-        "/communities/new",
-        "/join/profile",
-        "audit.required_batch_failed",
-        "DROPTRIGGERIFEXISTS",
-        "awaitrm(tempRoot,{recursive:true,force:true})",
+        "awaitrm(container,{recursive:true,force:true",
     ] {
         assert!(
-            runner.contains(required),
-            "compiled Class A proof runner lost containment or route evidence: {required}"
+            isolated.contains(required),
+            "shared compiled-Worker fixture lost containment evidence: {required}"
         );
     }
     for forbidden in [

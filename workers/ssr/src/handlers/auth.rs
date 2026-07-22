@@ -6,13 +6,9 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 
 use crate::db::session as session_db;
-use crate::session::require_auth;
 
 pub async fn post_logout(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return redirect("/join"),
-    };
+    let auth = crate::require_auth_or!(&req, env, redirect("/join"));
 
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();

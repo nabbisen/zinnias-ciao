@@ -9,7 +9,6 @@ use crate::crypto::hmac_hex;
 use crate::db::{self, membership as membership_db};
 use crate::form_token::ConsumeResult;
 use crate::render;
-use crate::session::require_auth;
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::{DisplayNameError, validate_display_name};
 
@@ -17,10 +16,7 @@ const DISPLAY_NAME_UPDATED_REF: &str = "display_name_updated";
 const DISPLAY_NAME_UNCHANGED_REF: &str = "display_name_unchanged";
 
 pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
     let url = req.url()?;
@@ -38,7 +34,7 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
         .unwrap_or_default();
 
     let logout_token =
-        crate::codlet::issue_token(env, &auth.user_id, token_purpose::LOGOUT, None).await;
+        crate::codlet::issue_token(env, &auth.user_id, token_purpose::LOGOUT, None).await?;
 
     let community = db::community::find_active(&db, community_id).await?;
     let community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or("");
@@ -170,10 +166,7 @@ pub async fn get_display_name(
     _rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let token = crate::codlet::issue_token(
         env,
@@ -181,7 +174,7 @@ pub async fn get_display_name(
         token_purpose::CHANGE_DISPLAY_NAME,
         Some(&membership.membership_id),
     )
-    .await;
+    .await?;
     render_display_name_form(&membership, &token, &membership.display_name, None)
 }
 
@@ -191,10 +184,7 @@ pub async fn post_display_name(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
 
     let form = req.form_data().await?;
@@ -216,10 +206,10 @@ pub async fn post_display_name(
     };
 
     let db = env.d1("DB")?;
-    let pepper = crate::crypto::pepper(env);
+    let pepper = crate::crypto::pepper(env)?;
     let consume = crate::form_token::consume_detailed(
         &db,
-        &pepper,
+        pepper.as_str(),
         &auth.user_id,
         token_purpose::CHANGE_DISPLAY_NAME,
         &raw_token,
@@ -243,7 +233,8 @@ pub async fn post_display_name(
     }
 
     if display_name == membership.display_name {
-        crate::form_token::set_result(&db, &pepper, &raw_token, DISPLAY_NAME_UNCHANGED_REF).await?;
+        crate::form_token::set_result(&db, pepper.as_str(), &raw_token, DISPLAY_NAME_UNCHANGED_REF)
+            .await?;
         return redirect(&format!("/c/{community_id}/me"));
     }
 
@@ -254,7 +245,7 @@ pub async fn post_display_name(
         &auth.user_id,
         &membership.membership_id,
         &display_name,
-        &pepper,
+        pepper.as_str(),
         &raw_token,
     )
     .await?;
@@ -277,7 +268,7 @@ async fn refresh_display_name_form(
         token_purpose::CHANGE_DISPLAY_NAME,
         Some(&membership.membership_id),
     )
-    .await;
+    .await?;
     render_display_name_form(membership, &token, display_name, error)
 }
 

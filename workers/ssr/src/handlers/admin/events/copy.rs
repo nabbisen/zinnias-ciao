@@ -6,7 +6,6 @@ use zinnias_ciao_domain::recurrence_materialization_window;
 use crate::authz::require_admin;
 use crate::db::{self, event as event_db, event_series as series_db, membership as membership_db};
 use crate::render;
-use crate::session::require_auth;
 
 use super::forms::{RepeatFieldPrefill, render_event_create_fields_with_repeat};
 use super::policy::event_is_recurring;
@@ -29,10 +28,7 @@ pub async fn get_copy_event(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let _membership = require_admin(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
@@ -75,7 +71,7 @@ pub async fn get_copy_event(
     );
 
     let token =
-        crate::codlet::issue_token(env, &auth.user_id, token_purpose::CREATE_EVENT, None).await;
+        crate::codlet::issue_token(env, &auth.user_id, token_purpose::CREATE_EVENT, None).await?;
     let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
         .await
         .unwrap_or_default();

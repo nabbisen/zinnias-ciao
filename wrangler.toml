@@ -27,6 +27,9 @@ id      = "local"
 # not sensitive). Set it per-environment below. Leave unset/empty for a
 # host-only cookie (correct for a single-host deployment).
 
+[secrets]
+required = ["HMAC_PEPPER"]
+
 [vars]
 BUILD_VERSION              = "dev"
 LOG_LEVEL                  = "info"
@@ -35,6 +38,8 @@ COMMUNITY_RECOVERY_ENABLED = "false"
 
 [env.dev]
 name = "zinnias-ciao-ssr-dev"
+[env.dev.secrets]
+required = ["HMAC_PEPPER"]
 [env.dev.vars]
 BUILD_VERSION              = "dev"
 LOG_LEVEL                  = "debug"
@@ -61,6 +66,8 @@ id      = "local"
 # Then replace only the staging D1 database_id and RATE_LIMIT KV id below.
 [env.staging]
 name = "zinnias-ciao-ssr-stg"
+[env.staging.secrets]
+required = ["HMAC_PEPPER"]
 [env.staging.vars]
 LOG_LEVEL                  = "info"
 BUILD_VERSION              = "staging"
@@ -78,6 +85,8 @@ id      = "REPLACE_WITH_STAGING_KV_ID"         # create with: wrangler kv namesp
 
 [env.production]
 name = "zinnias-ciao-ssr-prd"
+[env.production.secrets]
+required = ["HMAC_PEPPER"]
 [env.production.vars]
 LOG_LEVEL                  = "warn"
 BUILD_VERSION              = "production"

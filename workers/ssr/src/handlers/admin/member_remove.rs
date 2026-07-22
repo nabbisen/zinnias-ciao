@@ -7,7 +7,6 @@ use zinnias_ciao_contracts::i18n;
 use crate::authz::require_admin;
 use crate::db::{self, membership as membership_db};
 use crate::render;
-use crate::session::require_auth;
 
 fn redirect(url: &str) -> Result<Response> {
     let mut r = Response::empty()?;
@@ -24,10 +23,7 @@ pub async fn get_remove_member(
     community_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id).await?;
 
     // Cannot remove yourself.
@@ -42,7 +38,7 @@ pub async fn get_remove_member(
         token_purpose::REMOVE_MEMBER,
         Some(target_membership_id),
     )
-    .await;
+    .await?;
 
     let target =
         match membership_db::find_active_summary(&db, target_membership_id, community_id).await? {
@@ -109,10 +105,7 @@ pub async fn post_remove_member(
     community_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id).await?;
 
     if target_membership_id == membership.membership_id {

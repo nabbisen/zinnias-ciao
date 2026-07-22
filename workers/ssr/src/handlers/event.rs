@@ -9,7 +9,6 @@ use crate::db::{
     membership as membership_db,
 };
 use crate::render::{self, ParticipantEntry};
-use crate::session::require_auth;
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::{
     status::{AttendanceStatus, DayTimeState, Role, validate_status_transition},
@@ -33,10 +32,7 @@ pub async fn get_event_detail(
     flash: Option<&str>,
     err: Option<&str>,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
@@ -86,7 +82,7 @@ pub async fn get_event_detail(
         token_purpose::SET_STATUS,
         Some(event_id),
     )
-    .await;
+    .await?;
 
     // ── Days section ─────────────────────────────────────────────────────
     let mut days_html = String::new();
@@ -213,7 +209,7 @@ pub async fn get_event_detail(
     // ── Note section ─────────────────────────────────────────────────────
     let save_token =
         crate::codlet::issue_token(env, &auth.user_id, token_purpose::SAVE_NOTE, Some(event_id))
-            .await;
+            .await?;
 
     let note_html = render::note_form(
         community_id,
@@ -391,10 +387,7 @@ pub async fn post_my_status(
     event_id: &str,
     day_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
@@ -497,10 +490,7 @@ pub async fn post_my_note(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
@@ -543,10 +533,7 @@ pub async fn get_delete_note_confirm(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 
@@ -558,7 +545,7 @@ pub async fn get_delete_note_confirm(
         token_purpose::DELETE_NOTE,
         Some(event_id),
     )
-    .await;
+    .await?;
 
     // Only show the confirmation if the member actually has a note.
     let my_note = note_db::find_mine(&db, event_id, &membership.membership_id).await?;
@@ -615,10 +602,7 @@ pub async fn delete_my_note(
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
-    let auth = match require_auth(&req, env).await {
-        Ok(a) => a,
-        Err(_) => return render::session_expired(),
-    };
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
     let db = env.d1("DB")?;
 

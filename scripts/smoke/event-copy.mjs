@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Scenario smoke for RFC-066 event-copy workflows. Local wrangler dev only.
 
+import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+
 import { createHmac } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
@@ -12,7 +14,8 @@ const outDir = process.env.EVIDENCE_DIR ?? '.git-exclude/evidence/rfc066';
 const reportName = process.env.REPORT_NAME ?? 'rfc066-event-copy-smoke-results.json';
 const userDataDir = `.git-exclude/tmp/chrome-event-copy-sandboxed-${Date.now()}`;
 const chromium = process.env.CHROMIUM ?? '/usr/bin/chromium';
-const pepper = 'dev-pepper-change-in-production';
+const isolated = await prepareIsolatedWorkerTest("event-copy");
+const pepper = isolated.pepper;
 const now = '2026-07-09T00:00:00.000Z';
 
 const communityId = 'com_rfc066_primary';
@@ -57,7 +60,7 @@ function assertLocalOnly() {
 function runWrangler(args) {
   if (args.includes('--remote')) throw new Error('event-copy smoke refuses remote D1 operations');
   try {
-    return execFileSync('bunx', ['wrangler', ...args], {
+    return isolated.runWranglerSync(args, {
       cwd: process.cwd(),
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
@@ -428,10 +431,7 @@ try {
   seed();
 
   logStep(`starting local wrangler dev on ${baseUrl}`);
-  dev = spawn('bun', ['run', 'dev', '--', '--port', String(port)], {
-    cwd: process.cwd(),
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
+  dev = isolated.spawnDev(port);
   dev.stderr.on('data', (chunk) => {
     devStderr += chunk.toString();
   });
@@ -700,4 +700,5 @@ try {
   if (dev && dev.exitCode === null) dev.kill('SIGTERM');
   await sleep(500);
   await rm(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  await isolated.cleanup();
 }
