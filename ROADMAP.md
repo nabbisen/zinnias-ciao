@@ -31,20 +31,20 @@ and audit durability/redaction. Until those blockers are resolved and reviewed:
 - RFC-050 hosted evidence work and RFC-054 Japanese copy review may continue,
   because they close existing release evidence rather than add feature scope;
 - production, public-pilot, and first-real-community deployment remain No-Go;
-- controlled staging remains conditional on the architecture review's B1-B3
-  findings being fixed or explicitly risk-accepted for an isolated, short-lived
-  non-production environment.
+- controlled staging remains conditional on the architecture review's open B1
+  and B3 findings being fixed or explicitly risk-accepted for an isolated,
+  short-lived non-production environment; B2 is closed.
 
 The RFC lifecycle now separates Proposed design from Accepted implementation.
 Remediation design and accepted implementation take priority. Feature work
 resumes only after the remediation hold is explicitly lifted in this roadmap.
 
-## Accepted Remediation Work
+## Architecture Remediation Work
 
 | RFC | Theme | Current note |
 |-----|-------|--------------|
 | 076 | One-time invite code response isolation | Local implementation reviewed, owner-accepted, and committed at `b72f22b`. Corrected isolated automated evidence and bounded human no-JS/network observation were architecture-reviewed and owner-accepted on 2026-07-21, closing criterion 8 locally; RFC-050 exact-candidate hosted evidence remains required before B1 closes for a public or production pilot. |
-| 077 | Fail-closed HMAC pepper configuration | Bounded local implementation and the complete reviewed-handoff local gate set were completed on 2026-07-21; architecture implementation review is pending. Hosted deployment-time, runtime-negative, and exact-candidate evidence remain unauthorized and required before B2 closes for a public or production pilot. |
+| 077 | Fail-closed HMAC pepper configuration | Implemented at `901855b`. Corrected disposable hosted evidence was architecture-reviewed and owner-accepted on 2026-07-22: criteria 8–9 are satisfied and B2 is closed. This does not close unrelated RFC-050, B1, B3, B5, production, public-pilot, real-device, performance, persistent-observability, or release gates. |
 | 079 | Atomic required audits and recursive metadata redaction | Architecture reviewed and owner-accepted on 2026-07-15. Local Packages 0A–8 and the Class A failure-telemetry correction are reviewed and committed. RFC-050 exact-candidate hosted evidence, persistent incident delivery, and every public/production pilot gate remain open. |
 
 ## Proposed Work

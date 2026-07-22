@@ -53,7 +53,7 @@ materially changed form against the
 ## Auth storage gates (v0.38.6)
 
 - [ ] `HMAC_PEPPER` secret is set in the target environment, either by bootstrap seeding or by `wrangler secret put` with the target environment's ignored local config.
-- [ ] Root and the selected Wrangler environment declare `HMAC_PEPPER` required; the exact candidate returns a fixed non-mutating `503` for missing/invalid configuration and ready `/healthz` only for the preserved valid secret. *(RFC-077; hosted evidence remains required)*
+- [x] Root and every named Wrangler environment declare `HMAC_PEPPER` required; corrected disposable hosted evidence binds exact candidate `901855b` to classified deployment rejection, fixed non-mutating runtime `503`, ready valid-secret credential flows, permitted secret deletion, and strict teardown. *(RFC-077 criteria 8–9; architecture-reviewed and owner-accepted 2026-07-22; B2 closed. Real-target secret attachment remains the separate unchecked operator gate above.)*
 - [ ] `RATE_LIMIT` KV namespace is created and bound in ignored local Wrangler config for the target environment.
 - [ ] New invite code generation writes to `invite_codes` only (verify: `SELECT COUNT(*) FROM invite_codes` increases after admin generates a code).
 - [ ] New session issuance writes to `sessions` (verify: `SELECT COUNT(*) FROM sessions` increases after a successful join).
@@ -326,7 +326,7 @@ materially changed form against the
 
 ## Operational gates
 
-- [x] Local implementation makes `GET /healthz` return `{"ok":true,"ready":true,"service":"ciao.zinnias"}` only with a valid pepper and a generic not-ready `503` otherwise. *(RFC-077 health handler and isolated local configuration gate; hosted exact-candidate evidence remains open)*
+- [x] `GET /healthz` returns `{"ok":true,"ready":true,"service":"ciao.zinnias"}` only with a valid pepper and a generic not-ready `503` otherwise. Corrected exact-candidate hosted evidence also proves classified required-secret rejection, runtime-negative behavior, valid credential flows, secret-deletion failure behavior, bounded non-mutation, and strict teardown. *(RFC-077 criteria 8–9; architecture-reviewed and owner-accepted 2026-07-22; B2 closed.)*
 - [x] `GET /version` returns build version. *(health.rs get_version reads BUILD_VERSION var)*
 - [x] Rollback procedure documented and understood. *(docs/src/shared/deployment.md §Rollback: `wrangler rollback --env production`)*
 - [x] Log persistence approach documented. *(docs/src/shared/deployment.md §Log persistence: Cloudflare Logpush to R2/S3)*

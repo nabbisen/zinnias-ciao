@@ -1,10 +1,10 @@
 # RFC 077 — Fail-Closed HMAC Pepper Configuration
 
-**Status.** Accepted — architecture-reviewed and owner-accepted on 2026-07-21;
-bounded local implementation is complete and awaiting architecture
-implementation review
-**Priority.** Architect-review remediation; blocks controlled hosted staging unless
-risk-accepted and blocks any public or production pilot  
+**Status.** Implemented — local implementation committed at `901855b`; hosted
+criteria 8–9 and architecture finding B2 were architecture-reviewed and
+owner-accepted on 2026-07-22
+**Priority.** Completed architect-review remediation for B2; unrelated
+architecture and public/production pilot holds remain  
 **Source finding.** 2026-07-14 architecture preparation review B2  
 **Tracks.** RFC-003, RFC-012, RFC-016, RFC-038, RFC-045, RFC-050, RFC-069  
 **Touches.** `workers/ssr/src/crypto.rs`, pepper callers and error propagation,
@@ -14,10 +14,10 @@ hosted negative evidence
 
 ## Summary
 
-Remove the fixed public HMAC-pepper fallback and require valid secret material
+RFC-077 removed the fixed public HMAC-pepper fallback and requires valid secret material
 before any secret-dependent application route can execute.
 
-The current centralized accessor returns
+Before RFC-077, the centralized accessor returned
 `dev-pepper-change-in-production` whenever neither a secret nor a plain variable
 is bound. That fallback is reachable in hosted staging and production after a
 configuration mistake. The same pepper protects invite codes, relink codes,
@@ -34,10 +34,11 @@ RFC-077 introduces two independent enforcement layers:
 Local development uses a developer-specific ignored `.dev.vars.dev` secret.
 There is no built-in, committed, deterministic, or plain-variable fallback.
 
-This remediation design is accepted. Its handoff was architecture-reviewed and
-the owner authorized the bounded local implementation at checkpoint `91f3a39`.
-The resulting patch and local gate evidence still require architecture
-implementation review. Hosted criteria 8–9 remain separate and unauthorized.
+This remediation design, implementation, and hosted evidence are accepted. Its
+handoff was architecture-reviewed, the owner authorized the bounded local
+implementation at checkpoint `91f3a39`, and the implementation was committed
+as `901855b`. Corrected exact-candidate hosted evidence satisfied criteria 8–9
+and closed source architecture finding B2 on 2026-07-22.
 
 ## Problem and Security Invariant
 
@@ -450,7 +451,9 @@ RFC-077 implementation is complete only when:
 Architecture approval may accept this design and move it to `accepted/` before
 hosted evidence exists. Moving implementation to `done/` establishes the local
 source/config change; it does not by itself close hosted B2 evidence or lift
-the roadmap remediation hold.
+the roadmap remediation hold. For RFC-077, the separately reviewed hosted
+evidence now closes B2; the overall roadmap hold remains because unrelated
+findings and release gates are still open.
 
 ## Rollout and Rollback
 
@@ -520,11 +523,38 @@ the documentation build, and `git diff --check`. Two initially parallelized
 browser runs collided on shared legacy ports and passed when rerun
 sequentially; only the uncontested reruns are treated as gate evidence.
 
-This evidence is local and awaits architecture implementation review. It does
-not establish deployment-time required-secret rejection, hosted
-runtime-negative behavior, exact-candidate hosted validity, B2 closure,
-production/pilot readiness, or release authorization. RFC-077 therefore
-remains in `accepted/`.
+The local implementation and correction reviews were accepted on 2026-07-22.
+The local evidence does not by itself establish hosted behavior; the separately
+reviewed evidence below supplies that boundary.
+
+## Hosted Evidence and B2 Closure
+
+The owner-authorized disposable Cloudflare run against exact candidate
+`901855bfa584a373a66bc240a54fba9c78eefc84` observed:
+
+- ordinary deployment rejected specifically because required
+  `HMAC_PEPPER` was absent, with strict non-publication inventory;
+- exact-artifact runtime-negative readiness and fixed dynamic `503` behavior,
+  no redirect or cookie, and bounded D1/KV non-mutation;
+- valid-secret ready health plus invite generation, calendar-token generation,
+  join/authenticated session, authenticated form-token, help-signin, and
+  relink flows;
+- permitted secret deletion followed by the same fail-closed matrix; and
+- strict deletion and zero final disposable D1, KV, and Worker inventory.
+
+The provenance chain binds clean tracked `HEAD`, an in-run release build,
+JS/Wasm SHA-256 manifest, isolated matching snapshot, Wrangler version IDs,
+and matching remote version annotations. The corrected schema-2 evidence and
+architecture acceptance are retained in ignored project records:
+
+- `.git-exclude/evidence/rfc077/hosted-evidence-corrected-rerun.md`;
+- `.git-exclude/tmp/rfc077-hosted-evidence-901855b.json`; and
+- `.git-exclude/reviewed/zinnias-ciao-main-2026-07-22-rfc-077-hosted-evidence-correction-rereview.md`.
+
+Acceptance criteria 8–9 are satisfied and architecture finding B2 is closed.
+This closure does not authorize production deployment, public traffic or
+pilot activity, release, or closure of unrelated RFC-050, B1, B3, B5,
+real-device, performance, or persistent-observability gates.
 
 ## Review Questions
 

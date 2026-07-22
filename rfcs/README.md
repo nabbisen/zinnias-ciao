@@ -17,7 +17,6 @@ authorize implementation.
 | ID | Title | Accepted | Note |
 |----|-------|----------|------|
 | 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Local implementation reviewed/accepted/committed at `b72f22b`; corrected isolated automation and bounded human no-JS/network evidence were architecture-reviewed and owner-accepted, closing criterion 8 locally. RFC-050 hosted evidence remains required before public/production B1 closure |
-| 077 | [Fail-Closed HMAC Pepper Configuration](./accepted/077-fail-closed-hmac-pepper-configuration.md) | 2026-07-21 | Bounded local implementation and full local handoff gate set completed on 2026-07-21; architecture implementation review is pending. Hosted criteria 8–9 remain unauthorized and required before public/production B2 closure |
 | 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 0A–8 and the Class A telemetry correction reviewed/committed. Persistent delivery and exact-candidate hosted B5 evidence remain required |
 
 ## Done — MVP core (001–019)
@@ -56,7 +55,7 @@ authorize implementation.
 | 036 | [Public Release Readiness, Security Review, and Launch Runbook](./done/036-public-release-readiness-security-review-and-launch-runbook.md) | v0.15.0 |
 | 026 | [Multi-Language and Plain-Language Localization](./done/026-multi-language-and-plain-language-localization.md) | v0.10.0 — EN/JA table complete; per-community lang selection deferred |
 
-## Done — F7 stabilization (architect deep-review remediation, 037–042)
+## Done — F7 stabilization and architect remediation
 
 | ID | Title | Shipped in |
 |----|-------|------------|
@@ -66,6 +65,7 @@ authorize implementation.
 | 040 | [Event Edit Contract](./done/040-event-edit-contract.md) | v0.23.0 |
 | 041 | [Atomic Invite Redemption](./done/041-atomic-invite-redemption.md) | v0.23.0 |
 | 042 | [Pilot Offline and Private Cache Contract](./done/042-pilot-offline-and-private-cache-contract.md) | v0.23.0 |
+| 077 | [Fail-Closed HMAC Pepper Configuration](./done/077-fail-closed-hmac-pepper-configuration.md) | `main` at `901855b`; hosted criteria 8–9 and B2 closure accepted 2026-07-22 |
 | 043 | [Pilot UX Acceptance and Error Feedback](./done/043-pilot-ux-acceptance-and-error-feedback.md) | v0.23.0 / v0.24.0 |
 | 046 | [Event-Bound Status Token](./done/046-event-bound-status-token.md) | v0.27.0 |
 | 047 | [Japanese Date/Time Presentation](./done/047-japanese-date-time-presentation.md) | v0.27.0 |
