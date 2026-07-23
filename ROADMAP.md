@@ -39,6 +39,43 @@ The RFC lifecycle now separates Proposed design from Accepted implementation.
 Remediation design and accepted implementation take priority. Feature work
 resumes only after the remediation hold is explicitly lifted in this roadmap.
 
+## Active Remediation and Release Sequence
+
+RFC numbers are stable identifiers, not execution-order numbers. The current
+dependency order is:
+
+1. Reconcile RFC-079 and the release checklist with the completed Class A
+   failure-telemetry implementation review and committed implementation.
+2. Prepare the RFC-078 implementation handoff, including native SSR CI,
+   workspace/all-target Clippy, retention of the WASM check, and focused test
+   modules that do not further enlarge the monolithic release-gate file. Apply
+   the already-committed RFC-071 threat-model and form-security baseline during
+   design, implementation, and review.
+3. Implement RFC-078 and complete its implementation review and required local
+   evidence. This is the immediate code priority and the remaining B3 source
+   remediation.
+4. Complete architecture review and owner acceptance of RFC-050 after the
+   RFC-078 implementation candidate is sufficiently concrete to keep its
+   evidence procedures executable. Before canonical candidate upload, decide,
+   provision, and document the owner-approved persistent incident sink,
+   retention, and access boundary.
+5. Build and identify one exact immutable release candidate, then execute the
+   frozen RFC-050 hosted evidence campaign for the remaining B1, B3, B4, and B5
+   claims. The same campaign must include E7 canary delivery, retrieval,
+   health, retention, and access proof for the provisioned persistent sink;
+   console output and `wrangler tail` are not sufficient.
+6. Reassess the remediation hold and v0.60.0 readiness from the integrated
+   evidence. Lifting one finding does not implicitly lift another.
+7. Resume product-feature implementation only after this roadmap explicitly
+   lifts the hold.
+
+RFC-050 procedures, tooling, and persistent-sink preparation may proceed where
+doing so reduces risk, but the sink must be provisioned before canonical upload
+and none of that preparation is final B4/B5 evidence until the frozen campaign
+proves it against the reviewed RFC-078 exact candidate. RFC-044 and RFC-045 are
+not automatically prerequisites: their remaining scopes must first be checked
+for overlap with or supersession by the revised RFC-050.
+
 ## Architecture Remediation Work
 
 | RFC | Theme | Current note |
@@ -48,9 +85,28 @@ resumes only after the remediation hold is explicitly lifted in this roadmap.
 | 078 | Fail-closed strongly consistent abuse controls | Corrected architecture was reviewed and owner-accepted on 2026-07-23. Implementation is authorized but has not started; B3 remains open until implementation review and required local/exact-candidate hosted evidence pass. All controlled-staging, public-pilot, production, and release holds remain unchanged. |
 | 079 | Atomic required audits and recursive metadata redaction | Architecture reviewed and owner-accepted on 2026-07-15. Local Packages 0A–8 and the Class A failure-telemetry correction are reviewed and committed. RFC-050 exact-candidate hosted evidence, persistent incident delivery, and every public/production pilot gate remain open. |
 
-## Proposed Work
+## Active Proposed Remediation
 
-The active proposed backlog is:
+| RFC | Theme | Current note |
+|-----|-------|--------------|
+| 050 | Exact-candidate hosted staging evidence and pilot gate | B4 remediation revision; Proposed pending architecture review and owner acceptance. It follows RFC-078 implementation in the active dependency sequence and is not post-hold feature work. |
+
+## Implemented Lifecycle Reconciliation
+
+RFC-070 and RFC-071 are already implemented on `main`; they are not future
+implementation candidates. On 2026-07-23 the owner explicitly authorized their
+direct lifecycle correction from `proposed/` to `done/`. Their Status fields,
+index entries, and inbound links move together while their remaining evidence
+qualifications and non-blocking notes remain visible.
+
+| RFC | Implemented baseline | Remaining qualification |
+|-----|----------------------|-------------------------|
+| 070 | Self display-name editing committed at `4bfe4f2`; implementation review accepted with notes. | Remaining browser/hosted evidence is release evidence, not unimplemented source scope. |
+| 071 | Threat-model documentation committed at `1b12d96`; implementation review accepted with notes. | The mandatory baseline is already in use. Preserve precise checklist-versus-observed-evidence labeling as non-blocking documentation cleanup. |
+
+## Paused Proposed Work
+
+The paused proposed backlog is:
 
 | RFC | Theme | Current note |
 |-----|-------|--------------|
@@ -61,10 +117,7 @@ The active proposed backlog is:
 | 034 | Notification-free quiet mode and attention design | Should be considered with RFC-021. |
 | 044 | D1 query-budget gate and integration test harness | Runtime/integration hardening candidate. |
 | 045 | Pre-pilot runtime verification matrix | Runtime evidence and operator verification candidate. |
-| 050 | Exact-candidate hosted staging evidence and pilot gate | B4 remediation revision; Proposed pending architecture review and owner acceptance. |
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
-| 070 | Self display name editing | Member-facing profile maintenance candidate. |
-| 071 | Application threat model and form security baseline | Consolidate security reasoning before more form-heavy workflows. |
 | 072 | Member language preference and runtime localization | Design remains proposed; implementation is paused by the architect remediation hold. |
 | 073 | Calendar events list and day detail UX | Design remains proposed; implementation is paused by the architect remediation hold. |
 | 074 | Community switch route preservation | Design remains proposed; implementation is paused by the architect remediation hold. |
@@ -76,55 +129,52 @@ The feature candidates below are paused while the architect-review remediation
 hold is active. Their relative order is preserved for reconsideration after the
 hold is explicitly lifted; this list is not implementation authorization.
 
-1. **RFC-070: Self Display Name Editing**
-   Small member-facing profile maintenance feature. It lets active members fix
-   their own community-scoped display name without admin/operator D1 repair or
-   re-invite workarounds.
+1. **External identity/OIDC pre-RFC consultation**
+   Revisit the parked consultation only after the remediation hold is
+   explicitly lifted, applying the current RFC-071 security baseline.
+   Resolve account linking, codlet-to-OIDC transition, provider identity,
+   recovery, session, and lockout semantics before drafting an implementation
+   RFC. This roadmap entry does not authorize an RFC or implementation.
 
-2. **RFC-071: Application Threat Model and Form Security Baseline**
-   Security controls exist across requirements, RFCs, release gates, and
-   operations docs. This should consolidate assets, actors, trust boundaries,
-   threats, controls, evidence, and form-review expectations before the project
-   adds more form-heavy workflows.
-
-3. **RFC-054: Japanese UX Copy Review**
+2. **RFC-054: Japanese UX Copy Review**
    Recent releases added sensitive recovery and member-management flows. Copy
    quality is part of usability and safety, but the full native-speaker copy
    review should wait until the user-facing surface is more stable.
 
-4. **RFC-021 and RFC-034: Notifications and Quiet Mode**
+3. **RFC-021 and RFC-034: Notifications and Quiet Mode**
    These should be designed together to avoid adding reminders without a clear
    attention and opt-out policy.
 
-5. **RFC-031: Consentful Contact Channels**
+4. **RFC-031: Consentful Contact Channels**
    Useful after notification policy is clear. This should remain privacy-first
    and consent-bound.
 
-6. **RFC-033: Subgroups and Event Visibility**
+5. **RFC-033: Subgroups and Event Visibility**
    Large feature area touching authorization, event visibility, and community
    boundaries. It should start with design review, not direct implementation.
 
-7. **RFC-044, RFC-045, RFC-050: Runtime Evidence and Hardening**
-   These are good candidates when the project priority shifts from product
-   workflow to deployment confidence and Cloudflare-hosted evidence.
+6. **RFC-044 and RFC-045: Remaining Runtime Harness Work**
+   Reassess their unimplemented portions after RFC-050. Retain only work that
+   is not already discharged or superseded by the exact-candidate evidence
+   contract.
 
-8. **RFC-072: Member Language Preference and Runtime Localization**
+7. **RFC-072: Member Language Preference and Runtime Localization**
    The i18n scaffold exists, but runtime UI language selection does not. This
    should start with design review around membership-vs-user scope, locale
    precedence, settings UX, `html lang`, and tests before schema or handler
    work.
 
-9. **RFC-073: Calendar Events List and Day Detail UX**
+8. **RFC-073: Calendar Events List and Day Detail UX**
    The Calendar grid, monthly event list, and attendance matrix now carry
    different user jobs. Split them into explicit tabs and make selected-day
    detail appear under the calendar without sending users back to the top.
 
-10. **RFC-074: Community Switch Route Preservation**
+9. **RFC-074: Community Switch Route Preservation**
     Header switching should preserve the current page family where safe, such
     as Calendar or My Page, and fall back only when the target community lacks
     permission or no equivalent route exists.
 
-11. **RFC-075: Render Style System and Inline Style Reduction**
+10. **RFC-075: Render Style System and Inline Style Reduction**
     Inline styling across server-rendered Rust strings is now a maintenance
     risk. Start with a reviewed CSS/class strategy and migrate by surface,
     likely beginning with Calendar.
@@ -136,12 +186,13 @@ service.
 
 ### Operator Tasks
 
-- [ ] Apply all D1 migrations through `0009_recurrence_v2.sql` to the target environment; rehearse rollback.
+- [ ] Apply the exact candidate's complete D1 migration ledger to the target environment, through at least `0010_audit_integrity.sql` at the current baseline; rehearse rollback/forward recovery and RFC-079's metadata-reset, backup-sensitivity, and privacy boundary.
 - [ ] Set required secrets per environment without printing or committing real values.
 - [ ] Configure required KV/D1 bindings per environment.
 - [ ] Configure `SESSION_COOKIE_DOMAIN` as a non-secret variable only when a shared cookie domain is required.
-- [ ] Configure Logpush for production if production audit retention requires it.
-- [ ] Consolidate and review the application threat model and form-security baseline.
+- [ ] Decide and provision the owner-approved persistent incident sink before canonical candidate upload; document retention and access, then prove E7 canary delivery/retrieval in the frozen RFC-050 campaign.
+- [x] Consolidate and review the application threat model and form-security baseline. *(committed at `1b12d96`; implementation review accepted with notes)*
+- [ ] Apply the threat-model/form-security review gate to every security-sensitive change in the exact candidate and retain precise checklist-versus-observed-evidence labels.
 - [ ] Run security review against the release checklist.
 
 ### Browser and Device QA

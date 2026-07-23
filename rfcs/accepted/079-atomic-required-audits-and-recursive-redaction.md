@@ -2,8 +2,10 @@
 
 **Status.** Accepted — architecture review accepted with notes on 2026-07-14;
 explicit owner acceptance recorded on 2026-07-15; local Packages 0A–8 are
-implemented and reviewed. A locally implemented Class A failure-telemetry
-correction awaits architecture implementation review.
+implemented, reviewed, and committed. The Class A failure-telemetry correction
+was architecture-reviewed, owner-accepted, and committed at `71e3ebd`.
+Persistent incident delivery and RFC-050 exact-candidate hosted evidence remain
+open, so B5 and every public/production pilot gate remain open.
 
 **Priority.** Architect-review remediation B5; blocks every public or production
 pilot
@@ -481,8 +483,13 @@ Emit structured operational events:
 audit.required_batch_failed
 audit.pre_disclosure_failed
 audit.secondary_write_failed
-audit.metadata_rejected
 ```
+
+Metadata construction or validation failure is not a separate event family.
+For Class A it is emitted once as `audit.required_batch_failed` with the closed
+`failure_category=construction`; Class B and Class C retain their respective
+event owners. This keeps one operational failure owner per attempted action and
+avoids duplicate incident lines.
 
 Allowed log fields:
 

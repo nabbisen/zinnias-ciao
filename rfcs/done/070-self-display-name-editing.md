@@ -1,8 +1,14 @@
 # RFC 070 - Self Display Name Editing
 
-**Status.** Proposed  
-**Target release.** v0.60.0 candidate  
-**Tracks.** Member profile, community UX, identity display, audit safety.  
+**Status.** Done — source implementation committed on `main` at `4bfe4f2`;
+implementation review accepted with notes. Browser smoke and hosted evidence
+remain release qualifications and are not claimed by this lifecycle move.
+
+**Release.** Unreleased at the v0.59.0 roadmap baseline; originally targeted
+for the v0.60.0 candidate.
+
+**Tracks.** Member profile, community UX, identity display, audit safety.
+
 **Touches.** Me/profile page, community route dispatcher, membership write path,
 display-name validation, form tokens, i18n, audit logging, release gates,
 browser smoke.
@@ -352,6 +358,11 @@ Add a reusable smoke script for the self-display-name workflow. It should verify
   validation copy usable without horizontal overflow.
 
 ## Acceptance Criteria
+
+The source implementation criteria are satisfied on `main`. The browser-smoke
+items below remain required release evidence before this workflow is included
+in a release candidate; moving the implemented RFC to `done/` does not claim
+that evidence was observed.
 
 RFC-070 can be considered complete when:
 

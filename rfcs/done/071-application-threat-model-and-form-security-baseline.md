@@ -1,8 +1,15 @@
 # RFC 071 - Application Threat Model and Form Security Baseline
 
-**Status.** Proposed  
-**Target release.** v0.61.0 candidate  
-**Tracks.** Security, privacy, forms, release gates, operations.  
+**Status.** Done — durable documentation committed on `main` at `1b12d96`;
+implementation review accepted with notes. The mandatory threat-model baseline
+is already in use. Precise checklist-versus-observed-evidence labeling remains
+a non-blocking documentation cleanup.
+
+**Release.** Unreleased at the v0.59.0 roadmap baseline; originally targeted
+for the v0.61.0 candidate.
+
+**Tracks.** Security, privacy, forms, release gates, operations.
+
 **Touches.** Developer security docs, tester release checklist, form handlers,
 domain validators, render escaping tests, smoke scripts, review process.
 
@@ -334,7 +341,8 @@ name the affected assets, actors, trust boundaries, controls, and evidence.
   form-security baseline gate.
 - The future-review hook for security-sensitive RFCs and new/changed forms is
   documented.
-- `ROADMAP.md` includes RFC-071 as a near-term security hardening candidate.
+- `ROADMAP.md` records RFC-071 as an implemented baseline used by current
+  remediation and future security-sensitive work.
 - `rfcs/README.md` indexes RFC-071.
 - The threat model maps assets, actors, trust boundaries, threats, controls,
   evidence, and known gaps.
@@ -355,25 +363,33 @@ name the affected assets, actors, trust boundaries, controls, and evidence.
 - Should future feature RFCs include a mandatory "Threat Model Impact" section,
   or is a release-review checklist enough?
 
-## Rollout Plan
+## Implementation and Maintenance Record
 
-1. Review and accept this RFC.
-2. Add the developer threat-model document and checklist links.
-3. Add or adjust release gates only where the document reveals missing
-   evidence for already-active forms.
-4. Use the threat model in the next security-sensitive RFC review.
-5. Revisit the document before first pilot deployment and after any major auth,
+The design and implementation reviews were accepted with notes, and the
+developer threat-model document, navigation, maintainer entry points, and
+release-checklist form gate were committed at `1b12d96`. The mandatory review
+hook is now active and applies to RFC-078.
+
+Maintenance remains ongoing:
+
+1. add or adjust release gates where the threat model reveals missing evidence
+   for an active form;
+2. label checklist requirements separately from evidence actually observed;
+3. use the threat model in every security-sensitive RFC review; and
+4. revisit the document before first pilot deployment and after any major auth,
    notification, export, or visibility-boundary feature.
 
 ## Open Gaps to Track
 
-This RFC should not hide known gaps. Initial candidates:
+This RFC does not hide known gaps. Current candidates:
 
-- No single threat-model document exists yet.
 - Some existing forms have workflow smoke but limited render-level hostile-input
   tests.
 - Some security assertions live in review notes or `.git-exclude` evidence
   rather than durable docs.
+- Some surface-map evidence labels name a checklist or expected smoke category
+  without distinguishing it from an observed execution artifact; clarify those
+  labels when the document is next updated.
 - Full hosted staging evidence is still operator-dependent.
 - No automated scanner or fuzzing harness is required today.
 - No formal incident-response playbook exists beyond operational recovery and

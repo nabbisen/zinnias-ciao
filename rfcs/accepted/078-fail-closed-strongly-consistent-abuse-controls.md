@@ -562,15 +562,23 @@ Implementation should remain one reviewable B3 patch after RFC-077 is complete:
    reservations.
 6. Remove all runtime `RATE_LIMIT` KV reads/writes and fail-open branches.
 7. Add fixed `429`/`503` rendering and privacy-safe structured events.
-8. Update threat model, architecture map, deployment/teardown docs, runbook,
+8. Add focused RFC-078 unit/integration/contract tests in dedicated test
+   modules rather than extending the monolithic
+   `packages/contracts/tests/release_gates.rs` file.
+9. Strengthen the standard CI path to run native SSR tests and
+   workspace/all-target Clippy with warnings denied; align the repository
+   `lint` script with that boundary and retain the SSR WASM type-check.
+10. Update threat model, architecture map, deployment/teardown docs, runbook,
    RFC-045/RFC-050 evidence expectations, and release checklist.
-9. Capture isolated hosted binding-negative, concurrency, expiry, reset, and
+11. Capture isolated hosted binding-negative, concurrency, expiry, reset, and
    valid-flow evidence.
 
 No developer handoff is required at Proposed status. If the RFC is Accepted
 and implementation is delegated, a companion handoff should pin the worker-rs
 Durable Object protocol, Wrangler version/configuration boundary, and exact test
-locations while keeping B1/B5 changes out unless separately accepted.
+locations while keeping B1/B5 changes out unless separately accepted. It must
+also identify the CI commands and dedicated RFC-078 test modules required by
+slices 8–9.
 
 ## Test and Release Evidence
 
@@ -714,7 +722,11 @@ RFC-078 implementation is complete only when:
    declarative lifecycle entry whose per-environment reconciliation is proven.
 8. `RATE_LIMIT` KV and every fail-open branch are absent from runtime code.
 9. Privacy-safe blocked/unavailable telemetry is observable for hosted review.
-10. Local integration and exact-candidate hosted concurrency, cross-origin,
+10. CI runs the native SSR tests and workspace/all-target Clippy with warnings
+    denied, retains the SSR WASM check, and the repository `lint` command
+    enforces the same Clippy boundary. Focused RFC-078 contract gates live in
+    dedicated test modules rather than enlarging the general release-gate file.
+11. Local integration and exact-candidate hosted concurrency, cross-origin,
     direct-ingress, lifecycle, and negative evidence pass before B3 is closed
     for controlled staging or public/production pilot.
 

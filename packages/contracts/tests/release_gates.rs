@@ -2780,7 +2780,7 @@ const RFC079_RFC014_SRC: &str =
 const RFC079_RFC052_SRC: &str =
     include_str!("../../../rfcs/done/052-audit-retention-and-operator-access-policy.md");
 const RFC079_RFC071_SRC: &str = include_str!(
-    "../../../rfcs/proposed/071-application-threat-model-and-form-security-baseline.md"
+    "../../../rfcs/done/071-application-threat-model-and-form-security-baseline.md"
 );
 const RFC079_RFC050_SRC: &str =
     include_str!("../../../rfcs/proposed/050-staging-runtime-verification-evidence-pack.md");

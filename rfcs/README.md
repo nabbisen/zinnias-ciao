@@ -12,6 +12,12 @@ authorize implementation.
 > evidence, and RFC-054 Japanese copy review may continue. See
 > [ROADMAP.md](../ROADMAP.md#architect-review-remediation-hold).
 
+RFC numbers and the tables below are stable identifiers and lifecycle indexes,
+not execution priority. The active dependency order is maintained in
+[ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-078
+implementation and review, followed by the RFC-050 exact-candidate campaign,
+including persistent-incident-delivery proof.
+
 ## Accepted — approved for implementation
 
 | ID | Title | Accepted | Note |
@@ -96,6 +102,13 @@ authorize implementation.
 | 064 | [Rust Module and Crate Boundary Cleanup](./done/064-rust-module-and-crate-boundary-cleanup.md) | v0.52.0 / v0.53.0 / v0.58.0 |
 | 069 | [Total Community Access Recovery](./done/069-total-community-access-recovery.md) | v0.59.0 |
 
+## Done — implemented on `main`, unreleased
+
+| ID | Title | Implemented baseline |
+|----|-------|----------------------|
+| 070 | [Self Display Name Editing](./done/070-self-display-name-editing.md) | `main` at `4bfe4f2`; implementation review accepted with notes. Browser smoke and hosted evidence remain release qualifications for the v0.60.0 candidate |
+| 071 | [Application Threat Model and Form Security Baseline](./done/071-application-threat-model-and-form-security-baseline.md) | `main` at `1b12d96`; implementation review accepted with notes. The baseline is active; precise checklist-versus-observed-evidence labeling remains non-blocking cleanup |
+
 ## Also Done
 
 | ID | Title | Shipped in |
@@ -126,12 +139,10 @@ authorize implementation.
 | 050 | [Exact-Candidate Hosted Staging Evidence and Pilot Gate](./proposed/050-staging-runtime-verification-evidence-pack.md) | B4 remediation revision: pin evidence to an immutable Worker version plus separately identified external state; architecture review required |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
 
-## Proposed — profile, security baseline, settings, and UX hardening (070–075)
+## Proposed — settings and UX hardening (072–075)
 
 | ID | Title | File | Note |
 |----|-------|------|------|
-| 070 | [Self Display Name Editing](./proposed/070-self-display-name-editing.md) | Community-scoped self-service display-name update for active members |
-| 071 | [Application Threat Model and Form Security Baseline](./proposed/071-application-threat-model-and-form-security-baseline.md) | Consolidated threat model and reusable form-security review baseline |
 | 072 | [Member Language Preference and Runtime Localization](./proposed/072-member-language-preference-and-runtime-localization.md) | Controlled design for user-selectable EN/JA runtime UI language |
 | 073 | [Calendar Events List and Day Detail UX](./proposed/073-calendar-events-list-and-day-detail-ux.md) | Split Calendar grid, Events list, and Attendance table into distinct views |
 | 074 | [Community Switch Route Preservation](./proposed/074-community-switch-route-preservation.md) | Preserve current route family on community switch when safe |
