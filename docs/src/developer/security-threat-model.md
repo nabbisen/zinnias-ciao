@@ -34,7 +34,7 @@ Status:
 | Form tokens | Write operations are protected from CSRF, replay, and accidental double submit by purpose-bound tokens. |
 | Audit log | Security-relevant actions are recorded with minimal metadata and without bearer secrets or unnecessary personal data. |
 | D1 data | Writes are scoped, parameterized, migration-compatible, and auditable where security relevant. |
-| KV rate-limit state | Abuse counters support brute-force protection without becoming a sensitive user-data store. |
+| Abuse-control coordinator state | The `AbuseLimiter` Durable Object's per-scope/subject counters support brute-force and creation-quota protection without becoming a sensitive user-data store. |
 | Service-worker cache | Offline behavior must not expose private authenticated content after logout, session loss, or direct offline navigation. |
 | Deployment configuration | D1/KV identifiers, local environment files, and secrets must not be accidentally committed or printed. |
 
@@ -63,7 +63,7 @@ Status:
 | Member role to admin role | Admin forms must re-check admin status on POST, not only when rendering GET pages. |
 | Admin role to operator-only tooling | Operator recovery and deployment tasks must not become ordinary app UI. |
 | Worker to D1 | SQL must be parameterized and scoped to the current community/user/resource. |
-| Worker to KV | KV rate-limit failures and namespace mistakes affect abuse controls. |
+| Worker to Durable Object | The `AbuseLimiter` binding, coordinator failures, and direct-edge ingress trust affect abuse controls; missing binding or storage failure must fail closed (RFC-078). |
 | Worker to secrets/config | Secrets and environment-specific IDs must remain outside shared commits and logs. |
 | Server-rendered HTML to DOM | User-controlled values must be escaped before entering text or attribute contexts. |
 | Client enhancement to no-JS behavior | JavaScript can improve UX, but state changes must work correctly as plain forms. |
@@ -84,7 +84,7 @@ Status:
 | Attribute injection | Values inserted into attributes are escaped with the same render helper or a context-appropriate equivalent. | `escape_html` tests include attribute vectors; RFC-070 form tests cover hostile quotes. | New form tests should include quoted event-handler payloads for prefilled values and hidden tokens. |
 | CSV formula injection | Matrix CSV export is generated client-side and hardens formula-like values; server receives metadata-only audit. | RFC-068, smoke script, release checklist CSV gates. | Re-review if server-side CSV generation is ever introduced. |
 | ICS/feed bearer leakage | Feed URLs are treated as bearer links, shown with privacy warning, revocable, and excluded from audit metadata. | RFC-053, release checklist calendar-feed gates. | Feed URL exposure through browser history and copy/paste remains a user education issue. |
-| Invite/relink brute force | Failed code redemption is rate-limited and returns generic errors; plaintext codes are not logged. | RFC-012, RFC-024, RFC-041, RFC-063, smoke scripts and release gates. | KV failure behavior should be reviewed before production pilot. |
+| Invite/relink brute force | Failed and successful code redemption both reserve capacity in the fail-closed `AbuseLimiter` Durable Object (10 attempts / 5 minutes per canonical client-network subject) before credential lookup; a missing binding, storage failure, or malformed response denies the operation rather than allowing it. Plaintext codes are not logged. | RFC-012, RFC-024, RFC-041, RFC-063, RFC-078, `abuse_control.rs`/`abuse_limiter.rs` native and local-workerd evidence, smoke scripts and release gates. | RFC-050 exact-candidate hosted evidence (direct-ingress topology, native IPv6 `/64` sharing, Pseudo IPv4 classification) remains required before public/production B3 closure. |
 | Generated invite-code transport leakage | Invite generation returns a direct non-cacheable `200` with the plaintext once in escaped body text, a clean canonical URL, and `no-referrer`; replay redirects without mutation or redisplay. Legacy `code` query keys are canonicalized before authentication or binding access. | RFC-076, `admin/members.rs`, contracts gate, focused native tests, local invite-redemption smoke, and architecture-accepted isolated automated plus bounded human no-JS/network evidence. | Criterion 8 is closed locally; RFC-050 exact-candidate hosted evidence remains required before public/production B1 closure. |
 | Session theft impact | Session cookies are HttpOnly, Secure, SameSite=Strict, host-only by default, and revocable. | RFC-038, `session.rs`, release checklist. | Account-wide session management UI is not implemented. |
 | Cache privacy leak | Authenticated HTML is not stored in service-worker cache; offline fallback does not expose stale private content. | RFC-042, RFC-055, release checklist offline gates. | Browser-specific cache behavior should remain part of staging smoke. |
@@ -201,7 +201,9 @@ must say what is required and why.
 - No automated scanner or fuzzing harness is required today.
 - Persistent `audit.*_failed` incident delivery has not yet been demonstrated
   against an owner-approved sink; `console`/tail observation is diagnostic only.
-- KV rate-limit failure behavior should be reviewed before first production
+- RFC-078's `AbuseLimiter` direct-ingress topology, native IPv6 `/64` sharing,
+  and Pseudo IPv4 zone classification have only local-workerd evidence; exact-
+  candidate hosted proof remains required (RFC-050) before first production
   pilot.
 - Older destructive/admin forms should be checked against the replay-result
   baseline.

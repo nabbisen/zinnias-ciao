@@ -27,6 +27,9 @@ hex                         = { workspace = true }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 codlet                      = { workspace = true }
 getrandom                   = { workspace = true }  # crypto.rs random_token + generate_request_id
+# Required directly (not only transitively via `worker`) for the
+# `#[durable_object]` macro's generated glue to resolve (RFC-078).
+wasm-bindgen                = "0.2"
 
 # getrandom needed directly in admin/members.rs non-wasm fallback path
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

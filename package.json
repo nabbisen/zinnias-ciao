@@ -13,7 +13,7 @@
     "bootstrap:production": "node scripts/bootstrap-cloudflare.mjs --target production --config wrangler.production.local.toml",
     "recover:community-access": "node scripts/recover-community-access.mjs",
     "test": "cargo test -p zinnias-ciao-domain -p zinnias-ciao-contracts -p zinnias-ciao-ssr",
-    "lint": "cargo clippy -p zinnias-ciao-domain -p zinnias-ciao-contracts -- -D warnings",
+    "lint": "cargo clippy --workspace --all-targets -- -D warnings",
     "fmt": "cargo fmt --all -- --check",
     "reset:dev": "node scripts/setup.mjs --reset",
     "smoke:runtime": "node scripts/runtime-smoke.mjs",
@@ -28,11 +28,12 @@
     "test:local-secret-setup": "node scripts/test-local-secret-setup.mjs",
     "test:bootstrap-safety": "node scripts/test-bootstrap-cloudflare.mjs",
     "test:hmac-pepper-configuration": "node scripts/test-hmac-pepper-configuration.mjs",
+    "test:abuse-controls": "node scripts/smoke/abuse-controls.mjs",
     "smoke:display-name": "node scripts/smoke/self-display-name-editing.mjs",
     "smoke:matrix": "node scripts/smoke/monthly-attendance-matrix.mjs",
     "smoke:matrix-csv": "node scripts/smoke/calendar-matrix-csv-export.mjs"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "wrangler": "4.113.0"
   }
 }

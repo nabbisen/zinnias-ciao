@@ -267,7 +267,7 @@ Use this template after the prototype smoke passes.
 - [ ] Staging D1 migrations applied.
 - [ ] `HMAC_PEPPER` secret set for staging.
 - [ ] Exact candidate identity verified and `/healthz` returns `ok: true, ready: true` before `/join` or other user traffic.
-- [ ] `RATE_LIMIT` KV namespace bound for staging.
+- [ ] `ABUSE_LIMITER` Durable Object class/binding provisioned for staging (RFC-078); exact-candidate direct-ingress topology and native IPv6 `/64` sharing evidence captured.
 - [ ] First staging community and admin seeded with non-production data.
 - [ ] Join flow succeeds with a staging invite code.
 - [ ] Asia/Tokyo 09:00 event creation displays as 09:00 after round-trip.

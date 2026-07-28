@@ -13,10 +13,16 @@ binding       = "DB"
 database_name = "zinnias-ciao"
 database_id   = "local"          # tracked template value; hosted IDs live in ignored wrangler*.local.toml
 
-# KV namespace for rate-limiting (RFC-012)
-[[kv_namespaces]]
-binding = "RATE_LIMIT"
-id      = "local"
+# Fail-closed abuse-control coordinator (RFC-078). One inherited top-level
+# declarative export; `durable_objects` bindings are non-inheritable and are
+# therefore repeated under root and each named environment below.
+[exports.AbuseLimiter]
+type    = "durable-object"
+storage = "sqlite"
+
+[[durable_objects.bindings]]
+name       = "ABUSE_LIMITER"
+class_name = "AbuseLimiter"
 
 # Secret bindings — set via `wrangler secret put` in each environment.
 # Never hard-coded here.
@@ -51,9 +57,9 @@ binding       = "DB"
 database_name = "zinnias-ciao-dev"
 database_id   = "local"
 
-[[env.dev.kv_namespaces]]
-binding = "RATE_LIMIT"
-id      = "local"
+[[env.dev.durable_objects.bindings]]
+name       = "ABUSE_LIMITER"
+class_name = "AbuseLimiter"
 
 # Hosted staging uses the same config shape with real Cloudflare IDs in an
 # ignored local copy:
@@ -63,7 +69,7 @@ id      = "local"
 #   docs/src/shared/deployment.md#staging-exposure
 #   docs/src/shared/deployment.md#staging-teardown
 #   docs/src/tester/staging-runtime-prototype.md#hosted-staging-smoke
-# Then replace only the staging D1 database_id and RATE_LIMIT KV id below.
+# Then replace only the staging D1 database_id below.
 [env.staging]
 name = "zinnias-ciao-ssr-stg"
 [env.staging.secrets]
@@ -79,9 +85,9 @@ binding       = "DB"
 database_name = "zinnias-ciao-staging"
 database_id   = "REPLACE_WITH_STAGING_D1_ID"   # create with: wrangler d1 create zinnias-ciao-staging
 
-[[env.staging.kv_namespaces]]
-binding = "RATE_LIMIT"
-id      = "REPLACE_WITH_STAGING_KV_ID"         # create with: wrangler kv namespace create RATE_LIMIT --env staging
+[[env.staging.durable_objects.bindings]]
+name       = "ABUSE_LIMITER"
+class_name = "AbuseLimiter"
 
 [env.production]
 name = "zinnias-ciao-ssr-prd"
@@ -98,6 +104,6 @@ binding       = "DB"
 database_name = "zinnias-ciao"
 database_id   = "REPLACE_WITH_PRODUCTION_D1_ID"   # create with: wrangler d1 create zinnias-ciao
 
-[[env.production.kv_namespaces]]
-binding = "RATE_LIMIT"
-id      = "REPLACE_WITH_PRODUCTION_KV_ID"         # create with: wrangler kv namespace create RATE_LIMIT --env production
+[[env.production.durable_objects.bindings]]
+name       = "ABUSE_LIMITER"
+class_name = "AbuseLimiter"

@@ -41,21 +41,38 @@ Edit only ignored local config files in the steps below:
 - `wrangler.staging.local.toml` for staging;
 - `wrangler.production.local.toml` for production.
 
-For hosted staging, replace the placeholders in `[[env.staging.d1_databases]]`
-and `[[env.staging.kv_namespaces]]`:
+For hosted staging, replace the placeholder in `[[env.staging.d1_databases]]`:
 
 ```toml
 [[env.staging.d1_databases]]
 binding       = "DB"
 database_name = "zinnias-ciao-staging"
 database_id   = "PASTE_STAGING_D1_DATABASE_ID_HERE"
-
-[[env.staging.kv_namespaces]]
-binding = "RATE_LIMIT"
-id      = "PASTE_STAGING_RATE_LIMIT_KV_ID_HERE"
 ```
 
-Do not introduce another hosted deployment configuration layer.
+The `[[env.staging.durable_objects.bindings]]` block for `ABUSE_LIMITER`
+(RFC-078) needs no ID to paste — it references the inherited top-level
+`[exports.AbuseLimiter]` class export and is provisioned automatically on
+first deploy. Do not introduce another hosted deployment configuration layer.
+
+**If `wrangler.staging.local.toml` or `wrangler.production.local.toml` already
+exists from before RFC-078**, it still has the retired shape (a
+`[[env.*.kv_namespaces]]` block bound to `RATE_LIMIT`, no
+`durable_objects.bindings` for `ABUSE_LIMITER`) and will not work with this
+version's compiled Worker. Before the next deploy to that environment:
+
+- add `[[env.staging.durable_objects.bindings]]` / `[[env.production.durable_objects.bindings]]`
+  with `name = "ABUSE_LIMITER"` and `class_name = "AbuseLimiter"` (copy from
+  the tracked `wrangler.toml`);
+- remove the `[[env.*.kv_namespaces]]` block bound to `RATE_LIMIT`;
+- do **not** delete the hosted `RATE_LIMIT` KV namespace itself yet — see
+  [Deployment: Staging Teardown](../shared/deployment.md#staging-teardown)
+  for the separately authorized retirement procedure.
+
+Deploying an exact candidate that exports `AbuseLimiter` against a local
+config that omits this binding will make every protected `POST` route
+(`/join`, `/relink`, `/communities/new`) fail closed with a generic `503`,
+since the Worker cannot resolve the binding at runtime.
 
 - [ ] Done.
 
@@ -90,32 +107,25 @@ Replace `REPLACE_WITH_STAGING_D1_ID` in `wrangler.staging.local.toml` with the r
 
 - [ ] Done.
 
-### 1.3 Create production KV namespace for rate limiting
+### 1.3 Confirm the Durable Object class/binding for each environment
 
-```sh
-bunx wrangler kv namespace create RATE_LIMIT --env production \
-  --config wrangler.production.local.toml
-```
-
-Note the `id`. Replace the production `RATE_LIMIT` placeholder in
-`wrangler.production.local.toml`:
+`workers/ssr` exports the `AbuseLimiter` Durable Object class (RFC-078)
+declaratively — there is no `wrangler kv namespace create` equivalent step.
+Confirm `wrangler.production.local.toml` and `wrangler.staging.local.toml`
+each carry the binding (inherited unchanged from the tracked template):
 
 ```toml
-[[env.production.kv_namespaces]]
-binding = "RATE_LIMIT"
-id      = "PASTE_REAL_KV_ID_HERE"
+[[env.production.durable_objects.bindings]]
+name       = "ABUSE_LIMITER"
+class_name = "AbuseLimiter"
 ```
 
-- [ ] Done.
-
-### 1.4 Create staging KV namespace
-
-```sh
-bunx wrangler kv namespace create RATE_LIMIT --env staging \
-  --config wrangler.staging.local.toml
-```
-
-Replace `REPLACE_WITH_STAGING_KV_ID` in `wrangler.staging.local.toml`.
+The namespace is provisioned automatically the first time the exact
+candidate is deployed to that environment. A retired hosted `RATE_LIMIT` KV
+namespace from a pre-RFC-078 deployment may still exist; do not delete it as
+part of this bootstrap — see
+[Deployment: Staging Teardown](../shared/deployment.md#staging-teardown) for
+the separately authorized retirement procedure.
 
 - [ ] Done.
 

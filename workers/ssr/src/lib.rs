@@ -1,5 +1,7 @@
 use worker::*;
 
+mod abuse_control;
+mod abuse_limiter;
 mod audit;
 mod authz;
 mod codlet;
@@ -7,11 +9,18 @@ mod crypto;
 mod db;
 mod errors;
 mod form_token;
-mod rate_limit;
 mod render;
 mod session;
 
 mod handlers;
+
+// Exported at crate root for the generated Worker class name (RFC-078).
+// The Durable Object is reachable only through the same-Worker binding; it
+// is never added to the public HTTP router in `dispatch_request` below.
+// wasm32-only: the `#[durable_object]`-generated glue does not compile
+// natively (see `abuse_limiter`'s module doc).
+#[cfg(target_arch = "wasm32")]
+pub use abuse_limiter::AbuseLimiter;
 
 #[event(fetch)]
 pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {

@@ -1331,6 +1331,7 @@ dependencies = [
  "sha2 0.10.9",
  "thiserror",
  "time",
+ "wasm-bindgen",
  "worker",
  "zinnias-ciao-contracts",
  "zinnias-ciao-domain",

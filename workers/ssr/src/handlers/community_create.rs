@@ -7,9 +7,10 @@ use zinnias_ciao_domain::{
     CommunityNameError, DisplayNameError, validate_community_name, validate_display_name,
 };
 
+use crate::abuse_control::{self, Outcome, Scope};
 use crate::authz::{MembershipContext, require_active_admin_somewhere};
 use crate::crypto::random_token;
-use crate::rate_limit;
+use crate::form_token::ConsumeResult;
 use crate::render::{self, escape_html};
 
 const COMMUNITY_CREATE_PATH: &str = "/communities/new";
@@ -48,6 +49,17 @@ pub async fn get_new_community(req: Request, env: &Env, _rid: &str) -> Result<Re
 }
 
 pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
+    // Direct-edge ingress validation runs before authentication, form-token
+    // D1 access, limiter access, and application D1 access (RFC-078). A
+    // rejection returns the fixed generic 503 without touching D1.
+    let client_network = match abuse_control::canonical_client_network(&req) {
+        Ok(subject) => subject,
+        Err(rejection) => {
+            abuse_control::log_ingress_rejected(rid, "community_create", rejection);
+            return render::configuration_unavailable();
+        }
+    };
+
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let admin = require_active_admin_somewhere(env, &auth).await?;
 
@@ -55,7 +67,6 @@ pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Resul
         return render_disabled(&admin);
     }
 
-    let client_ip = rate_limit::client_ip(&req);
     let form = req.form_data().await?;
     let raw_token = form.get_field("_token").unwrap_or_default();
     let raw_name = form.get_field("community_name").unwrap_or_default();
@@ -63,21 +74,6 @@ pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Resul
     let timezone = form
         .get_field("timezone")
         .unwrap_or_else(|| SUPPORTED_TIMEZONE.to_owned());
-
-    if rate_limit::is_community_creation_limited(env, &auth.user_id, &auth.session_id, &client_ip)
-        .await
-    {
-        return refresh_form(
-            env,
-            &auth.user_id,
-            &admin,
-            &raw_name,
-            &raw_display_name,
-            &timezone,
-            Some(i18n::JA_COMMUNITY_CREATE_RATE_LIMITED),
-        )
-        .await;
-    }
 
     let community_name = match validate_community_name(&raw_name) {
         Ok(name) => name,
@@ -124,19 +120,76 @@ pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Resul
         .await;
     }
 
-    let replay = crate::codlet::consume_token(
-        env,
+    let pepper = crate::crypto::pepper(env)?;
+    let db = env.d1("DB")?;
+    let consumed = crate::form_token::consume_detailed(
+        &db,
+        pepper.as_str(),
         &auth.user_id,
         token_purpose::CREATE_COMMUNITY,
         &raw_token,
         None,
     )
     .await?;
-    if let Some(community_id) = replay {
-        return redirect(&format!("/c/{community_id}/home"));
+    match consumed {
+        ConsumeResult::Replay(Some(community_id)) => {
+            return redirect(&format!("/c/{community_id}/home"));
+        }
+        ConsumeResult::Replay(None) => return redirect("/"),
+        ConsumeResult::Proceed => {}
     }
 
-    let db = env.d1("DB")?;
+    // Reserve user, then session, then network, in that exact order.
+    // Earlier charges remain if a later dimension blocks or fails — no
+    // rollback protocol for this bounded 3/day security quota (RFC-078).
+    if let Some(resp) = reserve_or_respond(
+        env,
+        rid,
+        pepper.as_str(),
+        &admin,
+        &auth.user_id,
+        &raw_name,
+        &raw_display_name,
+        &timezone,
+        Scope::CommunityUser,
+        &auth.user_id,
+    )
+    .await?
+    {
+        return Ok(resp);
+    }
+    if let Some(resp) = reserve_or_respond(
+        env,
+        rid,
+        pepper.as_str(),
+        &admin,
+        &auth.user_id,
+        &raw_name,
+        &raw_display_name,
+        &timezone,
+        Scope::CommunitySession,
+        &auth.session_id,
+    )
+    .await?
+    {
+        return Ok(resp);
+    }
+    if let Some(resp) = reserve_or_respond(
+        env,
+        rid,
+        pepper.as_str(),
+        &admin,
+        &auth.user_id,
+        &raw_name,
+        &raw_display_name,
+        &timezone,
+        Scope::CommunityNetwork,
+        &client_network,
+    )
+    .await?
+    {
+        return Ok(resp);
+    }
     let community_id = format!("com_{}", &random_token()[..24]);
     let membership_id = format!("mem_{}", &random_token()[..24]);
     crate::db::community::create_with_first_admin(
@@ -151,11 +204,64 @@ pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Resul
     )
     .await?;
 
-    let pepper = crate::crypto::pepper(env)?;
     crate::form_token::set_result(&db, pepper.as_str(), &raw_token, &community_id).await?;
-    rate_limit::record_community_creation(env, &auth.user_id, &auth.session_id, &client_ip).await;
 
     redirect(&format!("/c/{community_id}/home"))
+}
+
+/// Reserve one abuse-control dimension. Returns `Ok(Some(response))` when the
+/// caller must stop and return that response (`Blocked`/`Unavailable`), or
+/// `Ok(None)` to continue. Community creation does not reset capacity on
+/// success (RFC-078).
+#[allow(clippy::too_many_arguments)]
+async fn reserve_or_respond(
+    env: &Env,
+    rid: &str,
+    pepper: &str,
+    admin: &MembershipContext,
+    auth_user_id: &str,
+    raw_name: &str,
+    raw_display_name: &str,
+    timezone: &str,
+    scope: Scope,
+    subject: &str,
+) -> Result<Option<Response>> {
+    match abuse_control::reserve(env, pepper, scope, subject).await {
+        Outcome::Allowed => Ok(None),
+        Outcome::Blocked {
+            retry_after_seconds,
+        } => {
+            abuse_control::log_blocked(rid, "community_create", scope);
+            let resp = refresh_form(
+                env,
+                auth_user_id,
+                admin,
+                raw_name,
+                raw_display_name,
+                timezone,
+                Some(i18n::JA_COMMUNITY_CREATE_RATE_LIMITED),
+            )
+            .await?;
+            Ok(Some(abuse_control::apply_blocked(
+                resp,
+                retry_after_seconds,
+            )?))
+        }
+        Outcome::Unavailable { category } => {
+            abuse_control::log_unavailable(rid, "community_create", scope, category);
+            let resp = refresh_form(
+                env,
+                auth_user_id,
+                admin,
+                raw_name,
+                raw_display_name,
+                timezone,
+                Some(i18n::JA_CONFIGURATION_UNAVAILABLE),
+            )
+            .await?;
+            Ok(Some(resp.with_status(503)))
+        }
+    }
 }
 
 async fn refresh_form(

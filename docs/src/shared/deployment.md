@@ -86,10 +86,16 @@ binding       = "DB"
 database_name = "zinnias-ciao-staging"
 database_id   = "PASTE_STAGING_D1_DATABASE_ID_HERE"
 
-[[env.staging.kv_namespaces]]
-binding = "RATE_LIMIT"
-id      = "PASTE_STAGING_RATE_LIMIT_KV_ID_HERE"
+[[env.staging.durable_objects.bindings]]
+name       = "ABUSE_LIMITER"
+class_name = "AbuseLimiter"
 ```
+
+The `ABUSE_LIMITER` binding (RFC-078) references the same declarative
+`[exports.AbuseLimiter]` class export inherited from the tracked
+`wrangler.toml`; it has no separate ID to paste. There is no `RATE_LIMIT` KV
+namespace to provision — it was retired when RFC-078 replaced the fail-open
+KV rate limiter with this fail-closed Durable Object coordinator.
 
 For hosted production:
 
@@ -107,9 +113,9 @@ binding       = "DB"
 database_name = "zinnias-ciao"
 database_id   = "PASTE_PRODUCTION_D1_DATABASE_ID_HERE"
 
-[[env.production.kv_namespaces]]
-binding = "RATE_LIMIT"
-id      = "PASTE_PRODUCTION_RATE_LIMIT_KV_ID_HERE"
+[[env.production.durable_objects.bindings]]
+name       = "ABUSE_LIMITER"
+class_name = "AbuseLimiter"
 ```
 
 ## Hosted Staging Deployment
@@ -259,15 +265,19 @@ Delete the remote staging D1 database:
 bunx wrangler d1 delete zinnias-ciao-staging
 ```
 
-Delete the staging KV namespace. Copy the staging `RATE_LIMIT` namespace ID from
-`wrangler.staging.local.toml` before running this:
+The retired `RATE_LIMIT` KV namespace (pre-RFC-078) may still exist as a
+hosted resource even though the tracked `wrangler.toml` no longer declares
+it. Do not delete it as a routine teardown step: RFC-078 requires retaining
+it, unused, until the exact-candidate B3 hosted evidence is accepted and the
+owner separately authorizes deletion. Once authorized:
 
 ```sh
 bunx wrangler kv namespace delete --namespace-id <staging-rate-limit-kv-id>
 ```
 
-After deleting D1 or KV, remove or replace the deleted staging IDs in
-`wrangler.staging.local.toml` before the next staging deployment.
+After deleting D1 or an authorized KV namespace, remove or replace the
+deleted staging IDs in `wrangler.staging.local.toml` before the next staging
+deployment.
 
 ## Production Deployment
 

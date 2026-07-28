@@ -60,7 +60,11 @@ export function assertIsolatedChildEnvironment(environment) {
   }
 }
 
-function configText(main, migrations, { includeD1, includeKv, recoveryEnabled, requiredSecrets }) {
+function configText(
+  main,
+  migrations,
+  { includeD1, includeAbuseLimiter, recoveryEnabled, requiredSecrets },
+) {
   const required = requiredSecrets.map(quoteToml).join(', ');
   const rootD1 = includeD1
     ? `
@@ -71,11 +75,20 @@ database_id = "local"
 migrations_dir = ${quoteToml(migrations)}
 `
     : '';
-  const rootKv = includeKv
+  // RFC-078: the compiled Worker always exports the `AbuseLimiter` Durable
+  // Object class. Declaring the binding here by default keeps every
+  // isolated-harness consumer working; omitting it is a deliberate negative
+  // phase for a test that wants to prove the missing-binding fail-closed
+  // path (`abuse-controls.mjs`), never an accident.
+  const rootAbuseLimiter = includeAbuseLimiter
     ? `
-[[kv_namespaces]]
-binding = "RATE_LIMIT"
-id = "local"
+[exports.AbuseLimiter]
+type = "durable-object"
+storage = "sqlite"
+
+[[durable_objects.bindings]]
+name = "ABUSE_LIMITER"
+class_name = "AbuseLimiter"
 `
     : '';
   const devD1 = includeD1
@@ -87,11 +100,11 @@ database_id = "local"
 migrations_dir = ${quoteToml(migrations)}
 `
     : '';
-  const devKv = includeKv
+  const devAbuseLimiter = includeAbuseLimiter
     ? `
-[[env.dev.kv_namespaces]]
-binding = "RATE_LIMIT"
-id = "local"
+[[env.dev.durable_objects.bindings]]
+name = "ABUSE_LIMITER"
+class_name = "AbuseLimiter"
 `
     : '';
   return `name = "zinnias-ciao-isolated-test"
@@ -107,7 +120,7 @@ BUILD_VERSION = "isolated-test"
 LOG_LEVEL = "debug"
 COMMUNITY_CREATION_ENABLED = "true"
 COMMUNITY_RECOVERY_ENABLED = ${quoteToml(recoveryEnabled ? 'true' : 'false')}
-${rootD1}${rootKv}
+${rootD1}${rootAbuseLimiter}
 
 [env.dev]
 name = "zinnias-ciao-isolated-test-dev"
@@ -120,7 +133,7 @@ BUILD_VERSION = "isolated-test"
 LOG_LEVEL = "debug"
 COMMUNITY_CREATION_ENABLED = "true"
 COMMUNITY_RECOVERY_ENABLED = ${quoteToml(recoveryEnabled ? 'true' : 'false')}
-${devD1}${devKv}
+${devD1}${devAbuseLimiter}
 `;
 }
 
@@ -128,7 +141,13 @@ export async function prepareIsolatedWorkerTest(
   label,
   {
     includeD1 = true,
-    includeKv = true,
+    // Defaults true for every consumer of this shared harness, not only
+    // RFC-078's own tests: the compiled Worker always exports the
+    // `AbuseLimiter` class, so any caller that omitted this binding would
+    // silently exercise a different Worker shape than production. Pass
+    // `false` only for a deliberate negative phase proving the missing-
+    // binding fail-closed path (see `scripts/smoke/abuse-controls.mjs`).
+    includeAbuseLimiter = true,
     includeSecretFile = true,
     pepper: suppliedPepper,
     recoveryEnabled = false,
@@ -178,7 +197,7 @@ export async function prepareIsolatedWorkerTest(
     configPath,
     configText(workerMain, migrations, {
       includeD1,
-      includeKv,
+      includeAbuseLimiter,
       recoveryEnabled,
       requiredSecrets,
     }),

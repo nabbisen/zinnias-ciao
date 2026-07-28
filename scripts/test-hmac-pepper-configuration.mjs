@@ -138,10 +138,18 @@ function scalar(fixture, statement) {
   return Number((parsed?.[0]?.results ?? parsed?.results)?.[0]?.value ?? Number.NaN);
 }
 
+function rows(fixture, statement) {
+  const parsed = JSON.parse(execute(fixture, statement, true));
+  // `wrangler d1 execute --json` wraps rows in a `meta` envelope that
+  // includes a non-deterministic `duration` (query execution time in ms).
+  // Only the `results` rows are the actual sentinel data to compare.
+  return (parsed?.[0]?.results ?? parsed?.results) ?? [];
+}
+
 async function invalidPhase(label, options, fullMatrix = false) {
   const fixture = await prepareIsolatedWorkerTest(`pepper-${label}`, {
     includeD1: false,
-    includeKv: false,
+    includeAbuseLimiter: false,
     ...options,
   });
   let running;
@@ -200,40 +208,25 @@ const nonMutation = await prepareIsolatedWorkerTest('pepper-non-mutation', {
 let nonMutationServer;
 try {
   migrate(nonMutation);
+  // Application-D1 sentinel (RFC-078): a guard row's full field values, not
+  // just an unrelated table's row count, must remain byte-identical across
+  // the invalid-configuration request. This replaces the retired RATE_LIMIT
+  // KV guard-key/value probe with an equivalent D1-only observable.
   execute(
     nonMutation,
     "INSERT INTO communities (id,name,timezone,is_active,created_at) VALUES ('com_guard','Guard','Asia/Tokyo',1,'2026-07-21T00:00:00.000Z')",
   );
-  nonMutation.runWranglerSync([
-    'kv',
-    'key',
-    'put',
-    'guard-key',
-    'guard-value',
-    '--binding',
-    'RATE_LIMIT',
-    '--local',
-    '--env',
-    'dev',
-  ]);
+  const guardQuery =
+    "SELECT id,name,timezone,is_active,created_at FROM communities WHERE id='com_guard'";
   const d1Before = scalar(nonMutation, 'SELECT COUNT(*) AS value FROM communities');
-  const kvBefore = nonMutation.runWranglerSync(
-    ['kv', 'key', 'get', 'guard-key', '--binding', 'RATE_LIMIT', '--local', '--env', 'dev', '--text'],
-    { encoding: 'utf8' },
-  );
+  const guardBefore = JSON.stringify(rows(nonMutation, guardQuery));
   nonMutationServer = await start(nonMutation);
   assertUnavailable(await request(nonMutationServer.baseUrl, '/join'));
   assertUnavailable(await request(nonMutationServer.baseUrl, '/join', { method: 'POST', form: {} }));
   await stop(nonMutationServer);
   nonMutationServer = undefined;
   assert.equal(scalar(nonMutation, 'SELECT COUNT(*) AS value FROM communities'), d1Before);
-  assert.equal(
-    nonMutation.runWranglerSync(
-      ['kv', 'key', 'get', 'guard-key', '--binding', 'RATE_LIMIT', '--local', '--env', 'dev', '--text'],
-      { encoding: 'utf8' },
-    ),
-    kvBefore,
-  );
+  assert.equal(JSON.stringify(rows(nonMutation, guardQuery)), guardBefore);
 } finally {
   await stop(nonMutationServer);
   await nonMutation.cleanup();

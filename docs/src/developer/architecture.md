@@ -42,7 +42,10 @@ workers/
       form_token.rs          Server-issued CSRF + idempotency tokens (AD-4)
       authz.rs               Community-scoped and active-admin-somewhere authorization guards
       audit.rs               Closed typed audit model, atomic helpers, bounded events (RFC-079)
-      rate_limit.rs          KV-backed invite failure and community-creation counters
+      abuse_control.rs       Fail-closed abuse-control coordinator client: ingress
+                             validation, HMAC subject digesting, reserve/reset (RFC-078)
+      abuse_limiter.rs       AbuseLimiter Durable Object: SQLite transition, alarm cleanup,
+                             private /v1/reserve + /v1/reset protocol (RFC-078)
       crypto.rs              HMAC-SHA256 helpers (AD-3)
     static/
       app.css                Design tokens + base styles (RFC-011)
@@ -108,7 +111,11 @@ The ≤200-char note is per `(event, membership)`, not per day.
 - **XSS**: all user text passes through `render::escape_html()` — single render exit point.
 - **CSRF**: form token (AD-4) + `SameSite=Strict` cookie.
 - **Resource enumeration**: 404 and 403 return identical user-facing messages.
-- **Rate limiting**: invite code failures counted in KV, hard-capped per IP window.
+- **Abuse control**: invite/relink redemption and community creation are gated by the
+  `AbuseLimiter` Durable Object — one SQLite-backed, HMAC-sharded object per
+  scope/subject, reserved atomically before credential lookup or mutation. Fail-closed:
+  a missing binding, storage failure, or malformed coordinator response is `Unavailable`,
+  never `Allowed` (RFC-078, replacing the earlier fail-open KV counters).
 
 ## Audit integrity boundary
 

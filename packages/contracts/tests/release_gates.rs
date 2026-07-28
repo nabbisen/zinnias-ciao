@@ -670,7 +670,6 @@ const COMMUNITY_CREATE_HANDLER_SRC: &str =
 const ME_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/me.rs");
 const LIB_SRC: &str = include_str!("../../../workers/ssr/src/lib.rs");
 const AUTHZ_SRC: &str = include_str!("../../../workers/ssr/src/authz.rs");
-const RATE_LIMIT_SRC: &str = include_str!("../../../workers/ssr/src/rate_limit.rs");
 const CALENDAR_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/calendar.rs");
 const COMMUNITY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/community.rs");
 const EVENT_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event.rs");
@@ -1212,8 +1211,9 @@ fn tracked_wrangler_template_contains_only_placeholder_resource_ids() {
     }
 
     assert!(
-        checked >= 6,
-        "release gate expected to inspect top-level, dev, staging, and production D1/KV ids"
+        checked >= 4,
+        "release gate expected to inspect top-level, dev, staging, and production D1 ids \
+         (RATE_LIMIT KV was retired by RFC-078; Durable Object bindings have no raw id to check)"
     );
 }
 
@@ -1798,11 +1798,11 @@ fn rfc024_redemption_is_single_use_generic_and_revokes_old_sessions() {
         "RFC-024 redemption must revoke other active sessions for the target user after inserting the new session"
     );
     assert!(
-        RELINK_HANDLER_SRC.contains("rate_limit::is_relink_rate_limited")
-            && RELINK_HANDLER_SRC.contains("record_relink_failure")
+        RELINK_HANDLER_SRC.contains("abuse_control::reserve")
+            && RELINK_HANDLER_SRC.contains("abuse_control::reset")
             && !RELINK_HANDLER_SRC.contains("write_legacy")
             && RELINK_DB_SRC.contains("AuditAction::MembershipRelinkRedeemed"),
-        "RFC-024 failed redemption should be rate-limited, not audited as a membership event"
+        "RFC-024 failed redemption should be fail-closed rate-limited (RFC-078), not audited as a membership event"
     );
 }
 
@@ -1916,15 +1916,14 @@ fn rfc057_token_idempotency_rate_limit_and_timezone_are_fixed() {
     assert!(
         COMMUNITY_CREATE_HANDLER_SRC.contains("token_purpose::CREATE_COMMUNITY")
             && COMMUNITY_CREATE_HANDLER_SRC.contains("set_result")
-            && COMMUNITY_CREATE_HANDLER_SRC.contains("if let Some(community_id) = replay"),
+            && COMMUNITY_CREATE_HANDLER_SRC.contains("ConsumeResult::Replay(Some(community_id))"),
         "Community creation must use scoped form tokens and replay to the created community"
     );
     assert!(
-        RATE_LIMIT_SRC.contains("community_create_user")
-            && RATE_LIMIT_SRC.contains("community_create_session")
-            && RATE_LIMIT_SRC.contains("community_create_ip")
-            && RATE_LIMIT_SRC.contains("COMMUNITY_CREATION_MAX_PER_WINDOW"),
-        "Community creation must be rate-limited by user, session, and IP"
+        COMMUNITY_CREATE_HANDLER_SRC.contains("Scope::CommunityUser")
+            && COMMUNITY_CREATE_HANDLER_SRC.contains("Scope::CommunitySession")
+            && COMMUNITY_CREATE_HANDLER_SRC.contains("Scope::CommunityNetwork"),
+        "Community creation must be fail-closed rate-limited by user, session, and network (RFC-078)"
     );
     assert!(
         COMMUNITY_CREATE_HANDLER_SRC.contains("SUPPORTED_TIMEZONE: &str = \"Asia/Tokyo\"")
@@ -2779,9 +2778,8 @@ const RFC079_RFC014_SRC: &str =
     include_str!("../../../rfcs/done/014-observability-audit-and-privacy-logging.md");
 const RFC079_RFC052_SRC: &str =
     include_str!("../../../rfcs/done/052-audit-retention-and-operator-access-policy.md");
-const RFC079_RFC071_SRC: &str = include_str!(
-    "../../../rfcs/done/071-application-threat-model-and-form-security-baseline.md"
-);
+const RFC079_RFC071_SRC: &str =
+    include_str!("../../../rfcs/done/071-application-threat-model-and-form-security-baseline.md");
 const RFC079_RFC050_SRC: &str =
     include_str!("../../../rfcs/proposed/050-staging-runtime-verification-evidence-pack.md");
 const RFC079_THREAT_MODEL_SRC: &str =

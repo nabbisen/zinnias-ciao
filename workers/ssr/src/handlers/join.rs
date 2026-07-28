@@ -14,6 +14,8 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::{validate_display_name, validate_invite_input};
 
+use crate::abuse_control::{self, Outcome, Scope};
+use crate::form_token::ConsumeResult;
 use crate::render::{self, escape_html};
 
 // ── GET /join ─────────────────────────────────────────────────────────────
@@ -31,6 +33,18 @@ pub async fn get_join(req: Request, env: &Env, _rid: &str) -> Result<Response> {
 // ── POST /join ────────────────────────────────────────────────────────────
 
 pub async fn post_join(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
+    // Direct-edge ingress validation runs before body parsing, form-token
+    // D1 access, limiter access, and application D1 access (RFC-078). A
+    // rejection returns the fixed generic 503 without touching D1 or
+    // issuing a token.
+    let client_network = match abuse_control::canonical_client_network(&req) {
+        Ok(subject) => subject,
+        Err(rejection) => {
+            abuse_control::log_ingress_rejected(rid, "join", rejection);
+            return render::configuration_unavailable();
+        }
+    };
+
     let body = req.form_data().await?;
     let raw_code = body.get_field("code").unwrap_or_default();
     let raw_token = body.get_field("_token").unwrap_or_default();
@@ -40,7 +54,7 @@ pub async fn post_join(mut req: Request, env: &Env, rid: &str) -> Result<Respons
         return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
     }
 
-    legacy_post_join(req, env, rid, raw_code, raw_token).await
+    legacy_post_join(env, rid, raw_code, raw_token, client_network).await
 }
 
 // ── GET /join/profile ──────────────────────────────────────────────────────
@@ -73,21 +87,17 @@ pub async fn post_profile(mut req: Request, env: &Env, rid: &str) -> Result<Resp
 // ── Shared storage-backed helpers ──────────────────────────────────────────
 
 async fn legacy_post_join(
-    req: Request,
     env: &Env,
     rid: &str,
     raw_code: String,
     raw_token: String,
+    client_network: String,
 ) -> Result<Response> {
     use zinnias_ciao_contracts::auth::token_purpose;
-    let client_ip = crate::rate_limit::client_ip(&req);
-    if crate::rate_limit::is_rate_limited(env, &client_ip).await {
-        worker::console_log!("[{}] join invite rejected: reason=rate_limited", rid);
-        return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
-    }
     let pepper = crate::crypto::pepper(env)?;
     let db = env.d1("DB")?;
-    let _ = crate::form_token::consume(
+
+    let consumed = crate::form_token::consume_detailed(
         &db,
         pepper.as_str(),
         "",
@@ -96,16 +106,36 @@ async fn legacy_post_join(
         None,
     )
     .await?;
+    if matches!(consumed, ConsumeResult::Replay(_)) {
+        worker::console_log!("[{}] join invite rejected: reason=form_replay", rid);
+        return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
+    }
+
+    match abuse_control::reserve(env, pepper.as_str(), Scope::Invite, &client_network).await {
+        Outcome::Allowed => {}
+        Outcome::Blocked {
+            retry_after_seconds,
+        } => {
+            abuse_control::log_blocked(rid, "join", Scope::Invite);
+            let resp = refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await?;
+            return abuse_control::apply_blocked(resp, retry_after_seconds);
+        }
+        Outcome::Unavailable { category } => {
+            abuse_control::log_unavailable(rid, "join", Scope::Invite, category);
+            let resp = refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await?;
+            return Ok(resp.with_status(503));
+        }
+    }
+
     let normalized = crate::crypto::normalize_invite_code(&raw_code);
     let code_hmac = crate::crypto::hmac_hex(pepper.as_str(), &normalized);
     let invite = crate::db::invite::find_valid(&db, &code_hmac).await?;
     if invite.is_none() {
-        crate::rate_limit::record_failure(env, &client_ip).await;
         worker::console_log!("[{}] join invite rejected: reason=no_valid_invite", rid);
         return refresh_join_form(env, Some(i18n::JA_JOIN_CODE_HINT)).await;
     }
     let invite = invite.unwrap();
-    crate::rate_limit::clear_failures(env, &client_ip).await;
+    abuse_control::reset(env, rid, pepper.as_str(), Scope::Invite, &client_network).await;
     let ticket = crate::crypto::random_token();
     let ticket_value = format!("{}:{}", invite.id, invite.community_id);
     let ticket_hmac = crate::crypto::hmac_hex(pepper.as_str(), &ticket_value);

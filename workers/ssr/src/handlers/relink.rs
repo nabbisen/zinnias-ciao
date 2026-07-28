@@ -4,8 +4,10 @@ use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
+use crate::abuse_control::{self, Outcome, Scope};
 use crate::crypto::{hmac_hex, normalize_invite_code, random_token};
 use crate::db::relink as relink_db;
+use crate::form_token::ConsumeResult;
 use crate::render::{self, escape_html};
 
 fn redirect(url: &str) -> Result<Response> {
@@ -29,11 +31,17 @@ pub async fn get_relink(req: Request, env: &Env, _rid: &str) -> Result<Response>
 // ── POST /relink ─────────────────────────────────────────────────────────
 
 pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
-    let client_ip = crate::rate_limit::client_ip(&req);
-    if crate::rate_limit::is_relink_rate_limited(env, &client_ip).await {
-        worker::console_log!("[{}] relink rejected: reason=rate_limited", rid);
-        return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
-    }
+    // Direct-edge ingress validation runs before body parsing, form-token
+    // D1 access, limiter access, and application D1 access (RFC-078). A
+    // rejection returns the fixed generic 503 without touching D1 or
+    // issuing a token.
+    let client_network = match abuse_control::canonical_client_network(&req) {
+        Ok(subject) => subject,
+        Err(rejection) => {
+            abuse_control::log_ingress_rejected(rid, "relink", rejection);
+            return render::configuration_unavailable();
+        }
+    };
 
     let body = req.form_data().await?;
     let raw_code = body.get_field("code").unwrap_or_default();
@@ -41,7 +49,7 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
     let pepper = crate::crypto::pepper(env)?;
     let db = env.d1("DB")?;
 
-    let replay = crate::form_token::consume(
+    let consumed = crate::form_token::consume_detailed(
         &db,
         pepper.as_str(),
         "",
@@ -50,15 +58,30 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
         None,
     )
     .await?;
-    if replay.is_some() {
+    if matches!(consumed, ConsumeResult::Replay(_)) {
         worker::console_log!("[{}] relink rejected: reason=form_replay", rid);
         return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
+    }
+
+    match abuse_control::reserve(env, pepper.as_str(), Scope::Relink, &client_network).await {
+        Outcome::Allowed => {}
+        Outcome::Blocked {
+            retry_after_seconds,
+        } => {
+            abuse_control::log_blocked(rid, "relink", Scope::Relink);
+            let resp = refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await?;
+            return abuse_control::apply_blocked(resp, retry_after_seconds);
+        }
+        Outcome::Unavailable { category } => {
+            abuse_control::log_unavailable(rid, "relink", Scope::Relink, category);
+            let resp = refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await?;
+            return Ok(resp.with_status(503));
+        }
     }
 
     let normalized = normalize_invite_code(&raw_code);
     let code_hmac = hmac_hex(pepper.as_str(), &normalized);
     let Some(target) = relink_db::find_valid_by_hmac(&db, &code_hmac).await? else {
-        crate::rate_limit::record_relink_failure(env, &client_ip).await;
         worker::console_log!("[{}] relink rejected: reason=no_valid_relink", rid);
         return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
     };
@@ -73,13 +96,12 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
             .await?
             .is_none()
         {
-            crate::rate_limit::record_relink_failure(env, &client_ip).await;
             worker::console_log!("[{}] relink rejected: reason=claim_lost", rid);
             return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
         }
         return Err(error);
     }
-    crate::rate_limit::clear_relink_failures(env, &client_ip).await;
+    abuse_control::reset(env, rid, pepper.as_str(), Scope::Relink, &client_network).await;
 
     let cookie_domain = env
         .var("SESSION_COOKIE_DOMAIN")
