@@ -24,6 +24,13 @@ storage = "sqlite"
 name       = "ABUSE_LIMITER"
 class_name = "AbuseLimiter"
 
+# Immutable Worker version identity (RFC-050 exact-candidate evidence). Exposes
+# the deployed version's id/tag to `/version` so a hosted evidence campaign can
+# prove which exact candidate answered a request. Not inheritable, same as the
+# bindings above — repeated under root and each named environment below.
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
 # Secret bindings — set via `wrangler secret put` in each environment.
 # Never hard-coded here.
 #   HMAC_PEPPER           — server pepper for invite/session/form-token HMACs
@@ -61,6 +68,9 @@ database_id   = "local"
 name       = "ABUSE_LIMITER"
 class_name = "AbuseLimiter"
 
+[env.dev.version_metadata]
+binding = "CF_VERSION_METADATA"
+
 # Hosted staging uses the same config shape with real Cloudflare IDs in an
 # ignored local copy:
 #   cp wrangler.toml wrangler.staging.local.toml
@@ -89,6 +99,9 @@ database_id   = "REPLACE_WITH_STAGING_D1_ID"   # create with: wrangler d1 create
 name       = "ABUSE_LIMITER"
 class_name = "AbuseLimiter"
 
+[env.staging.version_metadata]
+binding = "CF_VERSION_METADATA"
+
 [env.production]
 name = "zinnias-ciao-ssr-prd"
 [env.production.secrets]
@@ -107,3 +120,6 @@ database_id   = "REPLACE_WITH_PRODUCTION_D1_ID"   # create with: wrangler d1 cre
 [[env.production.durable_objects.bindings]]
 name       = "ABUSE_LIMITER"
 class_name = "AbuseLimiter"
+
+[env.production.version_metadata]
+binding = "CF_VERSION_METADATA"
