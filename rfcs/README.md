@@ -14,16 +14,17 @@ authorize implementation.
 
 RFC numbers and the tables below are stable identifiers and lifecycle indexes,
 not execution priority. The active dependency order is maintained in
-[ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-078
-implementation and review, followed by the RFC-050 exact-candidate campaign,
-including persistent-incident-delivery proof.
+[ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence):
+persistent-incident-sink provisioning, followed by the RFC-050 exact-candidate
+hosted evidence campaign, including persistent-incident-delivery proof.
 
 ## Accepted — approved for implementation
 
 | ID | Title | Accepted | Note |
 |----|-------|----------|------|
+| 050 | [Exact-Candidate Hosted Staging Evidence and Pilot Gate](./accepted/050-staging-runtime-verification-evidence-pack.md) | 2026-07-28 | B4 remediation revision architecture-reviewed and owner-accepted; authorizes local tooling implementation (RFC-050 Tooling Slices) only, not hosted execution. **IPv6 client support is not confirmed/implemented for this deployment** — see RFC-078 § Dated owner risk acceptances and this document's E4a |
 | 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Local implementation reviewed/accepted/committed at `b72f22b`; corrected isolated automation and bounded human no-JS/network evidence were architecture-reviewed and owner-accepted, closing criterion 8 locally. RFC-050 hosted evidence remains required before public/production B1 closure |
-| 078 | [Fail-Closed Strongly Consistent Abuse Controls](./accepted/078-fail-closed-strongly-consistent-abuse-controls.md) | 2026-07-23 | Corrected architecture accepted; implementation and exact-candidate hosted evidence remain pending, so B3 and all staging/public/production holds remain open |
+| 078 | [Fail-Closed Strongly Consistent Abuse Controls](./accepted/078-fail-closed-strongly-consistent-abuse-controls.md) | 2026-07-23 | Corrected architecture accepted; implemented and committed at `c991b82` on 2026-07-28, including the required I-B1 concurrency-burst evidence. RFC-050 exact-candidate hosted evidence remains pending, so B3 and all staging/public/production holds remain open |
 | 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 0A–8 and the Class A telemetry correction reviewed/committed. Persistent delivery and exact-candidate hosted B5 evidence remain required |
 
 ## Done — MVP core (001–019)
@@ -136,7 +137,6 @@ including persistent-incident-delivery proof.
 |----|-------|------|------|
 | 044 | D1 Query-Budget Gate and Integration Test Harness | [./proposed/044-d1-query-budget-gate-and-integration-test-harness.md](./proposed/044-d1-query-budget-gate-and-integration-test-harness.md) | Budget constants + SW gate shipped; live-D1 harness deferred (gates beta) |
 | 045 | Pre-Pilot Runtime Verification Matrix | [./proposed/045-pre-pilot-runtime-verification-matrix.md](./proposed/045-pre-pilot-runtime-verification-matrix.md) | Source verification discharged; staging-runtime matrix pending environment |
-| 050 | [Exact-Candidate Hosted Staging Evidence and Pilot Gate](./proposed/050-staging-runtime-verification-evidence-pack.md) | B4 remediation revision: pin evidence to an immutable Worker version plus separately identified external state; architecture review required |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
 
 ## Proposed — settings and UX hardening (072–075)

@@ -2781,7 +2781,7 @@ const RFC079_RFC052_SRC: &str =
 const RFC079_RFC071_SRC: &str =
     include_str!("../../../rfcs/done/071-application-threat-model-and-form-security-baseline.md");
 const RFC079_RFC050_SRC: &str =
-    include_str!("../../../rfcs/proposed/050-staging-runtime-verification-evidence-pack.md");
+    include_str!("../../../rfcs/accepted/050-staging-runtime-verification-evidence-pack.md");
 const RFC079_THREAT_MODEL_SRC: &str =
     include_str!("../../../docs/src/developer/security-threat-model.md");
 const RFC079_ARCHITECTURE_SRC: &str = include_str!("../../../docs/src/developer/architecture.md");

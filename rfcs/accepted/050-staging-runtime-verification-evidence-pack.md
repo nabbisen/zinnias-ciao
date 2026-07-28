@@ -1,7 +1,13 @@
 # RFC 050 — Exact-Candidate Hosted Staging Evidence and Pilot Gate
 
-**Status.** Proposed — remediation revision requires architecture review;
-implementation and hosted execution are not authorized
+**Status.** Accepted — architecture-reviewed and owner-accepted 2026-07-28;
+local tooling implementation (RFC-050 Tooling Slices, local mode only) is
+authorized. Hosted execution against a frozen candidate remains a separate,
+later, explicitly authorized operator action; this acceptance does not
+authorize any hosted command, deployment, resource creation, or secret
+operation, and does not close B1/B3/B4/B5. IPv6 client support is not
+confirmed/implemented for this deployment — see § Dated owner risk
+acceptances in RFC-078 and this document's E4a.
 
 **Priority.** Architect-review remediation B4; blocks every public or production
 pilot
@@ -54,9 +60,9 @@ behavior, B1–B3 negative configuration, no-JavaScript workflows, real-device
 resource behavior. A mutable checklist entry, local test, source inspection,
 Miniflare result, or generic `BUILD_VERSION=staging` response cannot close B4.
 
-This revision is a design checkpoint, not permission to deploy. It may move to
-`rfcs/accepted/` only after architecture review and explicit owner acceptance.
-Hosted execution is a later, separately approved operator action because it
+Architecture review and owner acceptance of this design (2026-07-28) authorize
+local tooling implementation only. They are not permission to deploy. Hosted
+execution is a later, separately approved operator action because it
 publishes a Worker and mutates isolated Cloudflare resources.
 
 ## Problem and Evidence Invariant
@@ -120,7 +126,13 @@ The invariant introduced by this RFC is:
 The design and local tooling may be reviewed before the other remediation RFCs
 are implemented. The final B4 evidence campaign must not begin until:
 
-1. RFC-076, RFC-077, and RFC-078 are Accepted and implemented in the candidate;
+1. RFC-076, RFC-077, and RFC-078 are Accepted and implemented in the
+   candidate. RFC-077's own hosted evidence was already reviewed and accepted
+   on 2026-07-22, closing architecture finding B2 — that acceptance came from
+   a deliberately disposable evidence snapshot, not this campaign's canonical
+   candidate, so E5 still re-proves pepper fail-closed behavior on the exact
+   candidate, but that re-proof is canonical-candidate confirmation, not a
+   reopening of B2;
 2. the B5 audit durability/redaction remediation is implemented if its behavior
    is included in the final pilot claim;
 3. local release gates for the exact commit pass;
@@ -382,6 +394,14 @@ Pass requires:
 - required D1 tables/indexes exist;
 - all required bindings for RFC-076–RFC-078 and the audit remediation are
   present and operational;
+- the per-environment declarative `exports` reconciliation output is captured
+  for this deployment, and confirms that the target named environment owns a
+  **distinct** `AbuseLimiter` namespace from every other environment; this
+  step is **forward-only** (Cloudflare does not permit rolling back across an
+  `exports` lifecycle change), so record it explicitly rather than inferring
+  it from deploy success;
+- the candidate performs no runtime read of the retired `RATE_LIMIT` KV
+  namespace (grep or runtime evidence that the binding is absent and unused);
 - staging feature flags match the manifest; and
 - start/end external-state manifests agree.
 
@@ -420,6 +440,43 @@ Using synthetic data and a fresh browser context:
 The operator records outcome counts and campaign-local aliases, not database
 row dumps.
 
+### E4a — direct-ingress topology and client-identity classification
+
+RFC-078's trusted-ingress contract has no precedent in any earlier RFC and is
+not exercised by any other gate. Prove, against the exact candidate, before
+E4:
+
+- inventory the candidate's routes, custom domains, service bindings, and any
+  upstream Worker to establish that the SSR Worker is the direct public
+  ingress for every RFC-078-protected route;
+- for a `workers.dev` target, capture runtime evidence that a native IPv6
+  request keeps the address in `CF-Connecting-IP` with no
+  `CF-Connecting-IPv6` header present;
+- for any custom-domain target, query the zone's `pseudo_ipv4` setting
+  through least-privilege read-only access and require `off` or
+  `add_header`; `overwrite_header`, an unreadable setting, or an unexpected
+  runtime shape is a fail, not a warning;
+- route one request through a disposable upstream Worker and observe the
+  fixed `503` before any form-token, limiter, or application-D1 work, then
+  execute and record that disposable Worker's predefined teardown.
+
+**E4's capacity results are void unless E4a passed against the same
+candidate.** A fronting Worker or a Pseudo IPv4 zone in Overwrite mode would
+derive the client-network subject from the wrong value, so E4's exact
+admitted-count evidence proves nothing about real clients until ingress
+shape is established first.
+
+**IPv6 client support is not confirmed/implemented for this deployment.** The
+controlled-external-IPv6-harness proof (two addresses in one owned `/64`
+sharing capacity, RFC-078 acceptance criterion 6's IPv6 sub-clause) is **not**
+part of this campaign's required E4a evidence: the owner explicitly
+risk-accepted deferring it on 2026-07-28 (see RFC-078 § Dated owner risk
+acceptances). Do not pursue an IPv6 harness for this reason alone, and do not
+represent IPv6 handling as hosted-proven, working, or supported anywhere in
+the attestation, the release checklist, or any evidence record — record it as
+risk-accepted-open and operationally unconfirmed. Every other E4a bullet
+remains required and gates E4 as stated above.
+
 ### E4 — concurrency and fail-closed controls
 
 Use bounded bursts against synthetic one-use credentials/tokens:
@@ -449,8 +506,10 @@ keeps its events distinguishable.
 
 Prove at minimum:
 
-- missing/invalid `HMAC_PEPPER` causes RFC-077 `503` behavior before protected
-  D1 work;
+- missing/invalid `HMAC_PEPPER` causes RFC-077 `503` behavior before
+  protected D1 work — architecture finding B2 is already closed from a prior
+  disposable-snapshot campaign, so this item confirms the same behavior on
+  *this* exact candidate rather than reopening or re-closing B2;
 - missing/unavailable RFC-078 coordinator causes `503`, not credential lookup
   or community mutation;
 - an exhausted coordinator returns generic `429`, not `503` or credential
@@ -540,13 +599,19 @@ Pass requires:
 - the RFC-069 total-community-access recovery drill with a synthetic community;
 - recovery flag disabled, temporary secret deleted/rotated, and endpoint
   confirmed closed afterward;
-- negative-test and recovery Workers/routes closed; and
+- negative-test and recovery Workers/routes closed, including the E4a
+  disposable upstream-Worker negative test and its predefined teardown; and
 - canonical staging Worker either removed or placed behind the reviewed access
   control when the evidence window ends.
 
 Teardown evidence records resource kind, privacy-safe fingerprint, action,
 result, time, and operator. Destructive deletion of retained staging D1 or
-evidence sinks remains a separate explicit owner decision.
+evidence sinks remains a separate explicit owner decision. The retired
+`RATE_LIMIT` KV namespace from a pre-RFC-078 deployment, if one exists for
+this environment, is recorded in the teardown inventory explicitly as
+**retained, not deleted, pending separate owner-authorized deletion** — it is
+rollback inventory, not a runtime fallback, and this campaign does not delete
+it.
 
 ## Tooling Slices
 
@@ -584,12 +649,19 @@ Repeat at least the affected gate when any of these changes:
 - Worker version ID, deployment allocation, code, static asset, binding,
   compatibility setting, feature flag, or relevant environment variable;
 - D1 database identity, migration ledger, relevant seed shape, or schema;
-- Durable Object class/migration/binding;
+- Durable Object class lifecycle (`exports`) or binding — this Worker uses
+  declarative `exports`, not the legacy `migrations` array, and must not
+  introduce one;
 - secret presence or pepper rotation for credential-dependent tests;
 - Logpush job, observability setting, destination, retention, or access policy;
 - hostname, route, Access policy, cache rule, or service-worker version;
 - browser/device version for a device-specific regression; or
 - evidence tooling/schema.
+
+E4a → E4 is a dependency, not a numbering convention: a failed, blocked, or
+re-run E4a invalidates any already-recorded E4 result against the same
+candidate, exactly as a redeploy invalidates E1. Do not record E4 as passing
+against a candidate whose E4a is not itself a current `Pass`.
 
 A cosmetic documentation-only change may retain runtime evidence only if the
 reviewer records why it cannot affect the tested artifact. The attestation still

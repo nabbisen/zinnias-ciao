@@ -41,32 +41,49 @@ resumes only after the remediation hold is explicitly lifted in this roadmap.
 
 ## Active Remediation and Release Sequence
 
-RFC numbers are stable identifiers, not execution-order numbers. The current
-dependency order is:
+RFC numbers are stable identifiers, not execution-order numbers. Steps 1–4 of
+the prior sequence are now complete; the live head is provisioning the
+persistent incident sink (renumbered 1 below). A fuller milestone/dependency
+breakdown with entry/exit criteria is maintained alongside this roadmap for
+internal planning (programme roadmap and developer execution guide); this
+section remains the tracked summary of record.
 
-1. Reconcile RFC-079 and the release checklist with the completed Class A
+**Complete:**
+
+1. Reconciled RFC-079 and the release checklist with the completed Class A
    failure-telemetry implementation review and committed implementation.
-2. Prepare the RFC-078 implementation handoff, including native SSR CI,
+2. Prepared the RFC-078 implementation handoff, including native SSR CI,
    workspace/all-target Clippy, retention of the WASM check, and focused test
-   modules that do not further enlarge the monolithic release-gate file. Apply
-   the already-committed RFC-071 threat-model and form-security baseline during
-   design, implementation, and review.
-3. Implement RFC-078 and complete its implementation review and required local
-   evidence. This is the immediate code priority and the remaining B3 source
-   remediation.
-4. Complete architecture review and owner acceptance of RFC-050 after the
-   RFC-078 implementation candidate is sufficiently concrete to keep its
-   evidence procedures executable. Before canonical candidate upload, decide,
-   provision, and document the owner-approved persistent incident sink,
-   retention, and access boundary.
-5. Build and identify one exact immutable release candidate, then execute the
+   modules that do not further enlarge the monolithic release-gate file,
+   applying the already-committed RFC-071 threat-model and form-security
+   baseline.
+3. Implemented RFC-078 — including the required I-B1 concurrency-burst
+   evidence and every non-blocking review item — and committed it at
+   `c991b82` on 2026-07-28. This was the immediate code priority and the
+   remaining B3 source remediation; B3 itself remains open pending RFC-050
+   exact-candidate hosted evidence.
+4. Architecture-reviewed and owner-accepted RFC-050 on 2026-07-28, moving it to
+   `rfcs/accepted/`. The owner also risk-accepted deferring the native IPv6
+   `/64` hosted-sharing proof on the same date — recorded in RFC-078 § Dated
+   owner risk acceptances and RFC-050's E4a; **IPv6 client support is not
+   confirmed/implemented for this deployment**, and this service must be
+   treated as IPv4-only in practice until hosted evidence says otherwise.
+   Acceptance authorizes local RFC-050 tooling implementation only, not any
+   hosted action.
+
+**Live sequence:**
+
+1. Decide, provision, and document the owner-approved persistent incident
+   sink (Logpush → R2, per the owner's decision), retention, and access
+   boundary before canonical candidate upload.
+2. Build and identify one exact immutable release candidate, then execute the
    frozen RFC-050 hosted evidence campaign for the remaining B1, B3, B4, and B5
    claims. The same campaign must include E7 canary delivery, retrieval,
    health, retention, and access proof for the provisioned persistent sink;
    console output and `wrangler tail` are not sufficient.
-6. Reassess the remediation hold and v0.60.0 readiness from the integrated
+3. Reassess the remediation hold and v0.60.0 readiness from the integrated
    evidence. Lifting one finding does not implicitly lift another.
-7. Resume product-feature implementation only after this roadmap explicitly
+4. Resume product-feature implementation only after this roadmap explicitly
    lifts the hold.
 
 RFC-050 procedures, tooling, and persistent-sink preparation may proceed where
@@ -80,16 +97,11 @@ for overlap with or supersession by the revised RFC-050.
 
 | RFC | Theme | Current note |
 |-----|-------|--------------|
+| 050 | Exact-candidate hosted staging evidence and pilot gate | B4 remediation revision, architecture-reviewed and owner-accepted 2026-07-28, moving it to `rfcs/accepted/`. A 2026-07-28 reconciliation review found the design needed a new E4a ingress/topology evidence item plus E1/E9/gate-invalidation extensions to match what shipped, and a re-review accepted the applied edits (Accept/Go). **IPv6 client support is not confirmed/implemented for this deployment** — the document carries a 2026-07-28 owner risk acceptance deferring the native IPv6 `/64` hosted-sharing proof; treat this service as IPv4-only in practice until hosted evidence says otherwise. Acceptance authorizes local RFC-050 tooling implementation only, not hosted execution. |
 | 076 | One-time invite code response isolation | Local implementation reviewed, owner-accepted, and committed at `b72f22b`. Corrected isolated automated evidence and bounded human no-JS/network observation were architecture-reviewed and owner-accepted on 2026-07-21, closing criterion 8 locally; RFC-050 exact-candidate hosted evidence remains required before B1 closes for a public or production pilot. |
 | 077 | Fail-closed HMAC pepper configuration | Implemented at `901855b`. Corrected disposable hosted evidence was architecture-reviewed and owner-accepted on 2026-07-22: criteria 8–9 are satisfied and B2 is closed. This does not close unrelated RFC-050, B1, B3, B5, production, public-pilot, real-device, performance, persistent-observability, or release gates. |
-| 078 | Fail-closed strongly consistent abuse controls | Corrected architecture was reviewed and owner-accepted on 2026-07-23. Implementation is authorized but has not started; B3 remains open until implementation review and required local/exact-candidate hosted evidence pass. All controlled-staging, public-pilot, production, and release holds remain unchanged. |
+| 078 | Fail-closed strongly consistent abuse controls | Corrected architecture was reviewed and owner-accepted on 2026-07-23. Implementation was reviewed, owner-accepted, and committed at `c991b82` on 2026-07-28; the required I-B1 concurrency-burst evidence and every non-blocking item were re-reviewed and accepted in that same round. B3 remains open pending the RFC-050 exact-candidate hosted evidence campaign. All controlled-staging, public-pilot, production, and release holds remain unchanged. |
 | 079 | Atomic required audits and recursive metadata redaction | Architecture reviewed and owner-accepted on 2026-07-15. Local Packages 0A–8 and the Class A failure-telemetry correction are reviewed and committed. RFC-050 exact-candidate hosted evidence, persistent incident delivery, and every public/production pilot gate remain open. |
-
-## Active Proposed Remediation
-
-| RFC | Theme | Current note |
-|-----|-------|--------------|
-| 050 | Exact-candidate hosted staging evidence and pilot gate | B4 remediation revision; Proposed pending architecture review and owner acceptance. It follows RFC-078 implementation in the active dependency sequence and is not post-hold feature work. |
 
 ## Implemented Lifecycle Reconciliation
 

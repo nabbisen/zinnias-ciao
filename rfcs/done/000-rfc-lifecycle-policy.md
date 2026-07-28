@@ -326,6 +326,20 @@ references and updates them in the same commit. The cost is
 seconds per move; the alternative — broken links accumulating
 silently — is worse.
 
+If the project's build or test system embeds an RFC file as a build
+input — for example, a Rust `include_str!`, a script that reads an
+`rfcs/` path at build or test time, or generated documentation that
+inlines RFC content — a folder move **is a source change**, even
+though no source file's own content was edited. Before moving an RFC,
+search the *entire* tracked tree, not just `rfcs/`, for its current
+path (`grep -n "rfcs/<folder>/<NNN>-<slug>"` across all tracked
+paths), update every hit in the same change, and run the project's
+full build/test gate — not just documentation checks — before
+committing the move. "Documentation-only change" is not a safe
+predicate for skipping that gate whenever a file is added, moved,
+renamed, or deleted, even if no gate skip would be needed for an
+in-place content edit to that same file.
+
 If your project's review tool renders relative links (GitHub,
 GitLab, sourcehut all do), broken links become visible in the
 preview, which gives a second line of defence.

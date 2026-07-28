@@ -534,6 +534,44 @@ Explicit owner risk acceptance may allow the isolated environment to exist for
 unrelated read-only checks, but it does not authorize fail-open credential
 validation. Public/production pilot remains No-Go.
 
+### Dated owner risk acceptances
+
+**2026-07-28 — IPv6 client support is not confirmed/implemented for this
+deployment.** State this plainly in every document that discusses it: this
+service must be treated as **IPv4-only in practice** until a hosted campaign
+proves otherwise. No IPv6 client request has ever been observed or verified
+against a real deployed candidate. Do not describe IPv6 as "supported,"
+"working," or "implemented" in any tracked document, release checklist, or
+evidence record — describe it as **not yet confirmed / not yet implemented in
+a verified sense**, full stop, regardless of what the source code contains.
+
+The owner explicitly risk-accepts deferring the controlled-external-IPv6-
+harness hosted evidence in acceptance criterion 6 (two addresses in one owned
+native IPv6 `/64` proven to share capacity) and the corresponding RFC-050
+E4a bullet. No such harness will be pursued for the current campaign. This is
+a decision about hosted *evidence acquisition and production readiness*, not
+a promise about what the code does; the distinction matters because the code
+facts below must not be read as "IPv6 is supported":
+
+- native IPv6 addresses are grouped by `/64` in
+  `abuse_control::canonicalize` (`zero_low_64_bits`) as designed, but this has
+  only ever run against synthetic native-test inputs, never a real client;
+- any `CF-Connecting-IPv6` header is rejected outright as an unsupported
+  Pseudo IPv4 overwrite/drift shape, independently of this deferral;
+- the `/64` grouping logic is natively tested
+  (`abuse_control::tests::canonicalizes_native_ipv6_to_first_64_bits`,
+  `same_64_prefix_yields_the_same_canonical_subject`) — native unit tests are
+  evidence that the *arithmetic* is correct, not that a real IPv6 client is
+  handled correctly end to end on hosted Cloudflare infrastructure.
+
+Until hosted proof exists (or this deferral is revisited), treat all of
+criterion 6's IPv6 handling as **risk-accepted-open and operationally
+unconfirmed**, not merely "the hosted sharing proof is missing." Do not
+represent any part of IPv6 handling as hosted-proven, working, or supported
+in any release checklist, roadmap entry, or evidence record. Revisit this
+decision if the deployment's actual client population makes native IPv6
+material enough to warrant the harness.
+
 ## Data Protection and Retention
 
 - Durable Object state contains only policy, timestamp, and count.
@@ -716,7 +754,12 @@ RFC-078 implementation is complete only when:
    identity, any `CF-Worker`, any `CF-Connecting-IPv6`, or Class E
    `CF-Connecting-IP` fails closed before token, limiter, or application D1
    work; exact-target evidence proves two addresses in one native IPv6 `/64`
-   share capacity.
+   share capacity. **IPv6 client support is not confirmed/implemented for
+   this deployment as of the 2026-07-28 owner risk acceptance — see § Dated
+   owner risk acceptances. Treat this criterion's IPv6 sub-clause as
+   risk-accepted-open and operationally unconfirmed, never as hosted-proven
+   or supported, regardless of the native `/64`-grouping test coverage.
+   Every other part of this criterion is unaffected.**
 7. The Durable Object is sharded per HMAC-derived subject/scope, uses SQLite,
    has correct root/named-environment bindings, and uses one inherited top-level
    declarative lifecycle entry whose per-environment reconciliation is proven.
