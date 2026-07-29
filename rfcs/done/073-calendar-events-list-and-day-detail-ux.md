@@ -1,8 +1,10 @@
 # RFC 073 - Calendar Events List and Day Detail UX
 
-**Status.** Accepted — architecture-reviewed and owner-accepted 2026-07-29;
-implementation must follow a reviewed Developer Handoff. First product theme
-after the 2026-07-29 amendment lifted the feature freeze.
+**Status.** Implemented — design accepted 2026-07-29 at `342ad2c`; implementation
+committed at `ed549be` and architecture-reviewed the same day. All nine
+acceptance criteria are met locally; this RFC has no hosted-evidence
+precondition. Real-device 200%-scaling confirmation remains a separate
+pre-pilot roadmap gate, not an RFC-073 criterion.
 
 **Target release.** Next product release; not tied to a version transition.
 

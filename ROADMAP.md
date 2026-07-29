@@ -121,12 +121,15 @@ section remains the tracked summary of record.
 
 **Live sequence — reordered 2026-07-29 (owner decision):**
 
-1. **RFC-073 — Calendar events list and day detail UX.** The current priority
-   theme. The Calendar page is the product's primary surface, and its combined
-   grid-plus-list view and top-of-page date-click behavior are the most concrete
-   user-facing complaints on record. Design revised 2026-07-29 to resolve its
-   open decisions; awaiting owner acceptance before implementation.
-2. Continue user-facing themes from Active Themes below, in owner-chosen order.
+1. ~~RFC-073 — Calendar events list and day detail UX.~~ **Complete
+   2026-07-29.** Design accepted at `342ad2c`, implemented at `ed549be`,
+   implementation review Approved, and moved to `rfcs/done/`. The Calendar page
+   now has three route-backed tabs with an always-present day-detail section, so
+   a date click no longer returns the user to the top of the page. All nine
+   acceptance criteria met locally; no hosted-evidence precondition. Real-device
+   200%-scaling confirmation remains a separate pre-pilot gate below.
+2. **Choose the next user-facing theme** from Post-Hold Feature Candidates
+   below. No theme is currently selected — this is an owner decision.
 3. **When a pilot is scheduled** — and not before — provision the persistent
    incident sink (Logpush → R2), then build and freeze one exact immutable
    release candidate and execute the RFC-050 hosted evidence campaign for the
@@ -229,10 +232,9 @@ hold is explicitly lifted; this list is not implementation authorization.
    precedence, settings UX, `html lang`, and tests before schema or handler
    work.
 
-8. **RFC-073: Calendar Events List and Day Detail UX**
-   The Calendar grid, monthly event list, and attendance matrix now carry
-   different user jobs. Split them into explicit tabs and make selected-day
-   detail appear under the calendar without sending users back to the top.
+8. ~~**RFC-073: Calendar Events List and Day Detail UX**~~ — **done**
+   (`ed549be`, 2026-07-29). Retained here for ordering context only; it is no
+   longer a candidate.
 
 9. **RFC-074: Community Switch Route Preservation**
     Header switching should preserve the current page family where safe, such
