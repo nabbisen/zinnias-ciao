@@ -456,7 +456,12 @@ For local smoke, see [Local Development Smoke](#local-development-smoke). For
 hosted staging smoke, see [Hosted Staging Deployment](#hosted-staging-deployment).
 
 The smoke collector writes evidence under `.git-exclude/evidence/rfc050-prototype/`
-and does not replace the full RFC-050 manual evidence pack.
+and does not replace the full RFC-050 evidence pack: the fill-in
+[manual evidence templates](../tester/evidence-templates/index.md), the local
+collectors for E3/E4/E5 (RFC-050 Tooling Slices 4–6), and the tracked
+[per-candidate attestation](../tester/release-candidates/index.md) that
+records every gate's verdict. *(Reconciled 2026-07-29, RFC-050 Tooling
+Slice 9.)*
 
 ## Rollback
 
@@ -474,3 +479,16 @@ reversed, write a new forward migration and apply it.
 V8 isolates have no filesystem. Use Cloudflare Logpush to R2 or an external
 S3-compatible store for log persistence. Configure in the Cloudflare dashboard
 under Workers -> Logpush.
+
+RFC-050's E7 gate requires a unique synthetic canary event delivered through
+the configured sink and retrievable after the documented delivery interval,
+plus request ID/version/outcome correlation, a security-control-unavailable
+and a representative audit event, Logpush job health, and matching
+retention/access. Record this check with named delivery-interval and
+retrieval-timestamp fields — see
+[60 — Observability and Runtime](../tester/evidence-templates/60-observability-and-runtime.md)
+— and its verdict in the candidate's
+[release candidate attestation](../tester/release-candidates/index.md) (gate
+`E7`). The persistent incident sink is decided (Logpush → R2, 2026-07-28) but
+not yet provisioned; this gate cannot pass until it is. *(Reconciled
+2026-07-29, RFC-050 Tooling Slice 9.)*

@@ -1,9 +1,23 @@
 # Staging Runtime Verification Prototype
 
-This page describes the testing-only prototype for RFC-045/RFC-050 runtime
-evidence. It is useful for checking that an already-running Worker is reachable
-and rendering basic public pages, but it does **not** complete the
-production-pilot RFC-050 gate by itself.
+This page describes one piece of RFC-045/RFC-050 runtime evidence: the
+`smoke:runtime` browser/route prototype. It is useful for checking that an
+already-running Worker is reachable and rendering basic public pages, but it
+does **not** complete the production-pilot RFC-050 gate by itself, and it
+predates most of the local tooling that now exists alongside it.
+
+**Reconciled 2026-07-29 (RFC-050 Tooling Slice 9).** RFC-050 Tooling Slices
+1–8 (all local-only; see `.git-exclude/tasks/018-rfc050-local-evidence-tooling-handoff.md`)
+have since landed a much larger local evidence suite than this one prototype
+script: version-metadata/manifest utilities, exact-identity smoke mode,
+authenticated/browser flow collection (E3), concurrency/postcondition
+tooling (E4), negative-configuration fixtures (E5), manual evidence
+templates, artifact hashing, leakage scanning, and the tracked attestation.
+See [RFC-050 Manual Evidence Templates](evidence-templates/index.md) and
+[RFC-050 Release Candidate Attestations](release-candidates/index.md) for
+the current tooling and the one artifact that is ever committed per
+candidate. This page's own scope (below) is unchanged and still accurate for
+what `smoke:runtime` itself does.
 
 ## Scope
 
@@ -33,7 +47,22 @@ It does not verify:
 - Logpush delivery;
 - Cloudflare dashboard CPU/runtime metrics.
 
-Those remain RFC-050 operator evidence items.
+Those remain RFC-050 operator evidence items. As of Tooling Slice 9, three of
+them have a **local** (non-hosted, non-authoritative) collector — this is
+progress on the tooling, not a substitute for the hosted evidence a real
+candidate still needs:
+
+- seeded authenticated workflows and the Asia/Tokyo round-trip:
+  `scripts/collect-evidence-e3-flows.mjs` (RFC-050 E3, local);
+- invite/form-token race behavior: `scripts/collect-evidence-e4-concurrency.mjs`
+  (RFC-050 E4, local; E4a direct-ingress topology is hosted-only and gates it);
+- negative configuration (missing pepper, missing/misnamed `ABUSE_LIMITER`,
+  exhausted coordinator, malformed version metadata):
+  `scripts/collect-evidence-e5-negative-config.mjs` (RFC-050 E5, local).
+
+Real-phone 200% scaling, Logpush delivery, and Cloudflare dashboard CPU/runtime
+metrics have no local equivalent — they require the deployed edge and remain
+purely hosted-operator items (RFC-050 E6/E7/E8).
 
 ## Staging Exposure Policy
 
@@ -260,23 +289,21 @@ Attach the JSON and screenshots to the release checklist or review request when
 using the prototype as staging evidence. The report includes an explicit list of
 manual RFC-050 evidence items that remain open.
 
-## Manual RFC-050 Evidence Template
+## Manual RFC-050 Evidence Template — superseded
 
-Use this template after the prototype smoke passes.
+**Reconciled 2026-07-29.** The flat checklist that used to live in this
+section is superseded by the tracked, sanitized tooling built in RFC-050
+Tooling Slices 7–8. Use those instead of this page for a real evidence
+campaign:
 
-- [ ] Staging D1 migrations applied.
-- [ ] `HMAC_PEPPER` secret set for staging.
-- [ ] Exact candidate identity verified and `/healthz` returns `ok: true, ready: true` before `/join` or other user traffic.
-- [ ] `ABUSE_LIMITER` Durable Object class/binding provisioned for staging (RFC-078); exact-candidate direct-ingress topology and native IPv6 `/64` sharing evidence captured.
-- [ ] First staging community and admin seeded with non-production data.
-- [ ] Join flow succeeds with a staging invite code.
-- [ ] Asia/Tokyo 09:00 event creation displays as 09:00 after round-trip.
-- [ ] Event edit from 09:00 to 13:00 updates the existing day row.
-- [ ] ICS download has correct DTSTART/DTEND for JST.
-- [ ] Concurrent invite redemption creates exactly one membership/session.
-- [ ] Concurrent form-token double-submit creates exactly one mutation.
-- [ ] No-JS destructive confirmations work in a browser.
-- [ ] Real phone 200% text scaling screenshots captured.
-- [ ] Admin action is visible in audit log.
-- [ ] Logpush delivers Worker logs to the configured sink.
-- [ ] Cloudflare dashboard shows no consistent Free-plan CPU limit errors.
+- [RFC-050 Manual Evidence Templates](evidence-templates/index.md) — the
+  fill-in-the-blank per-check templates (browser/device, observability/
+  runtime, recovery/restore), covering the same ground as the old checklist
+  above item-for-item plus named fields the flat list never had (e.g. E7's
+  delivery-interval/retrieval-timestamp pair).
+- [RFC-050 Release Candidate Attestations](release-candidates/index.md) —
+  the per-candidate, per-gate (E0–E9) tracked record with mechanically
+  enforced gate rules, which this checklist had no equivalent of at all.
+
+This section is kept only so an old link to it still resolves to something;
+do not fill in real values here — this page is not evidence.

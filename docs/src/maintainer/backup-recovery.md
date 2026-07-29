@@ -156,6 +156,28 @@ still requires exact-candidate evidence and explicit owner approval.
 
 ---
 
+## RFC-050 relationship (E9 gate)
+
+**Added 2026-07-29 (RFC-050 Tooling Slice 9).** This page's export/restore and
+migration-reversal procedures are the operator runbook; RFC-050's E9 gate
+("migration, restore, recovery, and closure") requires an actual hosted
+rehearsal of them against the frozen exact candidate — an export/restore
+rehearsal into a separate staging recovery database, representative
+sign-in/read verification against the restored database via an isolated
+recovery Worker/config, the RFC-069 total-community-access recovery drill
+with a synthetic community, and confirmed teardown of every recovery/negative
+resource afterward.
+
+**Current status: local-only, not yet exercised against a hosted candidate.**
+Nothing in this document has been run as part of an RFC-050 evidence
+campaign; no candidate has been frozen. Record the rehearsal in
+`docs/src/tester/evidence-templates/70-recovery-and-restore.md` when it
+happens, and the gate verdict itself in the candidate's
+[release candidate attestation](../tester/release-candidates/index.md) (gate
+`E9`). The retired pre-RFC-078 `RATE_LIMIT` KV namespace, if one exists for a
+given environment, is explicitly **retained, not deleted** during E9 teardown
+— it is rollback inventory, not something this campaign's procedures remove.
+
 ## Incident response checklist
 
 When data loss or corruption is suspected:

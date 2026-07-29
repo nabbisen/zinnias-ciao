@@ -110,3 +110,36 @@ non-technical. These are observational and require pilot participants.
   200% scaling as a hard gate. For a first internal staging pilot with known
   participants it may be downgraded to a fast-follow; for the public Japan pilot
   it remains a hard gate.
+
+## 10. Relationship to RFC-050 (reconciliation note, added 2026-07-29)
+
+**Stating the current fact plainly, not a disposition decision: this note
+does not close this RFC, move it between lifecycle folders, or alter its
+Status line above.**
+
+`rfcs/accepted/050-staging-runtime-verification-evidence-pack.md`, accepted
+2026-07-28, defines a more complete evidence-campaign gate structure (E0–E9)
+that covers everything in this RFC's §6 staging-runtime matrix and
+considerably more (concurrency postconditions, negative configuration,
+persistent-audit visibility, CPU/plan behavior, migration/restore/recovery
+closure). Item-for-item:
+
+| This RFC's §6 test | RFC-050 gate |
+|---|---|
+| S1 — deploy, healthz/version, migrations | E1 |
+| S2–S4 — Asia/Tokyo create/edit/ICS | E3 |
+| S5–S7 — concurrent redemption/token races | E4 (gated by E4a) |
+| S8 — SW cache/logout | E2/E3 |
+| S9 — no-JS browser | E6 |
+| S10 — real-phone 200% scaling | E6 |
+| S11 — Logpush/audit availability | E7 |
+
+§5's source-level verification stays valid and discharged on its own terms —
+RFC-050 does not re-derive it. §6's staging-runtime matrix, still pending
+infrastructure as written above, will be satisfied through the RFC-050
+hosted evidence campaign rather than a separate one; there is no intent to
+run this RFC's §6 as an independent exercise once that campaign starts. §7
+(product/usability, human QA) remains this RFC's own scope — RFC-050 does
+not cover it. §8/§9 (acceptance criteria, open decisions) are therefore only
+partially still load-bearing: the §6 half of the acceptance bar transfers to
+RFC-050's own required evidence matrix and B-finding closure process.

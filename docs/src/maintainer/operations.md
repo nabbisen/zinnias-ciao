@@ -268,6 +268,13 @@ exact-candidate observation. If required-audit failure occurs in hosted staging
 or production, treat it as a security-control incident and keep B5/pilot gates
 open.
 
+Record the canary-delivery check with named delivery-interval/retrieval-
+timestamp fields in
+`docs/src/tester/evidence-templates/60-observability-and-runtime.md` (RFC-050
+Tooling Slice 7/S7-R2), and the gate verdict itself in the candidate's
+[release candidate attestation](../tester/release-candidates/index.md) (gate
+`E7`). *(Reconciled 2026-07-29, RFC-050 Tooling Slice 9.)*
+
 ## Mixed legacy and canonical audit actions
 
 Migration 0010 preserves raw historical action values. Use the compatibility

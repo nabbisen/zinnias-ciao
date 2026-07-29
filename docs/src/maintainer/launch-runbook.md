@@ -312,12 +312,18 @@ bun run smoke:runtime -- "$STAGING_URL"
 ```
 
 See `docs/src/tester/staging-runtime-prototype.md` for the output files and the manual
-evidence that still remains outside the prototype.
+evidence that still remains outside the prototype — that page now points to
+the full local evidence tooling (`docs/src/tester/evidence-templates/`) and
+the tracked per-candidate attestation (`docs/src/tester/release-candidates/`)
+where this candidate's gate verdicts get recorded.
 
 - [ ] Health check passes.
 - [ ] Version check passes.
 - [ ] Join form loads without error.
 - [ ] RFC-050 prototype smoke passes.
+- [ ] This candidate's release attestation
+      (`docs/src/tester/release-candidates/<candidate-label>.md`) exists and
+      passes `bun run evidence:check-attestation <path>`.
 
 ### 4.5 Run the full QA checklist against staging
 
