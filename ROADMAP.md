@@ -70,6 +70,30 @@ section remains the tracked summary of record.
    treated as IPv4-only in practice until hosted evidence says otherwise.
    Acceptance authorizes local RFC-050 tooling implementation only, not any
    hosted action.
+5. Implemented RFC-050 Tooling Slices 1–7 — version metadata and the strict
+   `/version` schema, the candidate manifest with mechanical redaction,
+   exact-identity runtime smoke, E3 flow collection, E4 concurrency and
+   postcondition tooling, E5 negative-configuration fixtures, and the manual
+   evidence templates with artifact hashing and leakage scanning — committed at
+   `15b9409` and `c55787a`. Slices 8 (tracked attestation template and gate
+   rules) and 9 (documentation reconciliation) remain. All of this is **local
+   tooling only**: none of it is B4 evidence until the same tooling runs against
+   a frozen exact candidate, and it closes no finding.
+6. Fixed a shipped form-token replay-detection defect discovered by Slice 5's
+   concurrency evidence, committed at `c55787a`. A compatibility wrapper
+   collapsed `ConsumeResult::Proceed` and `Replay(None)` into one value, so 21
+   call sites across 17 handler files could not detect a replayed single-use
+   token; only display-name editing, which stores a `result_ref`, was unaffected.
+   CSRF protection was never weakened — invalid and absent tokens were always
+   rejected — but replay protection was, so a replayed token could re-execute
+   non-idempotent actions such as calendar-token regeneration and community
+   export authorization. The wrapper was removed, every call site migrated to
+   match `ConsumeResult` explicitly, a contract gate added so the pattern can no
+   longer compile, a replay regression test added for two non-idempotent
+   actions, and `docs/src/tester/release-checklist.md` corrected from a false
+   claim under an explicit "Corrected 2026-07-28" marker. Per the owner's
+   decision this was handled as a bounded remediation rather than a numbered
+   RFC; this entry is its durable record.
 
 **Live sequence:**
 
@@ -97,7 +121,7 @@ for overlap with or supersession by the revised RFC-050.
 
 | RFC | Theme | Current note |
 |-----|-------|--------------|
-| 050 | Exact-candidate hosted staging evidence and pilot gate | B4 remediation revision, architecture-reviewed and owner-accepted 2026-07-28, moving it to `rfcs/accepted/`. A 2026-07-28 reconciliation review found the design needed a new E4a ingress/topology evidence item plus E1/E9/gate-invalidation extensions to match what shipped, and a re-review accepted the applied edits (Accept/Go). **IPv6 client support is not confirmed/implemented for this deployment** — the document carries a 2026-07-28 owner risk acceptance deferring the native IPv6 `/64` hosted-sharing proof; treat this service as IPv4-only in practice until hosted evidence says otherwise. Acceptance authorizes local RFC-050 tooling implementation only, not hosted execution. |
+| 050 | Exact-candidate hosted staging evidence and pilot gate | B4 remediation revision, architecture-reviewed and owner-accepted 2026-07-28, moving it to `rfcs/accepted/`. A 2026-07-28 reconciliation review found the design needed a new E4a ingress/topology evidence item plus E1/E9/gate-invalidation extensions to match what shipped, and a re-review accepted the applied edits (Accept/Go). **IPv6 client support is not confirmed/implemented for this deployment** — the document carries a 2026-07-28 owner risk acceptance deferring the native IPv6 `/64` hosted-sharing proof; treat this service as IPv4-only in practice until hosted evidence says otherwise. Acceptance authorizes local RFC-050 tooling implementation only, not hosted execution. Tooling Slices 1–7 are implemented, reviewed, and committed at `15b9409` and `c55787a`; Slices 8–9 remain. That tooling is local only — it becomes B4 evidence solely when run against a frozen exact candidate, and B4 remains open. |
 | 076 | One-time invite code response isolation | Local implementation reviewed, owner-accepted, and committed at `b72f22b`. Corrected isolated automated evidence and bounded human no-JS/network observation were architecture-reviewed and owner-accepted on 2026-07-21, closing criterion 8 locally; RFC-050 exact-candidate hosted evidence remains required before B1 closes for a public or production pilot. |
 | 077 | Fail-closed HMAC pepper configuration | Implemented at `901855b`. Corrected disposable hosted evidence was architecture-reviewed and owner-accepted on 2026-07-22: criteria 8–9 are satisfied and B2 is closed. This does not close unrelated RFC-050, B1, B3, B5, production, public-pilot, real-device, performance, persistent-observability, or release gates. |
 | 078 | Fail-closed strongly consistent abuse controls | Corrected architecture was reviewed and owner-accepted on 2026-07-23. Implementation was reviewed, owner-accepted, and committed at `c991b82` on 2026-07-28; the required I-B1 concurrency-burst evidence and every non-blocking item were re-reviewed and accepted in that same round. B3 remains open pending the RFC-050 exact-candidate hosted evidence campaign. All controlled-staging, public-pilot, production, and release holds remain unchanged. |
