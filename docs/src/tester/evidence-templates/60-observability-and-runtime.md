@@ -49,13 +49,23 @@ as complete.
 - **Pass/fail:**
 - **Notes:**
 
-### Persistent incident sink delivery and retrieval (RFC-050 Prerequisite 6)
+### Persistent incident sink delivery and retrieval (RFC-050 Prerequisite 6, gate E7)
 
 - **Steps:**
 - **Expected:** a canary incident delivered through the configured sink
   (Logpush → R2 per the 2026-07-28 owner decision) is retrievable, with the
   documented retention (90d production / 30d staging) and access boundary
-  intact.
+  intact. E7 requires the canary be "retrievable after the documented
+  delivery interval" — record the interval and the retrieval time as named
+  fields, not free prose, so a pass cannot be claimed without both being
+  present.
+- **Canary sent (UTC):**
+- **Documented delivery interval:**
+- **Earliest permitted retrieval time (UTC):** (sent + interval)
+- **Retrieval attempted (UTC):**
+- **Retrieval timestamp (UTC):** (when the canary was actually confirmed
+  retrievable; must be at or after the earliest permitted retrieval time
+  above)
 - **Actual:**
 - **Pass/fail:**
 - **Notes:**

@@ -31,11 +31,13 @@
     "test:form-token-replay-rejected": "node scripts/test-form-token-replay-rejected.mjs",
     "test:abuse-controls": "node scripts/smoke/abuse-controls.mjs",
     "test:evidence-manifest": "node scripts/test-evidence-manifest.mjs",
+    "test:release-candidate-attestation-gates": "node scripts/test-release-candidate-attestation-gates.mjs",
     "evidence:e3-flows": "node scripts/collect-evidence-e3-flows.mjs",
     "evidence:e4-concurrency": "node scripts/collect-evidence-e4-concurrency.mjs",
     "evidence:e5-negative-config": "node scripts/collect-evidence-e5-negative-config.mjs",
     "evidence:hash-artifacts": "node scripts/hash-evidence-artifacts.mjs",
     "evidence:scan-leakage": "node scripts/scan-evidence-leakage.mjs",
+    "evidence:check-attestation": "node scripts/check-release-candidate-attestation.mjs",
     "smoke:display-name": "node scripts/smoke/self-display-name-editing.mjs",
     "smoke:matrix": "node scripts/smoke/monthly-attendance-matrix.mjs",
     "smoke:matrix-csv": "node scripts/smoke/calendar-matrix-csv-export.mjs"

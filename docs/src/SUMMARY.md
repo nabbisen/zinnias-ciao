@@ -18,6 +18,8 @@
     - [50 — Browser and Device](./tester/evidence-templates/50-browser-and-device.md)
     - [60 — Observability and Runtime](./tester/evidence-templates/60-observability-and-runtime.md)
     - [70 — Recovery and Restore](./tester/evidence-templates/70-recovery-and-restore.md)
+  - [RFC-050 Release Candidate Attestations](./tester/release-candidates/index.md)
+    - [TEMPLATE](./tester/release-candidates/TEMPLATE.md)
 - [Shared](./shared/index.md)
   - [Deployment](./shared/deployment.md)
   - [Reference: Roadmap and RFCs v1](./shared/ref/roadmap-and-rfcs-v1/ROADMAP.md)
