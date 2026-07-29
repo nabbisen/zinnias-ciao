@@ -41,8 +41,8 @@ weaker part of the product.
 
 Accordingly:
 
-- **product-feature work resumes** — RFC-073 first, then RFC-074 (see Active
-  Themes);
+- **product-feature work resumes** — RFC-073 and RFC-074 are complete (see
+  Active Themes);
 - the RFC-050 hosted evidence campaign is **deferred, not cancelled**, and
   remains mandatory before any real community uses the service;
 - persistent-incident-sink provisioning (Logpush → R2) is deferred with it, since
@@ -129,18 +129,19 @@ section remains the tracked summary of record.
    a date click no longer returns the user to the top of the page. All nine
    acceptance criteria met locally; no hosted-evidence precondition. Real-device
    200%-scaling confirmation remains a separate pre-pilot gate below.
-2. **RFC-074 — Community switch route preservation.** Owner-selected
-   2026-07-29 and accepted the same day. Changing community from the header
-   should keep the user on the same kind of page when the target community
-   supports it, instead of discarding their place and returning them to Home.
-   The design is complete: a closed `next` token grammar with target-side
-   authorization, no open redirect, no preserved community-scoped identifiers,
-   and no fragment. Implementation runs in **four slices** — grammar and
-   handler, member-level page wiring, admin page wiring, then fallback gates
-   and browser smoke. It also carries the RFC-067 gate generalization (O1) from
-   the RFC-073 review. No hosted-evidence precondition.
+2. ~~RFC-074 — Community switch route preservation.~~ **Complete
+   2026-07-30.** Design accepted at `5b901df`, implemented at `30e90c4`, both
+   review points Approved, and moved to `rfcs/done/`. Changing community from
+   the header now keeps the user on the same kind of page when the target
+   community supports it, through a closed `next` token grammar with
+   target-side authorization, no open redirect, no preserved community-scoped
+   identifiers, and no fragment. All nine acceptance criteria met locally; no
+   hosted-evidence precondition. It also **closed observation O1** from the
+   RFC-073 review: RFC-067's matrix contract is now proven behaviorally in
+   `ssr`, with the `release_gates.rs` source literal retained as a secondary
+   tripwire.
 3. **Choose the next user-facing theme** from Post-Hold Feature Candidates
-   below, once RFC-074 lands.
+   below. No theme is currently selected — this is an owner decision.
 3. **When a pilot is scheduled** — and not before — provision the persistent
    incident sink (Logpush → R2), then build and freeze one exact immutable
    release candidate and execute the RFC-050 hosted evidence campaign for the
@@ -205,8 +206,8 @@ The paused proposed backlog is:
 | 072 | Member language preference and runtime localization | Design remains proposed. No longer held by the feature freeze (lifted 2026-07-29); simply not yet scheduled. |
 | 075 | Render style system and inline style reduction | Design remains proposed. No longer held by the feature freeze (lifted 2026-07-29); simply not yet scheduled. |
 
-RFC-073 left this table on 2026-07-29 (shipped at `ed549be`), and RFC-074
-left it on acceptance the same day; neither is paused proposed work any more.
+RFC-073 left this table on 2026-07-29 (shipped at `ed549be`) and RFC-074 on
+2026-07-30 (shipped at `30e90c4`); neither is paused proposed work any more.
 
 ## Post-Hold Feature Candidates
 
@@ -257,12 +258,9 @@ RFC is.
    (`ed549be`, 2026-07-29). Retained here for ordering context only; it is no
    longer a candidate.
 
-9. ~~**RFC-074: Community Switch Route Preservation**~~ — **accepted**
-   (2026-07-29), implementation in progress in four slices. Retained here for
-   ordering context only; it is no longer a candidate. Header switching
-   preserves the current page family where safe, such as Calendar or My Page,
-   and falls back only when the target community lacks permission or no
-   equivalent route exists.
+9. ~~**RFC-074: Community Switch Route Preservation**~~ — **done**
+   (`30e90c4`, 2026-07-30). Retained here for ordering context only; it is no
+   longer a candidate.
 
 10. **RFC-075: Render Style System and Inline Style Reduction**
     Inline styling across server-rendered Rust strings is now a maintenance

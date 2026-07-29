@@ -1,7 +1,9 @@
 # RFC 074 - Community Switch Route Preservation
 
-**Status.** Accepted 2026-07-29 — design completed and architecture-reviewed;
-authorizes implementation in four slices with two review points.
+**Status.** Implemented — design accepted 2026-07-29 at `5b901df`;
+implemented at `30e90c4` across two review points and architecture-reviewed on
+2026-07-30 (Slice 1 and Slices 2–4 both Approved). All nine acceptance criteria
+are met locally; this RFC has no hosted-evidence precondition.
 
 **Target release.** Next unreleased increment on `main`; not tied to a version
 transition.
