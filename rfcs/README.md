@@ -6,23 +6,29 @@ Lifecycle: `proposed/` is design under review; `accepted/` is reviewed and
 owner-approved for implementation; `done/` is shipped. Only Accepted RFCs
 authorize implementation.
 
-> **Implementation hold (2026-07-14):** The proposed feature backlog must not
-> move into implementation while the architecture preparation review's
-> production/pilot blockers remain open. Remediation RFC work, RFC-050 hosted
-> evidence, and RFC-054 Japanese copy review may continue. See
-> [ROADMAP.md](../ROADMAP.md#architect-review-remediation-hold).
+> **Hold amended 2026-07-29:** The 2026-07-14 feature freeze is **lifted**.
+> Source remediation for the architecture-review blockers is complete (B2
+> closed; B1, B3, and B5 fixed, reviewed, committed, and locally evidenced), so
+> product-feature work has resumed. What remains outstanding is **hosted
+> evidence**, which is required only before deploying: B1, B3, B4, and B5 stay
+> **open**, and production, public-pilot, and first-real-community deployment
+> stay **No-Go**. The RFC-050 hosted campaign and persistent-incident-sink
+> provisioning are deferred until a pilot is scheduled — deferred, not
+> cancelled. See
+> [ROADMAP.md](../ROADMAP.md#architect-review-remediation-hold--amended-2026-07-29).
 
 RFC numbers and the tables below are stable identifiers and lifecycle indexes,
-not execution priority. The active dependency order is maintained in
-[ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence):
-persistent-incident-sink provisioning, followed by the RFC-050 exact-candidate
-hosted evidence campaign, including persistent-incident-delivery proof.
+not execution priority. The active order is maintained in
+[ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-073 is
+the current priority theme, with the RFC-050 hosted campaign and its sink
+deferred to the point a pilot is scheduled.
 
 ## Accepted — approved for implementation
 
 | ID | Title | Accepted | Note |
 |----|-------|----------|------|
 | 050 | [Exact-Candidate Hosted Staging Evidence and Pilot Gate](./accepted/050-staging-runtime-verification-evidence-pack.md) | 2026-07-28 | B4 remediation revision architecture-reviewed and owner-accepted; authorizes local tooling implementation (RFC-050 Tooling Slices) only, not hosted execution. Slices 1–7 committed at `15b9409`/`c55787a`; Slices 8–9 remain; B4 still open because local tooling is not evidence until run against a frozen candidate. **IPv6 client support is not confirmed/implemented for this deployment** — see RFC-078 § Dated owner risk acceptances and this document's E4a |
+| 073 | [Calendar Events List and Day Detail UX](./accepted/073-calendar-events-list-and-day-detail-ux.md) | 2026-07-29 | First post-hold product theme. Design revised 2026-07-29 to resolve its open decisions (day-detail always renders, Events list never day-filters, event links only, switcher emits no fragment) and to add acceptance criteria and implementation boundaries. Scope boundary against RFC-074 is explicit. Implementation not started |
 | 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Local implementation reviewed/accepted/committed at `b72f22b`; corrected isolated automation and bounded human no-JS/network evidence were architecture-reviewed and owner-accepted, closing criterion 8 locally. RFC-050 hosted evidence remains required before public/production B1 closure |
 | 078 | [Fail-Closed Strongly Consistent Abuse Controls](./accepted/078-fail-closed-strongly-consistent-abuse-controls.md) | 2026-07-23 | Corrected architecture accepted; implemented and committed at `c991b82` on 2026-07-28, including the required I-B1 concurrency-burst evidence. RFC-050 exact-candidate hosted evidence remains pending, so B3 and all staging/public/production holds remain open |
 | 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 0A–8 and the Class A telemetry correction reviewed/committed. Persistent delivery and exact-candidate hosted B5 evidence remain required |
@@ -144,7 +150,6 @@ hosted evidence campaign, including persistent-incident-delivery proof.
 | ID | Title | File | Note |
 |----|-------|------|------|
 | 072 | [Member Language Preference and Runtime Localization](./proposed/072-member-language-preference-and-runtime-localization.md) | Controlled design for user-selectable EN/JA runtime UI language |
-| 073 | [Calendar Events List and Day Detail UX](./proposed/073-calendar-events-list-and-day-detail-ux.md) | Split Calendar grid, Events list, and Attendance table into distinct views |
 | 074 | [Community Switch Route Preservation](./proposed/074-community-switch-route-preservation.md) | Preserve current route family on community switch when safe |
 | 075 | [Render Style System and Inline Style Reduction](./proposed/075-render-style-system-and-inline-style-reduction.md) | Incremental CSS/class migration for server-rendered UI |
 

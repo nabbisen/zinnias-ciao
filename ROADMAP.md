@@ -18,26 +18,50 @@ Calendar workflows, admin event-copy creation assistance, the monthly
 attendance matrix, admin-only matrix CSV export, contracts i18n boundary
 cleanup, and operator-only total community access recovery.
 
-## Architect Review Remediation Hold
+## Architect Review Remediation Hold — Amended 2026-07-29
 
 The 2026-07-14 architecture preparation review found production/pilot blockers
 in one-time invite-code handling, hosted secret configuration, abuse controls,
-and audit durability/redaction. Until those blockers are resolved and reviewed:
+and audit durability/redaction. The original hold froze product-feature work
+until those blockers were "resolved and reviewed".
 
-- do not implement new product-feature breadth from the proposed RFC backlog,
-  including RFC-072 through RFC-075;
-- remediation design and implementation take priority over the candidate order
-  below;
-- RFC-050 hosted evidence work and RFC-054 Japanese copy review may continue,
-  because they close existing release evidence rather than add feature scope;
-- production, public-pilot, and first-real-community deployment remain No-Go;
-- controlled staging remains conditional on the architecture review's open B1
-  and B3 findings being fixed or explicitly risk-accepted for an isolated,
-  short-lived non-production environment; B2 is closed.
+**Owner decision, 2026-07-29: the feature freeze is lifted; the deployment gates
+are not.** The hold's original wording conflated two different things, and they
+have now separated:
 
-The RFC lifecycle now separates Proposed design from Accepted implementation.
-Remediation design and accepted implementation take priority. Feature work
-resumes only after the remediation hold is explicitly lifted in this roadmap.
+| | Status |
+|---|---|
+| **Source remediation** — the code that makes the service safe | **Complete.** B2 fully closed. B1, B3, and B5 have their source fixes implemented, reviewed, committed, and locally evidenced |
+| **Hosted evidence** — proof against a frozen candidate | **Outstanding**, and only required before deploying |
+
+The blockers' *code* is fixed. What remains is evidence for a deployment that is
+not yet scheduled, so continuing to freeze product work on it would optimize the
+wrong constraint — particularly while the service's user-facing function is the
+weaker part of the product.
+
+Accordingly:
+
+- **product-feature work resumes**, starting with RFC-073 (see Active Themes);
+- the RFC-050 hosted evidence campaign is **deferred, not cancelled**, and
+  remains mandatory before any real community uses the service;
+- persistent-incident-sink provisioning (Logpush → R2) is deferred with it, since
+  its only consumer is that campaign;
+- production, public-pilot, and first-real-community deployment remain **No-Go**;
+- B1, B3, B4, and B5 remain **open**; nothing in this amendment closes a finding;
+- controlled staging remains conditional on the open B1 and B3 findings being
+  fixed or explicitly risk-accepted for an isolated, short-lived non-production
+  environment; B2 is closed.
+
+**What resuming feature work does not permit:** no reintroduction of a fail-open
+path, no weakening of the fail-closed pepper, abuse-control, audit, or
+form-token replay contracts, and no feature that would require hosted access to
+verify. Security-sensitive changes still go through the RFC-071 threat-model and
+form-security review gate.
+
+When a pilot is actually scheduled, the RFC-050 campaign must run against the
+candidate of that day — which will be later than today's tree. The tooling is
+committed and gated, so drift is detectable, but the campaign is not
+transferable evidence from an earlier commit.
 
 ## Active Remediation and Release Sequence
 
@@ -95,20 +119,25 @@ section remains the tracked summary of record.
    decision this was handled as a bounded remediation rather than a numbered
    RFC; this entry is its durable record.
 
-**Live sequence:**
+**Live sequence — reordered 2026-07-29 (owner decision):**
 
-1. Decide, provision, and document the owner-approved persistent incident
-   sink (Logpush → R2, per the owner's decision), retention, and access
-   boundary before canonical candidate upload.
-2. Build and identify one exact immutable release candidate, then execute the
-   frozen RFC-050 hosted evidence campaign for the remaining B1, B3, B4, and B5
-   claims. The same campaign must include E7 canary delivery, retrieval,
-   health, retention, and access proof for the provisioned persistent sink;
-   console output and `wrangler tail` are not sufficient.
-3. Reassess the remediation hold and v0.60.0 readiness from the integrated
+1. **RFC-073 — Calendar events list and day detail UX.** The current priority
+   theme. The Calendar page is the product's primary surface, and its combined
+   grid-plus-list view and top-of-page date-click behavior are the most concrete
+   user-facing complaints on record. Design revised 2026-07-29 to resolve its
+   open decisions; awaiting owner acceptance before implementation.
+2. Continue user-facing themes from Active Themes below, in owner-chosen order.
+3. **When a pilot is scheduled** — and not before — provision the persistent
+   incident sink (Logpush → R2), then build and freeze one exact immutable
+   release candidate and execute the RFC-050 hosted evidence campaign for the
+   remaining B1, B3, B4, and B5 claims. The campaign must include E7 canary
+   delivery, retrieval, health, retention, and access proof for the provisioned
+   sink; console output and `wrangler tail` are not sufficient.
+4. Reassess the deployment gates and version readiness from the integrated
    evidence. Lifting one finding does not implicitly lift another.
-4. Resume product-feature implementation only after this roadmap explicitly
-   lifts the hold.
+
+Steps 3 and 4 are deferred, not cancelled. No real community may use the service
+until they complete.
 
 RFC-050 procedures, tooling, and persistent-sink preparation may proceed where
 doing so reduces risk, but the sink must be provisioned before canonical upload
