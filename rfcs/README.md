@@ -28,6 +28,7 @@ campaign and its sink remain deferred to the point a pilot is scheduled.
 | ID | Title | Accepted | Note |
 |----|-------|----------|------|
 | 050 | [Exact-Candidate Hosted Staging Evidence and Pilot Gate](./accepted/050-staging-runtime-verification-evidence-pack.md) | 2026-07-28 | B4 remediation revision architecture-reviewed and owner-accepted; authorizes local tooling implementation (RFC-050 Tooling Slices) only, not hosted execution. Slices 1–7 committed at `15b9409`/`c55787a`; Slices 8–9 remain; B4 still open because local tooling is not evidence until run against a frozen candidate. **IPv6 client support is not confirmed/implemented for this deployment** — see RFC-078 § Dated owner risk acceptances and this document's E4a |
+| 074 | [Community Switch Route Preservation](./accepted/074-community-switch-route-preservation.md) | 2026-07-29 | Design completed and architecture-reviewed: the RFC-073 fragment question closed as settled, the derived-grammar question resolved against derivation, and Security/Compatibility/Risks/Acceptance Criteria/Implementation Slices added. Authorizes implementation in four slices; the current priority theme |
 | 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Local implementation reviewed/accepted/committed at `b72f22b`; corrected isolated automation and bounded human no-JS/network evidence were architecture-reviewed and owner-accepted, closing criterion 8 locally. RFC-050 hosted evidence remains required before public/production B1 closure |
 | 078 | [Fail-Closed Strongly Consistent Abuse Controls](./accepted/078-fail-closed-strongly-consistent-abuse-controls.md) | 2026-07-23 | Corrected architecture accepted; implemented and committed at `c991b82` on 2026-07-28, including the required I-B1 concurrency-burst evidence. RFC-050 exact-candidate hosted evidence remains pending, so B3 and all staging/public/production holds remain open |
 | 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 0A–8 and the Class A telemetry correction reviewed/committed. Persistent delivery and exact-candidate hosted B5 evidence remain required |
@@ -150,7 +151,6 @@ campaign and its sink remain deferred to the point a pilot is scheduled.
 | ID | Title | File | Note |
 |----|-------|------|------|
 | 072 | [Member Language Preference and Runtime Localization](./proposed/072-member-language-preference-and-runtime-localization.md) | Controlled design for user-selectable EN/JA runtime UI language |
-| 074 | [Community Switch Route Preservation](./proposed/074-community-switch-route-preservation.md) | Preserve current route family on community switch when safe |
 | 075 | [Render Style System and Inline Style Reduction](./proposed/075-render-style-system-and-inline-style-reduction.md) | Incremental CSS/class migration for server-rendered UI |
 
 ## Archive

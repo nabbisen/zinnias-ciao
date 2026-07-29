@@ -41,7 +41,8 @@ weaker part of the product.
 
 Accordingly:
 
-- **product-feature work resumes**, starting with RFC-073 (see Active Themes);
+- **product-feature work resumes** — RFC-073 first, then RFC-074 (see Active
+  Themes);
 - the RFC-050 hosted evidence campaign is **deferred, not cancelled**, and
   remains mandatory before any real community uses the service;
 - persistent-incident-sink provisioning (Logpush → R2) is deferred with it, since
@@ -128,8 +129,18 @@ section remains the tracked summary of record.
    a date click no longer returns the user to the top of the page. All nine
    acceptance criteria met locally; no hosted-evidence precondition. Real-device
    200%-scaling confirmation remains a separate pre-pilot gate below.
-2. **Choose the next user-facing theme** from Post-Hold Feature Candidates
-   below. No theme is currently selected — this is an owner decision.
+2. **RFC-074 — Community switch route preservation.** Owner-selected
+   2026-07-29 and accepted the same day. Changing community from the header
+   should keep the user on the same kind of page when the target community
+   supports it, instead of discarding their place and returning them to Home.
+   The design is complete: a closed `next` token grammar with target-side
+   authorization, no open redirect, no preserved community-scoped identifiers,
+   and no fragment. Implementation runs in **four slices** — grammar and
+   handler, member-level page wiring, admin page wiring, then fallback gates
+   and browser smoke. It also carries the RFC-067 gate generalization (O1) from
+   the RFC-073 review. No hosted-evidence precondition.
+3. **Choose the next user-facing theme** from Post-Hold Feature Candidates
+   below, once RFC-074 lands.
 3. **When a pilot is scheduled** — and not before — provision the persistent
    incident sink (Logpush → R2), then build and freeze one exact immutable
    release candidate and execute the RFC-050 hosted evidence campaign for the
@@ -186,16 +197,19 @@ The paused proposed backlog is:
 | 044 | D1 query-budget gate and integration test harness | Runtime/integration hardening candidate. |
 | 045 | Pre-pilot runtime verification matrix | Runtime evidence and operator verification candidate. |
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
-| 072 | Member language preference and runtime localization | Design remains proposed; implementation is paused by the architect remediation hold. |
-| 073 | Calendar events list and day detail UX | Design remains proposed; implementation is paused by the architect remediation hold. |
-| 074 | Community switch route preservation | Design remains proposed; implementation is paused by the architect remediation hold. |
-| 075 | Render style system and inline style reduction | Design remains proposed; implementation is paused by the architect remediation hold. |
+| 072 | Member language preference and runtime localization | Design remains proposed. No longer held by the feature freeze (lifted 2026-07-29); simply not yet scheduled. |
+| 075 | Render style system and inline style reduction | Design remains proposed. No longer held by the feature freeze (lifted 2026-07-29); simply not yet scheduled. |
+
+RFC-073 left this table on 2026-07-29 (shipped at `ed549be`), and RFC-074
+left it on acceptance the same day; neither is paused proposed work any more.
 
 ## Post-Hold Feature Candidates
 
-The feature candidates below are paused while the architect-review remediation
-hold is active. Their relative order is preserved for reconsideration after the
-hold is explicitly lifted; this list is not implementation authorization.
+The feature freeze over this list was **lifted on 2026-07-29**, so these are an
+ordered backlog rather than paused work. Their relative order is preserved as
+the default sequence, but theme selection is an owner decision taken one theme
+at a time. **This list is not implementation authorization** — only an Accepted
+RFC is.
 
 1. **External identity/OIDC pre-RFC consultation**
    Revisit the parked consultation only after the remediation hold is
@@ -236,10 +250,12 @@ hold is explicitly lifted; this list is not implementation authorization.
    (`ed549be`, 2026-07-29). Retained here for ordering context only; it is no
    longer a candidate.
 
-9. **RFC-074: Community Switch Route Preservation**
-    Header switching should preserve the current page family where safe, such
-    as Calendar or My Page, and fall back only when the target community lacks
-    permission or no equivalent route exists.
+9. ~~**RFC-074: Community Switch Route Preservation**~~ — **accepted**
+   (2026-07-29), implementation in progress in four slices. Retained here for
+   ordering context only; it is no longer a candidate. Header switching
+   preserves the current page family where safe, such as Calendar or My Page,
+   and falls back only when the target community lacks permission or no
+   equivalent route exists.
 
 10. **RFC-075: Render Style System and Inline Style Reduction**
     Inline styling across server-rendered Rust strings is now a maintenance
