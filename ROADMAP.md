@@ -157,8 +157,13 @@ RFC-050 procedures, tooling, and persistent-sink preparation may proceed where
 doing so reduces risk, but the sink must be provisioned before canonical upload
 and none of that preparation is final B4/B5 evidence until the frozen campaign
 proves it against the reviewed RFC-078 exact candidate. RFC-044 and RFC-045 are
-not automatically prerequisites: their remaining scopes must first be checked
-for overlap with or supersession by the revised RFC-050.
+not automatically prerequisites, and the overlap check this paragraph used to
+require **has now been performed** for both — RFC-045 during RFC-050 Tooling
+Slice 9, and RFC-044 on 2026-07-29 (recorded in that RFC's §6.4). Neither is a
+prerequisite for the RFC-050 campaign. RFC-044's harness and all four of its
+deferred regression tests were discharged by the RFC-050 local tooling committed
+at `c55787a`; only its runtime query-counting shim remains, and that gates beta,
+not the first pilot.
 
 ## Architecture Remediation Work
 
@@ -194,7 +199,7 @@ The paused proposed backlog is:
 | 031 | Consentful contact channels and privacy-safe messaging | Depends on consent and notification policy decisions. |
 | 033 | Subgroups, event visibility, and boundary safety | High-impact authorization and privacy design work. |
 | 034 | Notification-free quiet mode and attention design | Should be considered with RFC-021. |
-| 044 | D1 query-budget gate and integration test harness | Runtime/integration hardening candidate. |
+| 044 | D1 query-budget gate and integration test harness | Narrowed 2026-07-29 after the RFC-050 overlap check: harness and all four deferred regression tests discharged at `c55787a`. Only the runtime query-counting shim remains; gates beta, not the first pilot. |
 | 045 | Pre-pilot runtime verification matrix | Runtime evidence and operator verification candidate. |
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
 | 072 | Member language preference and runtime localization | Design remains proposed. No longer held by the feature freeze (lifted 2026-07-29); simply not yet scheduled. |
@@ -236,9 +241,11 @@ RFC is.
    boundaries. It should start with design review, not direct implementation.
 
 6. **RFC-044 and RFC-045: Remaining Runtime Harness Work**
-   Reassess their unimplemented portions after RFC-050. Retain only work that
-   is not already discharged or superseded by the exact-candidate evidence
-   contract.
+   The reassessment this entry called for is **done** — RFC-045 under RFC-050
+   Tooling Slice 9, RFC-044 on 2026-07-29 (see its §6.4). What survives is a
+   single narrow package: the runtime D1 query-counting shim, closing the band
+   between a route's exact budget and the 2× ceiling the existing static gate
+   enforces. It gates beta.
 
 7. **RFC-072: Member Language Preference and Runtime Localization**
    The i18n scaffold exists, but runtime UI language selection does not. This

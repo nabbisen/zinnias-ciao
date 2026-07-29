@@ -142,7 +142,7 @@ campaign and its sink remain deferred to the point a pilot is scheduled.
 
 | ID | Title | File | Note |
 |----|-------|------|------|
-| 044 | D1 Query-Budget Gate and Integration Test Harness | [./proposed/044-d1-query-budget-gate-and-integration-test-harness.md](./proposed/044-d1-query-budget-gate-and-integration-test-harness.md) | Budget constants + SW gate shipped; live-D1 harness deferred (gates beta) |
+| 044 | D1 Query-Budget Gate and Integration Test Harness | [./proposed/044-d1-query-budget-gate-and-integration-test-harness.md](./proposed/044-d1-query-budget-gate-and-integration-test-harness.md) | **Narrowed 2026-07-29.** Harness and all four deferred regression tests discharged by RFC-050 local tooling at `c55787a`; only the runtime query-counting shim remains (gates beta) |
 | 045 | Pre-Pilot Runtime Verification Matrix | [./proposed/045-pre-pilot-runtime-verification-matrix.md](./proposed/045-pre-pilot-runtime-verification-matrix.md) | Source verification discharged; staging-runtime matrix pending environment |
 | 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
 
