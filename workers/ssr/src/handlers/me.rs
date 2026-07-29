@@ -18,13 +18,14 @@ const DISPLAY_NAME_UNCHANGED_REF: &str = "display_name_unchanged";
 pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
     let url = req.url()?;
     let flash_code = url
         .query_pairs()
         .find(|(k, _)| k == "flash")
         .map(|(_, v)| v.to_string());
-    let flash_html = me_flash_message(flash_code.as_deref())
+    let flash_html = me_flash_message(locale, flash_code.as_deref())
         .map(|message| {
             format!(
                 "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0 1rem\">{}</p>",
@@ -45,11 +46,14 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let role_label = if membership.is_admin() {
-        i18n::JA_ROLE_ADMIN
-    } else {
-        i18n::JA_ROLE_MEMBER
-    };
+    let role_label = i18n::t(
+        locale,
+        if membership.is_admin() {
+            i18n::ROLE_ADMIN
+        } else {
+            i18n::ROLE_MEMBER
+        },
+    );
     let can_create_community = crate::handlers::community_create::community_creation_enabled(env)
         && membership_db::find_first_admin_for_user(&db, &auth.user_id)
             .await?
@@ -67,9 +71,9 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
         format!(
             "<section style=\"margin-top:1.5rem\"><h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{admin_section}</h2><a href=\"/c/{cid}/admin/members\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{members_lbl}</a><a href=\"/c/{cid}/admin/export\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{export_lbl}</a></section>",
             cid = render::escape_html(community_id),
-            admin_section = i18n::JA_ME_SECTION_ADMIN,
-            members_lbl = i18n::JA_ME_MANAGE_MEMBERS,
-            export_lbl = i18n::JA_ME_DATA_EXPORT,
+            admin_section = i18n::t(locale, i18n::ME_SECTION_ADMIN),
+            members_lbl = i18n::t(locale, i18n::ME_MANAGE_MEMBERS),
+            export_lbl = i18n::t(locale, i18n::ME_DATA_EXPORT),
         )
     } else {
         String::new()
@@ -77,13 +81,14 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
     let community_create_html = if can_create_community {
         format!(
             "<a href=\"/communities/new\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{}</a>",
-            i18n::JA_COMMUNITY_CREATE_LINK,
+            i18n::t(locale, i18n::COMMUNITY_CREATE_LINK),
         )
     } else {
         String::new()
     };
 
-    let nav = render::bottom_nav(community_id, "me");
+    let nav = render::bottom_nav_localized(community_id, "me", locale);
+    let title = i18n::t(locale, i18n::NAV_ME);
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
@@ -133,36 +138,37 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
                {lbl_logout}</button>\
            </form>\
          </main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_NAV_ME,
+        header = render::header_with_switcher_next_localized(
+            title,
             community_id,
             &_community_pairs,
-            "me"
+            "me",
+            locale
         ),
         name = render::escape_html(&membership.display_name),
         flash_html = flash_html,
-        change_name = i18n::JA_ME_CHANGE_DISPLAY_NAME,
+        change_name = i18n::t(locale, i18n::ME_CHANGE_DISPLAY_NAME),
         community = render::escape_html(community_name),
         role = role_label,
         community_create = community_create_html,
         cid = render::escape_html(community_id),
-        cal_section = i18n::JA_CALENDAR_TITLE,
-        cal_feed_lbl = i18n::JA_ME_CALENDAR_LABEL,
-        lbl_name = i18n::JA_ME_SECTION_NAME,
-        lbl_community = i18n::JA_ME_SECTION_COMMUNITY,
-        lbl_help = i18n::JA_ME_SECTION_HELP,
-        help_body = i18n::JA_ME_HELP_BODY,
-        lbl_logout = i18n::JA_LOGOUT,
-        lbl_about = i18n::JA_ME_SECTION_ABOUT,
-        lbl_version = i18n::JA_ME_VERSION_LABEL,
-        lbl_ref = i18n::JA_ME_REF_LABEL,
+        cal_section = i18n::t(locale, i18n::CALENDAR_TITLE),
+        cal_feed_lbl = i18n::t(locale, i18n::ME_CALENDAR_LABEL),
+        lbl_name = i18n::t(locale, i18n::ME_SECTION_NAME),
+        lbl_community = i18n::t(locale, i18n::ME_SECTION_COMMUNITY),
+        lbl_help = i18n::t(locale, i18n::ME_SECTION_HELP),
+        help_body = i18n::t(locale, i18n::ME_HELP_BODY),
+        lbl_logout = i18n::t(locale, i18n::LOGOUT),
+        lbl_about = i18n::t(locale, i18n::ME_SECTION_ABOUT),
+        lbl_version = i18n::t(locale, i18n::ME_VERSION_LABEL),
+        lbl_ref = i18n::t(locale, i18n::ME_REF_LABEL),
         version = render::escape_html(&app_version),
         ref_code = render::escape_html(support_ref),
         admin_tools = admin_tools_html,
         tok = render::escape_html(&logout_token),
         nav = nav,
     );
-    render::page(i18n::JA_NAV_ME, &body)
+    render::page_localized(locale, title, &body)
 }
 
 pub async fn get_display_name(
@@ -422,9 +428,12 @@ fn display_name_error(err: DisplayNameError) -> &'static str {
     }
 }
 
-fn me_flash_message(code: Option<&str>) -> Option<&'static str> {
+fn me_flash_message(
+    locale: zinnias_ciao_contracts::Locale,
+    code: Option<&str>,
+) -> Option<&'static str> {
     match code {
-        Some(DISPLAY_NAME_UPDATED_REF) => Some(i18n::JA_ME_DISPLAY_NAME_UPDATED),
+        Some(DISPLAY_NAME_UPDATED_REF) => Some(i18n::t(locale, i18n::ME_DISPLAY_NAME_UPDATED)),
         _ => None,
     }
 }

@@ -350,6 +350,23 @@ materially changed form against the
 - [x] RFC-067's matrix-preservation contract holds, proven behaviorally (exact destination URL for a matrix token) natively in `ssr`, in addition to the pre-existing `release_gates.rs` source-literal pin. *(community/tests.rs `switch_destination_communities_token_family`)*
 - [x] Browser smoke verifies switching from Calendar, My Page, member management, and Create Event (each to both an admin and a member-only target where relevant), plus Event Detail falling back to Home with no event id preserved. *(scripts/smoke/community-switch-route-preservation.mjs; evidence `.git-exclude/evidence/rfc074/`)*
 
+## Locale seam gates (RFC-072 Slice A — not user-visible yet)
+
+The language setting is **not reachable from the UI** in this slice — no link
+exists anywhere to `/c/:cid/me/language`, and that page is not yet built (see
+the Slice A review request for why). Nothing below is a user-visible
+language-switching claim; it establishes the mechanism only.
+
+- [x] `Locale` parses exactly `ja`/`en` and rejects everything else (empty, wrong case, `ja-JP`/`en-US`, `jp`, whitespace); no unvalidated locale reaches a render path. *(packages/contracts/src/locale.rs + native tests)*
+- [x] The i18n accessor boundary (`i18n::Localized` + `i18n::t`) resolves a locale-aware pair to the correct language's string, compile-checked (not a runtime key lookup); migrating a page is a single mechanical substitution per string, with no per-call-site `match locale { ... }`. *(packages/contracts/src/i18n.rs + native tests)*
+- [x] `migrations/0011_membership_ui_language.sql` adds a nullable `ui_language` to `community_memberships` with a closed `CHECK('ja','en')` set; applied against a disposable local D1 and confirmed to reject an out-of-set value and accept `ja`/`en`; no existing row is written. *(migration + `rfc072_migration_0011_ui_language_check_is_closed` release gate)*
+- [x] Locale resolution (active membership preference, else Japanese) reads `ui_language` from the same membership lookup every localized page already performs — no additional D1 query. *(db/membership.rs `find_active` + authz.rs `require_membership`)*
+- [x] A stored value outside the allow-list falls back to Japanese at render time rather than panicking; a release gate asserts no `unwrap`/`expect` on the locale read path. *(authz.rs `resolve_locale` + native tests + `rfc072_locale_resolution_never_panics_on_a_bad_stored_value` release gate)*
+- [x] My Page is migrated to the accessor as the proof the seam works: `html lang` and every rendered string derive from the same resolved locale, in both languages. *(handlers/me.rs `get_me` + native tests for `html lang` and locale-selected labels)*
+- [x] No authorization, validation, or error-classification decision branches on locale anywhere in this slice — locale selects rendered text only. *(handlers/me.rs, authz.rs)*
+- [x] Existing i18n parity gate (254 EN/JA pairs) passes unchanged; none of the 254 existing pairs were modified. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [ ] The language settings page (`GET`/`POST /c/:cid/me/language`) — blocked on missing copy for this specific page; see the Slice A review request's escalation. Not routed, not linked, not built yet.
+
 ## Operational gates
 
 - [x] `GET /healthz` returns `{"ok":true,"ready":true,"service":"ciao.zinnias"}` only with a valid pepper and a generic not-ready `503` otherwise. Corrected exact-candidate hosted evidence also proves classified required-secret rejection, runtime-negative behavior, valid credential flows, secret-deletion failure behavior, bounded non-mutation, and strict teardown. *(RFC-077 criteria 8–9; architecture-reviewed and owner-accepted 2026-07-22; B2 closed.)*

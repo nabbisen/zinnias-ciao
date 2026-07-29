@@ -21,10 +21,13 @@ pub use errors::{
 };
 #[allow(unused_imports)]
 pub use event_card::{CardDay, event_card};
-pub use nav::{bottom_nav, header, header_with_switcher, header_with_switcher_next};
+pub use nav::{
+    bottom_nav, bottom_nav_localized, header, header_with_switcher, header_with_switcher_next,
+    header_with_switcher_next_localized,
+};
 pub use notes::{admin_note_hide_form, note_form};
 pub use participants::{ParticipantEntry, participant_list};
-pub use shell::{escape_html, page};
+pub use shell::{escape_html, page, page_localized};
 #[allow(unused_imports)]
 pub use status::{status_chip, status_display, status_form, status_triplet};
 pub use time::{

@@ -12,6 +12,7 @@ use worker::{Env, Result};
 
 use crate::db::membership as membership_db;
 use crate::session::AuthContext;
+use zinnias_ciao_contracts::Locale;
 
 pub struct MembershipContext {
     pub membership_id: String,
@@ -19,6 +20,12 @@ pub struct MembershipContext {
     pub user_id: String,
     pub role: String,
     pub display_name: String,
+    /// Resolved once here (RFC-072), never re-derived downstream: the
+    /// membership's stored preference if it parses, else Japanese. A
+    /// stored value outside the allow-list — never expected, but possible
+    /// via manual repair — falls back the same way as no preference at
+    /// all. Never panics on this path (SEC-5).
+    pub locale: Locale,
 }
 
 impl MembershipContext {
@@ -39,12 +46,15 @@ pub async fn require_membership(
         .await?
         .ok_or_else(|| worker::Error::RustError("Not found.".to_string()))?; // generic: no resource existence leak
 
+    let locale = resolve_locale(row.ui_language.as_deref());
+
     Ok(MembershipContext {
         membership_id: row.id,
         community_id: row.community_id,
         user_id: row.user_id,
         role: row.role,
         display_name: row.display_name,
+        locale,
     })
 }
 
@@ -79,5 +89,43 @@ pub async fn require_active_admin_somewhere(
         user_id: row.user_id,
         role: row.role,
         display_name: row.display_name,
+        locale: Locale::default(), // not a localized page; not resolved from this query
     })
+}
+
+/// RFC-072 locale resolution (Slice A): active membership preference, else
+/// Japanese. `stored` is the raw `ui_language` column value — `None` (no
+/// preference set) and `Some(value)` outside the allow-list (never
+/// expected from the `CHECK` constraint, but possible via manual repair)
+/// both resolve to the same safe fallback. Never panics: a bad stored
+/// value reaching a render path would be an SEC-5 violation.
+fn resolve_locale(stored: Option<&str>) -> Locale {
+    stored.and_then(Locale::parse).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_locale;
+    use zinnias_ciao_contracts::Locale;
+
+    #[test]
+    fn resolve_locale_uses_the_stored_preference_when_valid() {
+        assert_eq!(resolve_locale(Some("ja")), Locale::Ja);
+        assert_eq!(resolve_locale(Some("en")), Locale::En);
+    }
+
+    #[test]
+    fn resolve_locale_falls_back_to_japanese_when_absent() {
+        assert_eq!(resolve_locale(None), Locale::Ja);
+    }
+
+    #[test]
+    fn resolve_locale_falls_back_to_japanese_for_an_out_of_allow_list_value_without_panicking() {
+        // A value the CHECK constraint should have rejected on write, but
+        // that a defensive read path must still survive (e.g. a
+        // hand-repaired row, or a future schema slip).
+        for bad in ["fr", "EN", "", "ja-JP", "en-US", "null", "0"] {
+            assert_eq!(resolve_locale(Some(bad)), Locale::Ja, "stored={bad:?}");
+        }
+    }
 }

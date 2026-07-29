@@ -1,3 +1,5 @@
+use super::Localized;
+
 // ── Communities ───────────────────────────────────────────────────────────
 pub const EN_COMMUNITIES_JOIN_ANOTHER: &str = "Join another community";
 
@@ -40,3 +42,9 @@ pub const JA_COMMUNITY_CREATE_NAME_INVALID: &str = "コミュニティ名に使�
 pub const JA_COMMUNITY_CREATE_DISPLAY_NAME_ERROR: &str =
     "このコミュニティで使う名前を入力してください。";
 pub const JA_COMMUNITY_CREATE_TIMEZONE_ERROR: &str = "この時間帯はまだ選べません。";
+
+/// RFC-072 locale-aware pair; see `i18n::Localized`.
+pub const COMMUNITY_CREATE_LINK: Localized = Localized {
+    ja: JA_COMMUNITY_CREATE_LINK,
+    en: EN_COMMUNITY_CREATE_LINK,
+};

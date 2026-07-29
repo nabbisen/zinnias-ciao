@@ -1,3 +1,5 @@
+use super::Localized;
+
 pub const EN_CALENDAR_MONTH_TITLE: &str = "This month";
 pub const EN_CALENDAR_PREV_MONTH: &str = "Previous month";
 pub const EN_CALENDAR_NEXT_MONTH: &str = "Next month";
@@ -66,3 +68,9 @@ pub const JA_CALENDAR_REGENERATE: &str = "リンクを再作成";
 pub const JA_CALENDAR_PRIVACY_NOTE: &str = "このカレンダーリンクは、持っている人なら誰でもあなたのコミュニティの予定を見られます。公開しないでください。こちらで再発行または無効化できます。";
 pub const JA_CALENDAR_GENERATED_FLASH: &str = "カレンダーリンクを作成しました。";
 pub const JA_CALENDAR_REVOKED_FLASH: &str = "カレンダーリンクを無効化しました。";
+
+/// RFC-072 locale-aware pair; see `i18n::Localized`.
+pub const CALENDAR_TITLE: Localized = Localized {
+    ja: JA_CALENDAR_TITLE,
+    en: EN_CALENDAR_TITLE,
+};

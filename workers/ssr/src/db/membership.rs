@@ -12,9 +12,16 @@ pub struct MembershipRow {
     pub role: String,
     pub display_name: String,
     pub is_active: bool,
+    /// Raw stored value (RFC-072), unvalidated. `None` means no preference
+    /// set (including a pre-migration row); a value outside the `CHECK`
+    /// allow-list should not occur but is possible via manual repair —
+    /// callers must resolve this defensively, never trust it directly.
+    pub ui_language: Option<String>,
 }
 
-/// Find an active membership for the given user + community.
+/// Find an active membership for the given user + community. This is the
+/// query every localized page's membership lookup already performs; RFC-072
+/// reads `ui_language` from this same row rather than adding a second query.
 /// Returns `None` if absent or removed (`removed_at IS NOT NULL`).
 pub async fn find_active(
     db: &D1Database,
@@ -23,7 +30,7 @@ pub async fn find_active(
 ) -> Result<Option<MembershipRow>> {
     let row = db
         .prepare(
-            "SELECT id, community_id, user_id, role, display_name \
+            "SELECT id, community_id, user_id, role, display_name, ui_language \
              FROM community_memberships \
              WHERE user_id = ?1 AND community_id = ?2 AND removed_at IS NULL \
              LIMIT 1",
@@ -40,6 +47,10 @@ pub async fn find_active(
             role: v.get("role")?.as_str()?.to_owned(),
             display_name: v.get("display_name")?.as_str()?.to_owned(),
             is_active: true,
+            ui_language: v
+                .get("ui_language")
+                .and_then(|value| value.as_str())
+                .map(str::to_owned),
         })
     }))
 }
@@ -70,6 +81,7 @@ pub async fn find_active_by_id(
             role: v.get("role")?.as_str()?.to_owned(),
             display_name: v.get("display_name")?.as_str()?.to_owned(),
             is_active: true,
+            ui_language: None, // not selected by this query; not locale-resolved
         })
     }))
 }
@@ -98,6 +110,7 @@ pub async fn list_active_for_user(db: &D1Database, user_id: &str) -> Result<Vec<
                 role: v.get("role")?.as_str()?.to_owned(),
                 display_name: v.get("display_name")?.as_str()?.to_owned(),
                 is_active: true,
+                ui_language: None, // not selected by this query; not locale-resolved
             })
         })
         .collect())
@@ -128,6 +141,7 @@ pub async fn find_first_admin_for_user(
             role: v.get("role")?.as_str()?.to_owned(),
             display_name: v.get("display_name")?.as_str()?.to_owned(),
             is_active: true,
+            ui_language: None, // not selected by this query; not locale-resolved
         })
     }))
 }

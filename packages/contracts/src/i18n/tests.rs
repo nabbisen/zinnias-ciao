@@ -226,3 +226,18 @@ fn en_ja_parity() {
         assert!(!key.is_empty(), "empty key: {key}");
     }
 }
+
+// RFC-072: the i18n accessor boundary. `t` must resolve each `Localized`
+// pair to the correct language's string with no per-call-site match.
+#[test]
+fn t_resolves_locale_aware_pairs() {
+    use super::{ME_SECTION_NAME, NAV_ME, ROLE_ADMIN, t};
+    use crate::locale::Locale;
+
+    assert_eq!(t(Locale::Ja, NAV_ME), super::JA_NAV_ME);
+    assert_eq!(t(Locale::En, NAV_ME), super::EN_NAV_ME);
+    assert_eq!(t(Locale::Ja, ME_SECTION_NAME), super::JA_ME_SECTION_NAME);
+    assert_eq!(t(Locale::En, ME_SECTION_NAME), super::EN_ME_SECTION_NAME);
+    assert_eq!(t(Locale::Ja, ROLE_ADMIN), super::JA_ROLE_ADMIN);
+    assert_eq!(t(Locale::En, ROLE_ADMIN), super::EN_ROLE_ADMIN);
+}

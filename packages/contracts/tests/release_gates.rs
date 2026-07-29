@@ -679,6 +679,8 @@ const ICS_SRC: &str = include_str!("../../../packages/contracts/src/ics.rs");
 const WRANGLER_TOML_SRC: &str = include_str!("../../../wrangler.toml");
 const GITIGNORE_SRC: &str = include_str!("../../../.gitignore");
 const MIGRATION_0009_SRC: &str = include_str!("../../../migrations/0009_recurrence_v2.sql");
+const MIGRATION_0011_SRC: &str =
+    include_str!("../../../migrations/0011_membership_ui_language.sql");
 const EVENT_SERIES_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event_series.rs");
 const EVENT_ADMIN_DOMAIN_SRC: &str = include_str!("../../../packages/domain/src/event_admin.rs");
 const CRYPTO_SRC: &str = include_str!("../../../workers/ssr/src/crypto.rs");
@@ -1512,8 +1514,8 @@ fn rfc061_member_management_is_discoverable_from_admin_workflows() {
         "RFC-061 Home admin shortcut must lead to member management, not directly to invite codes"
     );
     assert!(
-        ME_HANDLER_SRC.contains("JA_ME_SECTION_ADMIN")
-            && ME_HANDLER_SRC.contains("JA_ME_MANAGE_MEMBERS")
+        ME_HANDLER_SRC.contains("i18n::ME_SECTION_ADMIN") // RFC-072 locale-aware accessor
+            && ME_HANDLER_SRC.contains("i18n::ME_MANAGE_MEMBERS") // RFC-072 locale-aware accessor
             && ME_HANDLER_SRC.contains("/c/{cid}/admin/members")
             && ME_HANDLER_SRC.contains("/c/{cid}/admin/export"),
         "RFC-061 Me page must expose admin tools with member management and export"
@@ -1978,7 +1980,7 @@ fn rfc057_creation_writes_only_community_membership_and_audit() {
 #[test]
 fn rfc057_me_entry_and_feature_flag_defaults_are_reviewed() {
     assert!(
-        ME_HANDLER_SRC.contains("JA_COMMUNITY_CREATE_LINK")
+        ME_HANDLER_SRC.contains("i18n::COMMUNITY_CREATE_LINK") // RFC-072 locale-aware accessor
             && ME_HANDLER_SRC.contains("/communities/new")
             && ME_HANDLER_SRC.contains("find_first_admin_for_user")
             && ME_HANDLER_SRC.contains("community_creation_enabled"),
@@ -2007,8 +2009,8 @@ fn rfc070_self_display_name_editing_routes_are_member_scoped() {
         "RFC-070 display-name editing must require active membership, not admin role"
     );
     assert!(
-        ME_HANDLER_SRC.contains("JA_ME_CHANGE_DISPLAY_NAME")
-            && ME_HANDLER_SRC.contains("JA_ME_DISPLAY_NAME_UPDATED")
+        ME_HANDLER_SRC.contains("i18n::ME_CHANGE_DISPLAY_NAME") // RFC-072 locale-aware accessor
+            && ME_HANDLER_SRC.contains("i18n::ME_DISPLAY_NAME_UPDATED") // RFC-072 locale-aware accessor
             && ME_HANDLER_SRC.contains("?flash={DISPLAY_NAME_UPDATED_REF}"),
         "RFC-070 Me page must expose the edit link and fixed-code success feedback"
     );
@@ -2159,7 +2161,7 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
     );
     assert!(
         RENDER_SRC.contains("<button type='submit'")
-            && RENDER_SRC.contains("JA_NAV_SWITCH_GO")
+            && RENDER_SRC.contains("i18n::t(locale, i18n::NAV_SWITCH_GO)") // RFC-072 locale-aware accessor
             && !RENDER_SRC.contains("<noscript><button type='submit'"),
         "Community switcher must have a visible submit fallback, not only a noscript-only button"
     );
@@ -2390,6 +2392,43 @@ fn rfc074_fallback_family_pages_stay_on_default_switcher() {
             "{name} must stay on the default switcher and fall back to target Home; RFC-074's route-family matrix does not assign it a next token"
         );
     }
+}
+
+#[test]
+fn rfc072_locale_resolution_never_panics_on_a_bad_stored_value() {
+    assert!(
+        AUTHZ_SRC.contains("fn resolve_locale")
+            && AUTHZ_SRC.contains("Locale::parse")
+            && AUTHZ_SRC.contains("unwrap_or_default()"),
+        "RFC-072 locale resolution must parse-or-fall-back, not assume a valid stored value"
+    );
+    let resolve_locale_fn = AUTHZ_SRC
+        .split("fn resolve_locale")
+        .nth(1)
+        .and_then(|rest| rest.split("\n}\n").next())
+        .expect("resolve_locale function body must be present");
+    assert!(
+        !resolve_locale_fn.contains(".unwrap()") && !resolve_locale_fn.contains(".expect("),
+        "RFC-072 locale resolution must not unwrap/expect on the locale read path — a panic in a render path is an SEC-5 violation"
+    );
+}
+
+#[test]
+fn rfc072_migration_0011_ui_language_check_is_closed() {
+    assert!(
+        MIGRATION_0011_SRC.contains("ALTER TABLE community_memberships")
+            && MIGRATION_0011_SRC.contains("ADD COLUMN ui_language TEXT"),
+        "RFC-072 migration 0011 must add a nullable ui_language column to community_memberships"
+    );
+    assert!(
+        MIGRATION_0011_SRC.contains("CHECK(ui_language IN ('ja', 'en') OR ui_language IS NULL)"),
+        "RFC-072 migration 0011's CHECK set must stay exactly {{'ja', 'en', NULL}} — closed, no third value, no backfill"
+    );
+    assert!(
+        !MIGRATION_0011_SRC.to_ascii_uppercase().contains("UPDATE ")
+            && !MIGRATION_0011_SRC.to_ascii_uppercase().contains("DEFAULT"),
+        "RFC-072 migration 0011 must not backfill or default any existing row — NULL means Japanese fallback"
+    );
 }
 
 #[test]
@@ -3906,6 +3945,7 @@ fn rfc079_package7_removal_and_documentation_boundary_are_pinned() {
         "0008_membership_relink_codes.sql",
         "0009_recurrence_v2.sql",
         "0010_audit_integrity.sql",
+        "0011_membership_ui_language.sql",
     ];
     assert_eq!(
         migration_filenames, expected_migration_filenames,

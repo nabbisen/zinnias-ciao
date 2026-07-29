@@ -1,3 +1,5 @@
+use super::Localized;
+
 // ── Session / auth ────────────────────────────────────────────────────────
 pub const EN_SESSION_EXPIRED: &str =
     "Your session expired. Use an invite code or a sign-in-again code from your community admin.";
@@ -7,6 +9,12 @@ pub const EN_LOGOUT_CONFIRM: &str = "Log out?";
 pub const JA_SESSION_EXPIRED: &str = "時間がたったため、もう一度入る必要があります。管理者から受け取った招待コード、またはサインインし直すためのコードを使ってください。";
 pub const JA_LOGOUT: &str = "ログアウト";
 pub const JA_LOGOUT_CONFIRM: &str = "ログアウトしますか？";
+
+/// RFC-072 locale-aware pair; see `i18n::Localized`.
+pub const LOGOUT: Localized = Localized {
+    ja: JA_LOGOUT,
+    en: EN_LOGOUT,
+};
 
 // ── General ───────────────────────────────────────────────────────────────
 pub const EN_GENERAL_ERROR: &str = "Something went wrong. Please try again.";
@@ -51,12 +59,40 @@ pub const JA_NAV_BACK: &str = "イベントに戻る";
 pub const EN_NAV_SWITCH_GO: &str = "Switch";
 pub const JA_NAV_SWITCH_GO: &str = "切り替え";
 
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const NAV_HOME: Localized = Localized {
+    ja: JA_NAV_HOME,
+    en: EN_NAV_HOME,
+};
+pub const NAV_COMMUNITIES: Localized = Localized {
+    ja: JA_NAV_COMMUNITIES,
+    en: EN_NAV_COMMUNITIES,
+};
+pub const NAV_ME: Localized = Localized {
+    ja: JA_NAV_ME,
+    en: EN_NAV_ME,
+};
+pub const NAV_SWITCH_GO: Localized = Localized {
+    ja: JA_NAV_SWITCH_GO,
+    en: EN_NAV_SWITCH_GO,
+};
+
 // ── Role labels ───────────────────────────────────────────────────────────
 pub const EN_ROLE_ADMIN: &str = "Admin";
 pub const EN_ROLE_MEMBER: &str = "Member";
 
 pub const JA_ROLE_ADMIN: &str = "管理者";
 pub const JA_ROLE_MEMBER: &str = "メンバー";
+
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const ROLE_ADMIN: Localized = Localized {
+    ja: JA_ROLE_ADMIN,
+    en: EN_ROLE_ADMIN,
+};
+pub const ROLE_MEMBER: Localized = Localized {
+    ja: JA_ROLE_MEMBER,
+    en: EN_ROLE_MEMBER,
+};
 
 // ── Shared badges ────────────────────────────────────────────────────────
 pub const EN_CURRENT_BADGE: &str = "Current";

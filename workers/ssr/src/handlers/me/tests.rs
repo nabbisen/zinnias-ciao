@@ -2,13 +2,25 @@ use super::*;
 
 #[test]
 fn me_flash_message_uses_fixed_success_code() {
+    use zinnias_ciao_contracts::Locale;
+
     assert_eq!(
-        me_flash_message(Some("display_name_updated")),
+        me_flash_message(Locale::Ja, Some("display_name_updated")),
         Some(i18n::JA_ME_DISPLAY_NAME_UPDATED)
     );
-    assert_eq!(me_flash_message(Some("名前を変更しました")), None);
-    assert_eq!(me_flash_message(Some("<script>alert(1)</script>")), None);
-    assert_eq!(me_flash_message(None), None);
+    assert_eq!(
+        me_flash_message(Locale::En, Some("display_name_updated")),
+        Some(i18n::EN_ME_DISPLAY_NAME_UPDATED)
+    );
+    assert_eq!(
+        me_flash_message(Locale::Ja, Some("名前を変更しました")),
+        None
+    );
+    assert_eq!(
+        me_flash_message(Locale::Ja, Some("<script>alert(1)</script>")),
+        None
+    );
+    assert_eq!(me_flash_message(Locale::Ja, None), None);
 }
 
 #[test]
@@ -66,5 +78,6 @@ fn test_membership() -> crate::authz::MembershipContext {
         user_id: "usr_test".to_owned(),
         role: "member".to_owned(),
         display_name: "Member".to_owned(),
+        locale: zinnias_ciao_contracts::Locale::Ja,
     }
 }

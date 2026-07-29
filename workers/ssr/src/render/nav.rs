@@ -1,8 +1,15 @@
 use super::shell::escape_html;
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::i18n;
 
-/// Bottom tab navigation (Home | Communities | Me).
+/// Bottom tab navigation (Home | Communities | Me). Non-migrated pages:
+/// always Japanese labels. Behavior unchanged by RFC-072.
 pub fn bottom_nav(community_id: &str, active: &str) -> String {
+    bottom_nav_localized(community_id, active, Locale::Ja)
+}
+
+/// Bottom tab navigation with locale-selected labels (RFC-072).
+pub fn bottom_nav_localized(community_id: &str, active: &str, locale: Locale) -> String {
     let tab = |label: &str, href: &str, id: &str| -> String {
         let aria = if id == active {
             " aria-current=\"page\""
@@ -28,16 +35,20 @@ pub fn bottom_nav(community_id: &str, active: &str) -> String {
          {home}{communities}{me}\
          </nav>",
         home = tab(
-            i18n::JA_NAV_HOME,
+            i18n::t(locale, i18n::NAV_HOME),
             &format!("/c/{community_id}/home"),
             "home"
         ),
         communities = tab(
-            i18n::JA_NAV_COMMUNITIES,
+            i18n::t(locale, i18n::NAV_COMMUNITIES),
             &format!("/c/{community_id}/communities"),
             "communities"
         ),
-        me = tab(i18n::JA_NAV_ME, &format!("/c/{community_id}/me"), "me"),
+        me = tab(
+            i18n::t(locale, i18n::NAV_ME),
+            &format!("/c/{community_id}/me"),
+            "me"
+        ),
     )
 }
 
@@ -63,11 +74,28 @@ pub fn header_with_switcher(
     header_with_switcher_next(title, current_community_id, communities, "home")
 }
 
+/// Non-migrated pages: always the Japanese "Switch" button label. Behavior
+/// unchanged by RFC-072; migrated pages call
+/// [`header_with_switcher_next_localized`] instead.
 pub fn header_with_switcher_next(
     title: &str,
     current_community_id: &str,
     communities: &[(impl AsRef<str>, impl AsRef<str>)],
     next: &str,
+) -> String {
+    header_with_switcher_next_localized(title, current_community_id, communities, next, Locale::Ja)
+}
+
+/// Header with a community switcher, with the switch button's own label
+/// locale-selected (RFC-072). `title` must already be the string resolved
+/// for `locale`; community names in `communities` are user data, not app
+/// copy, and are never localized.
+pub fn header_with_switcher_next_localized(
+    title: &str,
+    current_community_id: &str,
+    communities: &[(impl AsRef<str>, impl AsRef<str>)],
+    next: &str,
+    locale: Locale,
 ) -> String {
     let title_s = escape_html(title);
 
@@ -108,7 +136,7 @@ pub fn header_with_switcher_next(
     h.push_str("margin-left:.25rem;min-height:44px;cursor:pointer;");
     h.push_str("background:#F5F5F7;color:#1D1D1F;border:1px solid #D1D1D6;");
     h.push_str("border-radius:8px;padding:.25rem .5rem'>");
-    h.push_str(i18n::JA_NAV_SWITCH_GO);
+    h.push_str(i18n::t(locale, i18n::NAV_SWITCH_GO));
     h.push_str("</button>");
     h.push_str("</form>");
     h.push_str("</header>");

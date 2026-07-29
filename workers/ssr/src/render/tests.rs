@@ -1,7 +1,74 @@
 use super::participants::initials;
-use super::shell::escape_html;
+use super::shell::{escape_html, shell_with_lang};
 use super::status::status_display;
 use super::time::{parse_utc_display, parse_utc_time};
+
+// RFC-072: `html lang` must derive from the same locale passed to the
+// shell — tested directly here for the same reason `title_escaped_in_shell`
+// tests `escape_html` directly: `page`/`page_localized` wrap a
+// `worker::Response` and cannot be constructed in a native test
+// environment.
+#[test]
+fn shell_lang_matches_the_locale_code_passed_in() {
+    use zinnias_ciao_contracts::Locale;
+
+    let ja = shell_with_lang(Locale::Ja.code(), "Title", "<p>Body</p>");
+    assert!(ja.contains("<html lang=\"ja\">"));
+    assert!(!ja.contains("<html lang=\"en\">"));
+
+    let en = shell_with_lang(Locale::En.code(), "Title", "<p>Body</p>");
+    assert!(en.contains("<html lang=\"en\">"));
+    assert!(!en.contains("<html lang=\"ja\">"));
+}
+
+#[test]
+fn bottom_nav_localized_labels_switch_with_locale() {
+    use zinnias_ciao_contracts::{Locale, i18n};
+
+    let ja = super::bottom_nav_localized("community-a", "me", Locale::Ja);
+    assert!(ja.contains(i18n::JA_NAV_HOME));
+    assert!(ja.contains(i18n::JA_NAV_ME));
+    assert!(!ja.contains(i18n::EN_NAV_HOME));
+
+    let en = super::bottom_nav_localized("community-a", "me", Locale::En);
+    assert!(en.contains(i18n::EN_NAV_HOME));
+    assert!(en.contains(i18n::EN_NAV_ME));
+    assert!(!en.contains(i18n::JA_NAV_HOME));
+}
+
+#[test]
+fn header_with_switcher_next_localized_switch_button_follows_locale() {
+    use zinnias_ciao_contracts::{Locale, i18n};
+
+    let communities: Vec<(String, String)> = vec![("community-a".to_string(), "A".to_string())];
+
+    // Checked as the exact button text (`>label</button>`), not a bare
+    // substring: the switcher's `<select>` carries a pre-existing,
+    // English-only `aria-label='Switch community'` unrelated to RFC-072
+    // (it predates the locale seam and is out of this slice's scope — see
+    // the review request), and `EN_NAV_SWITCH_GO` ("Switch") is itself a
+    // substring of that aria-label, which would false-positive a bare
+    // `.contains` check on the Japanese render too.
+    let ja = super::header_with_switcher_next_localized(
+        "Title",
+        "community-a",
+        &communities,
+        "me",
+        Locale::Ja,
+    );
+    assert!(ja.contains(&format!(">{}</button>", i18n::JA_NAV_SWITCH_GO)));
+    assert!(!ja.contains(&format!(">{}</button>", i18n::EN_NAV_SWITCH_GO)));
+
+    let en = super::header_with_switcher_next_localized(
+        "Title",
+        "community-a",
+        &communities,
+        "me",
+        Locale::En,
+    );
+    assert!(en.contains(&format!(">{}</button>", i18n::EN_NAV_SWITCH_GO)));
+    assert!(!en.contains(&format!(">{}</button>", i18n::JA_NAV_SWITCH_GO)));
+}
 
 #[test]
 fn escape_script_tag() {
