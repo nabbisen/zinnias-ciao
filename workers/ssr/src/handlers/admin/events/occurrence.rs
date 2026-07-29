@@ -83,7 +83,7 @@ pub async fn post_cancel_occurrence(
         Some(day_id),
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
     let _event = match event_db::find_for_community(&db, event_id, community_id).await? {

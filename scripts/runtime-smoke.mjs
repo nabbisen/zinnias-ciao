@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { buildCandidateTuple, createManifest, MANIFEST_FILENAME } from './lib/evidence-manifest.mjs';
 
 const args = process.argv.slice(2);
 const rawBaseUrl = argValue('--base-url') ?? args.find((arg) => !arg.startsWith('--'));
@@ -15,6 +17,40 @@ const outDir = process.env.EVIDENCE_DIR ?? '.git-exclude/evidence/rfc050-prototy
 const chromium = process.env.CHROMIUM ?? '/usr/bin/chromium';
 const remotePort = Number(process.env.CHROME_REMOTE_PORT ?? 9250);
 const userDataDir = `.git-exclude/tmp/chrome-rfc050-runtime-sandboxed-${Date.now()}`;
+
+// Exact-candidate identity (RFC-050 Tooling Slice 3). Providing every one of
+// these five inputs switches the run into authoritative/hosted mode, which
+// requires `/version`'s reported Worker version id/tag to match exactly.
+// Providing none of them keeps the prototype's original, non-authoritative
+// local behavior. Providing some but not all is refused as ambiguous.
+const expectedCommit = argValue('--expected-commit') ?? process.env.EXPECTED_COMMIT;
+const candidateLabel = argValue('--candidate-label') ?? process.env.CANDIDATE_LABEL;
+const expectedWorkerVersionId = argValue('--expected-worker-version-id') ?? process.env.EXPECTED_WORKER_VERSION_ID;
+const expectedWorkerVersionTag = argValue('--expected-worker-version-tag') ?? process.env.EXPECTED_WORKER_VERSION_TAG;
+const candidateDeployment = argValue('--deployment') ?? process.env.DEPLOYMENT;
+
+const identityInputs = {
+  commit: expectedCommit,
+  label: candidateLabel,
+  workerVersionId: expectedWorkerVersionId,
+  workerVersionTag: expectedWorkerVersionTag,
+  deployment: candidateDeployment,
+};
+const identityInputsProvided = Object.values(identityInputs).filter(Boolean).length;
+if (identityInputsProvided > 0 && identityInputsProvided < 5) {
+  console.error(
+    'Usage: exact-identity (hosted) mode requires ALL of --expected-commit, --candidate-label, '
+    + '--expected-worker-version-id, --expected-worker-version-tag, --deployment (or their '
+    + 'EXPECTED_COMMIT/CANDIDATE_LABEL/EXPECTED_WORKER_VERSION_ID/EXPECTED_WORKER_VERSION_TAG/DEPLOYMENT '
+    + 'env vars). Provide all five for hosted mode, or none for local non-authoritative mode.',
+  );
+  process.exit(2);
+}
+const authoritative = identityInputsProvided === 5;
+
+const toolVersion = JSON.parse(
+  await readFile(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
+).version;
 
 await mkdir(outDir, { recursive: true });
 await rm(userDataDir, { recursive: true, force: true });
@@ -295,6 +331,7 @@ try {
       json: version.json,
       expectedVersion,
       cacheControl: version.cacheControl,
+      authoritative,
     },
     checks: {
       status: version.status === 200,
@@ -302,6 +339,16 @@ try {
       version: version.json?.version === expectedVersion,
       noStore: version.cacheControl?.includes('no-store'),
       securityHeaders: hasSecurityHeaders(version),
+      // Only present (and only able to fail) in authoritative/hosted mode.
+      // In local/non-authoritative mode there is no exact identity to
+      // require, so these are omitted rather than reported as trivially
+      // passing — an omitted check cannot be mistaken for a proven one.
+      ...(authoritative
+        ? {
+          workerVersionIdMatchesCandidate: version.json?.worker_version_id === expectedWorkerVersionId,
+          workerVersionTagMatchesCandidate: version.json?.worker_version_tag === expectedWorkerVersionTag,
+        }
+        : {}),
     },
   });
 
@@ -429,10 +476,17 @@ try {
     result.passed = allChecksPass(result.checks);
   }
 
+  const nonAuthoritativeWarning = 'LOCAL RUN — NOT AUTHORITATIVE — this record must never be treated as '
+    + 'RFC-050 B4 evidence; no exact Worker version identity was required or confirmed.';
+
   const report = {
     generatedAt: new Date().toISOString(),
     baseUrl: baseUrl.toString(),
     expectedVersion,
+    authoritative,
+    ...(authoritative
+      ? { candidate: { commit: expectedCommit, label: candidateLabel, workerVersionId: expectedWorkerVersionId, workerVersionTag: expectedWorkerVersionTag, deployment: candidateDeployment } }
+      : { warning: nonAuthoritativeWarning }),
     chromium,
     userDataDir,
     chromeFlags: flags,
@@ -455,8 +509,28 @@ try {
     `${outDir}/rfc050-runtime-smoke-results.json`,
     JSON.stringify(report, null, 2),
   );
+
+  if (authoritative) {
+    const candidate = buildCandidateTuple({
+      commit: expectedCommit,
+      label: candidateLabel,
+      workerVersionId: expectedWorkerVersionId,
+      workerVersionTag: expectedWorkerVersionTag,
+      deployment: candidateDeployment,
+    });
+    const manifest = createManifest({
+      candidate,
+      generatedAt: report.generatedAt,
+      tool: 'runtime-smoke.mjs',
+      toolVersion,
+    });
+    await writeFile(`${outDir}/${MANIFEST_FILENAME}`, `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+
   console.log(JSON.stringify({
     passed: report.passed,
+    authoritative,
+    ...(authoritative ? {} : { warning: nonAuthoritativeWarning }),
     evidence: `${outDir}/rfc050-runtime-smoke-results.json`,
     routeResults: routeResults.map((result) => ({
       name: result.name,

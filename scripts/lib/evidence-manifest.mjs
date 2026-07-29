@@ -7,6 +7,8 @@
 // evidence solely when the same tooling runs against a frozen hosted
 // candidate (RFC-050 Tooling Slice 3 onward).
 
+import { createHash } from 'node:crypto';
+
 export const MANIFEST_SCHEMA_VERSION = 1;
 export const MANIFEST_FILENAME = '00-manifest.json';
 export const LOCAL_GATES_FILENAME = '01-local-gates.json';
@@ -20,7 +22,7 @@ export class EvidenceRedactionError extends Error {
   }
 }
 
-class EvidenceSchemaError extends Error {}
+export class EvidenceSchemaError extends Error {}
 
 // Fields whose value is required to be hex-shaped for a legitimate reason
 // (a git commit sha, a namespaced artifact hash). Every other bare hex string
@@ -29,10 +31,6 @@ class EvidenceSchemaError extends Error {}
 // secrets, subject digests, and Durable Object ids are all bare lowercase hex.
 const ARTIFACT_HASH_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const COMMIT_PATTERN = /^[0-9a-f]{7,40}$/i;
-const HEX_FIELD_EXEMPTIONS = new Map([
-  ['artifactHash', ARTIFACT_HASH_PATTERN],
-  ['commit', COMMIT_PATTERN],
-]);
 
 // Digest/token/secret/Durable-Object-id lengths this project actually
 // produces: sha1/DO-id-adjacent (40), sha256/HMAC token (64, this project's
@@ -60,20 +58,72 @@ const SQL_KEYWORD_PATTERN = /\b(SELECT\b[\s\S]{0,200}?\bFROM\b|INSERT\s+INTO\b|U
 const D1_ERROR_PATTERN = /D1_ERROR/;
 const COOKIE_SHAPED_VALUE_PATTERN = /ciao_sid\s*=/i;
 
-function fieldNameFromPath(path) {
-  const match = /\.?([^.[\]]+)$/.exec(path);
-  return match ? match[1] : path;
+// Path-scoped, not name-scoped (S-N2 from the Slices 1+2 review): a nested
+// field that merely happens to be named "commit" elsewhere does not inherit
+// the exemption, only the real candidate-tuple/record positions do.
+const HEX_FIELD_PATH_EXEMPTIONS = [
+  { pattern: /\.candidate\.commit$/, valuePattern: COMMIT_PATTERN, name: 'commit' },
+  { pattern: /\.artifactHash$/, valuePattern: ARTIFACT_HASH_PATTERN, name: 'artifactHash' },
+];
+
+// Run-scoped value registry (S-N1 from the Slices 1+2 review). A synthetic
+// invite code, display name, or note body is shape-indistinguishable from
+// ordinary prose, so no pattern rule can catch it inside a free-text field
+// like `observed` without false-positiving on legitimate descriptions. A
+// harness that generates such a value registers it for the run; any string
+// containing a registered value is rejected by exact-match containment,
+// which is mechanical and has no false-positive mode.
+const registeredRunSecrets = new Set();
+
+// S3-N2 from the Slices 3+4 review: a registered value shorter than this
+// would reject unrelated prose (e.g. registering "ok" breaks any record
+// containing that word). Failing closed here is deliberate — the caller
+// must pick a longer, specific fixture value rather than have the registry
+// silently skip or truncate a short one.
+const MIN_REGISTERED_SECRET_LENGTH = 4;
+
+export function registerRunSecrets(values) {
+  for (const value of values) {
+    if (typeof value !== 'string' || value.length === 0) {
+      throw new EvidenceSchemaError('registerRunSecrets values must be non-empty strings');
+    }
+    if (value.length < MIN_REGISTERED_SECRET_LENGTH) {
+      throw new EvidenceSchemaError(
+        `registerRunSecrets value "${value}" is shorter than ${MIN_REGISTERED_SECRET_LENGTH} characters; `
+        + 'a short value would match unrelated prose and reject unrelated records — use a longer, specific fixture value',
+      );
+    }
+    registeredRunSecrets.add(value);
+  }
+}
+
+export function clearRegisteredRunSecrets() {
+  registeredRunSecrets.clear();
 }
 
 function checkStringValue(value, path) {
-  const field = fieldNameFromPath(path);
-  const exemption = HEX_FIELD_EXEMPTIONS.get(field);
-  if (exemption) {
-    if (!exemption.test(value)) {
+  // Case-insensitive (S3-N1 from the Slices 3+4 review): the application
+  // itself accepts invite codes case-insensitively, so a collector may
+  // legitimately hold or record a code in a different case than it was
+  // generated in. Matching case-sensitively would let that case variant
+  // silently defeat the registry.
+  const lowerValue = value.toLowerCase();
+  for (const secret of registeredRunSecrets) {
+    if (lowerValue.includes(secret.toLowerCase())) {
+      throw new EvidenceRedactionError(
+        'registered_run_secret',
+        path,
+        `value at ${path} contains a registered run-scoped value (never the value itself, only its presence)`,
+      );
+    }
+  }
+  const hexExemption = HEX_FIELD_PATH_EXEMPTIONS.find((entry) => entry.pattern.test(path));
+  if (hexExemption) {
+    if (!hexExemption.valuePattern.test(value)) {
       throw new EvidenceRedactionError(
         'malformed_exempt_field',
         path,
-        `"${field}" at ${path} does not match its required shape`,
+        `"${hexExemption.name}" at ${path} does not match its required shape`,
       );
     }
   } else if (HEX_ONLY_PATTERN.test(value) && HEX_SECRET_LENGTHS.has(value.length)) {
@@ -108,10 +158,12 @@ function isHarShaped(value) {
 // Mechanically rejects every forbidden content class from the RFC-050 local
 // tooling handoff: credentials, cookies, form tokens, the pepper, raw or
 // hashed secrets, subject identifiers, digests, Durable Object names/ids, raw
-// resource ids, SQL, binds, D1 error bodies, and HAR files. "Business
-// content" is rejected structurally: callers only reach this function through
-// `createEvidenceRecord`/`parseManifestRecords`, whose closed schema has no
-// field business content could ride in on.
+// resource ids, SQL, binds, D1 error bodies, and HAR files. Undeclared fields
+// (a place business content could otherwise ride in on) are rejected by the
+// closed-schema checks every builder/parser below runs before calling this.
+// A *declared* free-text field's value (e.g. `observed`) is covered by the
+// run-scoped registry above, not by pattern matching — see
+// `registerRunSecrets`.
 export function assertRedacted(value, path = '$') {
   if (value === null || value === undefined) return;
   if (typeof value === 'string') {
@@ -139,20 +191,75 @@ export function assertRedacted(value, path = '$') {
 
 const CANDIDATE_FIELDS = ['commit', 'label', 'workerVersionId', 'workerVersionTag', 'deployment'];
 
+// Shared closed-schema check used by every builder and its parse-side
+// counterpart (S-N3 from the Slices 1+2 review), so construction and parsing
+// can never silently drift apart on which fields are allowed.
+function assertClosedSchema(raw, requiredFields, kind) {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new EvidenceSchemaError(`${kind} must be an object`);
+  }
+  // `raw[field] === undefined` (not `!(field in raw)`) so an object built by
+  // destructuring an incomplete input — which keeps the key with an explicit
+  // `undefined` value — is still caught as missing, not just true absence.
+  const missing = requiredFields.filter((field) => raw[field] === undefined);
+  if (missing.length > 0) {
+    throw new EvidenceSchemaError(`${kind} missing required field(s): ${missing.join(', ')}`);
+  }
+  const extra = Object.keys(raw).filter((key) => !requiredFields.includes(key));
+  if (extra.length > 0) {
+    throw new EvidenceSchemaError(
+      `${kind} has undeclared field(s): ${extra.join(', ')} `
+      + '(closed schema — unlisted fields, including business content, are rejected)',
+    );
+  }
+}
+
+function assertCandidateShape(raw) {
+  assertClosedSchema(raw, CANDIDATE_FIELDS, 'candidate tuple');
+  for (const field of CANDIDATE_FIELDS) {
+    if (typeof raw[field] !== 'string' || raw[field].length === 0) {
+      throw new EvidenceSchemaError(`candidate tuple field "${field}" must be a non-empty string`);
+    }
+  }
+  if (!COMMIT_PATTERN.test(raw.commit)) {
+    throw new EvidenceSchemaError('candidate tuple "commit" must be a hex git commit sha (short or full)');
+  }
+}
+
 // The exact-candidate identity every evidence record is scoped to (RFC-050's
 // "pin evidence to an immutable Worker version" requirement).
 export function buildCandidateTuple({ commit, label, workerVersionId, workerVersionTag, deployment }) {
-  const values = { commit, label, workerVersionId, workerVersionTag, deployment };
-  const missing = CANDIDATE_FIELDS.filter((field) => typeof values[field] !== 'string' || values[field].length === 0);
-  if (missing.length > 0) {
-    throw new EvidenceSchemaError(`candidate tuple missing required field(s): ${missing.join(', ')}`);
-  }
-  if (!COMMIT_PATTERN.test(commit)) {
-    throw new EvidenceSchemaError('candidate tuple "commit" must be a hex git commit sha (short or full)');
-  }
-  const tuple = Object.freeze({ commit, label, workerVersionId, workerVersionTag, deployment });
-  assertRedacted(tuple, '$.candidate');
-  return tuple;
+  const tuple = { commit, label, workerVersionId, workerVersionTag, deployment };
+  assertCandidateShape(tuple);
+  const frozen = Object.freeze(tuple);
+  assertRedacted(frozen, '$.candidate');
+  return frozen;
+}
+
+// Shared local-only placeholder convention (S3-N3 from the Slices 3+4
+// review), so every local-only collector (S4 onward) spells "this record
+// has no real candidate identity" identically instead of each slice
+// inventing its own literal. Pair with `localObserved` below on every
+// `observed` string for the same reason.
+export const LOCAL_CANDIDATE_PLACEHOLDER = 'local';
+export const LOCAL_CANDIDATE_LABEL_SUFFIX = '-non-authoritative';
+export const LOCAL_OBSERVED_PREFIX = '[local, non-authoritative] ';
+
+export function buildLocalCandidateTuple({ commit, label }) {
+  const normalizedLabel = label.endsWith(LOCAL_CANDIDATE_LABEL_SUFFIX)
+    ? label
+    : `${label}${LOCAL_CANDIDATE_LABEL_SUFFIX}`;
+  return buildCandidateTuple({
+    commit,
+    label: normalizedLabel,
+    workerVersionId: LOCAL_CANDIDATE_PLACEHOLDER,
+    workerVersionTag: LOCAL_CANDIDATE_PLACEHOLDER,
+    deployment: LOCAL_CANDIDATE_PLACEHOLDER,
+  });
+}
+
+export function localObserved(text) {
+  return `${LOCAL_OBSERVED_PREFIX}${text}`;
 }
 
 const ISO_UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
@@ -262,9 +369,22 @@ export function createExternalStateSnapshot({ candidate, collectedAt, label, tab
   return snapshot;
 }
 
+function assertIsExternalStateSnapshot(snapshot, label) {
+  if (
+    snapshot === null || typeof snapshot !== 'object'
+    || snapshot.tables === null || typeof snapshot.tables !== 'object' || Array.isArray(snapshot.tables)
+  ) {
+    throw new EvidenceSchemaError(
+      `diffExternalStateSnapshots "${label}" must be an external-state snapshot object with a "tables" object`,
+    );
+  }
+}
+
 // Row-count-only diff between two snapshots, for later postcondition checks
 // (RFC-050 Tooling Slice 5). Never touches raw rows.
 export function diffExternalStateSnapshots(before, after) {
+  assertIsExternalStateSnapshot(before, 'before');
+  assertIsExternalStateSnapshot(after, 'after');
   const tables = new Set([...Object.keys(before.tables), ...Object.keys(after.tables)]);
   const diff = {};
   for (const table of tables) {
@@ -289,21 +409,148 @@ export function parseManifestRecords(text) {
     throw new EvidenceSchemaError('manifest must be a JSON array of evidence records');
   }
   return parsed.map((raw, index) => {
-    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-      throw new EvidenceSchemaError(`manifest record ${index} must be an object`);
-    }
-    const missing = RECORD_REQUIRED_FIELDS.filter((field) => !(field in raw));
-    if (missing.length > 0) {
-      throw new EvidenceSchemaError(`manifest record ${index} missing required field(s): ${missing.join(', ')}`);
-    }
-    const extra = Object.keys(raw).filter((key) => !RECORD_REQUIRED_FIELDS.includes(key));
-    if (extra.length > 0) {
-      throw new EvidenceSchemaError(
-        `manifest record ${index} has undeclared field(s): ${extra.join(', ')} `
-        + '(closed schema — unlisted fields, including business content, are rejected)',
-      );
-    }
+    assertClosedSchema(raw, RECORD_REQUIRED_FIELDS, `manifest record ${index}`);
     assertRedacted(raw, `$[${index}]`);
     return Object.freeze(raw);
   });
+}
+
+const MANIFEST_REQUIRED_FIELDS = ['schemaVersion', 'candidate', 'generatedAt', 'tool', 'toolVersion'];
+const EXTERNAL_STATE_REQUIRED_FIELDS = ['schemaVersion', 'candidate', 'collectedAt', 'label', 'tables'];
+
+// Symmetric parse-side counterpart to `createManifest` (S-N3 from the Slices
+// 1+2 review): re-validates the closed schema, the candidate shape, and
+// redaction on every read, so a persisted `00-manifest.json` cannot silently
+// widen what it is allowed to carry between being written and being read.
+export function parseManifest(text) {
+  const parsed = JSON.parse(text);
+  assertClosedSchema(parsed, MANIFEST_REQUIRED_FIELDS, 'manifest');
+  assertCandidateShape(parsed.candidate);
+  if (typeof parsed.generatedAt !== 'string' || !ISO_UTC_TIMESTAMP_PATTERN.test(parsed.generatedAt)) {
+    throw new EvidenceSchemaError('manifest "generatedAt" must be an ISO-8601 UTC timestamp ending in "Z"');
+  }
+  if (typeof parsed.tool !== 'string' || parsed.tool.length === 0) {
+    throw new EvidenceSchemaError('manifest "tool" is required');
+  }
+  if (typeof parsed.toolVersion !== 'string' || parsed.toolVersion.length === 0) {
+    throw new EvidenceSchemaError('manifest "toolVersion" is required');
+  }
+  assertRedacted(parsed, '$');
+  return Object.freeze({ ...parsed, candidate: Object.freeze({ ...parsed.candidate }) });
+}
+
+// Symmetric parse-side counterpart to `createExternalStateSnapshot` (S-N3).
+export function parseExternalStateSnapshot(text) {
+  const parsed = JSON.parse(text);
+  assertClosedSchema(parsed, EXTERNAL_STATE_REQUIRED_FIELDS, 'external-state snapshot');
+  assertCandidateShape(parsed.candidate);
+  if (typeof parsed.collectedAt !== 'string' || !ISO_UTC_TIMESTAMP_PATTERN.test(parsed.collectedAt)) {
+    throw new EvidenceSchemaError('external-state snapshot "collectedAt" must be an ISO-8601 UTC timestamp ending in "Z"');
+  }
+  if (typeof parsed.label !== 'string' || parsed.label.length === 0) {
+    throw new EvidenceSchemaError('external-state snapshot "label" is required');
+  }
+  if (parsed.tables === null || typeof parsed.tables !== 'object' || Array.isArray(parsed.tables)) {
+    throw new EvidenceSchemaError('external-state snapshot "tables" must be an object of table name to row count');
+  }
+  for (const [table, count] of Object.entries(parsed.tables)) {
+    if (!Number.isInteger(count) || count < 0) {
+      throw new EvidenceSchemaError(`external-state snapshot table "${table}" count must be a non-negative integer, not a row dump`);
+    }
+  }
+  assertRedacted(parsed, '$');
+  return Object.freeze({ ...parsed, tables: Object.freeze({ ...parsed.tables }) });
+}
+
+// == RFC-050 Tooling Slice 7: artifact hashing and evidence-tree leakage ====
+// scanning. `assertRedacted` above is field-aware and built for one
+// structured JSON value at a time (it can tell a `commit` field from an
+// arbitrary string because it knows the field's path). A leakage sweep over
+// the whole evidence tree also has to cover free-text files (manual
+// evidence templates, notes) where there is no field path to reason about —
+// `scanTextForLeakage` below is the bounded, deliberately narrower
+// counterpart for that case.
+
+export function hashToArtifactHash(bufferOrString) {
+  return `sha256:${createHash('sha256').update(bufferOrString).digest('hex')}`;
+}
+
+export class EvidenceLeakageError extends Error {
+  constructor(category, path, message) {
+    super(message);
+    this.name = 'EvidenceLeakageError';
+    this.category = category;
+    this.path = path;
+  }
+}
+
+// Every one of these is already non-anchored (no `^`/`$`), so it works as a
+// substring search over an arbitrarily large text blob without changes.
+const TEXT_LEAKAGE_PATTERNS = [
+  ['cookie', COOKIE_SHAPED_VALUE_PATTERN],
+  ['d1_error_body', D1_ERROR_PATTERN],
+  ['sql', SQL_KEYWORD_PATTERN],
+];
+
+const EMBEDDED_RESOURCE_ID_PATTERN = new RegExp(
+  `\\b(?:${RAW_RESOURCE_ID_PREFIXES.map((prefix) => prefix.slice(0, -1)).join('|')})_[A-Za-z0-9]+`,
+);
+
+// S7-C1 from the Slice 7 review: a bare hex run of this project's actual
+// secret/digest/token/Durable-Object-id length (56/64/96/128 — see
+// `HEX_SECRET_LENGTHS`) is caught in free text too, unlike the field-aware
+// `assertRedacted` above only applying to structured JSON. 32 and 40 are
+// deliberately excluded here: a git commit sha is 7-40 hex characters, so a
+// whole-document substring sweep for those two lengths would false-positive
+// on a legitimate commit sha in prose constantly. The lengths do not
+// otherwise overlap — `random_token()` (pepper, session secrets, join
+// tickets), HMAC-SHA256 subject digests, and Durable Object ids are all
+// exactly 64 hex characters, well outside the commit-sha range. `\b` on
+// both ends of an exact-length pattern only matches a hex run of exactly
+// that length, never a same-length substring of a longer run, since a
+// contiguous hex string has no internal word boundary.
+const EMBEDDED_SECRET_HEX_LENGTHS = [56, 64, 96, 128];
+const EMBEDDED_HEX_PATTERNS = EMBEDDED_SECRET_HEX_LENGTHS.map(
+  (length) => new RegExp(`\\b[0-9a-f]{${length}}\\b`, 'i'),
+);
+
+// The residual, deliberate gap versus the field-aware `assertRedacted`: a
+// bare 32- or 40-hex-character value (md5/sha1-length, or this project's own
+// commit-sha range) cannot be mechanically distinguished from a legitimate
+// commit sha in free text, since there is no field path here to exempt one
+// from the other. JSON evidence files remain fully covered for every length
+// via `scanJsonValueForLeakage`'s path-scoped exemptions; this residual is
+// free text only.
+export function scanTextForLeakage(text, path) {
+  for (const secret of registeredRunSecrets) {
+    if (text.toLowerCase().includes(secret.toLowerCase())) {
+      throw new EvidenceLeakageError(
+        'registered_run_secret',
+        path,
+        `${path} contains a registered run-scoped value (never the value itself, only its presence)`,
+      );
+    }
+  }
+  for (const pattern of EMBEDDED_HEX_PATTERNS) {
+    if (pattern.test(text)) {
+      throw new EvidenceLeakageError(
+        'raw_or_hashed_secret',
+        path,
+        `${path} contains a bare hex value at a secret/digest/token/Durable-Object-id length`,
+      );
+    }
+  }
+  for (const [category, pattern] of TEXT_LEAKAGE_PATTERNS) {
+    if (pattern.test(text)) {
+      throw new EvidenceLeakageError(category, path, `${path} contains ${category}-shaped content`);
+    }
+  }
+  if (EMBEDDED_RESOURCE_ID_PATTERN.test(text)) {
+    throw new EvidenceLeakageError('raw_resource_id', path, `${path} contains a raw resource-id-shaped value`);
+  }
+}
+
+// JSON evidence files get the full field-aware `assertRedacted` sweep.
+export function scanJsonValueForLeakage(value, path) {
+  assertRedacted(value, path);
 }

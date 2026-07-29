@@ -185,7 +185,7 @@ pub async fn post_regenerate_calendar(
         None,
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         return redirect(&format!("/c/{community_id}/me/calendar"));
     }
 
@@ -229,7 +229,7 @@ pub async fn post_revoke_calendar(
         None,
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         return redirect(&format!("/c/{community_id}/me/calendar"));
     }
 

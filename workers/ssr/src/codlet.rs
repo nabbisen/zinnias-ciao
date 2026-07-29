@@ -6,6 +6,8 @@
 
 use worker::{Env, Result};
 
+pub use crate::form_token::ConsumeResult;
+
 /// Issue a single-use CSRF form token.
 pub async fn issue_token(
     env: &Env,
@@ -19,16 +21,21 @@ pub async fn issue_token(
 }
 
 /// Validate and consume a single-use CSRF form token.
+///
+/// Callers must match on the returned `ConsumeResult` explicitly
+/// (`matches!(result, ConsumeResult::Replay(_))`) — never call `.is_some()`
+/// on it, and never wrap it back into an `Option`. See
+/// `form_token::consume_detailed`'s doc comment for why.
 pub async fn consume_token(
     env: &Env,
     user_id: &str,
     purpose: &str,
     raw_token: &str,
     bound_resource: Option<&str>,
-) -> Result<Option<String>> {
+) -> Result<ConsumeResult> {
     let pepper = crate::crypto::pepper(env)?;
     let db = env.d1("DB")?;
-    crate::form_token::consume(
+    crate::form_token::consume_detailed(
         &db,
         pepper.as_str(),
         user_id,

@@ -141,7 +141,7 @@ pub async fn post_create_event(
         None,
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         return redirect(&format!("/c/{community_id}/home"));
     }
 

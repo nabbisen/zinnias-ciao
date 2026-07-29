@@ -239,7 +239,7 @@ pub async fn post_matrix_export_audit(
         Some(&bound_resource),
     )
     .await?;
-    if token.is_empty() || replay.is_some() {
+    if token.is_empty() || matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         return json_error(400, i18n::JA_GENERAL_ERROR);
     }
     let pepper = crate::crypto::pepper(env)?;

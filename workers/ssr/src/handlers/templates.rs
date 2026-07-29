@@ -211,7 +211,7 @@ pub async fn post_create_template(
         Some(community_id),
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         return redirect(&format!("/c/{community_id}/admin/templates"));
     }
 
@@ -281,7 +281,7 @@ pub async fn post_delete_template(
         Some(template_id),
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         return redirect(&format!("/c/{community_id}/admin/templates"));
     }
 

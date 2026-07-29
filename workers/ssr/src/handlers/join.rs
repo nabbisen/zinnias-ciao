@@ -177,7 +177,7 @@ async fn legacy_post_profile(
     let pepper = crate::crypto::pepper(env)?;
     let ticket_hmac = crate::crypto::hmac_hex(pepper.as_str(), &ticket_value);
     let db = env.d1("DB")?;
-    let replay = crate::form_token::consume(
+    let replay = crate::form_token::consume_detailed(
         &db,
         pepper.as_str(),
         &ticket,
@@ -186,7 +186,7 @@ async fn legacy_post_profile(
         Some(&ticket_hmac),
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, ConsumeResult::Replay(_)) {
         return redirect("/");
     }
     let mut tv = ticket_value.splitn(2, ':');

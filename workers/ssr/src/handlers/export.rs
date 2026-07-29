@@ -126,7 +126,7 @@ pub async fn get_export_json(
         Some(community_id),
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         // Already used — redirect back to export page for a fresh token.
         return redirect(&format!("/c/{community_id}/admin/export"));
     }

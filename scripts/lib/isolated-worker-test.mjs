@@ -1,12 +1,60 @@
 import { randomBytes } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { rmSync } from 'node:fs';
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const scriptsDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = resolve(scriptsDir, '..');
+
+// R-N3 (2026-07-28 form-token-replay-detection remediation review): this
+// harness copies the pre-built `workers/ssr/build/` artifact rather than
+// rebuilding from source (see `bun run build`). A Rust source change with no
+// rebuild in between silently produces confidently wrong evidence — every
+// test using this harness would keep exercising the old compiled behavior.
+// Warn (not fail — some workflows may intentionally pin an older artifact)
+// whenever the artifact predates the newest file under `workers/ssr/src/`.
+async function newestMtimeUnder(dir) {
+  let newest = 0;
+  const entries = await readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      newest = Math.max(newest, await newestMtimeUnder(path));
+    } else if (entry.isFile()) {
+      const info = await stat(path);
+      newest = Math.max(newest, info.mtimeMs);
+    }
+  }
+  return newest;
+}
+
+async function warnIfWorkerArtifactIsStale() {
+  const sourceDir = join(repositoryRoot, 'workers', 'ssr', 'src');
+  const artifactPath = join(repositoryRoot, 'workers', 'ssr', 'build', 'index.js');
+  let sourceNewest;
+  let artifactMtime;
+  try {
+    [sourceNewest, artifactMtime] = await Promise.all([
+      newestMtimeUnder(sourceDir),
+      stat(artifactPath).then((info) => info.mtimeMs),
+    ]);
+  } catch {
+    // Either path is missing; the artifact copy step just below will fail
+    // loudly with a clearer message than a staleness warning would give.
+    return;
+  }
+  if (artifactMtime < sourceNewest) {
+    console.warn(
+      '\n⚠️  workers/ssr/build/index.js is older than the newest file under '
+      + 'workers/ssr/src/ — this isolated Worker test copies that pre-built '
+      + 'artifact rather than rebuilding, so it is about to exercise stale '
+      + 'compiled behavior. Run `bun run build` first if you changed Rust '
+      + 'source and expect this run to reflect it.\n',
+    );
+  }
+}
 
 const CONTROL_ENVIRONMENT = new Set([
   'CLOUDFLARE_INCLUDE_PROCESS_ENV',
@@ -63,7 +111,7 @@ export function assertIsolatedChildEnvironment(environment) {
 function configText(
   main,
   migrations,
-  { includeD1, includeAbuseLimiter, recoveryEnabled, requiredSecrets },
+  { includeD1, includeAbuseLimiter, recoveryEnabled, requiredSecrets, communityCreationEnabled },
 ) {
   const required = requiredSecrets.map(quoteToml).join(', ');
   const rootD1 = includeD1
@@ -118,7 +166,7 @@ required = [${required}]
 [vars]
 BUILD_VERSION = "isolated-test"
 LOG_LEVEL = "debug"
-COMMUNITY_CREATION_ENABLED = "true"
+COMMUNITY_CREATION_ENABLED = ${quoteToml(communityCreationEnabled ? 'true' : 'false')}
 COMMUNITY_RECOVERY_ENABLED = ${quoteToml(recoveryEnabled ? 'true' : 'false')}
 ${rootD1}${rootAbuseLimiter}
 
@@ -131,7 +179,7 @@ required = [${required}]
 [env.dev.vars]
 BUILD_VERSION = "isolated-test"
 LOG_LEVEL = "debug"
-COMMUNITY_CREATION_ENABLED = "true"
+COMMUNITY_CREATION_ENABLED = ${quoteToml(communityCreationEnabled ? 'true' : 'false')}
 COMMUNITY_RECOVERY_ENABLED = ${quoteToml(recoveryEnabled ? 'true' : 'false')}
 ${devD1}${devAbuseLimiter}
 `;
@@ -154,6 +202,19 @@ export async function prepareIsolatedWorkerTest(
     recoveryToken,
     requiredSecrets = ['HMAC_PEPPER'],
     secretContents,
+    // Defaults true to match every existing consumer's expectation (the
+    // isolated harness is normally a "feature on" environment). Pass `false`
+    // only for a deliberate negative-configuration phase proving the
+    // disabled-flag path (RFC-050 Tooling Slice 6).
+    communityCreationEnabled = true,
+    // Escape hatch for negative-configuration fixtures this harness has no
+    // named option for (a misnamed binding, a malformed section, etc.):
+    // `(text) => text` receives the fully generated `wrangler.toml` body and
+    // returns the text actually written. Use sparingly and only for a
+    // deliberate negative phase — prefer a named option (like
+    // `communityCreationEnabled` above) when the same negative shape will be
+    // reused.
+    configOverride,
   } = {},
 ) {
   safeLabel(label);
@@ -183,6 +244,7 @@ export async function prepareIsolatedWorkerTest(
   });
   await chmod(canaryPath, 0o600);
 
+  await warnIfWorkerArtifactIsStale();
   const workerArtifacts = join(root, 'worker-build');
   const isolatedMigrations = join(root, 'migrations');
   await cp(join(repositoryRoot, 'workers', 'ssr', 'build'), workerArtifacts, {
@@ -193,14 +255,16 @@ export async function prepareIsolatedWorkerTest(
   const configPath = join(root, 'wrangler.toml');
   const workerMain = join(workerArtifacts, 'index.js');
   const migrations = isolatedMigrations;
+  const generatedConfigText = configText(workerMain, migrations, {
+    includeD1,
+    includeAbuseLimiter,
+    recoveryEnabled,
+    requiredSecrets,
+    communityCreationEnabled,
+  });
   await writeFile(
     configPath,
-    configText(workerMain, migrations, {
-      includeD1,
-      includeAbuseLimiter,
-      recoveryEnabled,
-      requiredSecrets,
-    }),
+    configOverride ? configOverride(generatedConfigText) : generatedConfigText,
     { mode: 0o600 },
   );
   await chmod(configPath, 0o600);

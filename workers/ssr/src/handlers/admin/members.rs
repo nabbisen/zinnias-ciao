@@ -374,7 +374,7 @@ pub async fn post_revoke_invite(
         Some(invite_id),
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, ConsumeResult::Replay(_)) {
         return redirect(&format!("/c/{community_id}/admin/invites"));
     }
 

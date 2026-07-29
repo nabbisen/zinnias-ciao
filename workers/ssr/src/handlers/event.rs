@@ -407,7 +407,7 @@ pub async fn post_my_status(
     )
     .await?;
 
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         // Already processed — redirect to detail (idempotent)
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
@@ -506,7 +506,7 @@ pub async fn post_my_note(
         Some(event_id),
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         return redirect(&format!("/c/{community_id}/events/{event_id}?flash=saved"));
     }
 
@@ -617,7 +617,7 @@ pub async fn delete_my_note(
         Some(event_id),
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
 

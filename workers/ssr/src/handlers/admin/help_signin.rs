@@ -118,7 +118,7 @@ pub async fn post_help_signin(
         Some(target_membership_id),
     )
     .await?;
-    if replay.is_some() {
+    if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
         return redirect(&format!("/c/{community_id}/admin/members"));
     }
 

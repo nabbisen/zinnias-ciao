@@ -59,22 +59,15 @@ pub async fn issue(
 /// - Checks (if provided) that `bound_resource` matches.
 /// - On success, marks `consumed_at` atomically.
 /// - A previously consumed token returns the prior result ref if available.
-pub async fn consume(
-    db: &D1Database,
-    pepper: &str,
-    user_id: &str,
-    purpose: &str,
-    raw_token: &str,
-    bound_resource: Option<&str>,
-) -> Result<Option<String>> {
-    match consume_detailed(db, pepper, user_id, purpose, raw_token, bound_resource).await? {
-        ConsumeResult::Proceed => Ok(None),
-        ConsumeResult::Replay(result_ref) => Ok(result_ref),
-    }
-}
-
-/// Detailed consume outcome for handlers that must distinguish a first consume
-/// from a replay whose result_ref is still absent.
+///
+/// Every caller must match on the returned `ConsumeResult` explicitly
+/// (`matches!(result, ConsumeResult::Replay(_))`) to detect a replay — never
+/// collapse it to an `Option` first. A prior wrapper did exactly that
+/// (`Proceed => Ok(None)`, `Replay(None) => Ok(None)`), which made every
+/// purpose except display-name editing's `result_ref` unable to distinguish
+/// a replay from a fresh consume, letting a replayed token re-execute its
+/// action across 21 call sites. The wrapper has been removed; do not
+/// reintroduce an `Option`-collapsing shim over this function.
 pub async fn consume_detailed(
     db: &D1Database,
     pepper: &str,
