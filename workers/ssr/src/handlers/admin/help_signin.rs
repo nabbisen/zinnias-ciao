@@ -71,10 +71,11 @@ pub async fn get_help_signin(
                {confirm}</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher(
+        header = render::header_with_switcher_next(
             i18n::JA_ADMIN_HELP_SIGNIN_TITLE,
             community_id,
-            &community_pairs
+            &community_pairs,
+            "admin_members"
         ),
         title = i18n::JA_ADMIN_HELP_SIGNIN_TITLE,
         name = render::escape_html(&target.display_name),
@@ -170,10 +171,11 @@ pub async fn post_help_signin(
          <p><a href=\"/c/{cid}/admin/members\" \
            style=\"color:#007AFF;text-decoration:none\">{back}</a></p>\
          </main>{nav}",
-        header = render::header_with_switcher(
+        header = render::header_with_switcher_next(
             i18n::JA_ADMIN_HELP_SIGNIN_TITLE,
             community_id,
-            &community_pairs_for_user(&db, &auth.user_id).await
+            &community_pairs_for_user(&db, &auth.user_id).await,
+            "admin_members"
         ),
         title = i18n::JA_ADMIN_HELP_SIGNIN_TITLE,
         name = render::escape_html(&target.display_name),

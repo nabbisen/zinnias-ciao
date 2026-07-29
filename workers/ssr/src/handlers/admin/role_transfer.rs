@@ -109,7 +109,12 @@ async fn get_role_change_confirm(
                {confirm}</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher(cfg.title, community_id, &community_pairs),
+        header = render::header_with_switcher_next(
+            cfg.title,
+            community_id,
+            &community_pairs,
+            "admin_members"
+        ),
         title = cfg.title,
         name = render::escape_html(&target.display_name),
         consequence = cfg.consequence,

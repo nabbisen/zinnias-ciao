@@ -78,10 +78,11 @@ pub async fn get_remove_member(
                {confirm}</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher(
+        header = render::header_with_switcher_next(
             i18n::JA_ADMIN_REMOVE_TITLE,
             community_id,
-            &_community_pairs
+            &_community_pairs,
+            "admin_members"
         ),
         name = render::escape_html(&target.display_name),
         cid = render::escape_html(community_id),

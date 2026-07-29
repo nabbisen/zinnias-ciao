@@ -150,8 +150,12 @@ pub async fn get_me_calendar(
          {flash}\
          {feed}\
          </main>{nav}",
-        header =
-            render::header_with_switcher(i18n::JA_CALENDAR_TITLE, community_id, &community_pairs),
+        header = render::header_with_switcher_next(
+            i18n::JA_CALENDAR_TITLE,
+            community_id,
+            &community_pairs,
+            "calendar_feed"
+        ),
         cal_title = i18n::JA_CALENDAR_TITLE,
         cal_desc = i18n::JA_CALENDAR_DESCRIPTION,
         back = back,

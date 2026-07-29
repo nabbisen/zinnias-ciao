@@ -29,31 +29,7 @@ pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response>
     // Only redirect to a community the user actually belongs to.
     let dest = match target {
         Some(ref cid) if memberships.iter().any(|m| &m.community_id == cid) => {
-            match next.as_deref() {
-                Some("communities") => format!("/c/{cid}/communities"),
-                Some(next) if next.starts_with("communities:") => {
-                    calendar_next_destination(cid, next)
-                        .unwrap_or_else(|| format!("/c/{cid}/communities"))
-                }
-                Some("admin_events_new") if is_admin_target(&memberships, cid) => {
-                    format!("/c/{cid}/admin/events/new")
-                }
-                Some(next) if next.starts_with("admin_events_new:") => {
-                    if is_admin_target(&memberships, cid) {
-                        admin_events_new_destination(cid, next)
-                            .unwrap_or_else(|| format!("/c/{cid}/admin/events/new"))
-                    } else {
-                        format!("/c/{cid}/home")
-                    }
-                }
-                Some("admin_members") if is_admin_target(&memberships, cid) => {
-                    format!("/c/{cid}/admin/members")
-                }
-                Some("admin_invites") if is_admin_target(&memberships, cid) => {
-                    format!("/c/{cid}/admin/invites")
-                }
-                _ => format!("/c/{cid}/home"),
-            }
+            switch_destination(cid, next.as_deref(), &memberships)
         }
         // Unknown / non-member target: send to their first community, or /join.
         _ => match memberships.first() {
@@ -65,6 +41,55 @@ pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response>
     let mut resp = Response::from_html("")?;
     resp.headers_mut().set("Location", &dest)?;
     Ok(resp.with_status(303))
+}
+
+/// The closed `next` grammar (RFC-074): given a validated target community id,
+/// the raw `next` token, and the caller's full membership list, constructs the
+/// destination path. The caller has already confirmed active membership in
+/// `cid` before calling this; every `admin_*` token additionally requires
+/// `is_admin_target(memberships, cid)` — checked against the **target**, never
+/// inherited from any other membership the caller holds. Every rejection path
+/// (unknown token, malformed date, extra component, any fragment/path/URL
+/// shape) falls through to the target's Home. `next` is never treated as a
+/// URL, path, or fragment; every destination is constructed from `cid`.
+fn switch_destination(
+    cid: &str,
+    next: Option<&str>,
+    memberships: &[membership_db::CommunitySummary],
+) -> String {
+    match next {
+        Some("home") => format!("/c/{cid}/home"),
+        Some("me") => format!("/c/{cid}/me"),
+        Some("calendar_feed") => format!("/c/{cid}/me/calendar"),
+        Some("communities") => format!("/c/{cid}/communities"),
+        Some(next) if next.starts_with("communities:") => {
+            calendar_next_destination(cid, next).unwrap_or_else(|| format!("/c/{cid}/communities"))
+        }
+        Some("admin_events_new") if is_admin_target(memberships, cid) => {
+            format!("/c/{cid}/admin/events/new")
+        }
+        Some(next) if next.starts_with("admin_events_new:") => {
+            if is_admin_target(memberships, cid) {
+                admin_events_new_destination(cid, next)
+                    .unwrap_or_else(|| format!("/c/{cid}/admin/events/new"))
+            } else {
+                format!("/c/{cid}/home")
+            }
+        }
+        Some("admin_members") if is_admin_target(memberships, cid) => {
+            format!("/c/{cid}/admin/members")
+        }
+        Some("admin_invites") if is_admin_target(memberships, cid) => {
+            format!("/c/{cid}/admin/invites")
+        }
+        Some("admin_export") if is_admin_target(memberships, cid) => {
+            format!("/c/{cid}/admin/export")
+        }
+        Some("admin_templates") if is_admin_target(memberships, cid) => {
+            format!("/c/{cid}/admin/templates")
+        }
+        _ => format!("/c/{cid}/home"),
+    }
 }
 
 fn is_admin_target(memberships: &[membership_db::CommunitySummary], cid: &str) -> bool {

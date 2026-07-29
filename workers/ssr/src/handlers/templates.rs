@@ -173,8 +173,12 @@ pub async fn get_templates(
         lbl_loc = i18n::JA_TEMPLATES_LOC_LABEL,
         lbl_dur = i18n::JA_TEMPLATES_DUR_LABEL,
         btn_save = i18n::JA_TEMPLATES_SAVE_BTN,
-        header =
-            render::header_with_switcher(i18n::JA_TEMPLATES_TITLE, community_id, &community_pairs),
+        header = render::header_with_switcher_next(
+            i18n::JA_TEMPLATES_TITLE,
+            community_id,
+            &community_pairs,
+            "admin_templates"
+        ),
         flash = flash_html,
         empty = empty_msg,
         list = if list_html.is_empty() {

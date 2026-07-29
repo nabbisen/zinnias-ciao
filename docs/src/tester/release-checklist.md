@@ -338,6 +338,18 @@ materially changed form against the
 - [x] No new query is introduced per Calendar render: the Events list tab reuses the same month-bounded query the Calendar tab already performs. *(communities.rs `get_communities`)*
 - [x] Browser smoke verifies Calendar-tab grid without the list, the day-detail fragment target, admin create-on-day scoping, Events-list full-month behavior with `day` present, Matrix/CSV unchanged, switcher preservation with no fragment, and mobile 200% text scaling. *(scripts/smoke/calendar-views.mjs; evidence `.git-exclude/evidence/rfc073/`)*
 
+## Community switch route preservation gates (RFC-074)
+
+- [x] `/switch` accepts a closed, explicitly enumerated `next` grammar (`home`, `me`, `calendar_feed`, `communities[:...]`, `admin_events_new[:...]`, `admin_members`, `admin_invites`, `admin_export`, `admin_templates`) and constructs every destination from the validated target community id; `next` is never treated as a URL, path, or fragment. *(community.rs `switch_destination` + native tests)*
+- [x] Every `admin_*` token requires an active admin role in the **target** community, re-checked independently of any admin role the caller holds elsewhere; every member-level token requires active membership in the target. *(community.rs `is_admin_target` + native privilege-escalation test)*
+- [x] An unrecognized top-level token, an absent token, or any value shaped like a path, URL, or fragment (including `%2F` and `../`) falls back to the target's Home without error. A malformed value inside an already-recognized family (`communities:`/`admin_events_new:`) preserves RFC-073's own existing fallback (bare Calendar / bare Create Event), not Home — a deliberate, reviewed distinction. *(community.rs native tests)*
+- [x] No community-scoped identifier (member, event, invite, template) is preserved across a switch. *(route-family matrix; help-signin and member-action confirmations pass `admin_members`, never a member id)*
+- [x] The switch handler emits no fragment under any input. *(native test over every accepted token + browser smoke)*
+- [x] My Page, Calendar feed settings, Export, Templates, member-removal/promote/demote/help-signin confirmations pass their assigned token; Event Detail, note-delete confirmation, and the event admin pages (attendance/cancel/edit) deliberately stay on the default switcher and fall back to Home. *(handler wiring + `rfc074_fallback_family_pages_stay_on_default_switcher` release gate)*
+- [x] The no-JS switcher submit path continues to work — the switcher is a `<form method='get' action='/switch'>` with no app JavaScript. *(browser smoke drives the form's own native submit)*
+- [x] RFC-067's matrix-preservation contract holds, proven behaviorally (exact destination URL for a matrix token) natively in `ssr`, in addition to the pre-existing `release_gates.rs` source-literal pin. *(community/tests.rs `switch_destination_communities_token_family`)*
+- [x] Browser smoke verifies switching from Calendar, My Page, member management, and Create Event (each to both an admin and a member-only target where relevant), plus Event Detail falling back to Home with no event id preserved. *(scripts/smoke/community-switch-route-preservation.mjs; evidence `.git-exclude/evidence/rfc074/`)*
+
 ## Operational gates
 
 - [x] `GET /healthz` returns `{"ok":true,"ready":true,"service":"ciao.zinnias"}` only with a valid pepper and a generic not-ready `503` otherwise. Corrected exact-candidate hosted evidence also proves classified required-secret rejection, runtime-negative behavior, valid credential flows, secret-deletion failure behavior, bounded non-mutation, and strict teardown. *(RFC-077 criteria 8–9; architecture-reviewed and owner-accepted 2026-07-22; B2 closed.)*

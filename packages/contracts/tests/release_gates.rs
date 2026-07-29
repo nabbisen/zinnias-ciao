@@ -2357,6 +2357,42 @@ fn rfc067_monthly_attendance_matrix_contract_is_guarded() {
 }
 
 #[test]
+fn rfc074_fallback_family_pages_stay_on_default_switcher() {
+    // RFC-074's route-family matrix deliberately leaves these pages on the
+    // default switcher (bare `header_with_switcher`, no `next` token), since
+    // there is no cross-community equivalence for the event or member id
+    // they view: Event Detail, note-delete confirmation, and the event admin
+    // pages (attendance, cancel, edit) all fall back to the target's Home.
+    // A bare call is what produces that fallback; this gate catches a future
+    // edit silently handing one of them a `next` token the matrix does not
+    // assign.
+    let attendance = include_str!("../../../workers/ssr/src/handlers/admin/events/attendance.rs");
+    let cancel = include_str!("../../../workers/ssr/src/handlers/admin/events/cancel.rs");
+    let edit = include_str!("../../../workers/ssr/src/handlers/admin/events/edit.rs");
+    let notes = include_str!("../../../workers/ssr/src/handlers/admin/events/notes.rs");
+
+    for (name, src) in [
+        (
+            "event.rs (Event Detail + note-delete confirmation)",
+            EVENT_HANDLER_SRC,
+        ),
+        ("admin/events/attendance.rs", attendance),
+        ("admin/events/cancel.rs", cancel),
+        ("admin/events/edit.rs", edit),
+        ("admin/events/notes.rs", notes),
+    ] {
+        assert!(
+            src.contains("header_with_switcher("),
+            "{name} must still render the community switcher"
+        );
+        assert!(
+            !src.contains("header_with_switcher_next("),
+            "{name} must stay on the default switcher and fall back to target Home; RFC-074's route-family matrix does not assign it a next token"
+        );
+    }
+}
+
+#[test]
 fn rfc068_calendar_matrix_csv_export_contract_is_guarded() {
     assert!(
         COMMUNITIES_HANDLER_SRC.contains("token_purpose::CALENDAR_MATRIX_CSV_EXPORT")

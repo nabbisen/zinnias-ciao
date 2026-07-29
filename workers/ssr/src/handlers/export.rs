@@ -85,8 +85,12 @@ pub async fn get_export_page(
         privacy_note = i18n::JA_EXPORT_PRIVACY_NOTE,
         download_btn = i18n::JA_EXPORT_DOWNLOAD_BTN,
         single_use = i18n::JA_EXPORT_SINGLE_USE,
-        header =
-            render::header_with_switcher(i18n::JA_EXPORT_TITLE, community_id, &community_pairs),
+        header = render::header_with_switcher_next(
+            i18n::JA_EXPORT_TITLE,
+            community_id,
+            &community_pairs,
+            "admin_export"
+        ),
         name = render::escape_html(&community_name),
         events = event_count,
         members = member_count,

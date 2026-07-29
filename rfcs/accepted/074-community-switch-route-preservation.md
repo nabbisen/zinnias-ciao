@@ -273,8 +273,24 @@ review cycles for this theme would cost more than it returns.
    a URL, path, or fragment.
 2. Every `admin_*` token requires an active admin role in the **target**
    community; every member-level token requires active membership there.
-3. Unknown tokens, malformed dates, a day outside its month, extra components,
-   and any fragment fall back to the target's Home without error.
+3. Every rejection path lands on a safe, community-scoped page in the **target**
+   community, without error. Specifically:
+   - an unrecognized top-level token, an absent token, or any value shaped like a
+     path, URL, or fragment falls back to the target's **Home**;
+   - a malformed value *within* an already-recognized family falls back to that
+     family's own unfiltered landing page, which is RFC-073's existing behavior
+     and is **preserved**: `communities:<malformed>` → `/c/{cid}/communities`,
+     and `admin_events_new:<malformed>` → `/c/{cid}/admin/events/new` when the
+     caller is admin in the target, or Home when they are not.
+
+   **Clarified 2026-07-29** after the Slice 1 review. An earlier wording of this
+   criterion said every rejection lands on Home, which would have overridden
+   RFC-073's protected internal fallbacks. That was wrong twice over: those
+   fallbacks are explicitly outside this RFC's change scope, and landing on the
+   bare Calendar rather than Home is *better* for this RFC's own goal, since it
+   preserves the route family. The safety property this criterion exists to
+   guarantee — no error, no open redirect, no unauthorized access — holds in
+   both cases.
 4. No community-scoped identifier (member, event, invite, template) is preserved
    across a switch.
 5. The switch handler emits no fragment under any input.
@@ -283,8 +299,24 @@ review cycles for this theme would cost more than it returns.
 7. The no-JS switcher submit path continues to work.
 8. Every accepted token and every fallback case has a unit test; the four
    representative families have browser smoke.
-9. RFC-067's matrix-preservation contract still holds, asserted against the
-   destination the handler produces rather than a source literal.
+9. RFC-067's matrix-preservation contract still holds, and is proven
+   **behaviorally** — by a test asserting the exact destination URL the handler
+   produces for a matrix token — not only by a source-literal pin.
+
+   **Revised 2026-07-29** after the Slice 1 review. The original wording said
+   "rather than a source literal," implying the `release_gates.rs` pin would be
+   replaced. It cannot be, and should not be. `packages/contracts` depends only
+   on `zinnias-ciao-domain`, while `zinnias-ciao-ssr` depends on `contracts`;
+   the contracts crate has only ever had `include_str!` access to the handler's
+   *text*, never its compiled functions. Inverting that dependency to reach
+   `calendar_next_destination` would corrupt the crate graph for a test.
+
+   The achievable — and better — outcome is *additive*: the behavioral proof
+   lives natively in the `ssr` crate, and the contracts source-literal pin is
+   retained as a secondary tripwire. That is the same shape as the form-token
+   gates, where the real guarantee is carried structurally and the text pins are
+   secondary. Observation O1 is thereby resolved: the literal is no longer
+   doing all the work alone.
 
 ## Implementation Boundaries
 

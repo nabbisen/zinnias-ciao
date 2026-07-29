@@ -133,7 +133,12 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
                {lbl_logout}</button>\
            </form>\
          </main>{nav}",
-        header = render::header_with_switcher(i18n::JA_NAV_ME, community_id, &_community_pairs),
+        header = render::header_with_switcher_next(
+            i18n::JA_NAV_ME,
+            community_id,
+            &_community_pairs,
+            "me"
+        ),
         name = render::escape_html(&membership.display_name),
         flash_html = flash_html,
         change_name = i18n::JA_ME_CHANGE_DISPLAY_NAME,
