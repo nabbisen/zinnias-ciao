@@ -49,6 +49,120 @@ fn switcher_next_preserves_matrix_mode() {
 }
 
 #[test]
+fn switcher_next_preserves_list_mode() {
+    assert_eq!(
+        matrix::switcher_next(2026, 7, None, matrix::CalendarView::List),
+        "communities:2026-07:list"
+    );
+    assert_eq!(
+        matrix::switcher_next(2026, 7, Some("2026-07-05"), matrix::CalendarView::List),
+        "communities:2026-07:2026-07-05:list"
+    );
+}
+
+#[test]
+fn calendar_view_from_query_parses_and_falls_back() {
+    assert_eq!(
+        matrix::CalendarView::from_query(Some("list")),
+        matrix::CalendarView::List
+    );
+    assert_eq!(
+        matrix::CalendarView::from_query(Some("matrix")),
+        matrix::CalendarView::Matrix
+    );
+    assert_eq!(
+        matrix::CalendarView::from_query(None),
+        matrix::CalendarView::Month
+    );
+    assert_eq!(
+        matrix::CalendarView::from_query(Some("garbage")),
+        matrix::CalendarView::Month
+    );
+    assert_eq!(
+        matrix::CalendarView::from_query(Some("")),
+        matrix::CalendarView::Month
+    );
+}
+
+#[test]
+fn render_mode_tabs_shows_three_tabs_and_list_href_omits_day() {
+    let html = matrix::render_mode_tabs(
+        "community-a",
+        2026,
+        7,
+        Some("2026-07-05"),
+        matrix::CalendarView::Month,
+    );
+    assert!(html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_VIEW_MONTH));
+    assert!(html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_VIEW_LIST));
+    assert!(html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_VIEW_MATRIX));
+    assert!(
+        html.contains("/c/community-a/communities?month=2026-07&amp;view=list\""),
+        "the Events list tab href must omit `day` even when a day is selected: {html}"
+    );
+    assert!(
+        html.contains(
+            "/c/community-a/communities?month=2026-07&amp;day=2026-07-05&amp;view=matrix\""
+        ),
+        "the matrix tab href must still preserve the selected day: {html}"
+    );
+}
+
+#[test]
+fn day_detail_always_renders_and_is_day_scoped_not_full_month() {
+    let rows = vec![
+        event_row("day_1", "event_1", "2026-07-05", "Morning", "scheduled"),
+        event_row("day_2", "event_2", "2026-07-06", "Lunch", "scheduled"),
+    ];
+
+    let no_day_selected = calendar::render_calendar_day_detail(
+        "community-a",
+        "Asia/Tokyo",
+        &rows,
+        None,
+        2026,
+        7,
+        false,
+    );
+    assert!(no_day_selected.contains("id=\"calendar-day-detail\""));
+    assert!(no_day_selected.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_DAY_DETAIL_PROMPT));
+    assert!(
+        !no_day_selected.contains("/c/community-a/events/event_1")
+            && !no_day_selected.contains("/c/community-a/events/event_2"),
+        "with no day selected, day detail must not leak the full month list: {no_day_selected}"
+    );
+
+    let day_selected = calendar::render_calendar_day_detail(
+        "community-a",
+        "Asia/Tokyo",
+        &rows,
+        Some("2026-07-05"),
+        2026,
+        7,
+        false,
+    );
+    assert!(day_selected.contains("id=\"calendar-day-detail\""));
+    assert!(day_selected.contains("/c/community-a/events/event_1"));
+    assert!(
+        !day_selected.contains("/c/community-a/events/event_2"),
+        "day detail must be scoped to the selected day only, not the full month: {day_selected}"
+    );
+}
+
+#[test]
+fn events_list_tab_ignores_selected_day_and_shows_full_month() {
+    let rows = vec![
+        event_row("day_1", "event_1", "2026-07-05", "Morning", "scheduled"),
+        event_row("day_2", "event_2", "2026-07-06", "Lunch", "scheduled"),
+    ];
+
+    let html = calendar::render_calendar_list("community-a", "Asia/Tokyo", &rows, 2026, 7, false);
+    assert!(html.contains("/c/community-a/events/event_1"));
+    assert!(html.contains("/c/community-a/events/event_2"));
+    assert!(html.contains("view=list"));
+}
+
+#[test]
 fn matrix_render_uses_contract_symbols_and_multi_event_summary() {
     let members = vec![membership::MemberSummary {
         id: "mem_a".to_string(),

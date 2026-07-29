@@ -326,6 +326,18 @@ materially changed form against the
 - [x] CSV output uses deterministic filename `ciao-attendance-YYYY-MM.csv`, UTF-8 BOM, CRLF row endings, quoted values, escaped quotes, and formula hardening. *(app.js + browser smoke)*
 - [x] Browser smoke verifies member export absence, admin CSV download, formula hardening, audit request, no server CSV endpoint request, and layout overflow checks in sandboxed/incognito Chromium without `--no-sandbox`. *(scripts/smoke/calendar-matrix-csv-export.mjs; evidence `.git-exclude/evidence/rfc068/`)*
 
+## Calendar events list and day-detail gates (RFC-073)
+
+- [x] `CalendarView` parses exactly three variants (`Month`, `List`, `Matrix`) through one closed enum; any unrecognized `view` falls back to Calendar. *(matrix.rs `CalendarView::from_query` + native tests)*
+- [x] The Calendar tab renders the month grid and an always-present day-detail section (`id="calendar-day-detail"`) and does not render the monthly events list; with no day selected the section shows a short prompt instead of the full month. *(calendar.rs `render_calendar_day_detail` + native tests)*
+- [x] A date-cell click navigates to `...&day=YYYY-MM-DD#calendar-day-detail`, landing on the day's detail rather than the top of the page; the fragment target exists in the DOM on every Calendar render. *(calendar.rs day-cell href + browser smoke)*
+- [x] The Events list tab renders the full month regardless of any `day` in the query, and its own tab link omits `day`. *(calendar.rs `render_calendar_list` + native tests + browser smoke)*
+- [x] The Attendance table tab and admin CSV export (RFC-067/RFC-068) are unchanged. *(browser smoke re-run unchanged)*
+- [x] Community switching preserves `month`, `day`, and `view` — including `view=list` — through the exact reviewed `communities:YYYY-MM[:YYYY-MM-DD][:list|:matrix]` grammar, and emits no fragment. *(community.rs `calendar_next_destination` + native tests + browser smoke)*
+- [x] The Events list tab label (`EN_CALENDAR_VIEW_LIST` / `JA_CALENDAR_VIEW_LIST`) passes the i18n EN/JA parity gate. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] No new query is introduced per Calendar render: the Events list tab reuses the same month-bounded query the Calendar tab already performs. *(communities.rs `get_communities`)*
+- [x] Browser smoke verifies Calendar-tab grid without the list, the day-detail fragment target, admin create-on-day scoping, Events-list full-month behavior with `day` present, Matrix/CSV unchanged, switcher preservation with no fragment, and mobile 200% text scaling. *(scripts/smoke/calendar-views.mjs; evidence `.git-exclude/evidence/rfc073/`)*
+
 ## Operational gates
 
 - [x] `GET /healthz` returns `{"ok":true,"ready":true,"service":"ciao.zinnias"}` only with a valid pepper and a generic not-ready `503` otherwise. Corrected exact-candidate hosted evidence also proves classified required-secret rejection, runtime-negative behavior, valid credential flows, secret-deletion failure behavior, bounded non-mutation, and strict teardown. *(RFC-077 criteria 8–9; architecture-reviewed and owner-accepted 2026-07-22; B2 closed.)*

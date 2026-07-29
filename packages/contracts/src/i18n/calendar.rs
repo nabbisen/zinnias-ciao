@@ -7,7 +7,9 @@ pub const EN_CALENDAR_EMPTY_MONTH: &str = "No events this month.";
 pub const EN_CALENDAR_EMPTY_DAY: &str = "No events on this day.";
 pub const EN_CALENDAR_CREATE_ON_DAY: &str = "Create event on this day";
 pub const EN_CALENDAR_VIEW_MONTH: &str = "Calendar";
+pub const EN_CALENDAR_VIEW_LIST: &str = "Events list";
 pub const EN_CALENDAR_VIEW_MATRIX: &str = "Attendance table";
+pub const EN_CALENDAR_DAY_DETAIL_PROMPT: &str = "Select a date to see that day's events here.";
 pub const EN_CALENDAR_MATRIX_TITLE: &str = "Monthly attendance table";
 pub const EN_CALENDAR_MATRIX_TOO_LARGE: &str =
     "This month is too large for the attendance table. Use Calendar view.";
@@ -24,7 +26,9 @@ pub const JA_CALENDAR_EMPTY_MONTH: &str = "今月の予定はありません。"
 pub const JA_CALENDAR_EMPTY_DAY: &str = "この日の予定はありません。";
 pub const JA_CALENDAR_CREATE_ON_DAY: &str = "この日にイベントを作成";
 pub const JA_CALENDAR_VIEW_MONTH: &str = "カレンダー";
+pub const JA_CALENDAR_VIEW_LIST: &str = "予定一覧";
 pub const JA_CALENDAR_VIEW_MATRIX: &str = "回答表";
+pub const JA_CALENDAR_DAY_DETAIL_PROMPT: &str = "日付を選ぶと、その日の予定がここに表示されます。";
 pub const JA_CALENDAR_MATRIX_TITLE: &str = "月の回答表";
 pub const JA_CALENDAR_MATRIX_TOO_LARGE: &str =
     "この月は回答表を表示するには大きすぎます。カレンダー表示をご利用ください。";

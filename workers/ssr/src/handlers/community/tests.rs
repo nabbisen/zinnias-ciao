@@ -26,6 +26,24 @@ fn calendar_next_destination_preserves_matrix_mode() {
 }
 
 #[test]
+fn calendar_next_destination_preserves_list_mode() {
+    assert_eq!(
+        calendar_next_destination("community-a", "communities:2026-07:list").as_deref(),
+        Some("/c/community-a/communities?month=2026-07&view=list")
+    );
+    assert_eq!(
+        calendar_next_destination("community-a", "communities:2026-07:2026-07-05:list").as_deref(),
+        Some("/c/community-a/communities?month=2026-07&day=2026-07-05&view=list")
+    );
+    assert!(
+        !calendar_next_destination("community-a", "communities:2026-07:list")
+            .unwrap()
+            .contains('#'),
+        "the switcher must never emit a fragment"
+    );
+}
+
+#[test]
 fn calendar_next_destination_rejects_bad_dates() {
     assert_eq!(
         calendar_next_destination("community-a", "communities:2026-13"),
@@ -50,6 +68,8 @@ fn calendar_next_destination_rejects_bad_matrix_shapes() {
         "communities:2026-07:agenda",
         "communities::matrix",
         "communities:2026-07:2026-07-05:matrix:extra",
+        "communities:2026-07:list:list",
+        "communities:2026-07:2026-07-05:list:extra",
     ] {
         assert_eq!(calendar_next_destination("community-a", bad), None, "{bad}");
     }

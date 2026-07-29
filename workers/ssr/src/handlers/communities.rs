@@ -89,7 +89,7 @@ pub async fn get_communities(
         None => None,
     };
     let rows = match view {
-        matrix::CalendarView::Month => {
+        matrix::CalendarView::Month | matrix::CalendarView::List => {
             event_db::calendar_month_for_community(
                 &db,
                 community_id,
@@ -126,7 +126,7 @@ pub async fn get_communities(
                 selected_day.as_deref(),
                 &rows,
             );
-            let event_list = calendar::render_calendar_events(
+            let day_detail = calendar::render_calendar_day_detail(
                 community_id,
                 community_tz,
                 &rows,
@@ -135,8 +135,16 @@ pub async fn get_communities(
                 month,
                 can_create_event,
             );
-            format!("{calendar}{event_list}")
+            format!("{calendar}{day_detail}")
         }
+        matrix::CalendarView::List => calendar::render_calendar_list(
+            community_id,
+            community_tz,
+            &rows,
+            year,
+            month,
+            can_create_event,
+        ),
         matrix::CalendarView::Matrix => {
             let members = membership_db::list_all_active(&db, community_id).await?;
             let attendances = if members.len() > matrix::MEMBER_ROW_CAP

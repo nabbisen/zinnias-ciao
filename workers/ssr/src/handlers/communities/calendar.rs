@@ -16,7 +16,14 @@ pub(super) fn month_bounds(year: i32, month: i32) -> (String, String) {
     )
 }
 
-pub(super) fn render_calendar_events(
+/// Calendar tab's day-detail section (RFC-073). Always present in the DOM —
+/// `#calendar-day-detail` is a link target for the grid's date-cell
+/// fragments, so it must exist whether or not a day is currently selected.
+/// With a day selected, it reuses the existing month/day event-list helper
+/// (event links only, no attendance counts, per the RFC's Calendar Tab
+/// decision). With no day selected, it shows a short prompt instead of the
+/// full month list — the full month list is the Events list tab's job.
+pub(super) fn render_calendar_day_detail(
     community_id: &str,
     community_tz: &str,
     rows: &[event_db::HomeEventRow],
@@ -25,15 +32,70 @@ pub(super) fn render_calendar_events(
     month: i32,
     can_create_event: bool,
 ) -> String {
-    events::render_calendar_events(
+    let inner = match selected_day {
+        Some(day) => events::render_calendar_events(
+            community_id,
+            community_tz,
+            rows,
+            Some(day),
+            year,
+            month,
+            can_create_event,
+        ),
+        None => format!(
+            "<section style=\"margin:0 auto 1.5rem;max-width:42rem\">\
+             <p style=\"font-size:.875rem;color:#6e6e73;margin:0\">{}</p></section>",
+            i18n::JA_CALENDAR_DAY_DETAIL_PROMPT
+        ),
+    };
+    format!("<div id=\"calendar-day-detail\">{inner}</div>")
+}
+
+/// Events list tab (RFC-073): the full month-scoped event list, regardless
+/// of any selected day, with its own month navigation using `view=list`
+/// hrefs. Reuses the same event-list helper as day detail, always passing
+/// `selected_day = None` so `day` never filters this tab's contents.
+pub(super) fn render_calendar_list(
+    community_id: &str,
+    community_tz: &str,
+    rows: &[event_db::HomeEventRow],
+    year: i32,
+    month: i32,
+    can_create_event: bool,
+) -> String {
+    let (prev_year, prev_month) = add_months(year, month, -1);
+    let (next_year, next_month) = add_months(year, month, 1);
+    let month_url =
+        |y: i32, m: i32| format!("/c/{community_id}/communities?month={y:04}-{m:02}&view=list");
+    let current_url = format!("/c/{community_id}/communities?view=list");
+    let nav = format!(
+        "<nav aria-label=\"Calendar month\" style=\"display:flex;gap:.5rem;\
+         align-items:center;justify-content:space-between;margin:0 auto .75rem;\
+         max-width:42rem\">\
+         <a href=\"{prev_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
+         color:#007AFF;text-decoration:none;font-size:.875rem\">{prev_label}</a>\
+         <a href=\"{current_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
+         color:#007AFF;text-decoration:none;font-size:.875rem\">{current_label}</a>\
+         <a href=\"{next_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
+         color:#007AFF;text-decoration:none;font-size:.875rem\">{next_label}</a>\
+         </nav>",
+        prev_url = render::escape_html(&month_url(prev_year, prev_month)),
+        next_url = render::escape_html(&month_url(next_year, next_month)),
+        current_url = render::escape_html(&current_url),
+        prev_label = i18n::JA_CALENDAR_PREV_MONTH,
+        next_label = i18n::JA_CALENDAR_NEXT_MONTH,
+        current_label = i18n::JA_CALENDAR_THIS_MONTH,
+    );
+    let list = events::render_calendar_events(
         community_id,
         community_tz,
         rows,
-        selected_day,
+        None,
         year,
         month,
         can_create_event,
-    )
+    );
+    format!("{nav}{list}")
 }
 
 pub(super) fn render_calendar_month(
@@ -157,7 +219,7 @@ pub(super) fn render_calendar_month(
             ""
         };
         cells.push_str(&format!(
-            "<a href=\"/c/{cid}/communities?month={month_key}&amp;day={day_date}\" \
+            "<a href=\"/c/{cid}/communities?month={month_key}&amp;day={day_date}#calendar-day-detail\" \
              aria-label=\"{aria}\"{aria_current} style=\"min-height:60px;border:{border_width} solid {border};\
              border-radius:10px;background:{bg};padding:.375rem .25rem;display:flex;\
              flex-direction:column;align-items:center;justify-content:space-between;\

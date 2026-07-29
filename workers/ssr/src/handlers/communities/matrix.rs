@@ -17,12 +17,14 @@ pub(super) const EVENT_DAY_ROW_CAP: usize = 300;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum CalendarView {
     Month,
+    List,
     Matrix,
 }
 
 impl CalendarView {
     pub(super) fn from_query(value: Option<&str>) -> Self {
         match value {
+            Some("list") => Self::List,
             Some("matrix") => Self::Matrix,
             _ => Self::Month,
         }
@@ -40,6 +42,10 @@ pub(super) fn switcher_next(
             format!("communities:{year:04}-{month:02}:{day}:matrix")
         }
         (None, CalendarView::Matrix) => format!("communities:{year:04}-{month:02}:matrix"),
+        (Some(day), CalendarView::List) => {
+            format!("communities:{year:04}-{month:02}:{day}:list")
+        }
+        (None, CalendarView::List) => format!("communities:{year:04}-{month:02}:list"),
         (Some(day), CalendarView::Month) => format!("communities:{year:04}-{month:02}:{day}"),
         (None, CalendarView::Month) => format!("communities:{year:04}-{month:02}"),
     }
@@ -61,6 +67,11 @@ pub(super) fn render_mode_tabs(
         render::escape_html(community_id),
         render::escape_html(&month_key),
         day_query
+    );
+    let list_href = format!(
+        "/c/{}/communities?month={}&amp;view=list",
+        render::escape_html(community_id),
+        render::escape_html(&month_key)
     );
     let matrix_href = format!(
         "/c/{}/communities?month={}{}&amp;view=matrix",
@@ -85,12 +96,17 @@ pub(super) fn render_mode_tabs(
 
     format!(
         "<nav aria-label=\"Calendar view\" style=\"display:flex;gap:.5rem;\
-         margin:0 auto 1rem;max-width:42rem;flex-wrap:wrap\">{}{}\
+         margin:0 auto 1rem;max-width:42rem;flex-wrap:wrap\">{}{}{}\
          </nav>",
         tab(
             &month_href,
             i18n::JA_CALENDAR_VIEW_MONTH,
             current == CalendarView::Month
+        ),
+        tab(
+            &list_href,
+            i18n::JA_CALENDAR_VIEW_LIST,
+            current == CalendarView::List
         ),
         tab(
             &matrix_href,
