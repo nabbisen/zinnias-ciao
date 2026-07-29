@@ -41,8 +41,8 @@ weaker part of the product.
 
 Accordingly:
 
-- **product-feature work resumes** — RFC-073 and RFC-074 are complete (see
-  Active Themes);
+- **product-feature work resumes** — RFC-073 and RFC-074 are complete and
+  RFC-072 is in progress (see Active Themes);
 - the RFC-050 hosted evidence campaign is **deferred, not cancelled**, and
   remains mandatory before any real community uses the service;
 - persistent-incident-sink provisioning (Logpush → R2) is deferred with it, since
@@ -140,9 +140,20 @@ section remains the tracked summary of record.
    RFC-073 review: RFC-067's matrix contract is now proven behaviorally in
    `ssr`, with the `release_gates.rs` source literal retained as a secondary
    tripwire.
-3. **Choose the next user-facing theme** from Post-Hold Feature Candidates
-   below. No theme is currently selected — this is an owner decision.
-3. **When a pilot is scheduled** — and not before — provision the persistent
+3. **RFC-072 — Member language preference and runtime localization.**
+   Owner-selected 2026-07-30 and accepted the same day; **RFC-075 is to follow
+   it.** The measurement that shaped the design: all 254 English string
+   constants already exist under a parity gate, and **not one is reachable from
+   the worker**. This is therefore a seam refactor, not a translation project —
+   handlers name `i18n::JA_*` directly, so there is nowhere for a locale to be
+   honoured. Implementation runs in three slices: the locale seam plus schema
+   and settings form (A), the member-facing core (B), then exposing the switcher
+   with browser and 200%-text evidence (C). The switcher is deliberately **not
+   user-reachable until Slice C**, so members are never offered a language the
+   product only half-honours. Admin surfaces, anonymous routes, and
+   `Accept-Language` are a future RFC. No hosted-evidence precondition.
+4. **Choose the next user-facing theme** after RFC-075 — an owner decision.
+5. **When a pilot is scheduled** — and not before — provision the persistent
    incident sink (Logpush → R2), then build and freeze one exact immutable
    release candidate and execute the RFC-050 hosted evidence campaign for the
    remaining B1, B3, B4, and B5 claims. The campaign must include E7 canary
@@ -203,11 +214,12 @@ The paused proposed backlog is:
 | 044 | D1 query-budget gate and integration test harness | Narrowed 2026-07-29 after the RFC-050 overlap check: harness and all four deferred regression tests discharged at `c55787a`. Only the runtime query-counting shim remains; gates beta, not the first pilot. |
 | 045 | Pre-pilot runtime verification matrix | Runtime evidence and operator verification candidate. |
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
-| 072 | Member language preference and runtime localization | Design remains proposed. No longer held by the feature freeze (lifted 2026-07-29); simply not yet scheduled. |
 | 075 | Render style system and inline style reduction | Design remains proposed. No longer held by the feature freeze (lifted 2026-07-29); simply not yet scheduled. |
 
-RFC-073 left this table on 2026-07-29 (shipped at `ed549be`) and RFC-074 on
-2026-07-30 (shipped at `30e90c4`); neither is paused proposed work any more.
+RFC-073 left this table on 2026-07-29 (shipped at `ed549be`), RFC-074 on
+2026-07-30 (shipped at `30e90c4`), and RFC-072 on 2026-07-30 (accepted); none of
+the three is paused proposed work any more. RFC-075 is next in the default
+order.
 
 ## Post-Hold Feature Candidates
 
@@ -248,11 +260,9 @@ RFC is.
    between a route's exact budget and the 2× ceiling the existing static gate
    enforces. It gates beta.
 
-7. **RFC-072: Member Language Preference and Runtime Localization**
-   The i18n scaffold exists, but runtime UI language selection does not. This
-   should start with design review around membership-vs-user scope, locale
-   precedence, settings UX, `html lang`, and tests before schema or handler
-   work.
+7. ~~**RFC-072: Member Language Preference and Runtime Localization**~~ —
+   **accepted** (2026-07-30), implementation pending in Slices A–C. Retained
+   here for ordering context only; it is no longer a candidate.
 
 8. ~~**RFC-073: Calendar Events List and Day Detail UX**~~ — **done**
    (`ed549be`, 2026-07-29). Retained here for ordering context only; it is no
