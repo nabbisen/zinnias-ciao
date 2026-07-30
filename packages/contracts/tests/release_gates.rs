@@ -172,7 +172,7 @@ fn i18n_en_ja_parity_count() {
         (EN_NAV_HOME, JA_NAV_HOME),
         (EN_NAV_COMMUNITIES, JA_NAV_COMMUNITIES),
         (EN_NAV_ME, JA_NAV_ME),
-        (EN_HOME_TODAY, JA_HOME_TODAY),
+        (EN_TODAY, JA_TODAY),
         (EN_HOME_THIS_WEEK, JA_HOME_THIS_WEEK),
         (EN_HOME_LATER, JA_HOME_LATER),
         (EN_HOME_CREATE_EVENT, JA_HOME_CREATE_EVENT),
@@ -181,7 +181,6 @@ fn i18n_en_ja_parity_count() {
         (EN_HOME_CALENDAR_TITLE, JA_HOME_CALENDAR_TITLE),
         (EN_HOME_CALENDAR_HELPER, JA_HOME_CALENDAR_HELPER),
         (EN_HOME_CALENDAR_EMPTY, JA_HOME_CALENDAR_EMPTY),
-        (EN_HOME_CALENDAR_COUNT_SUFFIX, JA_HOME_CALENDAR_COUNT_SUFFIX),
         (EN_HOME_AGENDA_TITLE, JA_HOME_AGENDA_TITLE),
         (EN_CALENDAR_MONTH_TITLE, JA_CALENDAR_MONTH_TITLE),
         (EN_CALENDAR_PREV_MONTH, JA_CALENDAR_PREV_MONTH),
@@ -510,6 +509,27 @@ fn i18n_en_ja_parity_count() {
         (EN_NAV_BACK, JA_NAV_BACK),
         (EN_NAV_SWITCH_GO, JA_NAV_SWITCH_GO),
         (EN_NAV_SWITCH_ARIA_LABEL, JA_NAV_SWITCH_ARIA_LABEL),
+        (EN_CALENDAR_DAY_EVENTS_COUNT, JA_CALENDAR_DAY_EVENTS_COUNT),
+        (
+            EN_CALENDAR_MATRIX_MEMBER_COLUMN,
+            JA_CALENDAR_MATRIX_MEMBER_COLUMN,
+        ),
+        (
+            EN_CALENDAR_MATRIX_CELL_NO_EVENTS,
+            JA_CALENDAR_MATRIX_CELL_NO_EVENTS,
+        ),
+        (
+            EN_CALENDAR_MATRIX_CELL_CANCELLED,
+            JA_CALENDAR_MATRIX_CELL_CANCELLED,
+        ),
+        (
+            EN_CALENDAR_MATRIX_CELL_SINGLE_STATUS,
+            JA_CALENDAR_MATRIX_CELL_SINGLE_STATUS,
+        ),
+        (
+            EN_CALENDAR_MATRIX_CELL_BREAKDOWN,
+            JA_CALENDAR_MATRIX_CELL_BREAKDOWN,
+        ),
         (EN_NOTE_DELETE_BODY, JA_NOTE_DELETE_BODY),
         (EN_NOTE_KEEP_ACTION, JA_NOTE_KEEP_ACTION),
         (EN_FORM_FIELD_TITLE, JA_FORM_FIELD_TITLE),
@@ -1431,6 +1451,8 @@ const MATRIX_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/communities/matrix.rs");
 const MATRIX_DETAIL_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/communities/matrix/detail.rs");
+const MATRIX_CELLS_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/communities/matrix/cells.rs");
 const COMMUNITIES_MATRIX_SRC: &str = concat!(
     include_str!("../../../workers/ssr/src/handlers/communities/matrix.rs"),
     include_str!("../../../workers/ssr/src/handlers/communities/matrix/cells.rs"),
@@ -2292,7 +2314,7 @@ fn calendar_overview_contract_is_explicit() {
         "Calendar overview must include helper copy explaining that details are in the list below"
     );
     assert!(
-        calendar_src.contains("今日"),
+        calendar_src.contains("i18n::t(locale, i18n::TODAY)"),
         "Today must be identified by visible text, not color alone"
     );
     assert!(
@@ -2361,7 +2383,9 @@ fn rfc067_monthly_attendance_matrix_contract_is_guarded() {
             && COMMUNITIES_MATRIX_SRC.contains("\"?\"")
             && COMMUNITIES_MATRIX_SRC.contains("\"中\"")
             && COMMUNITIES_MATRIX_SRC.contains("format!(\"{answered}/{total}\")")
-            && COMMUNITIES_MATRIX_SRC.contains("未回答{}件"),
+            && COMMUNITIES_MATRIX_SRC.contains("i18n::CALENDAR_MATRIX_CELL_BREAKDOWN")
+            && zinnias_ciao_contracts::i18n::JA_CALENDAR_MATRIX_CELL_BREAKDOWN
+                .contains("未回答{}件"),
         "RFC-067 matrix cells must keep the reviewed single-event symbols and multi-event answered/total accessible breakdown"
     );
     assert!(
@@ -2533,19 +2557,23 @@ fn rfc072_language_settings_post_is_reject_no_op_replay_and_target_safe() {
 
 #[test]
 fn rfc072_member_facing_core_has_no_half_migrated_page() {
-    // RFC-072 Slice B §7.4: a half-migrated page — some strings resolved via
-    // `i18n::t(locale, ...)`, others still bare `i18n::JA_*` — is worse than
-    // not started, because `html lang` would then claim a language the page
-    // doesn't fully render. This gate pins each §5.2 surface (home.rs,
-    // communities.rs, calendar.rs, matrix.rs, event.rs) to zero bare
-    // `i18n::JA_` references, with three narrow, deliberate, and reviewed
-    // exceptions — every other bare reference would mean a string was missed.
+    // RFC-072 (§7.4 of Slice B's handoff, extended by Slice C's §7.2): a
+    // half-migrated page — some strings resolved via `i18n::t(locale, ...)`,
+    // others still bare `i18n::JA_*` — is worse than not started, because
+    // `html lang` would then claim a language the page doesn't fully render.
     //
-    // `me.rs` is intentionally excluded here: its display-name edit sub-page
-    // (get_display_name/post_display_name) still uses bare `i18n::JA_*` and
-    // was not migrated in Slice A, and is not one of Slice B's §5.2 surfaces
-    // — flagged in the review request rather than silently fixed or silently
-    // ignored by loosening this gate to cover it.
+    // Slice C closed every exception Slice B had to leave open (the
+    // date-format gap on Calendar/Matrix, the matrix cells screen-reader
+    // sentences, and me.rs's display-name edit sub-page, which is directly
+    // linked from My Page). The only exception remaining anywhere in the
+    // member-facing core is the one documented immediately below — a
+    // pre-auth branch with no membership lookup yet to resolve a locale
+    // from, the same rationale as `render/errors.rs`.
+    assert_eq!(
+        ME_HANDLER_SRC.matches("i18n::JA_").count(),
+        0,
+        "me.rs must have no bare i18n::JA_ references — RFC-072 Slice C migrated the display-name edit sub-page"
+    );
     assert_eq!(
         HOME_HANDLER_SRC.matches("i18n::JA_").count(),
         0,
@@ -2581,35 +2609,21 @@ fn rfc072_member_facing_core_has_no_half_migrated_page() {
         "communities.rs's one bare i18n::JA_ reference must be the documented pre-auth 401 branch"
     );
 
-    // Exception 2: communities/calendar.rs's month/day aria-labels and the
-    // month-grid header are deliberately Japanese-only date-sentence
-    // structures (see the `tz::date_label_ja` gap noted in the review
-    // request); exactly one bare reference is expected there, inside that
-    // exception.
+    // RFC-072 Slice C closed the date-format gap (§5.1) and the matrix
+    // cells gap (§5.2): communities/calendar.rs and matrix/cells.rs now
+    // have no remaining exception either.
     assert_eq!(
         COMMUNITIES_CALENDAR_HANDLER_SRC
             .matches("i18n::JA_")
             .count(),
-        1,
-        "communities/calendar.rs must have exactly the one documented date-format exception, no more"
+        0,
+        "communities/calendar.rs must have no bare i18n::JA_ references — RFC-072 Slice C closed the date-format exception"
     );
-    assert!(
-        COMMUNITIES_CALENDAR_HANDLER_SRC.contains("i18n::JA_HOME_CALENDAR_COUNT_SUFFIX"),
-        "communities/calendar.rs's one bare i18n::JA_ reference must be the documented aria-label exception"
+    assert_eq!(
+        MATRIX_CELLS_HANDLER_SRC.matches("i18n::JA_").count(),
+        0,
+        "communities/matrix/cells.rs must have no bare i18n::JA_ references — RFC-072 Slice C migrated it"
     );
-
-    // Exception 3: communities/matrix/cells.rs is deliberately left entirely
-    // unmigrated (whole-sentence Japanese aria-labels; the visible cell
-    // symbols are already language-neutral) — checked here only to document
-    // that the exclusion is intentional, not to bound its count.
-    assert!(
-        include_str!("../../../workers/ssr/src/handlers/communities/matrix/cells.rs")
-            .contains("i18n::JA_STATUS_GOING"),
-        "communities/matrix/cells.rs is expected to remain untouched by RFC-072 Slice B"
-    );
-
-    // matrix.rs (top-level, excluding cells.rs/detail.rs) carries the same
-    // "{year}年{month}月" date-format exception as calendar.rs.
     assert_eq!(
         MATRIX_HANDLER_SRC.matches("i18n::JA_").count(),
         0,
@@ -2638,6 +2652,19 @@ fn rfc072_communities_and_event_pages_resolve_locale_and_html_lang_together() {
             && EVENT_HANDLER_SRC.contains("i18n::t(locale, i18n::EVENT_TITLE_HEADER)")
             && EVENT_HANDLER_SRC.contains("render::page_localized(locale, &event.title, &body)"),
         "event.rs's get_event_detail must resolve locale from require_membership and thread it into page_localized"
+    );
+}
+
+#[test]
+fn rfc072_language_setting_is_linked_from_my_page() {
+    // RFC-072 Slice C §5.5/§10 acceptance criterion 9: the setting is now
+    // reachable. This is the flip side of Slice A/B's "not yet linked"
+    // requirement — checked here since no earlier gate asserted the link's
+    // absence in code (only the tester checklist tracked it).
+    assert!(
+        ME_HANDLER_SRC.contains("/c/{cid}/me/language")
+            && ME_HANDLER_SRC.contains("i18n::t(locale, i18n::ME_LANGUAGE_TITLE)"),
+        "My Page must link to the language setting, added only after §5.1-5.4 closed (handoff §7.1)"
     );
 }
 

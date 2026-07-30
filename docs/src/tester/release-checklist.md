@@ -383,6 +383,25 @@ Slice C's job). Nothing below is a user-visible language-switching claim.
 - [x] No authorization, validation, or error-classification decision branches on locale anywhere in this slice — locale still selects rendered text only.
 - [x] Locale resolution adds no additional D1 query to any budgeted route (the migrated pages' existing `require_membership`/`find_active` call already carried `ui_language`).
 
+## Locale seam gates (RFC-072 Slice C — user-visible language switching)
+
+This is the slice where claiming user-visible language switching becomes
+true: the setting is linked from My Page, and every page a member can reach
+from My Page — including dates, times, and the matrix's screen-reader
+labels — honors the language they selected. Out-of-boundary surfaces
+(admin, anonymous, error pages) remain Japanese by documented decision, not
+by omission.
+
+- [x] `GET`/`POST /c/:cid/me/language` is now linked from My Page, near the display-name action — superseding Slice A/B's "not yet linked" state. *(handlers/me.rs `get_me` + `rfc072_language_setting_is_linked_from_my_page` release gate)*
+- [x] Dates and times follow locale everywhere they render: day labels use the RFC's decided English shape (`Mon, 3 Aug` — never all-numeric, the month always spelled or abbreviated) and month headers use the full month name (`August 2026`). Closes the gap Slice B left open on Calendar (month grid, day-cell aria-labels), Matrix (month header), and Event Detail. *(packages/contracts/src/tz.rs `weekday_en`/`month_name_en`/`date_label_en` + native tests; render/time.rs `format_day_time_tz_localized`)*
+- [x] The matrix's screen-reader cell labels (date, member name, per-status counts) are now `Localized` templates substituted positionally, not composed Japanese literals. English uses label-value form (`events: 2`, `cancelled: 1`) rather than pluralized counts (never `"1 events"`); a native test asserts every template pair has the same placeholder count on both sides. Visible cell symbols (`○×済?中`, `N/total`) are unchanged. *(handlers/communities/matrix/cells.rs + `cell_label_templates_have_matching_placeholder_counts` native test)*
+- [x] The display-name edit sub-page (`get_display_name`/`post_display_name`), linked directly from My Page, is now fully migrated — the gap Slice A left and Slice B didn't own. *(handlers/me.rs + `rfc072_member_facing_core_has_no_half_migrated_page` release gate, extended to cover it)*
+- [x] Two copy constants were given more accurate names: `HOME_TODAY` moved to `general.rs` as `TODAY` (it renders on Calendar, not just Home; rename only, values unchanged), and the matrix's member-column header now has its own pair (`CALENDAR_MATRIX_MEMBER_COLUMN`) instead of reusing the `ROLE_MEMBER` badge label.
+- [x] The anti-half-migration gate's exception list is reduced to the one that genuinely remains: `communities.rs`'s pre-auth 401 in `post_matrix_export_audit`, which fires before any membership lookup exists. *(release_gates.rs `rfc072_member_facing_core_has_no_half_migrated_page`)*
+- [x] Browser smoke verifies, on one member with two communities: switching to English via the plain no-JS settings form: My Page, Home, Calendar (month/list/matrix), Event Detail, and the display-name sub-page all render English with `lang="en"`, including a date label and a month header; switching back to Japanese flips a page back; the second community membership's `ui_language` is unaffected throughout (locale is membership-scoped, not user-scoped). *(scripts/smoke/language-preference.mjs; evidence `.git-exclude/evidence/rfc072/`)*
+- [x] 200%-text scaling checked on My Page, the settings page, and Calendar's month view while rendering English: no horizontal overflow on any of the three. A pre-existing vertical overlap between the fixed bottom nav and page content in full-page screenshots was observed identically in both languages on My Page and Calendar — not a regression from English text length — and was not modified; see the Slice C review request. *(scripts/smoke/language-preference.mjs; evidence `.git-exclude/evidence/rfc072/`)*
+- [x] Re-running `smoke:calendar-views`, `smoke:matrix`, `smoke:matrix-csv`, `smoke:community-switch`, and `smoke:display-name` unmodified all still pass — this slice touches surfaces all five exercise.
+
 ## Operational gates
 
 - [x] `GET /healthz` returns `{"ok":true,"ready":true,"service":"ciao.zinnias"}` only with a valid pepper and a generic not-ready `503` otherwise. Corrected exact-candidate hosted evidence also proves classified required-secret rejection, runtime-negative behavior, valid credential flows, secret-deletion failure behavior, bounded non-mutation, and strict teardown. *(RFC-077 criteria 8–9; architecture-reviewed and owner-accepted 2026-07-22; B2 closed.)*

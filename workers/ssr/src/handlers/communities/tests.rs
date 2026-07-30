@@ -175,6 +175,42 @@ fn events_list_tab_ignores_selected_day_and_shows_full_month() {
 }
 
 #[test]
+fn render_calendar_month_day_cell_aria_label_follows_locale() {
+    use zinnias_ciao_contracts::tz;
+
+    let rows = vec![event_row(
+        "day_1",
+        "event_1",
+        "2026-08-03",
+        "Morning",
+        "scheduled",
+    )];
+
+    let ja =
+        calendar::render_calendar_month("community-a", 2026, 8, Some(3), None, &rows, Locale::Ja);
+    assert!(ja.contains("aria-label=\"2026年8月3日、今日、予定1件\""));
+
+    let en =
+        calendar::render_calendar_month("community-a", 2026, 8, Some(3), None, &rows, Locale::En);
+    let en_date = tz::date_label_en("2026-08-03");
+    assert!(en.contains(&format!("aria-label=\"{en_date}, Today, events: 1\"")));
+    assert!(!en.contains("年"));
+    assert!(!en.contains("今日"));
+}
+
+#[test]
+fn render_calendar_month_header_follows_locale() {
+    let rows: Vec<event_db::HomeEventRow> = vec![];
+
+    let ja = calendar::render_calendar_month("community-a", 2026, 8, None, None, &rows, Locale::Ja);
+    assert!(ja.contains(">2026年8月</p>"));
+
+    let en = calendar::render_calendar_month("community-a", 2026, 8, None, None, &rows, Locale::En);
+    assert!(en.contains(">August 2026</p>"));
+    assert!(!en.contains("2026年8月"));
+}
+
+#[test]
 fn render_calendar_list_labels_follow_locale() {
     use zinnias_ciao_contracts::i18n;
     let rows: Vec<event_db::HomeEventRow> = vec![];
@@ -458,12 +494,44 @@ fn matrix_render_member_column_header_follows_locale() {
     };
 
     let ja = matrix::render_matrix(input(Locale::Ja));
-    assert!(ja.contains(&format!(">{}</th>", i18n::JA_ROLE_MEMBER)));
-    assert!(!ja.contains(&format!(">{}</th>", i18n::EN_ROLE_MEMBER)));
+    assert!(ja.contains(&format!(">{}</th>", i18n::JA_CALENDAR_MATRIX_MEMBER_COLUMN)));
+    assert!(!ja.contains(&format!(">{}</th>", i18n::EN_CALENDAR_MATRIX_MEMBER_COLUMN)));
 
     let en = matrix::render_matrix(input(Locale::En));
-    assert!(en.contains(&format!(">{}</th>", i18n::EN_ROLE_MEMBER)));
-    assert!(!en.contains(&format!(">{}</th>", i18n::JA_ROLE_MEMBER)));
+    assert!(en.contains(&format!(">{}</th>", i18n::EN_CALENDAR_MATRIX_MEMBER_COLUMN)));
+    assert!(!en.contains(&format!(">{}</th>", i18n::JA_CALENDAR_MATRIX_MEMBER_COLUMN)));
+}
+
+#[test]
+fn matrix_render_month_header_follows_locale() {
+    let members = vec![membership::MemberSummary {
+        id: "mem_a".to_string(),
+        display_name: "Alice".to_string(),
+        role: "member".to_string(),
+    }];
+    let rows: Vec<event_db::HomeEventRow> = vec![];
+    let attendances = attendance_map(vec![]);
+
+    let input = |locale: Locale| matrix::MatrixRenderInput {
+        community_id: "community-a",
+        community_tz: "Asia/Tokyo",
+        year: 2026,
+        month: 8,
+        selected_day: None,
+        can_export_csv: false,
+        export_token: None,
+        rows: &rows,
+        members: &members,
+        attendances: &attendances,
+        locale,
+    };
+
+    let ja = matrix::render_matrix(input(Locale::Ja));
+    assert!(ja.contains(">2026年8月</p>"));
+
+    let en = matrix::render_matrix(input(Locale::En));
+    assert!(en.contains(">August 2026</p>"));
+    assert!(!en.contains("2026年8月"));
 }
 
 fn event_row(

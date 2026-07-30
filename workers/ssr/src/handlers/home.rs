@@ -163,13 +163,14 @@ fn render_home_communities(
             .filter(|r| seen.insert(r.event_id.clone()))
             .take(4)
             .map(|r| {
-                let date = render::format_day_time_tz(
+                let date = render::format_day_time_tz_localized(
                     &render::CardDay {
                         starts_at_utc: &r.starts_at_utc,
                         ends_at_utc: &r.ends_at_utc,
                         day_date: &r.day_date,
                     },
                     &community.timezone,
+                    locale,
                 );
                 let cancelled = if r.event_status == "cancelled" || r.occurrence_status == "cancelled" {
                     format!(

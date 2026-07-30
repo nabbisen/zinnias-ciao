@@ -1,7 +1,31 @@
+use super::event_card::CardDay;
 use super::participants::initials;
 use super::shell::{escape_html, shell_with_lang};
 use super::status::status_display;
-use super::time::{parse_utc_display, parse_utc_time};
+use super::time::{format_day_time_tz_localized, parse_utc_display, parse_utc_time};
+
+// RFC-072 Slice C: the date label inside a formatted day/time range must
+// follow `locale`, not always Japanese.
+#[test]
+fn format_day_time_tz_localized_date_label_follows_locale() {
+    use zinnias_ciao_contracts::Locale;
+
+    let day = CardDay {
+        starts_at_utc: "2026-08-03T00:00:00.000Z",
+        ends_at_utc: "2026-08-03T01:00:00.000Z",
+        day_date: "2026-08-03",
+    };
+
+    let ja = format_day_time_tz_localized(&day, "Asia/Tokyo", Locale::Ja);
+    assert!(ja.starts_with("8月3日（月）"));
+
+    let en = format_day_time_tz_localized(&day, "Asia/Tokyo", Locale::En);
+    assert!(en.starts_with("Mon, 3 Aug"));
+    assert!(
+        !en.chars().take(3).all(|c| c.is_ascii_digit() || c == '/'),
+        "EN date label must not be all-numeric: {en}"
+    );
+}
 
 // RFC-072: `html lang` must derive from the same locale passed to the
 // shell — tested directly here for the same reason `title_escaped_in_shell`

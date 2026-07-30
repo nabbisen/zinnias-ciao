@@ -45,8 +45,9 @@ fn en_ja_parity() {
         "NAV_HOME",
         "NAV_COMMUNITIES",
         "NAV_ME",
+        "NAV_SWITCH_ARIA_LABEL",
+        "TODAY",
         // Home
-        "HOME_TODAY",
         "HOME_THIS_WEEK",
         "HOME_LATER",
         "HOME_CREATE_EVENT",
@@ -55,7 +56,6 @@ fn en_ja_parity() {
         "HOME_CALENDAR_TITLE",
         "HOME_CALENDAR_HELPER",
         "HOME_CALENDAR_EMPTY",
-        "HOME_CALENDAR_COUNT_SUFFIX",
         "HOME_AGENDA_TITLE",
         "CALENDAR_MONTH_TITLE",
         "CALENDAR_PREV_MONTH",
@@ -72,6 +72,12 @@ fn en_ja_parity() {
         "CALENDAR_MATRIX_NO_MEMBERS",
         "CALENDAR_MATRIX_CSV_EXPORT",
         "CALENDAR_MATRIX_CSV_ERROR",
+        "CALENDAR_DAY_EVENTS_COUNT",
+        "CALENDAR_MATRIX_MEMBER_COLUMN",
+        "CALENDAR_MATRIX_CELL_NO_EVENTS",
+        "CALENDAR_MATRIX_CELL_CANCELLED",
+        "CALENDAR_MATRIX_CELL_SINGLE_STATUS",
+        "CALENDAR_MATRIX_CELL_BREAKDOWN",
         // Me
         "ME_SECTION_NAME",
         "ME_SECTION_COMMUNITY",
@@ -221,7 +227,7 @@ fn en_ja_parity() {
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
     ];
-    assert_eq!(en_keys.len(), 196, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 202, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }
@@ -240,4 +246,46 @@ fn t_resolves_locale_aware_pairs() {
     assert_eq!(t(Locale::En, ME_SECTION_NAME), super::EN_ME_SECTION_NAME);
     assert_eq!(t(Locale::Ja, ROLE_ADMIN), super::JA_ROLE_ADMIN);
     assert_eq!(t(Locale::En, ROLE_ADMIN), super::EN_ROLE_ADMIN);
+}
+
+// RFC-072 Slice C: matrix/cells.rs substitutes these templates' `{}`
+// placeholders positionally, not through `format!`. A mismatched
+// placeholder count between `ja` and `en` would be a silent rendering bug
+// (an English label missing a count, or a stray literal "{}" in output) —
+// this test is the guard the handoff's §8 requires.
+#[test]
+fn cell_label_templates_have_matching_placeholder_counts() {
+    use super::{
+        CALENDAR_MATRIX_CELL_BREAKDOWN, CALENDAR_MATRIX_CELL_CANCELLED,
+        CALENDAR_MATRIX_CELL_NO_EVENTS, CALENDAR_MATRIX_CELL_SINGLE_STATUS,
+    };
+
+    fn placeholder_count(s: &str) -> usize {
+        s.matches("{}").count()
+    }
+
+    for (name, pair) in [
+        (
+            "CALENDAR_MATRIX_CELL_NO_EVENTS",
+            CALENDAR_MATRIX_CELL_NO_EVENTS,
+        ),
+        (
+            "CALENDAR_MATRIX_CELL_CANCELLED",
+            CALENDAR_MATRIX_CELL_CANCELLED,
+        ),
+        (
+            "CALENDAR_MATRIX_CELL_SINGLE_STATUS",
+            CALENDAR_MATRIX_CELL_SINGLE_STATUS,
+        ),
+        (
+            "CALENDAR_MATRIX_CELL_BREAKDOWN",
+            CALENDAR_MATRIX_CELL_BREAKDOWN,
+        ),
+    ] {
+        assert_eq!(
+            placeholder_count(pair.ja),
+            placeholder_count(pair.en),
+            "{name}: ja and en must consume the same number of positional substitutions"
+        );
+    }
 }

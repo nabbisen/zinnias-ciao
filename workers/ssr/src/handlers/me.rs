@@ -101,6 +101,10 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
                style=\"display:inline-block;font-size:.9375rem;color:#007AFF;\
                margin-top:.5rem;min-height:44px;line-height:44px;text-decoration:none\">\
                {change_name}</a>\
+             <a href=\"/c/{cid}/me/language\" \
+               style=\"display:block;font-size:.9375rem;color:#007AFF;\
+               min-height:44px;line-height:44px;text-decoration:none\">\
+               {change_language}</a>\
            </section>\
            <section style=\"margin-bottom:1.5rem\">\
              <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
@@ -148,6 +152,7 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
         name = render::escape_html(&membership.display_name),
         flash_html = flash_html,
         change_name = i18n::t(locale, i18n::ME_CHANGE_DISPLAY_NAME),
+        change_language = i18n::t(locale, i18n::ME_LANGUAGE_TITLE),
         community = render::escape_html(community_name),
         role = role_label,
         community_create = community_create_html,
@@ -210,7 +215,7 @@ pub async fn post_display_name(
                 &auth.user_id,
                 &membership,
                 &raw_display_name,
-                Some(display_name_error(err)),
+                Some(display_name_error(membership.locale, err)),
             )
             .await;
         }
@@ -290,7 +295,8 @@ fn render_display_name_form(
     error: Option<&str>,
 ) -> Result<Response> {
     let body = display_name_form_body(membership, token, display_name, error);
-    render::page(i18n::JA_ME_DISPLAY_NAME_EDIT_TITLE, &body)
+    let title = i18n::t(membership.locale, i18n::ME_DISPLAY_NAME_EDIT_TITLE);
+    render::page_localized(membership.locale, title, &body)
 }
 
 fn display_name_form_body(
@@ -308,6 +314,7 @@ fn display_name_form_body(
         })
         .unwrap_or_default();
     let cid = render::escape_html(&membership.community_id);
+    let locale = membership.locale;
     format!(
         "{header}<main style=\"padding:1rem 1rem 5rem;max-width:560px;margin:0 auto\">\
            {error_html}\
@@ -320,15 +327,15 @@ fn display_name_form_body(
            </form>\
            <a href=\"/c/{cid}/me\" style=\"display:inline-block;margin-top:.75rem;color:#007AFF;min-height:44px;line-height:44px;text-decoration:none\">{cancel}</a>\
          </main>{nav}",
-        header = render::header(i18n::JA_ME_DISPLAY_NAME_EDIT_TITLE, ""),
+        header = render::header(i18n::t(locale, i18n::ME_DISPLAY_NAME_EDIT_TITLE), ""),
         error_html = error_html,
         cid = cid,
         token = render::escape_html(token),
-        label = i18n::JA_ME_SECTION_NAME,
+        label = i18n::t(locale, i18n::ME_SECTION_NAME),
         display = render::escape_html(display_name),
-        submit = i18n::JA_ME_DISPLAY_NAME_EDIT_SUBMIT,
-        cancel = i18n::JA_ME_DISPLAY_NAME_EDIT_CANCEL,
-        nav = render::bottom_nav(&membership.community_id, "me"),
+        submit = i18n::t(locale, i18n::ME_DISPLAY_NAME_EDIT_SUBMIT),
+        cancel = i18n::t(locale, i18n::ME_DISPLAY_NAME_EDIT_CANCEL),
+        nav = render::bottom_nav_localized(&membership.community_id, "me", locale),
     )
 }
 
@@ -701,10 +708,13 @@ fn require_changed(results: &[D1Result], index: usize, label: &str) -> Result<()
     }
 }
 
-fn display_name_error(err: DisplayNameError) -> &'static str {
+fn display_name_error(
+    locale: zinnias_ciao_contracts::Locale,
+    err: DisplayNameError,
+) -> &'static str {
     match err {
         DisplayNameError::Empty | DisplayNameError::TooLong | DisplayNameError::InvalidChars => {
-            i18n::JA_ME_DISPLAY_NAME_ERROR
+            i18n::t(locale, i18n::ME_DISPLAY_NAME_ERROR)
         }
     }
 }

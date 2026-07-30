@@ -1,7 +1,6 @@
 use super::Localized;
 
 // ── Home schedule view ────────────────────────────────────────────────────
-pub const EN_HOME_TODAY: &str = "Today";
 pub const EN_HOME_THIS_WEEK: &str = "This Week";
 pub const EN_HOME_LATER: &str = "Later";
 pub const EN_HOME_CREATE_EVENT: &str = "+ Create event";
@@ -11,10 +10,8 @@ pub const EN_HOME_CALENDAR_TITLE: &str = "Upcoming this month";
 pub const EN_HOME_CALENDAR_HELPER: &str =
     "Marked days have upcoming events. See the list below for details.";
 pub const EN_HOME_CALENDAR_EMPTY: &str = "No upcoming events yet.";
-pub const EN_HOME_CALENDAR_COUNT_SUFFIX: &str = " events";
 pub const EN_HOME_AGENDA_TITLE: &str = "Event list";
 
-pub const JA_HOME_TODAY: &str = "今日";
 pub const JA_HOME_THIS_WEEK: &str = "今週";
 pub const JA_HOME_LATER: &str = "それ以降";
 pub const JA_HOME_CREATE_EVENT: &str = "+ イベントを作成";
@@ -24,21 +21,12 @@ pub const JA_HOME_CALENDAR_TITLE: &str = "今月のこれからの予定";
 pub const JA_HOME_CALENDAR_HELPER: &str =
     "予定がある日に印をつけています。詳しくは下の一覧をご覧ください。";
 pub const JA_HOME_CALENDAR_EMPTY: &str = "これからの予定はまだありません。";
-pub const JA_HOME_CALENDAR_COUNT_SUFFIX: &str = "件";
 pub const JA_HOME_AGENDA_TITLE: &str = "予定の一覧";
 
 /// RFC-072 locale-aware pairs; see `i18n::Localized`.
-pub const HOME_TODAY: Localized = Localized {
-    ja: JA_HOME_TODAY,
-    en: EN_HOME_TODAY,
-};
 pub const HOME_CALENDAR_HELPER: Localized = Localized {
     ja: JA_HOME_CALENDAR_HELPER,
     en: EN_HOME_CALENDAR_HELPER,
-};
-pub const HOME_CALENDAR_COUNT_SUFFIX: Localized = Localized {
-    ja: JA_HOME_CALENDAR_COUNT_SUFFIX,
-    en: EN_HOME_CALENDAR_COUNT_SUFFIX,
 };
 pub const HOME_AGENDA_TITLE: Localized = Localized {
     ja: JA_HOME_AGENDA_TITLE,

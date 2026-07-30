@@ -37,6 +37,22 @@ pub const ME_DISPLAY_NAME_UPDATED: Localized = Localized {
     ja: JA_ME_DISPLAY_NAME_UPDATED,
     en: EN_ME_DISPLAY_NAME_UPDATED,
 };
+pub const ME_DISPLAY_NAME_EDIT_TITLE: Localized = Localized {
+    ja: JA_ME_DISPLAY_NAME_EDIT_TITLE,
+    en: EN_ME_DISPLAY_NAME_EDIT_TITLE,
+};
+pub const ME_DISPLAY_NAME_EDIT_SUBMIT: Localized = Localized {
+    ja: JA_ME_DISPLAY_NAME_EDIT_SUBMIT,
+    en: EN_ME_DISPLAY_NAME_EDIT_SUBMIT,
+};
+pub const ME_DISPLAY_NAME_EDIT_CANCEL: Localized = Localized {
+    ja: JA_ME_DISPLAY_NAME_EDIT_CANCEL,
+    en: EN_ME_DISPLAY_NAME_EDIT_CANCEL,
+};
+pub const ME_DISPLAY_NAME_ERROR: Localized = Localized {
+    ja: JA_ME_DISPLAY_NAME_ERROR,
+    en: EN_ME_DISPLAY_NAME_ERROR,
+};
 pub const ME_SECTION_COMMUNITY: Localized = Localized {
     ja: JA_ME_SECTION_COMMUNITY,
     en: EN_ME_SECTION_COMMUNITY,

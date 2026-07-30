@@ -236,7 +236,7 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
                 .get(&day_date)
                 .map(Vec::as_slice)
                 .unwrap_or(&[]);
-            let cell = cell_summary(&day_date, member, events, attendances);
+            let cell = cell_summary(&day_date, member, events, attendances, locale);
             cells.push_str(&format!(
                 "<td aria-label=\"{label}\"{export_value_attr} style=\"border:1px solid #E5E5EA;\
                  min-width:3.25rem;height:2.75rem;text-align:center;vertical-align:middle;\
@@ -283,9 +283,12 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
         |y: i32, m: i32| format!("/c/{community_id}/communities?month={y:04}-{m:02}&view=matrix");
     let current_url = format!("/c/{community_id}/communities?view=matrix");
 
-    // "{year}年{month}月" is deliberately NOT locale-switched — same
-    // Japanese date-sentence exception as calendar.rs's render_calendar_month
-    // (flagged in the review request); see that function's comment for why.
+    // Month header: same shape as calendar.rs's render_calendar_month
+    // (RFC-072 Slice C date-format decision — full month name in English).
+    let month_header = match locale {
+        Locale::Ja => format!("{year}年{month}月"),
+        Locale::En => format!("{} {year}", tz::month_name_en(month)),
+    };
     format!(
         "<section aria-label=\"{title}\" style=\"margin:0 auto 1.5rem;\
          max-width:100%\">\
@@ -293,7 +296,7 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
          align-items:flex-end;justify-content:space-between;gap:.75rem;flex-wrap:wrap\">\
          <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{title}</h2>\
          <p style=\"font-size:.9375rem;font-weight:700;color:#6e6e73;margin:0\">\
-         {year}年{month}月</p>{export_controls}</div>\
+         {month_header}</p>{export_controls}</div>\
          <nav aria-label=\"Calendar month\" style=\"display:flex;gap:.5rem;\
          align-items:center;justify-content:space-between;margin:0 auto .75rem;\
          max-width:42rem\">\
@@ -315,15 +318,14 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
          {member_col}</th>{header_cells}</tr></thead>\
          <tbody>{body_rows}</tbody></table></div>{detail}</section>",
         title = i18n::t(locale, i18n::CALENDAR_MATRIX_TITLE),
-        year = year,
-        month = month,
+        month_header = month_header,
         prev_url = render::escape_html(&month_url(prev_year, prev_month)),
         next_url = render::escape_html(&month_url(next_year, next_month)),
         current_url = render::escape_html(&current_url),
         prev_label = i18n::t(locale, i18n::CALENDAR_PREV_MONTH),
         next_label = i18n::t(locale, i18n::CALENDAR_NEXT_MONTH),
         current_label = i18n::t(locale, i18n::CALENDAR_THIS_MONTH),
-        member_col = i18n::t(locale, i18n::ROLE_MEMBER),
+        member_col = i18n::t(locale, i18n::CALENDAR_MATRIX_MEMBER_COLUMN),
         export_controls = export_controls,
         export_table_attr = export_table_attr,
         header_cells = header_cells,

@@ -18,6 +18,13 @@ pub const EN_CALENDAR_MATRIX_TOO_LARGE: &str =
 pub const EN_CALENDAR_MATRIX_NO_MEMBERS: &str = "There are no active members.";
 pub const EN_CALENDAR_MATRIX_CSV_EXPORT: &str = "Save CSV";
 pub const EN_CALENDAR_MATRIX_CSV_ERROR: &str = "CSV could not be saved. Please try again.";
+// Label-value form for the day-cell aria-label's event count (RFC-072 Slice
+// C) — "events: {count}", never "{count} events", so it needs no plural
+// agreement at any count including zero and one.
+pub const EN_CALENDAR_DAY_EVENTS_COUNT: &str = "events: ";
+// RFC-072 Slice C: own pair, not a reuse of ROLE_MEMBER — a role badge and
+// a table column header are different contexts (§5.4 of the handoff).
+pub const EN_CALENDAR_MATRIX_MEMBER_COLUMN: &str = "Member";
 
 pub const JA_CALENDAR_MONTH_TITLE: &str = "今月の予定";
 pub const JA_CALENDAR_PREV_MONTH: &str = "前の月";
@@ -36,6 +43,8 @@ pub const JA_CALENDAR_MATRIX_TOO_LARGE: &str =
     "この月は回答表を表示するには大きすぎます。カレンダー表示をご利用ください。";
 pub const JA_CALENDAR_MATRIX_NO_MEMBERS: &str = "有効なメンバーがいません。";
 pub const JA_CALENDAR_MATRIX_CSV_EXPORT: &str = "CSVを保存";
+pub const JA_CALENDAR_DAY_EVENTS_COUNT: &str = "予定";
+pub const JA_CALENDAR_MATRIX_MEMBER_COLUMN: &str = "メンバー";
 pub const JA_CALENDAR_MATRIX_CSV_ERROR: &str =
     "CSVを保存できませんでした。もう一度お試しください。";
 
@@ -107,6 +116,52 @@ pub const CALENDAR_MATRIX_CSV_EXPORT: Localized = Localized {
 pub const CALENDAR_MATRIX_CSV_ERROR: Localized = Localized {
     ja: JA_CALENDAR_MATRIX_CSV_ERROR,
     en: EN_CALENDAR_MATRIX_CSV_ERROR,
+};
+pub const CALENDAR_DAY_EVENTS_COUNT: Localized = Localized {
+    ja: JA_CALENDAR_DAY_EVENTS_COUNT,
+    en: EN_CALENDAR_DAY_EVENTS_COUNT,
+};
+pub const CALENDAR_MATRIX_MEMBER_COLUMN: Localized = Localized {
+    ja: JA_CALENDAR_MATRIX_MEMBER_COLUMN,
+    en: EN_CALENDAR_MATRIX_MEMBER_COLUMN,
+};
+
+// ── Matrix cell aria-label templates (RFC-072 Slice C) ────────────────────
+// Positional `{}` placeholders substituted in order by
+// `matrix/cells.rs::substitute_positional` — not a mechanical `i18n::t`
+// swap, because these carry counts. The English forms use label-value
+// pairs ("events: {}", "cancelled: {}", …), never "{} events", so no
+// plural agreement is needed at any count including zero and one. Every
+// pair here must keep the same number of `{}` placeholders on both sides —
+// see `cell_label_templates_have_matching_placeholder_counts`.
+pub const EN_CALENDAR_MATRIX_CELL_NO_EVENTS: &str = "{}, {}, no events";
+pub const EN_CALENDAR_MATRIX_CELL_CANCELLED: &str = "{}, {}, cancelled";
+pub const EN_CALENDAR_MATRIX_CELL_SINGLE_STATUS: &str = "{}, {}, {}";
+pub const EN_CALENDAR_MATRIX_CELL_BREAKDOWN: &str =
+    "{}, {}, events: {}, cancelled: {}, going: {}, not going: {}, attended: {}, no answer: {}";
+
+pub const JA_CALENDAR_MATRIX_CELL_NO_EVENTS: &str = "{}、{}、予定なし";
+pub const JA_CALENDAR_MATRIX_CELL_CANCELLED: &str = "{}、{}、中止";
+pub const JA_CALENDAR_MATRIX_CELL_SINGLE_STATUS: &str = "{}、{}、{}";
+pub const JA_CALENDAR_MATRIX_CELL_BREAKDOWN: &str =
+    "{}、{}、予定{}件、中止{}件、参加{}件、不参加{}件、参加済み{}件、未回答{}件";
+
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const CALENDAR_MATRIX_CELL_NO_EVENTS: Localized = Localized {
+    ja: JA_CALENDAR_MATRIX_CELL_NO_EVENTS,
+    en: EN_CALENDAR_MATRIX_CELL_NO_EVENTS,
+};
+pub const CALENDAR_MATRIX_CELL_CANCELLED: Localized = Localized {
+    ja: JA_CALENDAR_MATRIX_CELL_CANCELLED,
+    en: EN_CALENDAR_MATRIX_CELL_CANCELLED,
+};
+pub const CALENDAR_MATRIX_CELL_SINGLE_STATUS: Localized = Localized {
+    ja: JA_CALENDAR_MATRIX_CELL_SINGLE_STATUS,
+    en: EN_CALENDAR_MATRIX_CELL_SINGLE_STATUS,
+};
+pub const CALENDAR_MATRIX_CELL_BREAKDOWN: Localized = Localized {
+    ja: JA_CALENDAR_MATRIX_CELL_BREAKDOWN,
+    en: EN_CALENDAR_MATRIX_CELL_BREAKDOWN,
 };
 
 // ── Recurrence materialization notices ───────────────────────────────────

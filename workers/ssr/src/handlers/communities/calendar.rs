@@ -178,7 +178,7 @@ pub(super) fn render_calendar_month(
         } else {
             "#1D1D1F"
         };
-        let today_label = i18n::t(locale, i18n::HOME_TODAY);
+        let today_label = i18n::t(locale, i18n::TODAY);
         let marker_html = match (is_today, has_events, is_selected) {
             (true, true, true) => format!(
                 "<span style=\"display:flex;gap:.125rem;align-items:center;\
@@ -211,24 +211,39 @@ pub(super) fn render_calendar_month(
                     .to_string()
             }
         };
-        // Deliberately NOT locale-switched (RFC-072 Slice B, flagged in the
-        // review request): this is a screen-reader-only aria-label, not
-        // visible text, and it is a whole Japanese date-sentence structure
-        // (年/月/日 separators, 、today, 、N events), not a single swappable
-        // string. Producing a correct English equivalent is a date-format
-        // decision, not a mechanical `i18n::t` substitution, and per §17
-        // that is not this implementer's call to make silently.
-        let aria_label = if has_events {
-            let today_suffix = if is_today { "、今日" } else { "" };
-            format!(
-                "{year}年{month}月{day}日{today_suffix}、予定{count}{}",
-                i18n::JA_HOME_CALENDAR_COUNT_SUFFIX
-            )
-        } else if is_today {
-            format!("{year}年{month}月{day}日、今日")
-        } else {
-            format!("{year}年{month}月{day}日")
+        // RFC-072 Slice C: the day-cell aria-label is a composed sentence,
+        // not a single swappable string, so it is built per locale rather
+        // than through a single `i18n::t` call. The Japanese date segment
+        // keeps its established "{year}年{month}月{day}日" form unchanged
+        // (repeats year/month per cell, as before); the English segment
+        // uses the day-label convention used everywhere else in the app
+        // (`date_label_en`, which omits the year — the month header
+        // immediately above the grid already carries it) rather than
+        // inventing a third shape for this one sentence.
+        let date_segment = match locale {
+            Locale::Ja => format!("{year}年{month}月{day}日"),
+            Locale::En => tz::date_label_en(&day_date),
         };
+        let today_suffix = if is_today {
+            match locale {
+                Locale::Ja => format!("、{today_label}"),
+                Locale::En => format!(", {today_label}"),
+            }
+        } else {
+            String::new()
+        };
+        let events_suffix = if has_events {
+            // Label-value form, not "{count} events" — avoids pluralization
+            // entirely (RFC-072 Slice C, same technique as matrix/cells.rs).
+            let events_label = i18n::t(locale, i18n::CALENDAR_DAY_EVENTS_COUNT);
+            match locale {
+                Locale::Ja => format!("、{events_label}{count}件"),
+                Locale::En => format!(", {events_label}{count}"),
+            }
+        } else {
+            String::new()
+        };
+        let aria_label = format!("{date_segment}{today_suffix}{events_suffix}");
         let aria_current = if is_selected {
             " aria-current=\"date\""
         } else {
@@ -283,15 +298,13 @@ pub(super) fn render_calendar_month(
         String::new()
     };
 
-    // The "{year}年{month}月" month/year label and every aria-label in this
-    // function are deliberately NOT locale-switched (RFC-072 Slice B,
-    // flagged prominently in the review request): they are Japanese-specific
-    // date-format sentences (年/月/日 separators), not single swappable
-    // strings. Every event's own displayed date/time goes through
-    // `render::format_day_time_tz` → `tz::date_label_ja`, which has no
-    // English counterpart anywhere in this codebase today. Building one is
-    // a real date-format design decision, not a mechanical `i18n::t`
-    // rename, so it is out of this slice per §17 rather than invented here.
+    // Month header: full spelled-out month name in English (RFC-072 Slice C
+    // date-format decision — "August 2026", a page title with room), the
+    // established "{year}年{month}月" form unchanged in Japanese.
+    let month_header = match locale {
+        Locale::Ja => format!("{year}年{month}月"),
+        Locale::En => format!("{} {year}", tz::month_name_en(month)),
+    };
     format!(
         "<section aria-label=\"{title}\" style=\"margin:0 auto 1.5rem;\
          max-width:42rem\">\
@@ -299,7 +312,7 @@ pub(super) fn render_calendar_month(
          gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap\">\
          <h2 style=\"font-size:1.25rem;font-weight:700;margin:0\">{title}</h2>\
          <p style=\"font-size:.9375rem;font-weight:700;color:#6e6e73;margin:0\">\
-         {year}年{month}月</p>\
+         {month_header}</p>\
          </div>\
          <nav aria-label=\"Calendar month\" style=\"display:flex;gap:.5rem;\
          align-items:center;justify-content:space-between;margin:0 0 .75rem\">\
@@ -320,8 +333,7 @@ pub(super) fn render_calendar_month(
          </section>",
         title = i18n::t(locale, i18n::CALENDAR_MONTH_TITLE),
         helper = i18n::t(locale, i18n::HOME_CALENDAR_HELPER),
-        year = year,
-        month = month,
+        month_header = month_header,
         prev_url = render::escape_html(&month_url(prev_year, prev_month)),
         next_url = render::escape_html(&month_url(next_year, next_month)),
         current_url = render::escape_html(&current_url),

@@ -119,6 +119,7 @@ pub async fn get_event_detail(
             days.len() > 1,
             day.seq,
             community_tz_early,
+            locale,
         );
 
         let status_form = if occurrence_cancelled || event.status == "cancelled" {
@@ -641,6 +642,7 @@ pub fn classify_day(starts: &str, ends: &str, now: &str) -> DayTimeState {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn format_day_label(
     day_date: &str,
     starts: &str,
@@ -648,27 +650,29 @@ fn format_day_label(
     multi: bool,
     seq: u32,
     tz: &str,
+    locale: zinnias_ciao_contracts::Locale,
 ) -> String {
     let offset = render::tz_offset_minutes_pub(tz);
     let (local_date, start_hm) = render::utc_to_local_parts_pub(starts, offset);
     let end_hm = render::apply_offset_time_pub(ends, offset);
-    // Japan-first deployment: render the calendar date in Japanese convention,
-    // e.g. "6月14日（土）", instead of an English month abbreviation (RFC-047).
-    // The source date string is the local "YYYY-MM-DD" produced above.
-    // Deliberately NOT locale-switched (RFC-072 Slice B, flagged in the review
-    // request): `date_label_ja` has no English counterpart anywhere in the
-    // codebase, same gap noted in communities/calendar.rs and
-    // communities/matrix.rs. Every event date on this page stays Japanese
-    // regardless of `locale` until that gap is resolved.
+    // Japan-first deployment established the calendar-date convention
+    // (RFC-047); RFC-072 Slice C added the English form. The source date
+    // string is the local "YYYY-MM-DD" produced above.
     let date_src = if local_date.is_empty() {
         day_date
     } else {
         &local_date
     };
-    let display_date = zinnias_ciao_contracts::tz::date_label_ja(date_src);
+    let display_date = match locale {
+        zinnias_ciao_contracts::Locale::Ja => zinnias_ciao_contracts::tz::date_label_ja(date_src),
+        zinnias_ciao_contracts::Locale::En => zinnias_ciao_contracts::tz::date_label_en(date_src),
+    };
     if multi {
         format!("Day {seq} — {display_date} {start_hm}–{end_hm}")
     } else {
         format!("{display_date} {start_hm}–{end_hm}")
     }
 }
+
+#[cfg(test)]
+mod tests;

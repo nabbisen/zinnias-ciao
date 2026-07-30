@@ -38,13 +38,14 @@ pub(super) fn render_date_detail(
 
     let mut items = String::new();
     for row in events {
-        let date = render::format_day_time_tz(
+        let date = render::format_day_time_tz_localized(
             &render::CardDay {
                 starts_at_utc: &row.starts_at_utc,
                 ends_at_utc: &row.ends_at_utc,
                 day_date: &row.day_date,
             },
             community_tz,
+            locale,
         );
         let counts = aggregate_counts(&row.day_id, member_count, attendances);
         let cancelled = if event_day_cancelled(row) {

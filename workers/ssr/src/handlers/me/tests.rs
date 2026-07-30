@@ -25,18 +25,43 @@ fn me_flash_message_uses_fixed_success_code() {
 
 #[test]
 fn display_name_validation_errors_share_member_facing_copy() {
+    use zinnias_ciao_contracts::Locale;
+
     assert_eq!(
-        display_name_error(DisplayNameError::Empty),
+        display_name_error(Locale::Ja, DisplayNameError::Empty),
         i18n::JA_ME_DISPLAY_NAME_ERROR
     );
     assert_eq!(
-        display_name_error(DisplayNameError::TooLong),
+        display_name_error(Locale::Ja, DisplayNameError::TooLong),
         i18n::JA_ME_DISPLAY_NAME_ERROR
     );
     assert_eq!(
-        display_name_error(DisplayNameError::InvalidChars),
+        display_name_error(Locale::Ja, DisplayNameError::InvalidChars),
         i18n::JA_ME_DISPLAY_NAME_ERROR
     );
+    assert_eq!(
+        display_name_error(Locale::En, DisplayNameError::Empty),
+        i18n::EN_ME_DISPLAY_NAME_ERROR
+    );
+}
+
+#[test]
+fn display_name_form_body_and_page_follow_locale() {
+    use zinnias_ciao_contracts::Locale;
+
+    let mut membership = test_membership();
+    membership.locale = Locale::En;
+    let html = display_name_form_body(&membership, "tok_form", "Member", None);
+    assert!(html.contains(&format!(
+        ">{}</button>",
+        i18n::EN_ME_DISPLAY_NAME_EDIT_SUBMIT
+    )));
+    assert!(!html.contains(&format!(
+        ">{}</button>",
+        i18n::JA_ME_DISPLAY_NAME_EDIT_SUBMIT
+    )));
+    assert!(html.contains(i18n::EN_NAV_ME));
+    assert!(!html.contains(i18n::JA_NAV_ME));
 }
 
 #[test]

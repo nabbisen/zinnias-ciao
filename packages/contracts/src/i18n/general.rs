@@ -115,3 +115,15 @@ pub const ROLE_MEMBER: Localized = Localized {
 // ── Shared badges ────────────────────────────────────────────────────────
 pub const EN_CURRENT_BADGE: &str = "Current";
 pub const JA_CURRENT_BADGE: &str = "現在";
+
+// ── Shared date/calendar vocabulary ────────────────────────────────────────
+// RFC-072 Slice C: moved here from i18n/home.rs — used on Calendar's month
+// grid, not Home-specific. Rename only; values unchanged.
+pub const EN_TODAY: &str = "Today";
+pub const JA_TODAY: &str = "今日";
+
+/// RFC-072 locale-aware pair; see `i18n::Localized`.
+pub const TODAY: Localized = Localized {
+    ja: JA_TODAY,
+    en: EN_TODAY,
+};

@@ -42,7 +42,8 @@
     "smoke:matrix": "node scripts/smoke/monthly-attendance-matrix.mjs",
     "smoke:matrix-csv": "node scripts/smoke/calendar-matrix-csv-export.mjs",
     "smoke:calendar-views": "node scripts/smoke/calendar-views.mjs",
-    "smoke:community-switch": "node scripts/smoke/community-switch-route-preservation.mjs"
+    "smoke:community-switch": "node scripts/smoke/community-switch-route-preservation.mjs",
+    "smoke:language": "node scripts/smoke/language-preference.mjs"
   },
   "devDependencies": {
     "wrangler": "4.113.0"

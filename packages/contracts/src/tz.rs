@@ -267,6 +267,40 @@ pub fn month_abbr_en(month: i32) -> &'static str {
     }
 }
 
+/// English 3-letter weekday abbreviation for 0=Sunday..6=Saturday (RFC-072
+/// Slice C — same index convention as `weekday_ja`).
+pub fn weekday_en(index: i32) -> &'static str {
+    match index.rem_euclid(7) {
+        0 => "Sun",
+        1 => "Mon",
+        2 => "Tue",
+        3 => "Wed",
+        4 => "Thu",
+        5 => "Fri",
+        _ => "Sat",
+    }
+}
+
+/// English full month name for 1..=12 (RFC-072 Slice C — month headers use
+/// the full name; day labels use `month_abbr_en`).
+pub fn month_name_en(month: i32) -> &'static str {
+    match month {
+        1 => "January",
+        2 => "February",
+        3 => "March",
+        4 => "April",
+        5 => "May",
+        6 => "June",
+        7 => "July",
+        8 => "August",
+        9 => "September",
+        10 => "October",
+        11 => "November",
+        12 => "December",
+        _ => "",
+    }
+}
+
 /// Format a `YYYY-MM-DD` local date as a Japanese calendar label with weekday,
 /// e.g. `"6月14日（土）"`. Falls back to the raw string if unparseable.
 pub fn date_label_ja(local_date: &str) -> String {
@@ -286,18 +320,25 @@ pub fn date_label_ja(local_date: &str) -> String {
     format!("{m}月{d}日（{wd}）")
 }
 
-/// Format a `YYYY-MM-DD` local date as an English calendar label,
-/// e.g. `"14 Jun"`. Falls back to the raw string if unparseable.
+/// Format a `YYYY-MM-DD` local date as an English calendar label with
+/// weekday, e.g. `"Mon, 3 Aug"` (RFC-072 Slice C date-format decision: never
+/// all-numeric, weekday parity with `date_label_ja`). Falls back to the raw
+/// string if unparseable.
 pub fn date_label_en(local_date: &str) -> String {
     let segs: Vec<&str> = local_date.split('-').collect();
     if segs.len() < 3 {
         return local_date.to_owned();
     }
-    let (m, d) = match (segs[1].parse::<i32>(), segs[2].parse::<i32>()) {
-        (Ok(m), Ok(d)) => (m, d),
+    let (y, m, d) = match (
+        segs[0].parse::<i32>(),
+        segs[1].parse::<i32>(),
+        segs[2].parse::<i32>(),
+    ) {
+        (Ok(y), Ok(m), Ok(d)) => (y, m, d),
         _ => return local_date.to_owned(),
     };
-    format!("{d} {}", month_abbr_en(m))
+    let wd = weekday_en(weekday_index(y, m, d));
+    format!("{wd}, {d} {}", month_abbr_en(m))
 }
 
 #[cfg(test)]

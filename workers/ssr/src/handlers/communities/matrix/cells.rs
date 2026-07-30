@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::db::{attendance, event as event_db, membership};
-use zinnias_ciao_contracts::i18n;
+use zinnias_ciao_contracts::{Locale, i18n};
 
 pub(super) struct CellSummary {
     pub(super) visual: String,
@@ -11,17 +11,47 @@ pub(super) struct CellSummary {
     pub(super) background: &'static str,
 }
 
+/// Substitute a template's `{}` placeholders positionally, in order. Not
+/// `format!` (the template is a runtime `&str`, not a literal) — every
+/// `Localized` template consumed here must have the same placeholder count
+/// on both `ja` and `en`, checked by
+/// `cell_label_templates_have_matching_placeholder_counts` (RFC-072 Slice C).
+/// Excess values are ignored; a template asking for more values than given
+/// leaves that placeholder's `{}` in the output rather than panicking.
+pub(super) fn substitute_positional(template: &str, values: &[&str]) -> String {
+    let mut result = String::with_capacity(template.len());
+    let mut chars = template.chars().peekable();
+    let mut next = values.iter();
+    while let Some(c) = chars.next() {
+        if c == '{' && chars.peek() == Some(&'}') {
+            chars.next();
+            if let Some(value) = next.next() {
+                result.push_str(value);
+            } else {
+                result.push_str("{}");
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 pub(super) fn cell_summary(
     day_date: &str,
     member: &membership::MemberSummary,
     events: &[&event_db::HomeEventRow],
     attendances: &HashMap<String, Vec<attendance::AttendanceRow>>,
+    locale: Locale,
 ) -> CellSummary {
     if events.is_empty() {
         return CellSummary {
             visual: "&nbsp;".to_string(),
             export_value: String::new(),
-            label: format!("{day_date}、{}、予定なし", member.display_name),
+            label: substitute_positional(
+                i18n::t(locale, i18n::CALENDAR_MATRIX_CELL_NO_EVENTS),
+                &[day_date, &member.display_name],
+            ),
             color: "#8E8E93",
             background: "#FAFAFB",
         };
@@ -33,17 +63,23 @@ pub(super) fn cell_summary(
             return CellSummary {
                 visual: "中".to_string(),
                 export_value: "中".to_string(),
-                label: format!("{day_date}、{}、中止", member.display_name),
+                label: substitute_positional(
+                    i18n::t(locale, i18n::CALENDAR_MATRIX_CELL_CANCELLED),
+                    &[day_date, &member.display_name],
+                ),
                 color: "#6E6E73",
                 background: "#F5F5F7",
             };
         }
         let status = status_for_member(&row.day_id, &member.id, attendances);
-        let (visual, label_status, color, bg) = single_status_display(status);
+        let (visual, label_status, color, bg) = single_status_display(locale, status);
         return CellSummary {
             visual: visual.to_string(),
             export_value: visual.to_string(),
-            label: format!("{day_date}、{}、{label_status}", member.display_name),
+            label: substitute_positional(
+                i18n::t(locale, i18n::CALENDAR_MATRIX_CELL_SINGLE_STATUS),
+                &[day_date, &member.display_name, label_status],
+            ),
             color,
             background: bg,
         };
@@ -71,11 +107,18 @@ pub(super) fn cell_summary(
         return CellSummary {
             visual: "中".to_string(),
             export_value: "中".to_string(),
-            label: format!(
-                "{day_date}、{}、予定{}件、中止{}件、参加0件、不参加0件、参加済み0件、未回答0件",
-                member.display_name,
-                events.len(),
-                cancelled
+            label: substitute_positional(
+                i18n::t(locale, i18n::CALENDAR_MATRIX_CELL_BREAKDOWN),
+                &[
+                    day_date,
+                    &member.display_name,
+                    &events.len().to_string(),
+                    &cancelled.to_string(),
+                    "0",
+                    "0",
+                    "0",
+                    "0",
+                ],
             ),
             color: "#6E6E73",
             background: "#F5F5F7",
@@ -86,15 +129,18 @@ pub(super) fn cell_summary(
     CellSummary {
         visual: format!("{answered}/{total}"),
         export_value: format!("{answered}/{total}"),
-        label: format!(
-            "{day_date}、{}、予定{}件、中止{}件、参加{}件、不参加{}件、参加済み{}件、未回答{}件",
-            member.display_name,
-            events.len(),
-            cancelled,
-            going,
-            not_going,
-            attended,
-            no_reply
+        label: substitute_positional(
+            i18n::t(locale, i18n::CALENDAR_MATRIX_CELL_BREAKDOWN),
+            &[
+                day_date,
+                &member.display_name,
+                &events.len().to_string(),
+                &cancelled.to_string(),
+                &going.to_string(),
+                &not_going.to_string(),
+                &attended.to_string(),
+                &no_reply.to_string(),
+            ],
         ),
         color: if no_reply == 0 { "#0A7F43" } else { "#3A3A3C" },
         background: "#FFFFFF",
@@ -102,13 +148,34 @@ pub(super) fn cell_summary(
 }
 
 fn single_status_display(
+    locale: Locale,
     status: Option<&str>,
 ) -> (&'static str, &'static str, &'static str, &'static str) {
     match status {
-        Some("going") => ("○", i18n::JA_STATUS_GOING, "#0A7F43", "#F0FFF6"),
-        Some("not_going") => ("×", i18n::JA_STATUS_NOT_GOING, "#B42318", "#FFF5F3"),
-        Some("attended") => ("済", i18n::JA_STATUS_ATTENDED, "#0057B8", "#F0F7FF"),
-        _ => ("?", i18n::JA_STATUS_NO_ANSWER, "#6E6E73", "#FFFFFF"),
+        Some("going") => (
+            "○",
+            i18n::t(locale, i18n::STATUS_GOING),
+            "#0A7F43",
+            "#F0FFF6",
+        ),
+        Some("not_going") => (
+            "×",
+            i18n::t(locale, i18n::STATUS_NOT_GOING),
+            "#B42318",
+            "#FFF5F3",
+        ),
+        Some("attended") => (
+            "済",
+            i18n::t(locale, i18n::STATUS_ATTENDED),
+            "#0057B8",
+            "#F0F7FF",
+        ),
+        _ => (
+            "?",
+            i18n::t(locale, i18n::STATUS_NO_ANSWER),
+            "#6E6E73",
+            "#FFFFFF",
+        ),
     }
 }
 

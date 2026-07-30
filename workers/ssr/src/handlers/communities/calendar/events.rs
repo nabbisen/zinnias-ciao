@@ -21,13 +21,14 @@ pub(super) fn render_calendar_events(
                 .unwrap_or(true)
         })
         .map(|row| {
-            let date = render::format_day_time_tz(
+            let date = render::format_day_time_tz_localized(
                 &render::CardDay {
                     starts_at_utc: &row.starts_at_utc,
                     ends_at_utc: &row.ends_at_utc,
                     day_date: &row.day_date,
                 },
                 community_tz,
+                locale,
             );
             let cancelled = if row.event_status == "cancelled"
                 || row.occurrence_status == "cancelled"

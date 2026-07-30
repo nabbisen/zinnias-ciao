@@ -31,7 +31,8 @@ pub use shell::{escape_html, page, page_localized};
 #[allow(unused_imports)]
 pub use status::{status_chip, status_display, status_form, status_triplet};
 pub use time::{
-    apply_offset_time_pub, format_day_time_tz, tz_offset_minutes_pub, utc_to_local_parts_pub,
+    apply_offset_time_pub, format_day_time_tz, format_day_time_tz_localized, tz_offset_minutes_pub,
+    utc_to_local_parts_pub,
 };
 
 #[cfg(test)]
