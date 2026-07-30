@@ -2,11 +2,30 @@
 
 **Status.** Implemented — design accepted 2026-07-30 at `1b49070`; implemented
 across Slices A (`b237788`), B (`93e25de`), and C (`fcf84aa`), each
-architecture-reviewed and Approved. All ten acceptance criteria are met locally;
-this RFC has no hosted-evidence precondition. **Slice D — admin surfaces,
-anonymous routes (`/join`, `/relink`), static offline HTML, `Accept-Language`,
-and a community default — is deliberately out of scope and remains a future
-RFC.**
+architecture-reviewed and Approved, **plus a post-completion residue correction
+at `ced6ae4`**. All ten acceptance criteria are met locally; this RFC has no
+hosted-evidence precondition. **Slice D — admin surfaces, anonymous routes
+(`/join`, `/relink`), static offline HTML, `Accept-Language`, and a community
+default — is deliberately out of scope and remains a future RFC.**
+
+> **Correction, 2026-07-30.** Between Slice C and `ced6ae4`, this status claimed
+> all ten criteria were met. **Criterion 9 was not.** Event Detail rendered
+> Japanese attendance buttons, note-form labels, and participant text to a member
+> who had selected English, while the same page's cancelled badge rendered in
+> English — a half-migrated page, the exact condition the RFC forbids.
+>
+> The strings lived in shared render helpers (`render/status.rs`,
+> `render/notes.rs`, `render/participants.rs`) that `event.rs` calls. Slices B
+> and C were scoped by **handler file**, and
+> `rfc072_member_facing_core_has_no_half_migrated_page` asserted against handler
+> files only — so the gate passed while the rendered page was half-Japanese. The
+> gate's unit was the file; the property is about the page. It has since been
+> extended to the render layer, per file, with `render/errors.rs` (17, no
+> membership available) and `render/event_card.rs` (4, dead code) pinned at exact
+> counts as the only documented exceptions.
+>
+> Nothing was deployed, so no member was served this. The defect was in the claim
+> as much as the code, and the scoping error was the architect's.
 
 **Target release.** Next unreleased increment on `main`; not tied to a version
 transition.
