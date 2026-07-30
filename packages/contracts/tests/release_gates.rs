@@ -1450,7 +1450,7 @@ fn sw_cache_version_matches_workspace_version() {
 // message prints the actual value) and paste it in, in the same commit as
 // the version bump.
 const RELEASE_CACHE_ASSET_CONTENT_HASH: &str =
-    "34e0288706bdd6bcf84f65eb219dd98f6b5f36a3e5d5e2e0285097ee236699eb";
+    "a507e07dc06028d98327e489c315bdcec9afa4ac66789246aa9823ac6ab0f5b0";
 
 fn cached_asset_content_hash() -> String {
     use sha2::{Digest, Sha256};
@@ -2262,7 +2262,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Admin event creation switcher must keep users on the create-event page for the selected community"
     );
     assert!(
-        COMMUNITIES_SRC.contains("grid-template-columns:repeat(7,minmax(0,1fr))"),
+        COMMUNITIES_SRC.contains("cz-calendar-grid")
+            && APP_CSS_SOURCE.contains("grid-template-columns: repeat(7, minmax(0, 1fr));"),
         "Calendar overview must keep a stable seven-column grid"
     );
 }
@@ -2375,14 +2376,49 @@ fn calendar_overview_contract_is_explicit() {
             && calendar_src.contains("i18n::t(locale, i18n::CALENDAR_ALL_DAYS)"),
         "Calendar day cells are interactive in v0.42.0 and must expose selected-day state plus a clear filter"
     );
+    // RFC-075 Slice 1: re-expressed against the rendered class set, not the
+    // literal colour/border values that used to live in this file (moved to
+    // app.css). Same guarantee, proven a different way — the class-migrated
+    // twin of the RFC-067 gate rewrite made during RFC-074. Today and
+    // selected must (a) be built from independent conditions, so a day can
+    // never collapse them into one ambiguous state, and (b) render with a
+    // genuinely different `app.css` treatment that is not colour alone —
+    // checked here as differing `border-width`, mirroring the original
+    // literal check's own "calmer... distinct" property.
     assert!(
-        !calendar_src.contains("is_selected || is_today")
-            && calendar_src.contains("#FAFAFB")
-            && calendar_src.contains("let border_width = if is_today && !is_selected")
-            && calendar_src.contains("border:{border_width} solid {border}")
-            && calendar_src.contains("#6E6E73"),
-        "Today styling must stay calmer than selected-day styling and distinct from ordinary event days"
+        calendar_src.contains("day_class.push_str(\" cz-calendar-day--today\")")
+            && calendar_src.contains("day_class.push_str(\" cz-calendar-day--selected\")")
+            && calendar_src.contains("if is_today {")
+            && calendar_src.contains("if is_selected {"),
+        "Today and selected day-cell state must be built from independent conditions, never merged into one class"
     );
+    let today_rule = css_rule_body(APP_CSS_SOURCE, ".cz-calendar-day--today");
+    let selected_rule = css_rule_body(APP_CSS_SOURCE, ".cz-calendar-day--selected");
+    assert!(
+        today_rule.contains("border-width: 2px") && selected_rule.contains("border-width: 1px"),
+        "Today styling must stay calmer than selected-day styling — distinct border-width, not colour alone"
+    );
+    assert_ne!(
+        today_rule.split_whitespace().collect::<String>(),
+        selected_rule.split_whitespace().collect::<String>(),
+        "today and selected day-cell classes must render distinguishably from each other, not identically"
+    );
+}
+
+/// Extract a top-level CSS rule's declaration body by selector, e.g.
+/// `css_rule_body(src, ".cz-tab--active")` returns the text between that
+/// selector's `{` and its matching `}`. Panics if the selector isn't found —
+/// callers use this only to assert on rules that must exist.
+fn css_rule_body<'a>(css: &'a str, selector: &str) -> &'a str {
+    let needle = format!("{selector} {{");
+    let start = css
+        .find(&needle)
+        .unwrap_or_else(|| panic!("selector `{selector}` not found in app.css"));
+    let after_brace = start + needle.len();
+    let close = css[after_brace..]
+        .find('}')
+        .unwrap_or_else(|| panic!("selector `{selector}` has no closing brace in app.css"));
+    &css[after_brace..after_brace + close]
 }
 
 #[test]
@@ -4543,5 +4579,116 @@ fn invite_mark_used_does_not_write_membership_fk() {
     assert!(
         assign_body.contains("SET used_by_membership_id=?1"),
         "assign_used_membership should perform the post-membership FK backfill"
+    );
+}
+
+// ── RFC-075 ratchets: inline styling and hardcoded hex may only shrink ──────
+//
+// Not a threshold (Resolved Decision 2) — a ratchet. Both counts are
+// re-measured against the whole `workers/ssr/src` tree at test time (a
+// filesystem walk, not `include_str!`, so a new file or an untouched
+// existing one is covered automatically, not just the handful of files
+// already `include_str!`-ed elsewhere in this suite) and pinned here. A
+// count that increases means new inline styling or a new hardcoded colour
+// was added instead of reaching for a `cz-*` class / `--cz-*` token; lower
+// this pin whenever a slice migrates more.
+
+const INLINE_STYLE_RATCHET: usize = 418;
+const HARDCODED_HEX_RATCHET: usize = 322;
+
+fn workers_ssr_src_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../workers/ssr/src")
+}
+
+fn walk_rs_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+    let entries = std::fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("failed to read directory {}: {e}", dir.display()));
+    for entry in entries {
+        let path = entry
+            .unwrap_or_else(|e| panic!("failed to read directory entry: {e}"))
+            .path();
+        if path.is_dir() {
+            walk_rs_files(&path, out);
+        } else if path.extension().is_some_and(|ext| ext == "rs") {
+            out.push(path);
+        }
+    }
+}
+
+fn count_over_tree(count_in_file: impl Fn(&str) -> usize) -> usize {
+    let mut files = Vec::new();
+    walk_rs_files(&workers_ssr_src_dir(), &mut files);
+    assert!(
+        files.len() > 50,
+        "expected many .rs files under workers/ssr/src, found only {} — \
+         directory walk is probably broken, not the codebase actually shrinking",
+        files.len()
+    );
+    files
+        .iter()
+        .map(|path| {
+            let content = std::fs::read_to_string(path)
+                .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+            count_in_file(&content)
+        })
+        .sum()
+}
+
+fn count_inline_styles(content: &str) -> usize {
+    content.matches("style=").count()
+}
+
+/// Count `#RRGGBB` / `#RGB` hex-colour literals: a `#` followed by exactly 3
+/// or exactly 6 hex digits, with no hex digit immediately before or after
+/// (so this doesn't match a 6-digit prefix of a longer run, or double-count
+/// a 3-digit prefix of a 6-digit colour).
+fn count_hex_literals(content: &str) -> usize {
+    let bytes = content.as_bytes();
+    let mut count = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'#' {
+            let start = i + 1;
+            let mut end = start;
+            while end < bytes.len() && bytes[end].is_ascii_hexdigit() {
+                end += 1;
+            }
+            let len = end - start;
+            if (len == 3 || len == 6) && end == start + len {
+                count += 1;
+                i = end;
+                continue;
+            }
+            if len > 6 {
+                i = end;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    count
+}
+
+#[test]
+fn inline_style_count_never_increases() {
+    let count = count_over_tree(count_inline_styles);
+    assert!(
+        count <= INLINE_STYLE_RATCHET,
+        "inline `style=` count is {count}, above the RFC-075 ratchet of {INLINE_STYLE_RATCHET}. \
+         This count may only go down. If you added a new inline style, use a cz-* class from \
+         app.css instead; if you migrated more of the tree and lowered the real count, lower \
+         INLINE_STYLE_RATCHET to match — never raise it."
+    );
+}
+
+#[test]
+fn hardcoded_hex_color_count_never_increases() {
+    let count = count_over_tree(count_hex_literals);
+    assert!(
+        count <= HARDCODED_HEX_RATCHET,
+        "hardcoded hex-colour literal count is {count}, above the RFC-075 ratchet of \
+         {HARDCODED_HEX_RATCHET}. This count may only go down. If you added a new hex value in \
+         Rust, reach for a --cz-* token in app.css instead; if you migrated more of the tree and \
+         lowered the real count, lower HARDCODED_HEX_RATCHET to match — never raise it."
     );
 }

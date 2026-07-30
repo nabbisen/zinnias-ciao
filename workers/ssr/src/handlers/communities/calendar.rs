@@ -46,8 +46,8 @@ pub(super) fn render_calendar_day_detail(
             locale,
         ),
         None => format!(
-            "<section style=\"margin:0 auto 1.5rem;max-width:42rem\">\
-             <p style=\"font-size:.875rem;color:#6e6e73;margin:0\">{}</p></section>",
+            "<section class=\"cz-page-section\">\
+             <p class=\"cz-hint\">{}</p></section>",
             i18n::t(locale, i18n::CALENDAR_DAY_DETAIL_PROMPT)
         ),
     };
@@ -74,15 +74,10 @@ pub(super) fn render_calendar_list(
         |y: i32, m: i32| format!("/c/{community_id}/communities?month={y:04}-{m:02}&view=list");
     let current_url = format!("/c/{community_id}/communities?view=list");
     let nav = format!(
-        "<nav aria-label=\"Calendar month\" style=\"display:flex;gap:.5rem;\
-         align-items:center;justify-content:space-between;margin:0 auto .75rem;\
-         max-width:42rem\">\
-         <a href=\"{prev_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
-         color:#007AFF;text-decoration:none;font-size:.875rem\">{prev_label}</a>\
-         <a href=\"{current_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
-         color:#007AFF;text-decoration:none;font-size:.875rem\">{current_label}</a>\
-         <a href=\"{next_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
-         color:#007AFF;text-decoration:none;font-size:.875rem\">{next_label}</a>\
+        "<nav aria-label=\"Calendar month\" class=\"cz-calendar-nav\">\
+         <a href=\"{prev_url}\" class=\"cz-link cz-link--nav\">{prev_label}</a>\
+         <a href=\"{current_url}\" class=\"cz-link cz-link--nav\">{current_label}</a>\
+         <a href=\"{next_url}\" class=\"cz-link cz-link--nav\">{next_label}</a>\
          </nav>",
         prev_url = render::escape_html(&month_url(prev_year, prev_month)),
         next_url = render::escape_html(&month_url(next_year, next_month)),
@@ -129,17 +124,11 @@ pub(super) fn render_calendar_month(
     let weekdays = ["日", "月", "火", "水", "木", "金", "土"];
     let mut cells = String::new();
     for label in weekdays {
-        cells.push_str(&format!(
-            "<div style=\"min-height:28px;display:flex;align-items:center;\
-             justify-content:center;font-size:.75rem;font-weight:700;color:#6e6e73\">\
-             {label}</div>"
-        ));
+        cells.push_str(&format!("<div class=\"cz-calendar-weekday\">{label}</div>"));
     }
 
     for _ in 0..weekday_sunday_zero(year, month, 1) {
-        cells.push_str(
-            "<div aria-hidden=\"true\" style=\"min-height:54px;border-radius:10px\"></div>",
-        );
+        cells.push_str("<div aria-hidden=\"true\" class=\"cz-calendar-day-empty\"></div>");
     }
 
     let month_key = format!("{year:04}-{month:02}");
@@ -150,64 +139,42 @@ pub(super) fn render_calendar_month(
         let day_date = format!("{year:04}-{month:02}-{day:02}");
         let is_selected = selected_day == Some(day_date.as_str());
         let has_events = count > 0;
-        let bg = if is_selected {
-            "#EAF3FF"
-        } else if is_today {
-            "#FAFAFB"
-        } else if has_events {
-            "#FFFFFF"
-        } else {
-            "#F5F5F7"
-        };
-        let border = if is_selected {
-            "#007AFF"
-        } else if is_today || has_events {
-            "#D1D1D6"
-        } else {
-            "#F5F5F7"
-        };
-        let border_width = if is_today && !is_selected {
-            "2px"
-        } else {
-            "1px"
-        };
-        let day_color = if is_selected {
-            "#0057B8"
-        } else if is_today {
-            "#3A3A3C"
-        } else {
-            "#1D1D1F"
-        };
+        // RFC-075: state is expressed through classes, not an inline colour —
+        // declaration order in app.css reproduces the original if/else-if
+        // precedence (ordinary < has-events < today < selected) for every
+        // property including border-width. See
+        // `calendar_overview_contract_is_explicit` in release_gates.rs.
+        let mut day_class = String::from("cz-calendar-day");
+        if has_events {
+            day_class.push_str(" cz-calendar-day--has-events");
+        }
+        if is_today {
+            day_class.push_str(" cz-calendar-day--today");
+        }
+        if is_selected {
+            day_class.push_str(" cz-calendar-day--selected");
+        }
         let today_label = i18n::t(locale, i18n::TODAY);
         let marker_html = match (is_today, has_events, is_selected) {
             (true, true, true) => format!(
-                "<span style=\"display:flex;gap:.125rem;align-items:center;\
-                 justify-content:center;font-size:.6875rem;font-weight:700;\
-                 color:#0057B8;line-height:1.2\">\
+                "<span class=\"cz-calendar-day-badge cz-calendar-day-badge--selected\">\
                  <span>{today_label}</span><span aria-hidden=\"true\">●</span></span>"
             ),
             (true, true, false) => format!(
-                "<span style=\"display:flex;gap:.125rem;align-items:center;\
-                 justify-content:center;font-size:.6875rem;font-weight:600;\
-                 color:#6E6E73;line-height:1.2\">\
+                "<span class=\"cz-calendar-day-badge\">\
                  <span>{today_label}</span><span aria-hidden=\"true\">●</span></span>"
             ),
             (true, false, true) => format!(
-                "<span style=\"font-size:.6875rem;font-weight:700;color:#0057B8;\
-                 line-height:1.2\">{today_label}</span>"
+                "<span class=\"cz-calendar-day-label cz-calendar-day-label--selected\">{today_label}</span>"
             ),
-            (true, false, false) => format!(
-                "<span style=\"font-size:.6875rem;font-weight:600;color:#6E6E73;\
-                 line-height:1.2\">{today_label}</span>"
-            ),
+            (true, false, false) => {
+                format!("<span class=\"cz-calendar-day-label\">{today_label}</span>")
+            }
             (false, true, _) => {
-                "<span aria-hidden=\"true\" style=\"font-size:.8125rem;font-weight:700;\
-                 color:#007AFF;line-height:1.2\">●</span>"
-                    .to_string()
+                "<span aria-hidden=\"true\" class=\"cz-calendar-day-dot\">●</span>".to_string()
             }
             (false, false, _) => {
-                "<span aria-hidden=\"true\" style=\"font-size:.6875rem;line-height:1.2\">\
-                 &nbsp;</span>"
+                "<span aria-hidden=\"true\" class=\"cz-calendar-day-empty-marker\">&nbsp;</span>"
                     .to_string()
             }
         };
@@ -251,21 +218,14 @@ pub(super) fn render_calendar_month(
         };
         cells.push_str(&format!(
             "<a href=\"/c/{cid}/communities?month={month_key}&amp;day={day_date}#calendar-day-detail\" \
-             aria-label=\"{aria}\"{aria_current} style=\"min-height:60px;border:{border_width} solid {border};\
-             border-radius:10px;background:{bg};padding:.375rem .25rem;display:flex;\
-             flex-direction:column;align-items:center;justify-content:space-between;\
-             text-align:center;box-sizing:border-box;text-decoration:none;color:inherit\">\
-             <span style=\"font-size:.9375rem;font-weight:700;color:{day_color};\
-             line-height:1.1\">{day}</span>{marker_html}</a>",
+             aria-label=\"{aria}\"{aria_current} class=\"{day_class}\">\
+             <span class=\"cz-calendar-day-number\">{day}</span>{marker_html}</a>",
             cid = render::escape_html(community_id),
             month_key = render::escape_html(&month_key),
             day_date = render::escape_html(&day_date),
             aria = render::escape_html(&aria_label),
             aria_current = aria_current,
-            border = border,
-            border_width = border_width,
-            bg = bg,
-            day_color = day_color,
+            day_class = day_class,
             day = day,
             marker_html = marker_html
         ));
@@ -278,8 +238,7 @@ pub(super) fn render_calendar_month(
     let clear_filter = if selected_day.is_some() {
         format!(
             "<a href=\"/c/{cid}/communities?month={month_key}\" \
-             style=\"font-size:.875rem;color:#007AFF;text-decoration:none;min-height:44px;\
-             display:inline-flex;align-items:center\">{label}</a>",
+             class=\"cz-link cz-link--nav\">{label}</a>",
             cid = render::escape_html(community_id),
             month_key = render::escape_html(&month_key),
             label = i18n::t(locale, i18n::CALENDAR_ALL_DAYS),
@@ -290,8 +249,7 @@ pub(super) fn render_calendar_month(
 
     let empty = if counts.is_empty() {
         format!(
-            "<p style=\"font-size:.875rem;color:#6e6e73;margin:.75rem 0 0;\
-             text-align:center\">{}</p>",
+            "<p class=\"cz-hint cz-hint--gap-top cz-hint--center\">{}</p>",
             i18n::t(locale, i18n::CALENDAR_EMPTY_MONTH)
         )
     } else {
@@ -306,30 +264,20 @@ pub(super) fn render_calendar_month(
         Locale::En => format!("{} {year}", tz::month_name_en(month)),
     };
     format!(
-        "<section aria-label=\"{title}\" style=\"margin:0 auto 1.5rem;\
-         max-width:42rem\">\
-         <div style=\"display:flex;align-items:flex-end;justify-content:space-between;\
-         gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap\">\
-         <h2 style=\"font-size:1.25rem;font-weight:700;margin:0\">{title}</h2>\
-         <p style=\"font-size:.9375rem;font-weight:700;color:#6e6e73;margin:0\">\
-         {month_header}</p>\
+        "<section aria-label=\"{title}\" class=\"cz-page-section\">\
+         <div class=\"cz-section-header\">\
+         <h2 class=\"cz-section-title cz-section-title--lg\">{title}</h2>\
+         <p class=\"cz-month-subtitle\">{month_header}</p>\
          </div>\
-         <nav aria-label=\"Calendar month\" style=\"display:flex;gap:.5rem;\
-         align-items:center;justify-content:space-between;margin:0 0 .75rem\">\
-         <a href=\"{prev_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
-         color:#007AFF;text-decoration:none;font-size:.875rem\">{prev_label}</a>\
-         <a href=\"{current_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
-         color:#007AFF;text-decoration:none;font-size:.875rem\">{current_label}</a>\
-         <a href=\"{next_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
-         color:#007AFF;text-decoration:none;font-size:.875rem\">{next_label}</a>\
+         <nav aria-label=\"Calendar month\" class=\"cz-calendar-nav\">\
+         <a href=\"{prev_url}\" class=\"cz-link cz-link--nav\">{prev_label}</a>\
+         <a href=\"{current_url}\" class=\"cz-link cz-link--nav\">{current_label}</a>\
+         <a href=\"{next_url}\" class=\"cz-link cz-link--nav\">{next_label}</a>\
          </nav>\
-         <p style=\"font-size:.875rem;color:#6e6e73;line-height:1.5;margin:0 0 .75rem\">\
-         {helper}</p>\
-         <div style=\"background:#FFFFFF;border:1px solid #E5E5EA;border-radius:16px;\
-         padding:.75rem;box-shadow:0 1px 2px rgba(0,0,0,.04)\">\
-         <div style=\"display:grid;grid-template-columns:repeat(7,minmax(0,1fr));\
-         gap:.25rem\">{cells}</div>{empty}</div>\
-         <div style=\"margin-top:.5rem\">{clear_filter}</div>\
+         <p class=\"cz-hint cz-hint--lined\">{helper}</p>\
+         <div class=\"cz-calendar-card\">\
+         <div class=\"cz-calendar-grid\">{cells}</div>{empty}</div>\
+         <div class=\"cz-calendar-clear-filter-row\">{clear_filter}</div>\
          </section>",
         title = i18n::t(locale, i18n::CALENDAR_MONTH_TITLE),
         helper = i18n::t(locale, i18n::HOME_CALENDAR_HELPER),

@@ -49,12 +49,35 @@
   --cz-space-6: 32px;
 
   /* Radius tokens */
-  --cz-radius-card:   16px;
-  --cz-radius-button: 14px;
-  --cz-radius-input:  12px;
+  --cz-radius-card:    16px;
+  --cz-radius-button:  14px;
+  --cz-radius-input:   12px;
+  --cz-radius-day:     10px;  /* RFC-075: calendar day cells and grid placeholders */
+  --cz-radius-control: 8px;   /* RFC-075: tabs, export button, matrix scroller border */
 
   /* Touch target minimum (RFC-011 §5) */
   --cz-touch-min: 44px;
+  --cz-control-height-sm: 40px; /* RFC-075: smaller controls, e.g. tab/export buttons */
+
+  /* RFC-075: Calendar day-cell state colours — distinct from ordinary status
+   * triplets above; "today" and "selected" are UI states, not attendance
+   * statuses. Kept as their own tokens rather than reusing a status triplet
+   * that happens to share a value, so the two concepts don't couple. */
+  --cz-color-selected-bg: #EAF3FF;
+  --cz-color-selected-fg: #0057B8;
+  --cz-color-today-bg:    #FAFAFB;
+  --cz-color-today-fg:    #3A3A3C;
+  --cz-color-border-subtle: #D1D1D6;
+
+  /* RFC-075: exact pre-existing values with no round-number match in the
+   * space scale below — carried over as-is rather than rounded, to avoid a
+   * visual change during a presentation-only migration. */
+  --cz-space-hairline: .125rem;
+  --cz-space-tight: .35rem;
+  --cz-space-day-pad: .375rem;
+  --cz-space-3-5: .875rem;
+  --cz-space-page-bottom: 5rem;
+  --cz-shadow-card: 0 1px 2px rgba(0, 0, 0, .04);
 
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 16px;
@@ -86,6 +109,352 @@ a { color: var(--cz-color-going); }
 
 /* Touch targets — all interactive elements meet the 44 px minimum */
 button, a, [role="button"] { min-height: var(--cz-touch-min); }
+
+/* ── Component layer (RFC-075) ─────────────────────────────────────────────
+ * cz-* class prefix, matching the --cz-* token prefix. Narrowly scoped to
+ * the Calendar surface migrated in Slice 1; broader generic helpers
+ * (button_link, tabs, page_section render helpers) stay deferred until the
+ * pattern is proven on more surfaces. Every colour/spacing/radius below
+ * comes from a --cz-* token — see :root above for any added for this slice.
+ */
+
+/* Page / section layout */
+.cz-page-main {
+  padding: var(--cz-space-4) var(--cz-space-4) var(--cz-space-page-bottom);
+}
+.cz-page-section {
+  margin: 0 auto var(--cz-space-5);
+  max-width: 42rem;
+}
+.cz-page-section--wide {
+  max-width: 100%;
+}
+.cz-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--cz-space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--cz-space-3);
+}
+.cz-section-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0;
+}
+.cz-section-title--lg {
+  font-size: 1.25rem;
+}
+.cz-month-subtitle {
+  font-size: .9375rem;
+  font-weight: 700;
+  color: var(--cz-color-text-secondary);
+  margin: 0;
+}
+
+/* Hint / notice text */
+.cz-hint {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  margin: 0;
+}
+.cz-hint--gap-top {
+  margin: var(--cz-space-3) 0 0;
+}
+.cz-hint--center {
+  text-align: center;
+}
+.cz-hint--lined {
+  line-height: 1.5;
+  margin: 0 0 var(--cz-space-3);
+}
+.cz-agenda-scope {
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+  margin: var(--cz-space-1) 0 0;
+}
+.cz-notice {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  background: var(--cz-color-surface);
+  padding: var(--cz-space-3);
+  line-height: 1.5;
+}
+.cz-notice--section {
+  border-radius: var(--cz-radius-input);
+  margin: 0 auto var(--cz-space-4);
+  max-width: 42rem;
+}
+.cz-notice--inline {
+  border-radius: var(--cz-radius-control);
+  margin: var(--cz-space-3) 0 0;
+}
+.cz-notice-followup {
+  margin: var(--cz-space-3) 0 0;
+}
+
+/* Links */
+.cz-link {
+  color: var(--cz-color-focus);
+  text-decoration: none;
+  font-size: .875rem;
+}
+.cz-link--strong {
+  font-weight: 600;
+}
+.cz-link--nav {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--cz-touch-min);
+}
+.cz-link--action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--cz-touch-min);
+  font-weight: 600;
+  margin-top: var(--cz-space-3);
+}
+
+/* Tabs (mode switcher: Calendar / Events list / Attendance table) */
+.cz-tabs {
+  display: flex;
+  gap: var(--cz-space-2);
+  margin: 0 auto var(--cz-space-4);
+  max-width: 42rem;
+  flex-wrap: wrap;
+}
+.cz-tab {
+  min-height: var(--cz-control-height-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cz-space-tight) var(--cz-space-3);
+  border: 1px solid var(--cz-color-border-subtle);
+  border-radius: var(--cz-radius-control);
+  background: var(--cz-color-bg);
+  color: var(--cz-color-text-primary);
+  text-decoration: none;
+  font-size: .875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cz-tab--active {
+  background: var(--cz-color-text-primary);
+  color: var(--cz-color-bg);
+  border-color: var(--cz-color-text-primary);
+}
+
+/* Calendar month nav (Previous month / This month / Next month) */
+.cz-calendar-nav {
+  display: flex;
+  gap: var(--cz-space-2);
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 auto var(--cz-space-3);
+  max-width: 42rem;
+}
+
+/* Calendar grid */
+.cz-calendar-card {
+  background: var(--cz-color-bg);
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-card);
+  padding: var(--cz-space-3);
+  box-shadow: var(--cz-shadow-card);
+}
+.cz-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--cz-space-1);
+}
+.cz-calendar-weekday {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--cz-color-text-secondary);
+}
+.cz-calendar-day-empty {
+  min-height: 54px;
+  border-radius: var(--cz-radius-day);
+}
+.cz-calendar-clear-filter-row {
+  margin-top: var(--cz-space-2);
+}
+
+/* Calendar day cell — state expressed through classes, not colour alone
+ * (release_gates.rs `calendar_overview_contract_is_explicit`). Declaration
+ * order matters: later rules win on equal specificity, and this order
+ * reproduces the original if/else-if precedence exactly — ordinary <
+ * has-events < today < selected, for every property including border-width. */
+.cz-calendar-day {
+  min-height: 60px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--cz-color-surface);
+  border-radius: var(--cz-radius-day);
+  background: var(--cz-color-surface);
+  color: var(--cz-color-text-primary);
+  padding: var(--cz-space-day-pad) var(--cz-space-1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  text-align: center;
+  text-decoration: none;
+}
+.cz-calendar-day--has-events {
+  border-color: var(--cz-color-border-subtle);
+  background: var(--cz-color-bg);
+}
+.cz-calendar-day--today {
+  border-width: 2px;
+  border-color: var(--cz-color-border-subtle);
+  background: var(--cz-color-today-bg);
+  color: var(--cz-color-today-fg);
+}
+.cz-calendar-day--selected {
+  border-width: 1px;
+  border-color: var(--cz-color-focus);
+  background: var(--cz-color-selected-bg);
+  color: var(--cz-color-selected-fg);
+}
+.cz-calendar-day-number {
+  font-size: .9375rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.cz-calendar-day-badge {
+  display: flex;
+  gap: var(--cz-space-hairline);
+  align-items: center;
+  justify-content: center;
+  font-size: .6875rem;
+  font-weight: 600;
+  color: var(--cz-color-text-secondary);
+  line-height: 1.2;
+}
+.cz-calendar-day-badge--selected {
+  font-weight: 700;
+  color: var(--cz-color-selected-fg);
+}
+.cz-calendar-day-label {
+  font-size: .6875rem;
+  font-weight: 600;
+  color: var(--cz-color-text-secondary);
+  line-height: 1.2;
+}
+.cz-calendar-day-label--selected {
+  font-weight: 700;
+  color: var(--cz-color-selected-fg);
+}
+.cz-calendar-day-dot {
+  font-size: .8125rem;
+  font-weight: 700;
+  color: var(--cz-color-focus);
+  line-height: 1.2;
+}
+.cz-calendar-day-empty-marker {
+  font-size: .6875rem;
+  line-height: 1.2;
+}
+
+/* Event list */
+.cz-event-list {
+  list-style: none;
+  margin: var(--cz-space-2) 0 0;
+  padding: 0;
+}
+.cz-event-list-item {
+  border-top: 1px solid var(--cz-color-surface);
+}
+.cz-event-link {
+  display: block;
+  padding: var(--cz-space-3-5) 0;
+  text-decoration: none;
+  color: inherit;
+}
+.cz-event-title {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.cz-event-meta {
+  display: block;
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+  margin-top: var(--cz-space-1);
+}
+.cz-event-cancelled-badge {
+  font-size: .75rem;
+  color: var(--cz-status-not-going-fg);
+  margin-left: var(--cz-space-tight);
+}
+.cz-event-location {
+  color: var(--cz-color-text-secondary);
+}
+
+/* Matrix view shell (RFC-067/068) — tab links and the static shell only;
+ * per-row/per-column matrix cell rendering stays inline (RFC-075 §5.2). */
+.cz-matrix-header {
+  max-width: 42rem;
+  margin: 0 auto var(--cz-space-3);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--cz-space-3);
+  flex-wrap: wrap;
+}
+.cz-matrix-scroller {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-control);
+  background: var(--cz-color-bg);
+}
+.cz-matrix-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 72rem;
+  width: max-content;
+}
+.cz-matrix-corner-cell {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  background: var(--cz-color-bg);
+  border: 1px solid var(--cz-color-surface-strong);
+  text-align: left;
+  min-width: 8rem;
+  padding: var(--cz-space-2);
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+}
+.cz-export-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--cz-space-2);
+  flex-wrap: wrap;
+}
+.cz-export-button {
+  min-height: var(--cz-control-height-sm);
+  border: 1px solid var(--cz-color-focus);
+  border-radius: var(--cz-radius-control);
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+  font-size: .875rem;
+  font-weight: 700;
+  padding: var(--cz-space-tight) var(--cz-space-3);
+}
+.cz-export-status {
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+}
 
 /* Reduced motion — disable all non-essential animation (RFC-011 §5) */
 @media (prefers-reduced-motion: reduce) {

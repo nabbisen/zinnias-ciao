@@ -42,6 +42,7 @@ attributes inside Rust render strings.
 |---|---|
 | Inline `style=` occurrences in `workers/ssr/src` | **477** |
 | Hardcoded hex colours in Rust | **356** |
+| *(counting method note — see below)* | |
 | `--cz-*` design tokens defined in `app.css` | 35 |
 | Token references (`var(--cz-…)`) **from Rust** | **0** |
 | Token references from `app.js` | 0 |
@@ -52,6 +53,12 @@ twenty-seven are referenced nowhere at all, and the Rust code that renders
 essentially the entire UI consumes none of them — it hardcodes 356 hex values
 instead. The Summary's "design-token use is inconsistent" understates this: token
 use in the rendering layer is zero.
+
+**Counting method.** The two counts above use a `style=\"`-literal grep. The
+ratchet gates installed in Slice 1 walk the filesystem with a broader counter and
+report higher figures for the same tree. Both are internally consistent; **the
+gate's own function is authoritative** for the ratchets. Do not reconcile these
+numbers against each other or lower a pin to match this prose.
 
 The trend is also wrong. `lib.rs`'s CSP comment records "~272 occurrences" of
 inline `style=`; the count is now **477**. Inline styling has nearly doubled
@@ -330,8 +337,10 @@ Per slice, unless marked terminal.
    — forms, hrefs, ARIA, `aria-current`, table semantics, and every listed
    `data-*`.
 2. All app-owned classes use the `cz-*` prefix.
-3. Migrated surfaces reference `--cz-*` tokens rather than introducing new
-   hardcoded hex values.
+3. The CSS rules a migrated surface uses reference `--cz-*` tokens rather than
+   introducing new hardcoded hex values. **Clarified 2026-07-30:** this means the
+   `cz-*` rules in `app.css`, not the Rust strings — Rust emits class names and
+   should contain no `var(--cz-…)` at all.
 4. The Calendar accessibility gate is re-expressed against the rendered class
    set, with its guarantee unchanged and demonstrably still failing when the
    property is violated.

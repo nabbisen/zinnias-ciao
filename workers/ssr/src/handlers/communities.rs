@@ -209,7 +209,7 @@ pub async fn get_communities(
     let title = i18n::t(locale, i18n::NAV_COMMUNITIES);
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
+         <main class=\"cz-page-main\">\
            {notice}{mode_tabs}{content}\
          </main>{nav}",
         header = render::header_with_switcher_next_localized(
@@ -222,9 +222,7 @@ pub async fn get_communities(
         mode_tabs = mode_tabs,
         notice = materialization_notice
             .map(|msg| format!(
-                "<p role=\"status\" style=\"font-size:.875rem;color:#6e6e73;\
-                 background:#F5F5F7;border-radius:12px;padding:.75rem;margin:0 auto 1rem;\
-                 max-width:42rem;line-height:1.5\">{}</p>",
+                "<p role=\"status\" class=\"cz-notice cz-notice--section\">{}</p>",
                 render::escape_html(msg)
             ))
             .unwrap_or_default(),

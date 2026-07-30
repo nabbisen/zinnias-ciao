@@ -83,23 +83,16 @@ pub(super) fn render_mode_tabs(
         day_query
     );
     let tab = |href: &str, label: &str, selected: bool| {
-        let (bg, color, border, aria) = if selected {
-            ("#1D1D1F", "#FFFFFF", "#1D1D1F", " aria-current=\"page\"")
+        let (class, aria) = if selected {
+            ("cz-tab cz-tab--active", " aria-current=\"page\"")
         } else {
-            ("#FFFFFF", "#1D1D1F", "#D1D1D6", "")
+            ("cz-tab", "")
         };
-        format!(
-            "<a href=\"{href}\"{aria} style=\"min-height:40px;display:inline-flex;\
-             align-items:center;justify-content:center;padding:.35rem .75rem;\
-             border:1px solid {border};border-radius:8px;background:{bg};color:{color};\
-             text-decoration:none;font-size:.875rem;font-weight:700;white-space:nowrap\">\
-             {label}</a>"
-        )
+        format!("<a href=\"{href}\"{aria} class=\"{class}\">{label}</a>")
     };
 
     format!(
-        "<nav aria-label=\"Calendar view\" style=\"display:flex;gap:.5rem;\
-         margin:0 auto 1rem;max-width:42rem;flex-wrap:wrap\">{}{}{}\
+        "<nav aria-label=\"Calendar view\" class=\"cz-tabs\">{}{}{}\
          </nav>",
         tab(
             &month_href,
@@ -150,9 +143,9 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
 
     if members.is_empty() {
         return format!(
-            "<section style=\"margin:0 auto 1.5rem;max-width:42rem\">\
-             <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{}</h2>\
-             <p style=\"font-size:.875rem;color:#6e6e73;margin:.75rem 0 0\">{}</p>\
+            "<section class=\"cz-page-section\">\
+             <h2 class=\"cz-section-title\">{}</h2>\
+             <p class=\"cz-hint cz-hint--gap-top\">{}</p>\
              </section>",
             i18n::t(locale, i18n::CALENDAR_MATRIX_TITLE),
             i18n::t(locale, i18n::CALENDAR_MATRIX_NO_MEMBERS)
@@ -290,31 +283,19 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
         Locale::En => format!("{} {year}", tz::month_name_en(month)),
     };
     format!(
-        "<section aria-label=\"{title}\" style=\"margin:0 auto 1.5rem;\
-         max-width:100%\">\
-         <div style=\"max-width:42rem;margin:0 auto .75rem;display:flex;\
-         align-items:flex-end;justify-content:space-between;gap:.75rem;flex-wrap:wrap\">\
-         <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{title}</h2>\
-         <p style=\"font-size:.9375rem;font-weight:700;color:#6e6e73;margin:0\">\
-         {month_header}</p>{export_controls}</div>\
-         <nav aria-label=\"Calendar month\" style=\"display:flex;gap:.5rem;\
-         align-items:center;justify-content:space-between;margin:0 auto .75rem;\
-         max-width:42rem\">\
-         <a href=\"{prev_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
-         color:#007AFF;text-decoration:none;font-size:.875rem\">{prev_label}</a>\
-         <a href=\"{current_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
-         color:#007AFF;text-decoration:none;font-size:.875rem\">{current_label}</a>\
-         <a href=\"{next_url}\" style=\"min-height:44px;display:inline-flex;align-items:center;\
-         color:#007AFF;text-decoration:none;font-size:.875rem\">{next_label}</a>\
+        "<section aria-label=\"{title}\" class=\"cz-page-section cz-page-section--wide\">\
+         <div class=\"cz-matrix-header\">\
+         <h2 class=\"cz-section-title\">{title}</h2>\
+         <p class=\"cz-month-subtitle\">{month_header}</p>{export_controls}</div>\
+         <nav aria-label=\"Calendar month\" class=\"cz-calendar-nav\">\
+         <a href=\"{prev_url}\" class=\"cz-link cz-link--nav\">{prev_label}</a>\
+         <a href=\"{current_url}\" class=\"cz-link cz-link--nav\">{current_label}</a>\
+         <a href=\"{next_url}\" class=\"cz-link cz-link--nav\">{next_label}</a>\
          </nav>\
          <div data-rfc067-matrix-scroller=\"true\" \
-         style=\"overflow-x:auto;max-width:100%;border:1px solid #E5E5EA;\
-         border-radius:8px;background:#FFFFFF\" tabindex=\"0\">\
-         <table{export_table_attr} style=\"border-collapse:separate;border-spacing:0;min-width:72rem;\
-         width:max-content\">\
-         <thead><tr><th scope=\"col\" style=\"position:sticky;left:0;top:0;\
-         z-index:3;background:#FFFFFF;border:1px solid #E5E5EA;text-align:left;\
-         min-width:8rem;padding:.5rem;font-size:.8125rem;color:#6e6e73\">\
+         class=\"cz-matrix-scroller\" tabindex=\"0\">\
+         <table{export_table_attr} class=\"cz-matrix-table\">\
+         <thead><tr><th scope=\"col\" class=\"cz-matrix-corner-cell\">\
          {member_col}</th>{header_cells}</tr></thead>\
          <tbody>{body_rows}</tbody></table></div>{detail}</section>",
         title = i18n::t(locale, i18n::CALENDAR_MATRIX_TITLE),
@@ -344,16 +325,14 @@ fn render_export_controls(
         return String::new();
     };
     format!(
-        "<div style=\"display:flex;align-items:center;gap:.5rem;flex-wrap:wrap\">\
+        "<div class=\"cz-export-controls\">\
          <button type=\"button\" data-calendar-matrix-export-button=\"true\" \
          data-audit-url=\"/c/{cid}/admin/calendar/matrix-export/audit\" \
          data-month=\"{month}\" data-export-type=\"calendar_matrix_csv\" \
          data-token=\"{token}\" data-filename=\"ciao-attendance-{month}.csv\" \
-         style=\"min-height:40px;border:1px solid #007AFF;border-radius:8px;\
-         background:#007AFF;color:#FFFFFF;font-size:.875rem;font-weight:700;\
-         padding:.35rem .75rem\">{label}</button>\
+         class=\"cz-export-button\">{label}</button>\
          <span data-calendar-matrix-export-status=\"true\" data-error-message=\"{error}\" aria-live=\"polite\" \
-         style=\"font-size:.8125rem;color:#6e6e73\"></span></div>",
+         class=\"cz-export-status\"></span></div>",
         cid = render::escape_html(community_id),
         month = render::escape_html(month_key),
         token = render::escape_html(token),
@@ -371,13 +350,11 @@ fn export_attr(name: &str, value: &str, enabled: bool) -> String {
 
 fn render_too_large(community_id: &str, year: i32, month: i32, locale: Locale) -> String {
     format!(
-        "<section style=\"margin:0 auto 1.5rem;max-width:42rem\">\
-         <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{title}</h2>\
-         <p role=\"status\" style=\"font-size:.875rem;color:#6e6e73;\
-         background:#F5F5F7;border-radius:8px;padding:.75rem;margin:.75rem 0 0;\
-         line-height:1.5\">{message}</p>\
-         <p style=\"margin:.75rem 0 0\"><a href=\"/c/{cid}/communities?month={year:04}-{month:02}\" \
-         style=\"color:#007AFF;text-decoration:none;font-size:.875rem;font-weight:600\">\
+        "<section class=\"cz-page-section\">\
+         <h2 class=\"cz-section-title\">{title}</h2>\
+         <p role=\"status\" class=\"cz-notice cz-notice--inline\">{message}</p>\
+         <p class=\"cz-notice-followup\"><a href=\"/c/{cid}/communities?month={year:04}-{month:02}\" \
+         class=\"cz-link cz-link--strong\">\
          {calendar}</a></p></section>",
         title = i18n::t(locale, i18n::CALENDAR_MATRIX_TITLE),
         message = i18n::t(locale, i18n::CALENDAR_MATRIX_TOO_LARGE),

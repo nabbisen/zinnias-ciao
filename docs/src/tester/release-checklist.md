@@ -415,6 +415,21 @@ by omission.
 - [ ] `SESSION_COOKIE_DOMAIN` is configured as a **`[vars]` binding** in the target environment's ignored local Wrangler config if needed; leave unset for a host-only cookie. *(operator task — RFC-038)*
 - [ ] Logpush configured for production. *(operator task: Cloudflare dashboard)*
 
+## Calendar CSS migration gates (RFC-075 Slice 1)
+
+Presentation-only. No handler behavior, form, route, or `data-*` attribute
+changed. This slice does **not** change the Content-Security-Policy —
+`style-src 'unsafe-inline'` stays until inline `style=` reaches zero, which
+is a later, terminal slice of RFC-075, not this one.
+
+- [x] A `cz-*` class layer exists in `app.css`, covering page/section layout, tabs, links, the calendar grid and day cell (with `today`/`selected`/`has-events` state expressed as classes), the day-detail block, the event list, and the matrix view shell. Every new colour/spacing/radius rule references a `--cz-*` token; new tokens were added where no existing one matched the exact pre-migration value, to avoid a visual change. *(workers/ssr/static/app.css)*
+- [x] Calendar (`communities/calendar.rs`, `communities/calendar/events.rs`) and `communities.rs` are fully migrated to the class layer; the Matrix view shell and tab links (`communities/matrix.rs`) are migrated, but its per-row/per-column cell rendering stays inline by design, matching the RFC's own scope boundary (same exclusion already applied to `matrix/cells.rs` and `matrix/detail.rs`). *(release_gates.rs `inline_style_count_never_increases`)*
+- [x] The Calendar accessibility gate is re-expressed against the rendered class set rather than literal colour/border values: today and selected state come from independent, non-overlapping conditions, and `app.css` gives them a genuinely different treatment (border-width, not colour alone), with a mutation proof confirming the gate still fails when that distinction is removed. *(release_gates.rs `calendar_overview_contract_is_explicit`)*
+- [x] Two ratchets exist: total inline `style=` occurrences and total hardcoded hex-colour literals across `workers/ssr/src`, both re-measured and lowered from their pre-slice baseline, and both proven (for the inline-style ratchet) to fail on an increase and pass again after restore. *(release_gates.rs `inline_style_count_never_increases`, `hardcoded_hex_color_count_never_increases`)*
+- [x] `app.css`'s cache key moved in the same change as its content: `sw.js` `CACHE_VERSION`, the `app.js` cache-buster in `render/shell.rs` and `handlers/static_files.rs`, and the pinned asset-content-hash digest were all updated together, not just the digest alone. *(release_gates.rs `cached_asset_content_matches_pinned_hash`)*
+- [x] Browser smoke verifies all three Calendar view modes (month, list, matrix) render correctly at mobile width and 200% text, in both Japanese and English, with no horizontal overflow. *(scripts/smoke/rfc075-calendar-css-migration.mjs; evidence `.git-exclude/evidence/rfc075/`)*
+- [x] Re-running `smoke:calendar-views`, `smoke:matrix`, `smoke:matrix-csv`, `smoke:community-switch`, and `smoke:language` unmodified all still pass — this slice touches surfaces all five exercise.
+
 ## RFC-079 audit integrity and redaction
 
 - [x] Production audit actions use the closed 23 Class A + 2 Class B + 1 Class C inventory; no compatibility writer or arbitrary action/JSON entry point remains. *(audit.rs + repository-wide release gate)*

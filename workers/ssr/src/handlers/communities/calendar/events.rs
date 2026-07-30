@@ -30,40 +30,36 @@ pub(super) fn render_calendar_events(
                 community_tz,
                 locale,
             );
-            let cancelled = if row.event_status == "cancelled"
-                || row.occurrence_status == "cancelled"
-            {
-                format!(
-                    "<span style=\"font-size:.75rem;color:#B42318;margin-left:.35rem\">{}</span>",
-                    i18n::t(
-                        locale,
-                        if row.occurrence_status == "cancelled" {
-                            i18n::OCCURRENCE_CANCELLED_BADGE
-                        } else {
-                            i18n::EVENT_CANCELLED_BADGE
-                        }
+            let cancelled =
+                if row.event_status == "cancelled" || row.occurrence_status == "cancelled" {
+                    format!(
+                        "<span class=\"cz-event-cancelled-badge\">{}</span>",
+                        i18n::t(
+                            locale,
+                            if row.occurrence_status == "cancelled" {
+                                i18n::OCCURRENCE_CANCELLED_BADGE
+                            } else {
+                                i18n::EVENT_CANCELLED_BADGE
+                            }
+                        )
                     )
-                )
-            } else {
-                String::new()
-            };
+                } else {
+                    String::new()
+                };
             let location = row.event_location.as_deref().unwrap_or("");
             let location_html = if location.is_empty() {
                 String::new()
             } else {
                 format!(
-                    "<span style=\"color:#6e6e73\"> · {}</span>",
+                    "<span class=\"cz-event-location\"> · {}</span>",
                     render::escape_html(location)
                 )
             };
             format!(
-                "<li style=\"border-top:1px solid #F5F5F7\">\
-                 <a href=\"/c/{cid}/events/{eid}\" style=\"display:block;\
-                 padding:.875rem 0;text-decoration:none;color:inherit\">\
-                 <span style=\"display:block;font-size:1rem;font-weight:600;\
-                 line-height:1.35\">{title}{cancelled}</span>\
-                 <span style=\"display:block;font-size:.8125rem;color:#6e6e73;\
-                 margin-top:.25rem\">{date}{location}</span>\
+                "<li class=\"cz-event-list-item\">\
+                 <a href=\"/c/{cid}/events/{eid}\" class=\"cz-event-link\">\
+                 <span class=\"cz-event-title\">{title}{cancelled}</span>\
+                 <span class=\"cz-event-meta\">{date}{location}</span>\
                  </a></li>",
                 cid = render::escape_html(community_id),
                 eid = render::escape_html(&row.event_id),
@@ -84,19 +80,14 @@ pub(super) fn render_calendar_events(
         },
     );
     let content = if items.is_empty() {
-        format!(
-            "<p style=\"font-size:.875rem;color:#6e6e73;margin:.75rem 0 0\">{}</p>",
-            empty_copy
-        )
+        format!("<p class=\"cz-hint cz-hint--gap-top\">{}</p>", empty_copy)
     } else {
-        format!("<ul style=\"list-style:none;margin:.5rem 0 0;padding:0\">{items}</ul>")
+        format!("<ul class=\"cz-event-list\">{items}</ul>")
     };
     let create_on_day = match (selected_day, can_create_event) {
         (Some(day), true) => format!(
             "<a href=\"/c/{cid}/admin/events/new?day={day}\" \
-             style=\"display:inline-flex;align-items:center;justify-content:center;\
-             min-height:44px;margin:.75rem 0 0;color:#007AFF;text-decoration:none;\
-             font-size:.875rem;font-weight:600\">{label}</a>",
+             class=\"cz-link cz-link--action\">{label}</a>",
             cid = render::escape_html(community_id),
             day = render::escape_html(day),
             label = i18n::t(locale, i18n::CALENDAR_CREATE_ON_DAY)
@@ -105,9 +96,9 @@ pub(super) fn render_calendar_events(
     };
 
     format!(
-        "<section style=\"margin:0 auto 1.5rem;max-width:42rem\">\
-         <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{title}</h2>\
-         <p style=\"font-size:.8125rem;color:#6e6e73;margin:.25rem 0 0\">{scope}</p>\
+        "<section class=\"cz-page-section\">\
+         <h2 class=\"cz-section-title\">{title}</h2>\
+         <p class=\"cz-agenda-scope\">{scope}</p>\
          {create_on_day}{content}</section>",
         title = i18n::t(locale, i18n::HOME_AGENDA_TITLE),
         scope = selected_day
