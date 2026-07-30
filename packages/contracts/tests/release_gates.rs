@@ -509,6 +509,7 @@ fn i18n_en_ja_parity_count() {
         (EN_ADMIN_EDIT_STARTED, JA_ADMIN_EDIT_STARTED),
         (EN_NAV_BACK, JA_NAV_BACK),
         (EN_NAV_SWITCH_GO, JA_NAV_SWITCH_GO),
+        (EN_NAV_SWITCH_ARIA_LABEL, JA_NAV_SWITCH_ARIA_LABEL),
         (EN_NOTE_DELETE_BODY, JA_NOTE_DELETE_BODY),
         (EN_NOTE_KEEP_ACTION, JA_NOTE_KEEP_ACTION),
         (EN_FORM_FIELD_TITLE, JA_FORM_FIELD_TITLE),
@@ -524,6 +525,10 @@ fn i18n_en_ja_parity_count() {
         (EN_CURRENT_BADGE, JA_CURRENT_BADGE),
         (EN_ME_CALENDAR_LABEL, JA_ME_CALENDAR_LABEL),
         (EN_ME_DATA_EXPORT, JA_ME_DATA_EXPORT),
+        (EN_ME_LANGUAGE_TITLE, JA_ME_LANGUAGE_TITLE),
+        (EN_ME_LANGUAGE_SUBMIT, JA_ME_LANGUAGE_SUBMIT),
+        (EN_ME_LANGUAGE_UPDATED, JA_ME_LANGUAGE_UPDATED),
+        (EN_ME_LANGUAGE_CANCEL, JA_ME_LANGUAGE_CANCEL),
     ];
     // Strings that are intentionally identical across languages (product name,
     // numeric units, etc.) are exempted from the identity check.
@@ -720,7 +725,7 @@ const RFC077_DIRECT_PEPPER_CALLERS: &[(&str, &str, usize)] = &[
         1,
     ),
     ("community-create", COMMUNITY_CREATE_HANDLER_SRC, 1),
-    ("me", ME_HANDLER_SRC, 1),
+    ("me", ME_HANDLER_SRC, 2), // RFC-072 Slice B: post_language's own pepper resolution
     (
         "operator",
         include_str!("../../../workers/ssr/src/handlers/operator.rs"),
@@ -743,7 +748,7 @@ const RFC077_CODLET_ISSUE_CALLERS: &[(&str, &str, usize)] = &[
         include_str!("../../../workers/ssr/src/handlers/templates.rs"),
         2,
     ),
-    ("me", ME_HANDLER_SRC, 3),
+    ("me", ME_HANDLER_SRC, 5), // RFC-072 Slice B: get_language + refresh_language_form
     ("export", EXPORT_HANDLER_SRC, 1),
     ("event", EVENT_HANDLER_SRC, 3),
     ("community-create", COMMUNITY_CREATE_HANDLER_SRC, 2),
@@ -1028,7 +1033,7 @@ fn rfc077_pepper_codlet_and_auth_caller_inventories_are_closed() {
             actual
         })
         .sum();
-    assert_eq!(direct_count, 17, "direct pepper caller total drifted");
+    assert_eq!(direct_count, 18, "direct pepper caller total drifted");
 
     let issue_count: usize = RFC077_CODLET_ISSUE_CALLERS
         .iter()
@@ -1041,7 +1046,7 @@ fn rfc077_pepper_codlet_and_auth_caller_inventories_are_closed() {
             actual
         })
         .sum();
-    assert_eq!(issue_count, 27, "codlet issuance caller total drifted");
+    assert_eq!(issue_count, 29, "codlet issuance caller total drifted");
 
     assert!(
         SESSION_SRC.contains("pub enum AuthError")
@@ -1418,6 +1423,14 @@ fn sw_cache_version_matches_workspace_version() {
 
 const COMMUNITIES_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/communities.rs");
+const COMMUNITIES_CALENDAR_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/communities/calendar.rs");
+const CALENDAR_EVENTS_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/communities/calendar/events.rs");
+const MATRIX_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/communities/matrix.rs");
+const MATRIX_DETAIL_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/communities/matrix/detail.rs");
 const COMMUNITIES_MATRIX_SRC: &str = concat!(
     include_str!("../../../workers/ssr/src/handlers/communities/matrix.rs"),
     include_str!("../../../workers/ssr/src/handlers/communities/matrix/cells.rs"),
@@ -1509,7 +1522,8 @@ fn no_known_english_ui_leaks_in_rendered_text() {
 fn rfc061_member_management_is_discoverable_from_admin_workflows() {
     assert!(
         HOME_HANDLER_SRC.contains("/c/{cid}/admin/members")
-            && HOME_HANDLER_SRC.contains("JA_HOME_MANAGE_MEMBERS")
+            && HOME_HANDLER_SRC.contains("i18n::HOME_MANAGE_MEMBERS") // RFC-072 locale-aware accessor
+            && !HOME_HANDLER_SRC.contains("invite_label = i18n::t(locale, i18n::HOME_INVITE_MEMBERS)")
             && !HOME_HANDLER_SRC.contains("invite_label = i18n::JA_HOME_INVITE_MEMBERS"),
         "RFC-061 Home admin shortcut must lead to member management, not directly to invite codes"
     );
@@ -2088,11 +2102,12 @@ fn rfc056_home_lists_communities_without_switcher() {
         "Home must render communities one by one"
     );
     assert!(
-        HOME_HANDLER_SRC.contains("render::header(i18n::JA_NAV_HOME"),
+        HOME_HANDLER_SRC.contains("i18n::t(locale, i18n::NAV_HOME)") // RFC-072 locale-aware accessor
+            && HOME_HANDLER_SRC.contains("render::header(title, \"\")"),
         "Home must use a simple header without the community switcher"
     );
     assert!(
-        !HOME_HANDLER_SRC.contains("header_with_switcher(i18n::JA_NAV_HOME"),
+        !HOME_HANDLER_SRC.contains("header_with_switcher"),
         "Home must not render the community switcher"
     );
 }
@@ -2136,10 +2151,10 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         COMMUNITIES_SRC.contains("query_pairs()")
             && COMMUNITIES_SRC.contains("\"month\"")
             && COMMUNITIES_SRC.contains("\"day\"")
-            && COMMUNITIES_SRC.contains("JA_CALENDAR_PREV_MONTH")
-            && COMMUNITIES_SRC.contains("JA_CALENDAR_NEXT_MONTH")
-            && COMMUNITIES_SRC.contains("JA_CALENDAR_THIS_MONTH")
-            && COMMUNITIES_SRC.contains("JA_CALENDAR_ALL_DAYS"),
+            && COMMUNITIES_SRC.contains("i18n::CALENDAR_PREV_MONTH")
+            && COMMUNITIES_SRC.contains("i18n::CALENDAR_NEXT_MONTH")
+            && COMMUNITIES_SRC.contains("i18n::CALENDAR_THIS_MONTH")
+            && COMMUNITIES_SRC.contains("i18n::CALENDAR_ALL_DAYS"),
         "Calendar page must support month navigation and a clearable selected-day agenda"
     );
     assert!(
@@ -2273,7 +2288,7 @@ fn calendar_overview_contract_is_explicit() {
         .expect("Calendar page must keep a dedicated calendar renderer");
 
     assert!(
-        calendar_src.contains("JA_HOME_CALENDAR_HELPER"),
+        calendar_src.contains("i18n::t(locale, i18n::HOME_CALENDAR_HELPER)"),
         "Calendar overview must include helper copy explaining that details are in the list below"
     );
     assert!(
@@ -2287,7 +2302,7 @@ fn calendar_overview_contract_is_explicit() {
     assert!(
         calendar_src.contains("<a href=")
             && calendar_src.contains("aria-current=\\\"date\\\"")
-            && calendar_src.contains("JA_CALENDAR_ALL_DAYS"),
+            && calendar_src.contains("i18n::t(locale, i18n::CALENDAR_ALL_DAYS)"),
         "Calendar day cells are interactive in v0.42.0 and must expose selected-day state plus a clear filter"
     );
     assert!(
@@ -2319,7 +2334,7 @@ fn rfc067_monthly_attendance_matrix_contract_is_guarded() {
     assert!(
         COMMUNITIES_MATRIX_SRC.contains("pub(super) const MEMBER_ROW_CAP: usize = 100")
             && COMMUNITIES_MATRIX_SRC.contains("pub(super) const EVENT_DAY_ROW_CAP: usize = 300")
-            && COMMUNITIES_MATRIX_SRC.contains("JA_CALENDAR_MATRIX_TOO_LARGE"),
+            && COMMUNITIES_MATRIX_SRC.contains("i18n::CALENDAR_MATRIX_TOO_LARGE"),
         "RFC-067 matrix caps and too-large fallback must stay fixed"
     );
     assert!(
@@ -2335,8 +2350,8 @@ fn rfc067_monthly_attendance_matrix_contract_is_guarded() {
     assert!(
         COMMUNITIES_MATRIX_SRC.contains("CalendarView::Matrix")
             && COMMUNITIES_MATRIX_SRC.contains("view=matrix")
-            && COMMUNITIES_MATRIX_SRC.contains("JA_CALENDAR_VIEW_MATRIX")
-            && COMMUNITIES_MATRIX_SRC.contains("JA_CALENDAR_MATRIX_TITLE"),
+            && COMMUNITIES_MATRIX_SRC.contains("i18n::CALENDAR_VIEW_MATRIX")
+            && COMMUNITIES_MATRIX_SRC.contains("i18n::CALENDAR_MATRIX_TITLE"),
         "RFC-067 matrix mode must be route-backed and visibly switchable"
     );
     assert!(
@@ -2384,11 +2399,13 @@ fn rfc074_fallback_family_pages_stay_on_default_switcher() {
         ("admin/events/notes.rs", notes),
     ] {
         assert!(
-            src.contains("header_with_switcher("),
+            src.contains("header_with_switcher(")
+                || src.contains("header_with_switcher_localized("),
             "{name} must still render the community switcher"
         );
         assert!(
-            !src.contains("header_with_switcher_next("),
+            !src.contains("header_with_switcher_next(")
+                && !src.contains("header_with_switcher_next_localized("),
             "{name} must stay on the default switcher and fall back to target Home; RFC-074's route-family matrix does not assign it a next token"
         );
     }
@@ -2396,13 +2413,17 @@ fn rfc074_fallback_family_pages_stay_on_default_switcher() {
 
 #[test]
 fn rfc072_locale_resolution_never_panics_on_a_bad_stored_value() {
+    // Moved from authz.rs to db/membership.rs in Slice B (§7.1): resolution
+    // now happens next to the SELECT that reads ui_language, inside
+    // find_active, and MembershipContext.locale is a pre-resolved Locale
+    // — see rfc072_locale_is_only_ever_read_from_find_active below.
     assert!(
-        AUTHZ_SRC.contains("fn resolve_locale")
-            && AUTHZ_SRC.contains("Locale::parse")
-            && AUTHZ_SRC.contains("unwrap_or_default()"),
+        MEMBERSHIP_DB_SRC.contains("fn resolve_locale")
+            && MEMBERSHIP_DB_SRC.contains("Locale::parse")
+            && MEMBERSHIP_DB_SRC.contains("unwrap_or_default()"),
         "RFC-072 locale resolution must parse-or-fall-back, not assume a valid stored value"
     );
-    let resolve_locale_fn = AUTHZ_SRC
+    let resolve_locale_fn = MEMBERSHIP_DB_SRC
         .split("fn resolve_locale")
         .nth(1)
         .and_then(|rest| rest.split("\n}\n").next())
@@ -2410,6 +2431,213 @@ fn rfc072_locale_resolution_never_panics_on_a_bad_stored_value() {
     assert!(
         !resolve_locale_fn.contains(".unwrap()") && !resolve_locale_fn.contains(".expect("),
         "RFC-072 locale resolution must not unwrap/expect on the locale read path — a panic in a render path is an SEC-5 violation"
+    );
+}
+
+#[test]
+fn rfc072_locale_is_only_ever_read_from_find_active() {
+    // §7.1's trap, made structurally unrepresentable in Slice B: only
+    // `find_active` returns a row with a `locale` field at all (as
+    // `ActiveMembershipRow`); `find_active_by_id`, `list_active_for_user`,
+    // and `find_first_admin_for_user` return the plain `MembershipRow`,
+    // which has no locale field to reach for. A future page migrated from
+    // one of those three cannot silently render the wrong language — it
+    // would be a compile error, not a passing test with a wrong result.
+    assert!(
+        MEMBERSHIP_DB_SRC.contains("pub struct ActiveMembershipRow")
+            && MEMBERSHIP_DB_SRC.contains("pub locale: Locale")
+            && MEMBERSHIP_DB_SRC.contains("pub async fn find_active(")
+            && MEMBERSHIP_DB_SRC.contains("Result<Option<ActiveMembershipRow>>"),
+        "RFC-072: only find_active may return a row carrying a resolved locale"
+    );
+    assert!(
+        !MEMBERSHIP_DB_SRC.contains("pub struct MembershipRow")
+            || !MEMBERSHIP_DB_SRC
+                .split("pub struct MembershipRow")
+                .nth(1)
+                .and_then(|rest| rest.split("}\n").next())
+                .unwrap_or_default()
+                .contains("locale"),
+        "RFC-072: the plain MembershipRow (used by find_active_by_id, list_active_for_user, \
+         find_first_admin_for_user) must never carry a locale field"
+    );
+}
+
+#[test]
+fn rfc072_language_settings_post_is_reject_no_op_replay_and_target_safe() {
+    // RFC-072 Slice B §7.3/§8: post_language's shape mirrors post_display_name
+    // (RFC-070) — validated below via static source assertions, the same
+    // technique the RFC-070 gates above use, since `worker::Request`/D1
+    // cannot be constructed in a native test environment.
+    let post_language_src = ME_HANDLER_SRC
+        .split("pub async fn post_language")
+        .nth(1)
+        .expect("post_language handler must exist")
+        .split("\nasync fn refresh_language_form")
+        .next()
+        .expect("post_language handler must end before refresh_language_form");
+
+    // Reject: an out-of-allow-list ui_language value must be rejected before
+    // the token is ever consumed, so a legitimate mistaken resubmission can
+    // retry with the same token (same reasoning as RFC-070's validate-before-
+    // consume order).
+    assert!(
+        post_language_src.contains("Locale::parse(&raw_ui_language)")
+            && post_language_src.contains("refresh_language_form(")
+            && post_language_src
+                .find("Locale::parse(&raw_ui_language)")
+                .unwrap()
+                < post_language_src.find("consume_detailed(").unwrap(),
+        "post_language must validate the submitted locale before consuming the form token"
+    );
+
+    // No-op: submitting the member's current locale must not write, only
+    // record a replay-safe result_ref before redirecting — the actual DB
+    // write must be reachable only after this branch's early return.
+    assert!(
+        post_language_src.contains("if submitted == membership.locale {")
+            && post_language_src.contains(
+                "crate::form_token::set_result(&db, pepper.as_str(), &raw_token, UI_LANGUAGE_UNCHANGED_REF)"
+            )
+            && post_language_src
+                .find("crate::form_token::set_result(&db, pepper.as_str(), &raw_token, UI_LANGUAGE_UNCHANGED_REF)")
+                .unwrap()
+                < post_language_src.find("update_ui_language_with_result(").unwrap(),
+        "post_language same-value submission must be a no-op that records UI_LANGUAGE_UNCHANGED_REF, not a write"
+    );
+
+    // Replay: consumed token detection must branch by stored result_ref, not
+    // the older `.is_some()` pattern that misses consumed tokens with no ref
+    // (the same lesson RFC-070's gate above pins).
+    assert!(
+        post_language_src.contains(
+            "ConsumeResult::Replay(Some(result_ref)) if result_ref == UI_LANGUAGE_UPDATED_REF"
+        ) && post_language_src.contains(
+            "ConsumeResult::Replay(Some(result_ref)) if result_ref == UI_LANGUAGE_UNCHANGED_REF"
+        ) && post_language_src.contains("ConsumeResult::Replay(_)")
+            && !post_language_src.contains("if replay.is_some()"),
+        "post_language must classify every ConsumeResult::Replay case by its stored result_ref"
+    );
+
+    // No hidden field determines target: the form must read only its own
+    // token and the selected language — the membership/community being
+    // updated comes from `require_membership`'s URL-scoped lookup, not from
+    // attacker-controlled form data.
+    assert!(
+        post_language_src.matches("form.get_field(").count() == 2
+            && post_language_src.contains("form.get_field(\"_token\")")
+            && post_language_src.contains("form.get_field(\"ui_language\")"),
+        "post_language must not accept a hidden field that could redirect the write to another membership"
+    );
+}
+
+#[test]
+fn rfc072_member_facing_core_has_no_half_migrated_page() {
+    // RFC-072 Slice B §7.4: a half-migrated page — some strings resolved via
+    // `i18n::t(locale, ...)`, others still bare `i18n::JA_*` — is worse than
+    // not started, because `html lang` would then claim a language the page
+    // doesn't fully render. This gate pins each §5.2 surface (home.rs,
+    // communities.rs, calendar.rs, matrix.rs, event.rs) to zero bare
+    // `i18n::JA_` references, with three narrow, deliberate, and reviewed
+    // exceptions — every other bare reference would mean a string was missed.
+    //
+    // `me.rs` is intentionally excluded here: its display-name edit sub-page
+    // (get_display_name/post_display_name) still uses bare `i18n::JA_*` and
+    // was not migrated in Slice A, and is not one of Slice B's §5.2 surfaces
+    // — flagged in the review request rather than silently fixed or silently
+    // ignored by loosening this gate to cover it.
+    assert_eq!(
+        HOME_HANDLER_SRC.matches("i18n::JA_").count(),
+        0,
+        "home.rs must have no bare i18n::JA_ references — RFC-072 Slice B fully migrated it"
+    );
+    assert_eq!(
+        EVENT_HANDLER_SRC.matches("i18n::JA_").count(),
+        0,
+        "event.rs must have no bare i18n::JA_ references — RFC-072 Slice B fully migrated it"
+    );
+    assert_eq!(
+        CALENDAR_EVENTS_HANDLER_SRC.matches("i18n::JA_").count(),
+        0,
+        "communities/calendar/events.rs must have no bare i18n::JA_ references"
+    );
+    assert_eq!(
+        MATRIX_DETAIL_HANDLER_SRC.matches("i18n::JA_").count(),
+        0,
+        "communities/matrix/detail.rs must have no bare i18n::JA_ references"
+    );
+
+    // Exception 1: communities.rs's post_matrix_export_audit rejects an
+    // unauthenticated request before any membership lookup exists, so there
+    // is no locale to resolve yet — same rationale as render/errors.rs
+    // (RFC-072 §6 non-change scope). Exactly one such reference is expected.
+    assert_eq!(
+        COMMUNITIES_HANDLER_SRC.matches("i18n::JA_").count(),
+        1,
+        "communities.rs must have exactly the one documented pre-auth exception, no more"
+    );
+    assert!(
+        COMMUNITIES_HANDLER_SRC.contains("json_error(401, i18n::JA_SESSION_EXPIRED)"),
+        "communities.rs's one bare i18n::JA_ reference must be the documented pre-auth 401 branch"
+    );
+
+    // Exception 2: communities/calendar.rs's month/day aria-labels and the
+    // month-grid header are deliberately Japanese-only date-sentence
+    // structures (see the `tz::date_label_ja` gap noted in the review
+    // request); exactly one bare reference is expected there, inside that
+    // exception.
+    assert_eq!(
+        COMMUNITIES_CALENDAR_HANDLER_SRC
+            .matches("i18n::JA_")
+            .count(),
+        1,
+        "communities/calendar.rs must have exactly the one documented date-format exception, no more"
+    );
+    assert!(
+        COMMUNITIES_CALENDAR_HANDLER_SRC.contains("i18n::JA_HOME_CALENDAR_COUNT_SUFFIX"),
+        "communities/calendar.rs's one bare i18n::JA_ reference must be the documented aria-label exception"
+    );
+
+    // Exception 3: communities/matrix/cells.rs is deliberately left entirely
+    // unmigrated (whole-sentence Japanese aria-labels; the visible cell
+    // symbols are already language-neutral) — checked here only to document
+    // that the exclusion is intentional, not to bound its count.
+    assert!(
+        include_str!("../../../workers/ssr/src/handlers/communities/matrix/cells.rs")
+            .contains("i18n::JA_STATUS_GOING"),
+        "communities/matrix/cells.rs is expected to remain untouched by RFC-072 Slice B"
+    );
+
+    // matrix.rs (top-level, excluding cells.rs/detail.rs) carries the same
+    // "{year}年{month}月" date-format exception as calendar.rs.
+    assert_eq!(
+        MATRIX_HANDLER_SRC.matches("i18n::JA_").count(),
+        0,
+        "communities/matrix.rs (top-level) must have no bare i18n::JA_ references"
+    );
+}
+
+#[test]
+fn rfc072_communities_and_event_pages_resolve_locale_and_html_lang_together() {
+    // Complements the executable Ja/En render tests for calendar.rs/matrix.rs
+    // (which have extractable pure render functions): communities.rs's
+    // get_communities and event.rs's get_event_detail are async, D1-bound
+    // handlers with no such extractable function, so — like the RFC-070 and
+    // RFC-072 settings-page gates above — this checks statically that each
+    // resolves a representative string through `i18n::t(locale, ...)` and
+    // threads that same `locale` into `page_localized`, so `html lang` and
+    // the page's rendered language cannot drift apart.
+    assert!(
+        COMMUNITIES_HANDLER_SRC.contains("let locale = active_membership.locale;")
+            && COMMUNITIES_HANDLER_SRC.contains("i18n::t(locale, i18n::NAV_COMMUNITIES)")
+            && COMMUNITIES_HANDLER_SRC.contains("render::page_localized(locale, title, &body)"),
+        "communities.rs's get_communities must resolve locale from find_active and thread it into page_localized"
+    );
+    assert!(
+        EVENT_HANDLER_SRC.contains("let locale = membership.locale;")
+            && EVENT_HANDLER_SRC.contains("i18n::t(locale, i18n::EVENT_TITLE_HEADER)")
+            && EVENT_HANDLER_SRC.contains("render::page_localized(locale, &event.title, &body)"),
+        "event.rs's get_event_detail must resolve locale from require_membership and thread it into page_localized"
     );
 }
 
@@ -2454,7 +2682,7 @@ fn rfc068_calendar_matrix_csv_export_contract_is_guarded() {
             && COMMUNITIES_MATRIX_SRC.contains("data-export-value")
             && COMMUNITIES_MATRIX_SRC.contains("data-member-name")
             && COMMUNITIES_MATRIX_SRC.contains("data-date")
-            && COMMUNITIES_MATRIX_SRC.contains("JA_CALENDAR_MATRIX_CSV_EXPORT"),
+            && COMMUNITIES_MATRIX_SRC.contains("i18n::CALENDAR_MATRIX_CSV_EXPORT"),
         "RFC-068 admin matrix markup must carry the reviewed export controls and explicit cell values"
     );
     assert!(
@@ -2483,7 +2711,7 @@ fn rfc059_calendar_create_from_day_is_route_backed() {
     );
     assert!(
         COMMUNITIES_SRC.contains("/admin/events/new?day={day}")
-            && COMMUNITIES_SRC.contains("JA_CALENDAR_CREATE_ON_DAY"),
+            && COMMUNITIES_SRC.contains("i18n::CALENDAR_CREATE_ON_DAY"),
         "Selected Calendar days must expose a route-backed create-event link"
     );
     assert!(
@@ -2569,7 +2797,7 @@ fn rfc060_cancelled_event_recreate_is_admin_only_and_details_only() {
     );
     assert!(
         EVENT_HANDLER_SRC.contains("membership.is_admin() && event.status == \"cancelled\"")
-            && EVENT_HANDLER_SRC.contains("JA_ADMIN_RECREATE_EVENT_ACTION")
+            && EVENT_HANDLER_SRC.contains("i18n::ADMIN_RECREATE_EVENT_ACTION")
             && EVENT_HANDLER_SRC.contains("/admin/events/{eid}/recreate"),
         "Event Detail must show the recreate action only to admins on cancelled events"
     );
@@ -2637,7 +2865,7 @@ fn rfc066_event_copy_is_admin_reviewed_prefill_not_clone() {
     }
     assert!(
         EVENT_HANDLER_SRC.contains("membership.is_admin()")
-            && EVENT_HANDLER_SRC.contains("JA_ADMIN_COPY_EVENT_ACTION")
+            && EVENT_HANDLER_SRC.contains("i18n::ADMIN_COPY_EVENT_ACTION")
             && EVENT_HANDLER_SRC.contains("/admin/events/{eid}/copy"),
         "Event Detail must expose the copy action to active admins"
     );
@@ -3832,7 +4060,8 @@ fn rfc079_package6_disclosure_and_logout_boundaries_are_pinned() {
         matrix_audit < matrix_response
             && matrix_post.contains("AuditAction::CalendarMatrixCsvExportRequested")
             && matrix_post.contains("AuditMetadata::MatrixExportRequested")
-            && matrix_post.contains("return json_error(503, i18n::JA_GENERAL_ERROR);"),
+            && matrix_post
+                .contains("return json_error(503, i18n::t(locale, i18n::GENERAL_ERROR));"),
         "matrix export acknowledgement must return privacy-safe JSON 503 when typed audit evidence fails"
     );
     assert!(

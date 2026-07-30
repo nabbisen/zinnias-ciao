@@ -101,3 +101,43 @@ pub const ME_DATA_EXPORT: Localized = Localized {
     ja: JA_ME_DATA_EXPORT,
     en: EN_ME_DATA_EXPORT,
 };
+
+// ── Language settings (RFC-072) ──────────────────────────────────────────
+// Copy decided in the Slice A review (Handoff 021 §19 / Handoff 022 §7.2).
+// `ME_LANGUAGE_CANCEL` is deliberately its own pair, not a reuse of
+// `ME_DISPLAY_NAME_EDIT_CANCEL`, even though the values match today —
+// reusing it would couple two unrelated surfaces through a name that
+// describes only one of them.
+pub const EN_ME_LANGUAGE_TITLE: &str = "Language";
+pub const EN_ME_LANGUAGE_SUBMIT: &str = "Save";
+pub const EN_ME_LANGUAGE_UPDATED: &str = "Language updated.";
+pub const EN_ME_LANGUAGE_CANCEL: &str = "Cancel";
+
+pub const JA_ME_LANGUAGE_TITLE: &str = "言語";
+pub const JA_ME_LANGUAGE_SUBMIT: &str = "保存";
+pub const JA_ME_LANGUAGE_UPDATED: &str = "表示言語を変更しました。";
+pub const JA_ME_LANGUAGE_CANCEL: &str = "やめる";
+
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const ME_LANGUAGE_TITLE: Localized = Localized {
+    ja: JA_ME_LANGUAGE_TITLE,
+    en: EN_ME_LANGUAGE_TITLE,
+};
+pub const ME_LANGUAGE_SUBMIT: Localized = Localized {
+    ja: JA_ME_LANGUAGE_SUBMIT,
+    en: EN_ME_LANGUAGE_SUBMIT,
+};
+pub const ME_LANGUAGE_UPDATED: Localized = Localized {
+    ja: JA_ME_LANGUAGE_UPDATED,
+    en: EN_ME_LANGUAGE_UPDATED,
+};
+pub const ME_LANGUAGE_CANCEL: Localized = Localized {
+    ja: JA_ME_LANGUAGE_CANCEL,
+    en: EN_ME_LANGUAGE_CANCEL,
+};
+
+/// A language's own name for itself does not vary with the render locale,
+/// so these deliberately do not fit the `Localized` shape (Slice A review,
+/// Q2) — plain, unpaired, always-rendered-as-is literals.
+pub const LANGUAGE_OPTION_JA: &str = "日本語";
+pub const LANGUAGE_OPTION_EN: &str = "English";

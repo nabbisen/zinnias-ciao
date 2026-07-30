@@ -34,6 +34,7 @@ pub async fn get_communities(
         return render::not_found();
     };
     let can_create_event = active_membership.role == "admin";
+    let locale = active_membership.locale;
 
     let community = db::community::find_active(&db, community_id).await?;
     let community_tz = community
@@ -80,12 +81,12 @@ pub async fn get_communities(
                 db::event_series::materialize_for_community_through(&db, community_id, &month_end)
                     .await?;
             if report.cap_reached {
-                Some(i18n::JA_CALENDAR_MATERIALIZATION_LIMIT)
+                Some(i18n::t(locale, i18n::CALENDAR_MATERIALIZATION_LIMIT))
             } else {
                 None
             }
         }
-        Some(_) => Some(i18n::JA_CALENDAR_OUT_OF_RANGE),
+        Some(_) => Some(i18n::t(locale, i18n::CALENDAR_OUT_OF_RANGE)),
         None => None,
     };
     let rows = match view {
@@ -114,8 +115,14 @@ pub async fn get_communities(
     } else {
         None
     };
-    let mode_tabs =
-        matrix::render_mode_tabs(community_id, year, month, selected_day.as_deref(), view);
+    let mode_tabs = matrix::render_mode_tabs(
+        community_id,
+        year,
+        month,
+        selected_day.as_deref(),
+        view,
+        locale,
+    );
     let content = match view {
         matrix::CalendarView::Month => {
             let calendar = calendar::render_calendar_month(
@@ -125,6 +132,7 @@ pub async fn get_communities(
                 today_day,
                 selected_day.as_deref(),
                 &rows,
+                locale,
             );
             let day_detail = calendar::render_calendar_day_detail(
                 community_id,
@@ -134,6 +142,7 @@ pub async fn get_communities(
                 year,
                 month,
                 can_create_event,
+                locale,
             );
             format!("{calendar}{day_detail}")
         }
@@ -144,6 +153,7 @@ pub async fn get_communities(
             year,
             month,
             can_create_event,
+            locale,
         ),
         matrix::CalendarView::Matrix => {
             let members = membership_db::list_all_active(&db, community_id).await?;
@@ -184,6 +194,7 @@ pub async fn get_communities(
                 rows: &rows,
                 members: &members,
                 attendances: &attendances,
+                locale,
             })
         }
     };
@@ -194,17 +205,19 @@ pub async fn get_communities(
         .map(|s| (s.community_id.clone(), s.community_name.clone()))
         .collect();
 
-    let nav = render::bottom_nav(community_id, "communities");
+    let nav = render::bottom_nav_localized(community_id, "communities", locale);
+    let title = i18n::t(locale, i18n::NAV_COMMUNITIES);
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
            {notice}{mode_tabs}{content}\
          </main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_NAV_COMMUNITIES,
+        header = render::header_with_switcher_next_localized(
+            title,
             community_id,
             &community_pairs,
-            &matrix::switcher_next(year, month, selected_day.as_deref(), view)
+            &matrix::switcher_next(year, month, selected_day.as_deref(), view),
+            locale
         ),
         mode_tabs = mode_tabs,
         notice = materialization_notice
@@ -218,7 +231,7 @@ pub async fn get_communities(
         content = content,
         nav = nav,
     );
-    render::page(i18n::JA_NAV_COMMUNITIES, &body)
+    render::page_localized(locale, title, &body)
 }
 
 pub async fn post_matrix_export_audit(
@@ -227,8 +240,12 @@ pub async fn post_matrix_export_audit(
     rid: &str,
     community_id: &str,
 ) -> Result<Response> {
+    // No membership context exists yet at this point — auth itself has not
+    // succeeded — so there is nothing to resolve a locale from. Deployment
+    // default (Japanese), matching render/errors.rs's rationale.
     let auth = crate::require_auth_or!(&req, env, json_error(401, i18n::JA_SESSION_EXPIRED));
     let membership = crate::authz::require_admin(env, &auth, community_id).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
     let form = req.form_data().await?;
     let token = form_text(&form, "token");
@@ -236,7 +253,7 @@ pub async fn post_matrix_export_audit(
     let export_type = form_text(&form, "export_type");
 
     if calendar::parse_month(&month).is_none() || export_type != "calendar_matrix_csv" {
-        return json_error(400, i18n::JA_GENERAL_ERROR);
+        return json_error(400, i18n::t(locale, i18n::GENERAL_ERROR));
     }
     let bound_resource = calendar_matrix_csv_bound_resource_from_month(community_id, &month);
     let replay = crate::codlet::consume_token(
@@ -248,7 +265,7 @@ pub async fn post_matrix_export_audit(
     )
     .await?;
     if token.is_empty() || matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
-        return json_error(400, i18n::JA_GENERAL_ERROR);
+        return json_error(400, i18n::t(locale, i18n::GENERAL_ERROR));
     }
     let pepper = crate::crypto::pepper(env)?;
     crate::form_token::set_result(
@@ -273,7 +290,7 @@ pub async fn post_matrix_export_audit(
     .await
     .is_err()
     {
-        return json_error(503, i18n::JA_GENERAL_ERROR);
+        return json_error(503, i18n::t(locale, i18n::GENERAL_ERROR));
     }
 
     let mut resp = Response::from_json(&serde_json::json!({"ok": true}))?;

@@ -1,6 +1,7 @@
 use super::{calendar, matrix};
 use crate::db::{attendance, event as event_db, membership};
 use std::collections::HashMap;
+use zinnias_ciao_contracts::Locale;
 
 #[test]
 fn month_parse_rejects_bad_values() {
@@ -92,6 +93,7 @@ fn render_mode_tabs_shows_three_tabs_and_list_href_omits_day() {
         7,
         Some("2026-07-05"),
         matrix::CalendarView::Month,
+        Locale::Ja,
     );
     assert!(html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_VIEW_MONTH));
     assert!(html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_VIEW_LIST));
@@ -123,6 +125,7 @@ fn day_detail_always_renders_and_is_day_scoped_not_full_month() {
         2026,
         7,
         false,
+        Locale::Ja,
     );
     assert!(no_day_selected.contains("id=\"calendar-day-detail\""));
     assert!(no_day_selected.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_DAY_DETAIL_PROMPT));
@@ -140,6 +143,7 @@ fn day_detail_always_renders_and_is_day_scoped_not_full_month() {
         2026,
         7,
         false,
+        Locale::Ja,
     );
     assert!(day_selected.contains("id=\"calendar-day-detail\""));
     assert!(day_selected.contains("/c/community-a/events/event_1"));
@@ -156,10 +160,48 @@ fn events_list_tab_ignores_selected_day_and_shows_full_month() {
         event_row("day_2", "event_2", "2026-07-06", "Lunch", "scheduled"),
     ];
 
-    let html = calendar::render_calendar_list("community-a", "Asia/Tokyo", &rows, 2026, 7, false);
+    let html = calendar::render_calendar_list(
+        "community-a",
+        "Asia/Tokyo",
+        &rows,
+        2026,
+        7,
+        false,
+        Locale::Ja,
+    );
     assert!(html.contains("/c/community-a/events/event_1"));
     assert!(html.contains("/c/community-a/events/event_2"));
     assert!(html.contains("view=list"));
+}
+
+#[test]
+fn render_calendar_list_labels_follow_locale() {
+    use zinnias_ciao_contracts::i18n;
+    let rows: Vec<event_db::HomeEventRow> = vec![];
+
+    let ja = calendar::render_calendar_list(
+        "community-a",
+        "Asia/Tokyo",
+        &rows,
+        2026,
+        7,
+        false,
+        Locale::Ja,
+    );
+    assert!(ja.contains(&format!(">{}</a>", i18n::JA_CALENDAR_PREV_MONTH)));
+    assert!(!ja.contains(&format!(">{}</a>", i18n::EN_CALENDAR_PREV_MONTH)));
+
+    let en = calendar::render_calendar_list(
+        "community-a",
+        "Asia/Tokyo",
+        &rows,
+        2026,
+        7,
+        false,
+        Locale::En,
+    );
+    assert!(en.contains(&format!(">{}</a>", i18n::EN_CALENDAR_PREV_MONTH)));
+    assert!(!en.contains(&format!(">{}</a>", i18n::JA_CALENDAR_PREV_MONTH)));
 }
 
 #[test]
@@ -191,6 +233,7 @@ fn matrix_render_uses_contract_symbols_and_multi_event_summary() {
         rows: &rows,
         members: &members,
         attendances: &attendances,
+        locale: Locale::Ja,
     });
 
     assert!(html.contains(">○</td>"));
@@ -228,6 +271,7 @@ fn matrix_render_adds_csv_export_contract_for_admin_only() {
         rows: &rows,
         members: &members,
         attendances: &attendances,
+        locale: Locale::Ja,
     });
 
     assert!(html.contains("data-calendar-matrix-export=\"true\""));
@@ -270,6 +314,7 @@ fn matrix_render_omits_csv_export_contract_for_non_admin() {
         rows: &rows,
         members: &members,
         attendances: &attendances,
+        locale: Locale::Ja,
     });
 
     assert!(!html.contains("data-calendar-matrix-export"));
@@ -300,6 +345,7 @@ fn matrix_render_shows_cap_fallback() {
         rows: &[],
         members: &members,
         attendances: &HashMap::new(),
+        locale: Locale::Ja,
     });
 
     assert!(html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_MATRIX_TOO_LARGE));
@@ -336,6 +382,7 @@ fn matrix_render_shows_event_day_over_cap_fallback() {
         rows: &rows,
         members: &members,
         attendances: &HashMap::new(),
+        locale: Locale::Ja,
     });
 
     assert!(html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_MATRIX_TOO_LARGE));
@@ -372,10 +419,51 @@ fn matrix_render_allows_event_day_cap_boundary() {
         rows: &rows,
         members: &members,
         attendances: &HashMap::new(),
+        locale: Locale::Ja,
     });
 
     assert!(!html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_MATRIX_TOO_LARGE));
     assert!(html.contains(zinnias_ciao_contracts::i18n::JA_CALENDAR_MATRIX_TITLE));
+}
+
+#[test]
+fn matrix_render_member_column_header_follows_locale() {
+    use zinnias_ciao_contracts::i18n;
+    let members = vec![membership::MemberSummary {
+        id: "mem_a".to_string(),
+        display_name: "Alice".to_string(),
+        role: "member".to_string(),
+    }];
+    let rows = vec![event_row(
+        "day_1",
+        "event_1",
+        "2026-07-05",
+        "Morning",
+        "scheduled",
+    )];
+    let attendances = attendance_map(vec![attendance_row("day_1", "mem_a", Some("going"))]);
+
+    let input = |locale: Locale| matrix::MatrixRenderInput {
+        community_id: "community-a",
+        community_tz: "Asia/Tokyo",
+        year: 2026,
+        month: 7,
+        selected_day: None,
+        can_export_csv: false,
+        export_token: None,
+        rows: &rows,
+        members: &members,
+        attendances: &attendances,
+        locale,
+    };
+
+    let ja = matrix::render_matrix(input(Locale::Ja));
+    assert!(ja.contains(&format!(">{}</th>", i18n::JA_ROLE_MEMBER)));
+    assert!(!ja.contains(&format!(">{}</th>", i18n::EN_ROLE_MEMBER)));
+
+    let en = matrix::render_matrix(input(Locale::En));
+    assert!(en.contains(&format!(">{}</th>", i18n::EN_ROLE_MEMBER)));
+    assert!(!en.contains(&format!(">{}</th>", i18n::JA_ROLE_MEMBER)));
 }
 
 fn event_row(

@@ -405,6 +405,287 @@ async fn update_display_name_with_audit_and_result(
     Ok(())
 }
 
+// ── Language settings (RFC-072 Slice B) ───────────────────────────────────
+// Not linked from anywhere yet (Slice C links it from My Page). Copy is
+// `me.rs`, `post_display_name`'s shape exactly: same membership binding,
+// same no-JS POST-and-303 shape, same replay handling via `ConsumeResult`.
+//
+// Ordering note: the RFC's own POST Contract lists "accept only ja/en,
+// reject without writing" (items 4-5) *before* "consume a form token"
+// (item 6) — matching `post_display_name`'s actual shape (validate, then
+// consume). Handoff 022 §7.3's numbered list has this reversed (consume
+// before validate). Followed the RFC and the reference implementation,
+// not the handoff's list order, per "the RFC wins."
+
+const UI_LANGUAGE_UPDATED_REF: &str = "ui_language_updated";
+const UI_LANGUAGE_UNCHANGED_REF: &str = "ui_language_unchanged";
+
+pub async fn get_language(
+    req: Request,
+    env: &Env,
+    _rid: &str,
+    community_id: &str,
+) -> Result<Response> {
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
+    let membership = require_membership(env, &auth, community_id).await?;
+    let url = req.url()?;
+    let flash_code = url
+        .query_pairs()
+        .find(|(k, _)| k == "flash")
+        .map(|(_, v)| v.to_string());
+    let token = crate::codlet::issue_token(
+        env,
+        &auth.user_id,
+        token_purpose::CHANGE_UI_LANGUAGE,
+        Some(&membership.membership_id),
+    )
+    .await?;
+    let body = language_form_body(&membership, &token, None, flash_code.as_deref());
+    let title = i18n::t(membership.locale, i18n::ME_LANGUAGE_TITLE);
+    render::page_localized(membership.locale, title, &body)
+}
+
+pub async fn post_language(
+    mut req: Request,
+    env: &Env,
+    _rid: &str,
+    community_id: &str,
+) -> Result<Response> {
+    let auth = crate::require_auth_or!(&req, env, render::session_expired());
+    let membership = require_membership(env, &auth, community_id).await?;
+
+    let form = req.form_data().await?;
+    let raw_token = form.get_field("_token").unwrap_or_default();
+    let raw_ui_language = form.get_field("ui_language").unwrap_or_default();
+
+    // Attacker-controlled/out-of-allow-list value: reject without writing,
+    // and without consuming the token — mirrors `post_display_name`, which
+    // lets a legitimate mistaken resubmission retry with the same token.
+    // This can only happen via a tampered request (the rendered form only
+    // ever offers "ja"/"en"), so the app's existing generic error copy
+    // applies; no new copy was needed for this path.
+    let Some(submitted) = zinnias_ciao_contracts::Locale::parse(&raw_ui_language) else {
+        return refresh_language_form(
+            env,
+            &auth.user_id,
+            &membership,
+            Some(i18n::t(membership.locale, i18n::GENERAL_ERROR)),
+        )
+        .await;
+    };
+
+    let db = env.d1("DB")?;
+    let pepper = crate::crypto::pepper(env)?;
+    let consume = crate::form_token::consume_detailed(
+        &db,
+        pepper.as_str(),
+        &auth.user_id,
+        token_purpose::CHANGE_UI_LANGUAGE,
+        &raw_token,
+        Some(&membership.membership_id),
+    )
+    .await?;
+
+    match consume {
+        ConsumeResult::Replay(Some(result_ref)) if result_ref == UI_LANGUAGE_UPDATED_REF => {
+            return redirect(&format!(
+                "/c/{community_id}/me/language?flash={UI_LANGUAGE_UPDATED_REF}"
+            ));
+        }
+        ConsumeResult::Replay(Some(result_ref)) if result_ref == UI_LANGUAGE_UNCHANGED_REF => {
+            return redirect(&format!("/c/{community_id}/me/language"));
+        }
+        ConsumeResult::Replay(_) => {
+            return redirect(&format!("/c/{community_id}/me/language"));
+        }
+        ConsumeResult::Proceed => {}
+    }
+
+    if submitted == membership.locale {
+        crate::form_token::set_result(&db, pepper.as_str(), &raw_token, UI_LANGUAGE_UNCHANGED_REF)
+            .await?;
+        return redirect(&format!("/c/{community_id}/me/language"));
+    }
+
+    update_ui_language_with_result(
+        &db,
+        community_id,
+        &auth.user_id,
+        &membership.membership_id,
+        submitted,
+        pepper.as_str(),
+        &raw_token,
+    )
+    .await?;
+
+    redirect(&format!(
+        "/c/{community_id}/me/language?flash={UI_LANGUAGE_UPDATED_REF}"
+    ))
+}
+
+async fn refresh_language_form(
+    env: &Env,
+    user_id: &str,
+    membership: &crate::authz::MembershipContext,
+    error: Option<&str>,
+) -> Result<Response> {
+    let token = crate::codlet::issue_token(
+        env,
+        user_id,
+        token_purpose::CHANGE_UI_LANGUAGE,
+        Some(&membership.membership_id),
+    )
+    .await?;
+    render_language_form(membership, &token, error)
+}
+
+fn render_language_form(
+    membership: &crate::authz::MembershipContext,
+    token: &str,
+    error: Option<&str>,
+) -> Result<Response> {
+    let body = language_form_body(membership, token, error, None);
+    let title = i18n::t(membership.locale, i18n::ME_LANGUAGE_TITLE);
+    render::page_localized(membership.locale, title, &body)
+}
+
+fn language_form_body(
+    membership: &crate::authz::MembershipContext,
+    token: &str,
+    error: Option<&str>,
+    flash_code: Option<&str>,
+) -> String {
+    let locale = membership.locale;
+    let error_html = error
+        .map(|message| {
+            format!(
+                "<p role=\"alert\" style=\"color:#FF3B30;margin:.75rem 0 0\">{}</p>",
+                render::escape_html(message)
+            )
+        })
+        .unwrap_or_default();
+    let flash_html = language_flash_message(locale, flash_code)
+        .map(|message| {
+            format!(
+                "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0 1rem\">{}</p>",
+                render::escape_html(message)
+            )
+        })
+        .unwrap_or_default();
+    let cid = render::escape_html(&membership.community_id);
+    let ja_checked = if locale == zinnias_ciao_contracts::Locale::Ja {
+        " checked"
+    } else {
+        ""
+    };
+    let en_checked = if locale == zinnias_ciao_contracts::Locale::En {
+        " checked"
+    } else {
+        ""
+    };
+    format!(
+        "{header}<main style=\"padding:1rem 1rem 5rem;max-width:560px;margin:0 auto\">\
+           {error_html}{flash_html}\
+           <form method=\"post\" action=\"/c/{cid}/me/language\" style=\"margin-top:1rem\">\
+             <input type=\"hidden\" name=\"_token\" value=\"{token}\">\
+             <fieldset style=\"border:1px solid #D1D1D6;border-radius:8px;padding:.75rem 1rem\">\
+               <legend style=\"font-size:.875rem;font-weight:600;padding:0 .25rem\">{title}</legend>\
+               <label style=\"display:block;min-height:44px;line-height:44px\">\
+                 <input type=\"radio\" name=\"ui_language\" value=\"ja\"{ja_checked}> {ja_label}\
+               </label>\
+               <label style=\"display:block;min-height:44px;line-height:44px\">\
+                 <input type=\"radio\" name=\"ui_language\" value=\"en\"{en_checked}> {en_label}\
+               </label>\
+             </fieldset>\
+             <button type=\"submit\" style=\"width:100%;margin-top:1.25rem;padding:.875rem;background:#007AFF;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;min-height:44px;cursor:pointer\">{submit}</button>\
+           </form>\
+           <a href=\"/c/{cid}/me\" style=\"display:inline-block;margin-top:.75rem;color:#007AFF;min-height:44px;line-height:44px;text-decoration:none\">{cancel}</a>\
+         </main>{nav}",
+        header = render::header(i18n::t(locale, i18n::ME_LANGUAGE_TITLE), ""),
+        error_html = error_html,
+        flash_html = flash_html,
+        cid = cid,
+        token = render::escape_html(token),
+        title = i18n::t(locale, i18n::ME_LANGUAGE_TITLE),
+        ja_checked = ja_checked,
+        ja_label = i18n::LANGUAGE_OPTION_JA,
+        en_checked = en_checked,
+        en_label = i18n::LANGUAGE_OPTION_EN,
+        submit = i18n::t(locale, i18n::ME_LANGUAGE_SUBMIT),
+        cancel = i18n::t(locale, i18n::ME_LANGUAGE_CANCEL),
+        nav = render::bottom_nav_localized(&membership.community_id, "me", locale),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn update_ui_language_with_result(
+    db: &worker::D1Database,
+    community_id: &str,
+    user_id: &str,
+    membership_id: &str,
+    locale: zinnias_ciao_contracts::Locale,
+    pepper: &str,
+    raw_token: &str,
+) -> Result<()> {
+    let token_hmac = hmac_hex(pepper, raw_token);
+
+    let update_stmt = db
+        .prepare(
+            "UPDATE community_memberships \
+             SET ui_language = ?1 \
+             WHERE id = ?2 \
+               AND community_id = ?3 \
+               AND user_id = ?4 \
+               AND removed_at IS NULL",
+        )
+        .bind(&[
+            locale.code().into(),
+            membership_id.into(),
+            community_id.into(),
+            user_id.into(),
+        ])?;
+
+    let result_stmt = db
+        .prepare(
+            "UPDATE form_tokens \
+             SET result_ref = ?1 \
+             WHERE token_hmac = ?2 \
+               AND user_id = ?3 \
+               AND purpose = ?4 \
+               AND consumed_at IS NOT NULL \
+               AND EXISTS ( \
+                 SELECT 1 FROM community_memberships \
+                 WHERE id = ?5 AND community_id = ?6 AND user_id = ?3 \
+                   AND removed_at IS NULL AND ui_language = ?7 \
+               )",
+        )
+        .bind(&[
+            UI_LANGUAGE_UPDATED_REF.into(),
+            token_hmac.as_str().into(),
+            user_id.into(),
+            token_purpose::CHANGE_UI_LANGUAGE.into(),
+            membership_id.into(),
+            community_id.into(),
+            locale.code().into(),
+        ])?;
+
+    let results = db.batch(vec![update_stmt, result_stmt]).await?;
+    require_changed(&results, 0, "ui_language update")?;
+    require_changed(&results, 1, "ui_language replay result")?;
+
+    Ok(())
+}
+
+fn language_flash_message(
+    locale: zinnias_ciao_contracts::Locale,
+    code: Option<&str>,
+) -> Option<&'static str> {
+    match code {
+        Some(UI_LANGUAGE_UPDATED_REF) => Some(i18n::t(locale, i18n::ME_LANGUAGE_UPDATED)),
+        _ => None,
+    }
+}
+
 fn require_changed(results: &[D1Result], index: usize, label: &str) -> Result<()> {
     let changed = results
         .get(index)

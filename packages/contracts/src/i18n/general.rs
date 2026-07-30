@@ -26,6 +26,12 @@ pub const EN_EMPTY_EVENTS_HINT: &str = "Ask your community admin to add one.";
 pub const EN_EMPTY_EVENTS_ADMIN: &str = "No events yet. Create the first event for this community.";
 
 pub const JA_GENERAL_ERROR: &str = "エラーが発生しました。もう一度お試しください。";
+
+/// RFC-072 locale-aware pair; see `i18n::Localized`.
+pub const GENERAL_ERROR: Localized = Localized {
+    ja: JA_GENERAL_ERROR,
+    en: EN_GENERAL_ERROR,
+};
 pub const JA_CONFIGURATION_UNAVAILABLE: &str =
     "ただいまサービスを利用できません。しばらくしてから、もう一度お試しください。";
 pub const EN_NOT_FOUND: &str = "Not found.";
@@ -46,6 +52,12 @@ pub const JA_EMPTY_EVENTS_HINT: &str = "コミュニティの管理者にイベ�
 pub const JA_EMPTY_EVENTS_ADMIN: &str =
     "イベントはまだありません。最初のイベントを作成しましょう。";
 
+/// RFC-072 locale-aware pair; see `i18n::Localized`.
+pub const EMPTY_EVENTS_HINT: Localized = Localized {
+    ja: JA_EMPTY_EVENTS_HINT,
+    en: EN_EMPTY_EVENTS_HINT,
+};
+
 // ── Navigation ────────────────────────────────────────────────────────────
 pub const EN_NAV_HOME: &str = "Home";
 pub const EN_NAV_COMMUNITIES: &str = "Calendar";
@@ -58,6 +70,8 @@ pub const EN_NAV_BACK: &str = "Back to event";
 pub const JA_NAV_BACK: &str = "イベントに戻る";
 pub const EN_NAV_SWITCH_GO: &str = "Switch";
 pub const JA_NAV_SWITCH_GO: &str = "切り替え";
+pub const EN_NAV_SWITCH_ARIA_LABEL: &str = "Switch community";
+pub const JA_NAV_SWITCH_ARIA_LABEL: &str = "コミュニティを切り替え";
 
 /// RFC-072 locale-aware pairs; see `i18n::Localized`.
 pub const NAV_HOME: Localized = Localized {
@@ -75,6 +89,10 @@ pub const NAV_ME: Localized = Localized {
 pub const NAV_SWITCH_GO: Localized = Localized {
     ja: JA_NAV_SWITCH_GO,
     en: EN_NAV_SWITCH_GO,
+};
+pub const NAV_SWITCH_ARIA_LABEL: Localized = Localized {
+    ja: JA_NAV_SWITCH_ARIA_LABEL,
+    en: EN_NAV_SWITCH_ARIA_LABEL,
 };
 
 // ── Role labels ───────────────────────────────────────────────────────────

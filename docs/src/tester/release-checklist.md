@@ -367,6 +367,22 @@ language-switching claim; it establishes the mechanism only.
 - [x] Existing i18n parity gate (254 EN/JA pairs) passes unchanged; none of the 254 existing pairs were modified. *(release_gates.rs `i18n_en_ja_parity_count`)*
 - [ ] The language settings page (`GET`/`POST /c/:cid/me/language`) — blocked on missing copy for this specific page; see the Slice A review request's escalation. Not routed, not linked, not built yet.
 
+## Locale seam gates (RFC-072 Slice B — member-facing core, still not user-visible)
+
+The language setting is still **not reachable from the UI** in this slice —
+the settings page now exists and is routed, but nothing links to it (that is
+Slice C's job). Nothing below is a user-visible language-switching claim.
+
+- [x] `GET`/`POST /c/:cid/me/language` is built and routed (superseding the open Slice A item above): requires session + active membership, consumes a `change_ui_language` token bound to `membership_id`, accepts only `ja`/`en`, writes only the active row, is a no-op on the member's current value, and is not linked from anywhere yet. *(handlers/me.rs `get_language`/`post_language` + `rfc072_language_settings_post_is_reject_no_op_replay_and_target_safe` release gate)*
+- [x] §7.1's silent-wrong-locale risk is made structurally unrepresentable: only `db::membership::find_active` returns a row carrying a resolved `locale` (as `ActiveMembershipRow`); the plain `MembershipRow` returned by every other membership query has no locale field to reach for. *(db/membership.rs + `rfc072_locale_is_only_ever_read_from_find_active` release gate)*
+- [x] Every page named in the RFC's member-facing core — Home, Communities/Calendar (month, list, and matrix modes), and Event Detail (including the note-delete confirmation) — is fully migrated: `html lang` and every rendered string derive from the same resolved locale, with no bare `i18n::JA_*` left behind on any of them. *(release_gates.rs `rfc072_member_facing_core_has_no_half_migrated_page`)*
+- [x] The community switcher's `aria-label` follows locale like every other switcher label, checked as exact attribute text (a bare substring check would false-positive: `EN_NAV_SWITCH_GO` is itself a substring of the English aria-label value). *(render/nav.rs `header_with_switcher_next_localized` + render/tests.rs)*
+- [x] Three narrow exceptions are deliberate and reviewed, not oversights: (1) `communities.rs`'s matrix-export-audit 401 branch stays Japanese because it fires before any membership lookup exists — no locale source is available yet, same rationale as `render/errors.rs`; (2) the Japanese calendar-convention date/time formatting (`tz::date_label_ja` and the "{year}年{month}月" grid header) has no English counterpart anywhere in the codebase, so it stays Japanese-only on Calendar, Matrix, and Event Detail regardless of the viewer's locale; (3) `communities/matrix/cells.rs` is untouched — its aria-labels are whole Japanese sentences and its visible cell symbols are already language-neutral. *(release_gates.rs `rfc072_member_facing_core_has_no_half_migrated_page`)*
+- [x] `me.rs`'s display-name edit sub-page (`get_display_name`/`post_display_name`) is unchanged from Slice A and still renders bare Japanese; it is not one of this slice's five migrated surfaces.
+- [x] Existing i18n parity gate grows to cover every new pair this slice added; every pre-existing pair is unchanged. *(release_gates.rs `i18n_en_ja_parity_count`)*
+- [x] No authorization, validation, or error-classification decision branches on locale anywhere in this slice — locale still selects rendered text only.
+- [x] Locale resolution adds no additional D1 query to any budgeted route (the migrated pages' existing `require_membership`/`find_active` call already carried `ui_language`).
+
 ## Operational gates
 
 - [x] `GET /healthz` returns `{"ok":true,"ready":true,"service":"ciao.zinnias"}` only with a valid pepper and a generic not-ready `503` otherwise. Corrected exact-candidate hosted evidence also proves classified required-secret rejection, runtime-negative behavior, valid credential flows, secret-deletion failure behavior, bounded non-mutation, and strict teardown. *(RFC-077 criteria 8–9; architecture-reviewed and owner-accepted 2026-07-22; B2 closed.)*

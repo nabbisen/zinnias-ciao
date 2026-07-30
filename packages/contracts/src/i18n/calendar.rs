@@ -39,6 +39,76 @@ pub const JA_CALENDAR_MATRIX_CSV_EXPORT: &str = "CSVを保存";
 pub const JA_CALENDAR_MATRIX_CSV_ERROR: &str =
     "CSVを保存できませんでした。もう一度お試しください。";
 
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const CALENDAR_MONTH_TITLE: Localized = Localized {
+    ja: JA_CALENDAR_MONTH_TITLE,
+    en: EN_CALENDAR_MONTH_TITLE,
+};
+pub const CALENDAR_PREV_MONTH: Localized = Localized {
+    ja: JA_CALENDAR_PREV_MONTH,
+    en: EN_CALENDAR_PREV_MONTH,
+};
+pub const CALENDAR_NEXT_MONTH: Localized = Localized {
+    ja: JA_CALENDAR_NEXT_MONTH,
+    en: EN_CALENDAR_NEXT_MONTH,
+};
+pub const CALENDAR_THIS_MONTH: Localized = Localized {
+    ja: JA_CALENDAR_THIS_MONTH,
+    en: EN_CALENDAR_THIS_MONTH,
+};
+pub const CALENDAR_ALL_DAYS: Localized = Localized {
+    ja: JA_CALENDAR_ALL_DAYS,
+    en: EN_CALENDAR_ALL_DAYS,
+};
+pub const CALENDAR_EMPTY_MONTH: Localized = Localized {
+    ja: JA_CALENDAR_EMPTY_MONTH,
+    en: EN_CALENDAR_EMPTY_MONTH,
+};
+pub const CALENDAR_EMPTY_DAY: Localized = Localized {
+    ja: JA_CALENDAR_EMPTY_DAY,
+    en: EN_CALENDAR_EMPTY_DAY,
+};
+pub const CALENDAR_CREATE_ON_DAY: Localized = Localized {
+    ja: JA_CALENDAR_CREATE_ON_DAY,
+    en: EN_CALENDAR_CREATE_ON_DAY,
+};
+pub const CALENDAR_VIEW_MONTH: Localized = Localized {
+    ja: JA_CALENDAR_VIEW_MONTH,
+    en: EN_CALENDAR_VIEW_MONTH,
+};
+pub const CALENDAR_VIEW_LIST: Localized = Localized {
+    ja: JA_CALENDAR_VIEW_LIST,
+    en: EN_CALENDAR_VIEW_LIST,
+};
+pub const CALENDAR_VIEW_MATRIX: Localized = Localized {
+    ja: JA_CALENDAR_VIEW_MATRIX,
+    en: EN_CALENDAR_VIEW_MATRIX,
+};
+pub const CALENDAR_DAY_DETAIL_PROMPT: Localized = Localized {
+    ja: JA_CALENDAR_DAY_DETAIL_PROMPT,
+    en: EN_CALENDAR_DAY_DETAIL_PROMPT,
+};
+pub const CALENDAR_MATRIX_TITLE: Localized = Localized {
+    ja: JA_CALENDAR_MATRIX_TITLE,
+    en: EN_CALENDAR_MATRIX_TITLE,
+};
+pub const CALENDAR_MATRIX_TOO_LARGE: Localized = Localized {
+    ja: JA_CALENDAR_MATRIX_TOO_LARGE,
+    en: EN_CALENDAR_MATRIX_TOO_LARGE,
+};
+pub const CALENDAR_MATRIX_NO_MEMBERS: Localized = Localized {
+    ja: JA_CALENDAR_MATRIX_NO_MEMBERS,
+    en: EN_CALENDAR_MATRIX_NO_MEMBERS,
+};
+pub const CALENDAR_MATRIX_CSV_EXPORT: Localized = Localized {
+    ja: JA_CALENDAR_MATRIX_CSV_EXPORT,
+    en: EN_CALENDAR_MATRIX_CSV_EXPORT,
+};
+pub const CALENDAR_MATRIX_CSV_ERROR: Localized = Localized {
+    ja: JA_CALENDAR_MATRIX_CSV_ERROR,
+    en: EN_CALENDAR_MATRIX_CSV_ERROR,
+};
+
 // ── Recurrence materialization notices ───────────────────────────────────
 pub const EN_CALENDAR_OUT_OF_RANGE: &str =
     "Recurring dates are prepared only for the next several months.";
@@ -48,6 +118,16 @@ pub const JA_CALENDAR_OUT_OF_RANGE: &str =
     "繰り返し予定は、近い月から順に表示できるように準備します。";
 pub const JA_CALENDAR_MATERIALIZATION_LIMIT: &str =
     "一部の繰り返し予定はまだ準備中です。時間をおいて再度確認するか、管理者に確認してください。";
+
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const CALENDAR_OUT_OF_RANGE: Localized = Localized {
+    ja: JA_CALENDAR_OUT_OF_RANGE,
+    en: EN_CALENDAR_OUT_OF_RANGE,
+};
+pub const CALENDAR_MATERIALIZATION_LIMIT: Localized = Localized {
+    ja: JA_CALENDAR_MATERIALIZATION_LIMIT,
+    en: EN_CALENDAR_MATERIALIZATION_LIMIT,
+};
 
 // ── Calendar feed (RFC-023) ───────────────────────────────────────────────
 pub const EN_CALENDAR_TITLE: &str = "Calendar feed";

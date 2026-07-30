@@ -1,6 +1,6 @@
 use crate::db::event as event_db;
 use crate::render;
-use zinnias_ciao_contracts::{i18n, tz};
+use zinnias_ciao_contracts::{Locale, i18n, tz};
 
 mod events;
 
@@ -23,6 +23,7 @@ pub(super) fn month_bounds(year: i32, month: i32) -> (String, String) {
 /// (event links only, no attendance counts, per the RFC's Calendar Tab
 /// decision). With no day selected, it shows a short prompt instead of the
 /// full month list — the full month list is the Events list tab's job.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn render_calendar_day_detail(
     community_id: &str,
     community_tz: &str,
@@ -31,6 +32,7 @@ pub(super) fn render_calendar_day_detail(
     year: i32,
     month: i32,
     can_create_event: bool,
+    locale: Locale,
 ) -> String {
     let inner = match selected_day {
         Some(day) => events::render_calendar_events(
@@ -41,11 +43,12 @@ pub(super) fn render_calendar_day_detail(
             year,
             month,
             can_create_event,
+            locale,
         ),
         None => format!(
             "<section style=\"margin:0 auto 1.5rem;max-width:42rem\">\
              <p style=\"font-size:.875rem;color:#6e6e73;margin:0\">{}</p></section>",
-            i18n::JA_CALENDAR_DAY_DETAIL_PROMPT
+            i18n::t(locale, i18n::CALENDAR_DAY_DETAIL_PROMPT)
         ),
     };
     format!("<div id=\"calendar-day-detail\">{inner}</div>")
@@ -55,6 +58,7 @@ pub(super) fn render_calendar_day_detail(
 /// of any selected day, with its own month navigation using `view=list`
 /// hrefs. Reuses the same event-list helper as day detail, always passing
 /// `selected_day = None` so `day` never filters this tab's contents.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn render_calendar_list(
     community_id: &str,
     community_tz: &str,
@@ -62,6 +66,7 @@ pub(super) fn render_calendar_list(
     year: i32,
     month: i32,
     can_create_event: bool,
+    locale: Locale,
 ) -> String {
     let (prev_year, prev_month) = add_months(year, month, -1);
     let (next_year, next_month) = add_months(year, month, 1);
@@ -82,9 +87,9 @@ pub(super) fn render_calendar_list(
         prev_url = render::escape_html(&month_url(prev_year, prev_month)),
         next_url = render::escape_html(&month_url(next_year, next_month)),
         current_url = render::escape_html(&current_url),
-        prev_label = i18n::JA_CALENDAR_PREV_MONTH,
-        next_label = i18n::JA_CALENDAR_NEXT_MONTH,
-        current_label = i18n::JA_CALENDAR_THIS_MONTH,
+        prev_label = i18n::t(locale, i18n::CALENDAR_PREV_MONTH),
+        next_label = i18n::t(locale, i18n::CALENDAR_NEXT_MONTH),
+        current_label = i18n::t(locale, i18n::CALENDAR_THIS_MONTH),
     );
     let list = events::render_calendar_events(
         community_id,
@@ -94,10 +99,12 @@ pub(super) fn render_calendar_list(
         year,
         month,
         can_create_event,
+        locale,
     );
     format!("{nav}{list}")
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn render_calendar_month(
     community_id: &str,
     year: i32,
@@ -105,6 +112,7 @@ pub(super) fn render_calendar_month(
     today_day: Option<i32>,
     selected_day: Option<&str>,
     rows: &[event_db::HomeEventRow],
+    locale: Locale,
 ) -> String {
     use std::collections::BTreeMap;
 
@@ -170,27 +178,28 @@ pub(super) fn render_calendar_month(
         } else {
             "#1D1D1F"
         };
+        let today_label = i18n::t(locale, i18n::HOME_TODAY);
         let marker_html = match (is_today, has_events, is_selected) {
-            (true, true, true) => "<span style=\"display:flex;gap:.125rem;align-items:center;\
+            (true, true, true) => format!(
+                "<span style=\"display:flex;gap:.125rem;align-items:center;\
                  justify-content:center;font-size:.6875rem;font-weight:700;\
                  color:#0057B8;line-height:1.2\">\
-                 <span>今日</span><span aria-hidden=\"true\">●</span></span>"
-                .to_string(),
-            (true, true, false) => "<span style=\"display:flex;gap:.125rem;align-items:center;\
+                 <span>{today_label}</span><span aria-hidden=\"true\">●</span></span>"
+            ),
+            (true, true, false) => format!(
+                "<span style=\"display:flex;gap:.125rem;align-items:center;\
                  justify-content:center;font-size:.6875rem;font-weight:600;\
                  color:#6E6E73;line-height:1.2\">\
-                 <span>今日</span><span aria-hidden=\"true\">●</span></span>"
-                .to_string(),
-            (true, false, true) => {
+                 <span>{today_label}</span><span aria-hidden=\"true\">●</span></span>"
+            ),
+            (true, false, true) => format!(
                 "<span style=\"font-size:.6875rem;font-weight:700;color:#0057B8;\
-                 line-height:1.2\">今日</span>"
-                    .to_string()
-            }
-            (true, false, false) => {
+                 line-height:1.2\">{today_label}</span>"
+            ),
+            (true, false, false) => format!(
                 "<span style=\"font-size:.6875rem;font-weight:600;color:#6E6E73;\
-                 line-height:1.2\">今日</span>"
-                    .to_string()
-            }
+                 line-height:1.2\">{today_label}</span>"
+            ),
             (false, true, _) => {
                 "<span aria-hidden=\"true\" style=\"font-size:.8125rem;font-weight:700;\
                  color:#007AFF;line-height:1.2\">●</span>"
@@ -202,6 +211,13 @@ pub(super) fn render_calendar_month(
                     .to_string()
             }
         };
+        // Deliberately NOT locale-switched (RFC-072 Slice B, flagged in the
+        // review request): this is a screen-reader-only aria-label, not
+        // visible text, and it is a whole Japanese date-sentence structure
+        // (年/月/日 separators, 、today, 、N events), not a single swappable
+        // string. Producing a correct English equivalent is a date-format
+        // decision, not a mechanical `i18n::t` substitution, and per §17
+        // that is not this implementer's call to make silently.
         let aria_label = if has_events {
             let today_suffix = if is_today { "、今日" } else { "" };
             format!(
@@ -251,7 +267,7 @@ pub(super) fn render_calendar_month(
              display:inline-flex;align-items:center\">{label}</a>",
             cid = render::escape_html(community_id),
             month_key = render::escape_html(&month_key),
-            label = i18n::JA_CALENDAR_ALL_DAYS,
+            label = i18n::t(locale, i18n::CALENDAR_ALL_DAYS),
         )
     } else {
         String::new()
@@ -261,12 +277,21 @@ pub(super) fn render_calendar_month(
         format!(
             "<p style=\"font-size:.875rem;color:#6e6e73;margin:.75rem 0 0;\
              text-align:center\">{}</p>",
-            i18n::JA_CALENDAR_EMPTY_MONTH
+            i18n::t(locale, i18n::CALENDAR_EMPTY_MONTH)
         )
     } else {
         String::new()
     };
 
+    // The "{year}年{month}月" month/year label and every aria-label in this
+    // function are deliberately NOT locale-switched (RFC-072 Slice B,
+    // flagged prominently in the review request): they are Japanese-specific
+    // date-format sentences (年/月/日 separators), not single swappable
+    // strings. Every event's own displayed date/time goes through
+    // `render::format_day_time_tz` → `tz::date_label_ja`, which has no
+    // English counterpart anywhere in this codebase today. Building one is
+    // a real date-format design decision, not a mechanical `i18n::t`
+    // rename, so it is out of this slice per §17 rather than invented here.
     format!(
         "<section aria-label=\"{title}\" style=\"margin:0 auto 1.5rem;\
          max-width:42rem\">\
@@ -293,16 +318,16 @@ pub(super) fn render_calendar_month(
          gap:.25rem\">{cells}</div>{empty}</div>\
          <div style=\"margin-top:.5rem\">{clear_filter}</div>\
          </section>",
-        title = i18n::JA_CALENDAR_MONTH_TITLE,
-        helper = i18n::JA_HOME_CALENDAR_HELPER,
+        title = i18n::t(locale, i18n::CALENDAR_MONTH_TITLE),
+        helper = i18n::t(locale, i18n::HOME_CALENDAR_HELPER),
         year = year,
         month = month,
         prev_url = render::escape_html(&month_url(prev_year, prev_month)),
         next_url = render::escape_html(&month_url(next_year, next_month)),
         current_url = render::escape_html(&current_url),
-        prev_label = i18n::JA_CALENDAR_PREV_MONTH,
-        next_label = i18n::JA_CALENDAR_NEXT_MONTH,
-        current_label = i18n::JA_CALENDAR_THIS_MONTH,
+        prev_label = i18n::t(locale, i18n::CALENDAR_PREV_MONTH),
+        next_label = i18n::t(locale, i18n::CALENDAR_NEXT_MONTH),
+        current_label = i18n::t(locale, i18n::CALENDAR_THIS_MONTH),
         cells = cells,
         empty = empty,
         clear_filter = clear_filter

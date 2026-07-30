@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::db::{attendance, event as event_db};
 use crate::render;
-use zinnias_ciao_contracts::i18n;
+use zinnias_ciao_contracts::{Locale, i18n};
 
 use super::cells::{aggregate_counts, event_day_cancelled};
 
@@ -13,6 +13,7 @@ pub(super) fn render_date_detail(
     rows_by_date: &HashMap<String, Vec<&event_db::HomeEventRow>>,
     member_count: usize,
     attendances: &HashMap<String, Vec<attendance::AttendanceRow>>,
+    locale: Locale,
 ) -> String {
     let Some(day) = detail_day else {
         return format!(
@@ -20,8 +21,8 @@ pub(super) fn render_date_detail(
              <h3 style=\"font-size:1rem;font-weight:700;margin:0\">{}</h3>\
              <p style=\"font-size:.875rem;color:#6e6e73;margin:.5rem 0 0\">{}</p>\
              </section>",
-            i18n::JA_HOME_AGENDA_TITLE,
-            i18n::JA_CALENDAR_EMPTY_MONTH
+            i18n::t(locale, i18n::HOME_AGENDA_TITLE),
+            i18n::t(locale, i18n::CALENDAR_EMPTY_MONTH)
         );
     };
     let events = rows_by_date.get(day).map(Vec::as_slice).unwrap_or(&[]);
@@ -31,7 +32,7 @@ pub(super) fn render_date_detail(
              <h3 style=\"font-size:1rem;font-weight:700;margin:0\">{day}</h3>\
              <p style=\"font-size:.875rem;color:#6e6e73;margin:.5rem 0 0\">{}</p>\
              </section>",
-            i18n::JA_CALENDAR_EMPTY_DAY
+            i18n::t(locale, i18n::CALENDAR_EMPTY_DAY)
         );
     }
 
@@ -49,11 +50,14 @@ pub(super) fn render_date_detail(
         let cancelled = if event_day_cancelled(row) {
             format!(
                 "<span style=\"font-size:.75rem;color:#B42318;margin-left:.35rem\">{}</span>",
-                if row.occurrence_status == "cancelled" {
-                    i18n::JA_OCCURRENCE_CANCELLED_BADGE
-                } else {
-                    i18n::JA_EVENT_CANCELLED_BADGE
-                }
+                i18n::t(
+                    locale,
+                    if row.occurrence_status == "cancelled" {
+                        i18n::OCCURRENCE_CANCELLED_BADGE
+                    } else {
+                        i18n::EVENT_CANCELLED_BADGE
+                    }
+                )
             )
         } else {
             String::new()
@@ -74,13 +78,13 @@ pub(super) fn render_date_detail(
             title = render::escape_html(&row.event_title),
             cancelled = cancelled,
             date = render::escape_html(&date),
-            going = i18n::JA_STATUS_GOING,
+            going = i18n::t(locale, i18n::STATUS_GOING),
             going_count = counts.going,
-            not_going = i18n::JA_STATUS_NOT_GOING,
+            not_going = i18n::t(locale, i18n::STATUS_NOT_GOING),
             not_going_count = counts.not_going,
-            attended = i18n::JA_STATUS_ATTENDED,
+            attended = i18n::t(locale, i18n::STATUS_ATTENDED),
             attended_count = counts.attended,
-            no_answer = i18n::JA_STATUS_NO_ANSWER,
+            no_answer = i18n::t(locale, i18n::STATUS_NO_ANSWER),
             no_answer_count = counts.no_answer
         ));
     }

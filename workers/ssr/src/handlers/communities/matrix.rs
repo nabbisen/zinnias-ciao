@@ -6,10 +6,12 @@ use crate::db::{attendance, event as event_db, membership};
 use crate::render;
 use cells::cell_summary;
 use detail::render_date_detail;
-use zinnias_ciao_contracts::{i18n, tz};
+use zinnias_ciao_contracts::{Locale, i18n, tz};
 
 mod cells;
 mod detail;
+#[cfg(test)]
+mod tests;
 
 pub(super) const MEMBER_ROW_CAP: usize = 100;
 pub(super) const EVENT_DAY_ROW_CAP: usize = 300;
@@ -57,6 +59,7 @@ pub(super) fn render_mode_tabs(
     month: i32,
     selected_day: Option<&str>,
     current: CalendarView,
+    locale: Locale,
 ) -> String {
     let month_key = format!("{year:04}-{month:02}");
     let day_query = selected_day
@@ -100,17 +103,17 @@ pub(super) fn render_mode_tabs(
          </nav>",
         tab(
             &month_href,
-            i18n::JA_CALENDAR_VIEW_MONTH,
+            i18n::t(locale, i18n::CALENDAR_VIEW_MONTH),
             current == CalendarView::Month
         ),
         tab(
             &list_href,
-            i18n::JA_CALENDAR_VIEW_LIST,
+            i18n::t(locale, i18n::CALENDAR_VIEW_LIST),
             current == CalendarView::List
         ),
         tab(
             &matrix_href,
-            i18n::JA_CALENDAR_VIEW_MATRIX,
+            i18n::t(locale, i18n::CALENDAR_VIEW_MATRIX),
             current == CalendarView::Matrix
         )
     )
@@ -127,6 +130,7 @@ pub(super) struct MatrixRenderInput<'a> {
     pub(super) rows: &'a [event_db::HomeEventRow],
     pub(super) members: &'a [membership::MemberSummary],
     pub(super) attendances: &'a HashMap<String, Vec<attendance::AttendanceRow>>,
+    pub(super) locale: Locale,
 }
 
 pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
@@ -141,6 +145,7 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
         rows,
         members,
         attendances,
+        locale,
     } = input;
 
     if members.is_empty() {
@@ -149,13 +154,13 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
              <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{}</h2>\
              <p style=\"font-size:.875rem;color:#6e6e73;margin:.75rem 0 0\">{}</p>\
              </section>",
-            i18n::JA_CALENDAR_MATRIX_TITLE,
-            i18n::JA_CALENDAR_MATRIX_NO_MEMBERS
+            i18n::t(locale, i18n::CALENDAR_MATRIX_TITLE),
+            i18n::t(locale, i18n::CALENDAR_MATRIX_NO_MEMBERS)
         );
     }
 
     if members.len() > MEMBER_ROW_CAP || rows.len() > EVENT_DAY_ROW_CAP {
-        return render_too_large(community_id, year, month);
+        return render_too_large(community_id, year, month, locale);
     }
 
     let month_key = format!("{year:04}-{month:02}");
@@ -163,6 +168,7 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
         community_id,
         &month_key,
         can_export_csv.then_some(()).and(export_token),
+        locale,
     );
     let export_table_attr = if can_export_csv && export_token.is_some() {
         " data-calendar-matrix-export=\"true\""
@@ -269,6 +275,7 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
         &rows_by_date,
         members.len(),
         attendances,
+        locale,
     );
     let (prev_year, prev_month) = super::calendar::add_months(year, month, -1);
     let (next_year, next_month) = super::calendar::add_months(year, month, 1);
@@ -276,6 +283,9 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
         |y: i32, m: i32| format!("/c/{community_id}/communities?month={y:04}-{m:02}&view=matrix");
     let current_url = format!("/c/{community_id}/communities?view=matrix");
 
+    // "{year}年{month}月" is deliberately NOT locale-switched — same
+    // Japanese date-sentence exception as calendar.rs's render_calendar_month
+    // (flagged in the review request); see that function's comment for why.
     format!(
         "<section aria-label=\"{title}\" style=\"margin:0 auto 1.5rem;\
          max-width:100%\">\
@@ -302,17 +312,18 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
          <thead><tr><th scope=\"col\" style=\"position:sticky;left:0;top:0;\
          z-index:3;background:#FFFFFF;border:1px solid #E5E5EA;text-align:left;\
          min-width:8rem;padding:.5rem;font-size:.8125rem;color:#6e6e73\">\
-         メンバー</th>{header_cells}</tr></thead>\
+         {member_col}</th>{header_cells}</tr></thead>\
          <tbody>{body_rows}</tbody></table></div>{detail}</section>",
-        title = i18n::JA_CALENDAR_MATRIX_TITLE,
+        title = i18n::t(locale, i18n::CALENDAR_MATRIX_TITLE),
         year = year,
         month = month,
         prev_url = render::escape_html(&month_url(prev_year, prev_month)),
         next_url = render::escape_html(&month_url(next_year, next_month)),
         current_url = render::escape_html(&current_url),
-        prev_label = i18n::JA_CALENDAR_PREV_MONTH,
-        next_label = i18n::JA_CALENDAR_NEXT_MONTH,
-        current_label = i18n::JA_CALENDAR_THIS_MONTH,
+        prev_label = i18n::t(locale, i18n::CALENDAR_PREV_MONTH),
+        next_label = i18n::t(locale, i18n::CALENDAR_NEXT_MONTH),
+        current_label = i18n::t(locale, i18n::CALENDAR_THIS_MONTH),
+        member_col = i18n::t(locale, i18n::ROLE_MEMBER),
         export_controls = export_controls,
         export_table_attr = export_table_attr,
         header_cells = header_cells,
@@ -321,7 +332,12 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
     )
 }
 
-fn render_export_controls(community_id: &str, month_key: &str, token: Option<&str>) -> String {
+fn render_export_controls(
+    community_id: &str,
+    month_key: &str,
+    token: Option<&str>,
+    locale: Locale,
+) -> String {
     let Some(token) = token else {
         return String::new();
     };
@@ -339,8 +355,8 @@ fn render_export_controls(community_id: &str, month_key: &str, token: Option<&st
         cid = render::escape_html(community_id),
         month = render::escape_html(month_key),
         token = render::escape_html(token),
-        label = i18n::JA_CALENDAR_MATRIX_CSV_EXPORT,
-        error = render::escape_html(i18n::JA_CALENDAR_MATRIX_CSV_ERROR)
+        label = i18n::t(locale, i18n::CALENDAR_MATRIX_CSV_EXPORT),
+        error = render::escape_html(i18n::t(locale, i18n::CALENDAR_MATRIX_CSV_ERROR))
     )
 }
 
@@ -351,7 +367,7 @@ fn export_attr(name: &str, value: &str, enabled: bool) -> String {
     format!(" {name}=\"{}\"", render::escape_html(value))
 }
 
-fn render_too_large(community_id: &str, year: i32, month: i32) -> String {
+fn render_too_large(community_id: &str, year: i32, month: i32, locale: Locale) -> String {
     format!(
         "<section style=\"margin:0 auto 1.5rem;max-width:42rem\">\
          <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{title}</h2>\
@@ -361,11 +377,11 @@ fn render_too_large(community_id: &str, year: i32, month: i32) -> String {
          <p style=\"margin:.75rem 0 0\"><a href=\"/c/{cid}/communities?month={year:04}-{month:02}\" \
          style=\"color:#007AFF;text-decoration:none;font-size:.875rem;font-weight:600\">\
          {calendar}</a></p></section>",
-        title = i18n::JA_CALENDAR_MATRIX_TITLE,
-        message = i18n::JA_CALENDAR_MATRIX_TOO_LARGE,
+        title = i18n::t(locale, i18n::CALENDAR_MATRIX_TITLE),
+        message = i18n::t(locale, i18n::CALENDAR_MATRIX_TOO_LARGE),
         cid = render::escape_html(community_id),
         year = year,
         month = month,
-        calendar = i18n::JA_CALENDAR_VIEW_MONTH
+        calendar = i18n::t(locale, i18n::CALENDAR_VIEW_MONTH)
     )
 }

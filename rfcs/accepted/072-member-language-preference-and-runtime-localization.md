@@ -55,6 +55,35 @@ handlers name `i18n::JA_*` directly, so there is no seam at which a locale could
 be honoured. This RFC is therefore **not a translation project**. It is a
 refactor that introduces one seam, plus the schema and settings UI to drive it.
 
+**Precision added 2026-07-30 after the Slice B review.** The paragraph above is
+right about *string constants* and was imprecise about *date and time
+formatting*, which is computed rather than stored as a constant and so is not
+covered by the parity gate. The actual state:
+
+- `tz::date_label_en` **exists** and is tested, in the same unreachable
+  condition as the 254 string constants — called from nowhere in the worker.
+- It is **not at parity** with `tz::date_label_ja`: the Japanese form is
+  `{m}月{d}日（{wd}）` including the weekday, the English form is `{d} {mon}`
+  without it, because `weekday_en` does not exist (only `weekday_ja`).
+- There is **no English form at all** for the `{year}年{month}月` month headers
+  composed inline on Calendar and Matrix, nor for the composed Japanese
+  aria-label sentences in `communities/matrix/cells.rs`.
+
+This is still not a translation project — the gap is seven weekday strings, a
+month-name helper, and routing three call sites through the locale. But it is
+real work that the "copy already exists" framing would have let someone skip, and
+it lands in **Slice C**, because the switcher cannot honestly be exposed while an
+English member sees Japanese dates.
+
+**Date format decision (2026-07-30).** An English date must **never** be
+all-numeric: `08/03/2026` is ambiguous between month-first and day-first readers,
+and in a scheduling application the failure mode is a member arriving on the
+wrong day. That makes it a safety property, not a style preference. The month is
+always spelled or abbreviated. Day labels extend `date_label_en`'s established
+shape with the weekday (`Mon, 3 Aug`); month headers use the full month name
+(`August 2026`), which needs a `month_name_en` beside the existing
+`month_abbr_en`.
+
 That distinction changes the sizing, and it changes the answer to "how much
 handler refactoring is acceptable" — see Implementation Slices.
 

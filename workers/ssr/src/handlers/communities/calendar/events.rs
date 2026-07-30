@@ -1,7 +1,8 @@
 use crate::db::event as event_db;
 use crate::render;
-use zinnias_ciao_contracts::i18n;
+use zinnias_ciao_contracts::{Locale, i18n};
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn render_calendar_events(
     community_id: &str,
     community_tz: &str,
@@ -10,6 +11,7 @@ pub(super) fn render_calendar_events(
     year: i32,
     month: i32,
     can_create_event: bool,
+    locale: Locale,
 ) -> String {
     let items: String = rows
         .iter()
@@ -32,11 +34,14 @@ pub(super) fn render_calendar_events(
             {
                 format!(
                     "<span style=\"font-size:.75rem;color:#B42318;margin-left:.35rem\">{}</span>",
-                    if row.occurrence_status == "cancelled" {
-                        i18n::JA_OCCURRENCE_CANCELLED_BADGE
-                    } else {
-                        i18n::JA_EVENT_CANCELLED_BADGE
-                    }
+                    i18n::t(
+                        locale,
+                        if row.occurrence_status == "cancelled" {
+                            i18n::OCCURRENCE_CANCELLED_BADGE
+                        } else {
+                            i18n::EVENT_CANCELLED_BADGE
+                        }
+                    )
                 )
             } else {
                 String::new()
@@ -69,11 +74,14 @@ pub(super) fn render_calendar_events(
         })
         .collect();
 
-    let empty_copy = if selected_day.is_some() {
-        i18n::JA_CALENDAR_EMPTY_DAY
-    } else {
-        i18n::JA_CALENDAR_EMPTY_MONTH
-    };
+    let empty_copy = i18n::t(
+        locale,
+        if selected_day.is_some() {
+            i18n::CALENDAR_EMPTY_DAY
+        } else {
+            i18n::CALENDAR_EMPTY_MONTH
+        },
+    );
     let content = if items.is_empty() {
         format!(
             "<p style=\"font-size:.875rem;color:#6e6e73;margin:.75rem 0 0\">{}</p>",
@@ -90,7 +98,7 @@ pub(super) fn render_calendar_events(
              font-size:.875rem;font-weight:600\">{label}</a>",
             cid = render::escape_html(community_id),
             day = render::escape_html(day),
-            label = i18n::JA_CALENDAR_CREATE_ON_DAY
+            label = i18n::t(locale, i18n::CALENDAR_CREATE_ON_DAY)
         ),
         _ => String::new(),
     };
@@ -100,7 +108,7 @@ pub(super) fn render_calendar_events(
          <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{title}</h2>\
          <p style=\"font-size:.8125rem;color:#6e6e73;margin:.25rem 0 0\">{scope}</p>\
          {create_on_day}{content}</section>",
-        title = i18n::JA_HOME_AGENDA_TITLE,
+        title = i18n::t(locale, i18n::HOME_AGENDA_TITLE),
         scope = selected_day
             .map(render::escape_html)
             .unwrap_or_else(|| format!("{year:04}-{month:02}")),

@@ -23,3 +23,17 @@ pub const JA_NOTE_DELETE_BODY: &str = "このメモは削除されます。元�
 pub const EN_NOTE_KEEP_ACTION: &str = "Keep note";
 pub const JA_NOTE_KEEP_ACTION: &str = "メモを保持";
 pub const EN_NOTE_DELETE_BODY: &str = "Your note will be removed. This cannot be undone.";
+
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const NOTE_DELETE: super::Localized = super::Localized {
+    ja: JA_NOTE_DELETE,
+    en: EN_NOTE_DELETE,
+};
+pub const NOTE_DELETE_BODY: super::Localized = super::Localized {
+    ja: JA_NOTE_DELETE_BODY,
+    en: EN_NOTE_DELETE_BODY,
+};
+pub const NOTE_KEEP_ACTION: super::Localized = super::Localized {
+    ja: JA_NOTE_KEEP_ACTION,
+    en: EN_NOTE_KEEP_ACTION,
+};

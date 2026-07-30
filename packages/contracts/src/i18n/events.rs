@@ -11,6 +11,24 @@ pub const JA_STATUS_ATTENDED: &str = "参加済み";
 pub const JA_STATUS_NO_ANSWER: &str = "未回答";
 pub const JA_STATUS_ATTENDED_DISABLED: &str = "イベント終了後に利用可能";
 
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const STATUS_GOING: super::Localized = super::Localized {
+    ja: JA_STATUS_GOING,
+    en: EN_STATUS_GOING,
+};
+pub const STATUS_NOT_GOING: super::Localized = super::Localized {
+    ja: JA_STATUS_NOT_GOING,
+    en: EN_STATUS_NOT_GOING,
+};
+pub const STATUS_ATTENDED: super::Localized = super::Localized {
+    ja: JA_STATUS_ATTENDED,
+    en: EN_STATUS_ATTENDED,
+};
+pub const STATUS_NO_ANSWER: super::Localized = super::Localized {
+    ja: JA_STATUS_NO_ANSWER,
+    en: EN_STATUS_NO_ANSWER,
+};
+
 // ── Status actions ────────────────────────────────────────────────────────
 pub const EN_STATUS_CLEAR: &str = "Clear";
 pub const EN_STATUS_CLEAR_LABEL: &str = "Clear answer";
@@ -185,3 +203,49 @@ pub const JA_EVENT_NOTES_SECTION: &str = "メモ";
 pub const EN_TZ_ERROR: &str = "Community timezone is not configured correctly. Please ask the operator to set a valid timezone.";
 pub const JA_TZ_ERROR: &str =
     "コミュニティのタイムゾーンが正しく設定されていません。運営者にお問い合わせください。";
+
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const OCCURRENCE_CANCELLED_BADGE: super::Localized = super::Localized {
+    ja: JA_OCCURRENCE_CANCELLED_BADGE,
+    en: EN_OCCURRENCE_CANCELLED_BADGE,
+};
+pub const EVENT_CANCELLED_BADGE: super::Localized = super::Localized {
+    ja: JA_EVENT_CANCELLED_BADGE,
+    en: EN_EVENT_CANCELLED_BADGE,
+};
+pub const EVENT_ATTENDED_UNAVAILABLE: super::Localized = super::Localized {
+    ja: JA_EVENT_ATTENDED_UNAVAILABLE,
+    en: EN_EVENT_ATTENDED_UNAVAILABLE,
+};
+pub const EVENT_ATTENDED_ADMIN_ONLY: super::Localized = super::Localized {
+    ja: JA_EVENT_ATTENDED_ADMIN_ONLY,
+    en: EN_EVENT_ATTENDED_ADMIN_ONLY,
+};
+pub const OCCURRENCE_CANCEL_ACTION: super::Localized = super::Localized {
+    ja: JA_OCCURRENCE_CANCEL_ACTION,
+    en: EN_OCCURRENCE_CANCEL_ACTION,
+};
+pub const EVENT_WHOS_GOING: super::Localized = super::Localized {
+    ja: JA_EVENT_WHOS_GOING,
+    en: EN_EVENT_WHOS_GOING,
+};
+pub const EVENT_MEMBER_FALLBACK: super::Localized = super::Localized {
+    ja: JA_EVENT_MEMBER_FALLBACK,
+    en: EN_EVENT_MEMBER_FALLBACK,
+};
+pub const EVENT_NOTES_SECTION: super::Localized = super::Localized {
+    ja: JA_EVENT_NOTES_SECTION,
+    en: EN_EVENT_NOTES_SECTION,
+};
+pub const EVENT_TITLE_HEADER: super::Localized = super::Localized {
+    ja: JA_EVENT_TITLE_HEADER,
+    en: EN_EVENT_TITLE_HEADER,
+};
+pub const ADMIN_RECREATE_EVENT_ACTION: super::Localized = super::Localized {
+    ja: JA_ADMIN_RECREATE_EVENT_ACTION,
+    en: EN_ADMIN_RECREATE_EVENT_ACTION,
+};
+pub const ADMIN_COPY_EVENT_ACTION: super::Localized = super::Localized {
+    ja: JA_ADMIN_COPY_EVENT_ACTION,
+    en: EN_ADMIN_COPY_EVENT_ACTION,
+};

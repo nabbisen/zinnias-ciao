@@ -34,6 +34,7 @@ pub async fn get_event_detail(
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -101,11 +102,11 @@ pub async fn get_event_detail(
         let can_set_attended =
             membership.is_admin() && time_state == DayTimeState::Ended && !occurrence_cancelled;
         let attended_reason = if occurrence_cancelled {
-            i18n::JA_OCCURRENCE_CANCELLED_BADGE
+            i18n::t(locale, i18n::OCCURRENCE_CANCELLED_BADGE)
         } else if time_state != DayTimeState::Ended {
-            i18n::JA_EVENT_ATTENDED_UNAVAILABLE
+            i18n::t(locale, i18n::EVENT_ATTENDED_UNAVAILABLE)
         } else if !membership.is_admin() {
-            i18n::JA_EVENT_ATTENDED_ADMIN_ONLY
+            i18n::t(locale, i18n::EVENT_ATTENDED_ADMIN_ONLY)
         } else {
             ""
         };
@@ -124,7 +125,7 @@ pub async fn get_event_detail(
             format!(
                 "<p role=\"status\" style=\"font-size:.875rem;color:#B42318;\
                  background:#FFF0EF;border-radius:10px;padding:.625rem;margin:.5rem 0\">{}</p>",
-                i18n::JA_OCCURRENCE_CANCELLED_BADGE
+                i18n::t(locale, i18n::OCCURRENCE_CANCELLED_BADGE)
             )
         } else {
             render::status_form(
@@ -150,7 +151,7 @@ pub async fn get_event_detail(
                 cid = render::escape_html(community_id),
                 eid = render::escape_html(event_id),
                 did = render::escape_html(&day.id),
-                label = i18n::JA_OCCURRENCE_CANCEL_ACTION,
+                label = i18n::t(locale, i18n::OCCURRENCE_CANCEL_ACTION),
             )
         } else {
             String::new()
@@ -159,9 +160,9 @@ pub async fn get_event_detail(
         let (cg, cng, cna) = (counts.going, counts.not_going, counts.no_answer);
         let counts_html = format!(
             "<p style=\"font-size:.875rem;color:#6e6e73\">{gs} {cg} · {ns} {cng} · {nas} {cna}</p>",
-            gs = i18n::JA_STATUS_GOING,
-            ns = i18n::JA_STATUS_NOT_GOING,
-            nas = i18n::JA_STATUS_NO_ANSWER,
+            gs = i18n::t(locale, i18n::STATUS_GOING),
+            ns = i18n::t(locale, i18n::STATUS_NOT_GOING),
+            nas = i18n::t(locale, i18n::STATUS_NO_ANSWER),
         );
 
         // Participant rows for this day — from the pre-fetched batch, no N+1.
@@ -202,7 +203,7 @@ pub async fn get_event_detail(
             cancel_occurrence_action = cancel_occurrence_action,
             counts_html = counts_html,
             plist       = plist,
-            whos_going  = i18n::JA_EVENT_WHOS_GOING,
+            whos_going  = i18n::t(locale, i18n::EVENT_WHOS_GOING),
         ));
     }
 
@@ -228,7 +229,7 @@ pub async fn get_event_detail(
         let name = name_map
             .get(&n.membership_id)
             .map(|s| s.as_str())
-            .unwrap_or(i18n::JA_EVENT_MEMBER_FALLBACK);
+            .unwrap_or(i18n::t(locale, i18n::EVENT_MEMBER_FALLBACK));
         // The hide button is now a link to GET …/notes/:mid/hide (RFC-043).
         // Token is issued on that confirmation page — no per-note DB write here.
         let hide_btn = if membership.is_admin() {
@@ -254,7 +255,7 @@ pub async fn get_event_detail(
             "<section style=\"margin-top:1.5rem\">\
              <h2 style=\"font-size:1.0625rem;font-weight:600;margin-bottom:.5rem\">{notes_hd}</h2>\
              {others_html}</section>",
-            notes_hd = i18n::JA_EVENT_NOTES_SECTION,
+            notes_hd = i18n::t(locale, i18n::EVENT_NOTES_SECTION),
         )
     } else {
         String::new()
@@ -276,16 +277,16 @@ pub async fn get_event_detail(
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
     let back = format!(
         "<a href=\"/c/{}/home\" style=\"color:#007AFF;font-size:.9375rem\">\u{2190} {home}</a>",
         render::escape_html(community_id),
-        home = i18n::JA_NAV_HOME,
+        home = i18n::t(locale, i18n::NAV_HOME),
     );
     let cancelled_banner = if event.status == "cancelled" {
         &format!(
             "<div style=\"background:#FF3B3022;color:#FF3B30;padding:.75rem;border-radius:12px;margin-bottom:1rem\">{}</div>",
-            i18n::JA_EVENT_CANCELLED_BADGE
+            i18n::t(locale, i18n::EVENT_CANCELLED_BADGE)
         )
     } else {
         ""
@@ -301,7 +302,7 @@ pub async fn get_event_detail(
              </div>",
             cid = render::escape_html(community_id),
             eid = render::escape_html(event_id),
-            label = i18n::JA_ADMIN_RECREATE_EVENT_ACTION,
+            label = i18n::t(locale, i18n::ADMIN_RECREATE_EVENT_ACTION),
         )
     } else {
         String::new()
@@ -317,7 +318,7 @@ pub async fn get_event_detail(
              </div>",
             cid = render::escape_html(community_id),
             eid = render::escape_html(event_id),
-            label = i18n::JA_ADMIN_COPY_EVENT_ACTION,
+            label = i18n::t(locale, i18n::ADMIN_COPY_EVENT_ACTION),
         )
     } else {
         String::new()
@@ -337,10 +338,11 @@ pub async fn get_event_detail(
            {note}\
            {notes_section}\
          </main>{nav}",
-        header = render::header_with_switcher(
-            i18n::JA_EVENT_TITLE_HEADER,
+        header = render::header_with_switcher_localized(
+            i18n::t(locale, i18n::EVENT_TITLE_HEADER),
             community_id,
-            &_community_pairs
+            &_community_pairs,
+            locale
         ),
         err_banner = err
             .map(|e| format!(
@@ -374,7 +376,7 @@ pub async fn get_event_detail(
         notes_section = notes_section,
         nav = nav,
     );
-    render::page(&event.title, &body)
+    render::page_localized(locale, &event.title, &body)
 }
 
 // ── POST /c/:cid/events/:eid/days/:dayId/my-status ───────────────────────
@@ -535,6 +537,7 @@ pub async fn get_delete_note_confirm(
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     // Issue a fresh DELETE_NOTE token (the Event Detail page's token is not
@@ -560,7 +563,8 @@ pub async fn get_delete_note_confirm(
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
+    let title = i18n::t(locale, i18n::NOTE_DELETE);
 
     let body = format!(
         "{header}\
@@ -581,16 +585,16 @@ pub async fn get_delete_note_confirm(
              </form>\
            </div>\
          </main>{nav}",
-        header = render::header_with_switcher(i18n::JA_NOTE_DELETE, community_id, &pairs),
+        header = render::header_with_switcher_localized(title, community_id, &pairs, locale),
         cid = render::escape_html(community_id),
         eid = render::escape_html(event_id),
         tok = render::escape_html(&token),
         nav = nav,
-        nd = i18n::JA_NOTE_DELETE,
-        body_text = i18n::JA_NOTE_DELETE_BODY,
-        keep = i18n::JA_NOTE_KEEP_ACTION,
+        nd = title,
+        body_text = i18n::t(locale, i18n::NOTE_DELETE_BODY),
+        keep = i18n::t(locale, i18n::NOTE_KEEP_ACTION),
     );
-    render::page(i18n::JA_NOTE_DELETE, &body)
+    render::page_localized(locale, title, &body)
 }
 
 // ── POST /c/:cid/events/:eid/my-note/delete ──────────────────────────────
@@ -651,6 +655,11 @@ fn format_day_label(
     // Japan-first deployment: render the calendar date in Japanese convention,
     // e.g. "6月14日（土）", instead of an English month abbreviation (RFC-047).
     // The source date string is the local "YYYY-MM-DD" produced above.
+    // Deliberately NOT locale-switched (RFC-072 Slice B, flagged in the review
+    // request): `date_label_ja` has no English counterpart anywhere in the
+    // codebase, same gap noted in communities/calendar.rs and
+    // communities/matrix.rs. Every event date on this page stays Japanese
+    // regardless of `locale` until that gap is resolved.
     let date_src = if local_date.is_empty() {
         day_date
     } else {

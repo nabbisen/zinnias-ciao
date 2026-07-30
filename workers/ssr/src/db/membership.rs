@@ -4,6 +4,7 @@
 use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::db::now_utc;
 use worker::{D1Database, Result};
+use zinnias_ciao_contracts::Locale;
 
 pub struct MembershipRow {
     pub id: String,
@@ -12,22 +13,45 @@ pub struct MembershipRow {
     pub role: String,
     pub display_name: String,
     pub is_active: bool,
-    /// Raw stored value (RFC-072), unvalidated. `None` means no preference
-    /// set (including a pre-migration row); a value outside the `CHECK`
-    /// allow-list should not occur but is possible via manual repair —
-    /// callers must resolve this defensively, never trust it directly.
-    pub ui_language: Option<String>,
+}
+
+/// An active membership row that also carries a *resolved* locale
+/// (RFC-072). Only [`find_active`] produces this type — the row shape
+/// itself, not caller discipline, is what keeps a localized render path
+/// from ever taking a locale from `find_active_by_id`,
+/// `list_active_for_user`, or `find_first_admin_for_user`: those return
+/// the plain [`MembershipRow`], which has no locale field to reach for.
+/// (Slice A review, Observation O2.)
+pub struct ActiveMembershipRow {
+    pub id: String,
+    pub community_id: String,
+    pub user_id: String,
+    pub role: String,
+    pub display_name: String,
+    pub is_active: bool,
+    pub locale: Locale,
+}
+
+/// Resolves the raw stored `ui_language` column (RFC-072): the membership's
+/// preference if it parses, else Japanese. A stored value outside the
+/// `CHECK` allow-list — never expected, but possible via manual repair —
+/// falls back the same way as no preference at all. Never panics: a bad
+/// stored value reaching a render path would be an SEC-5 violation.
+fn resolve_locale(stored: Option<&str>) -> Locale {
+    stored.and_then(Locale::parse).unwrap_or_default()
 }
 
 /// Find an active membership for the given user + community. This is the
 /// query every localized page's membership lookup already performs; RFC-072
-/// reads `ui_language` from this same row rather than adding a second query.
+/// reads `ui_language` from this same row rather than adding a second query,
+/// and resolves it here into [`ActiveMembershipRow::locale`] — the only
+/// trustworthy source of a page's locale.
 /// Returns `None` if absent or removed (`removed_at IS NOT NULL`).
 pub async fn find_active(
     db: &D1Database,
     user_id: &str,
     community_id: &str,
-) -> Result<Option<MembershipRow>> {
+) -> Result<Option<ActiveMembershipRow>> {
     let row = db
         .prepare(
             "SELECT id, community_id, user_id, role, display_name, ui_language \
@@ -40,19 +64,47 @@ pub async fn find_active(
         .await?;
 
     Ok(row.and_then(|v| {
-        Some(MembershipRow {
+        let ui_language = v
+            .get("ui_language")
+            .and_then(|value| value.as_str())
+            .map(str::to_owned);
+        Some(ActiveMembershipRow {
             id: v.get("id")?.as_str()?.to_owned(),
             community_id: v.get("community_id")?.as_str()?.to_owned(),
             user_id: v.get("user_id")?.as_str()?.to_owned(),
             role: v.get("role")?.as_str()?.to_owned(),
             display_name: v.get("display_name")?.as_str()?.to_owned(),
             is_active: true,
-            ui_language: v
-                .get("ui_language")
-                .and_then(|value| value.as_str())
-                .map(str::to_owned),
+            locale: resolve_locale(ui_language.as_deref()),
         })
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_locale;
+    use zinnias_ciao_contracts::Locale;
+
+    #[test]
+    fn resolve_locale_uses_the_stored_preference_when_valid() {
+        assert_eq!(resolve_locale(Some("ja")), Locale::Ja);
+        assert_eq!(resolve_locale(Some("en")), Locale::En);
+    }
+
+    #[test]
+    fn resolve_locale_falls_back_to_japanese_when_absent() {
+        assert_eq!(resolve_locale(None), Locale::Ja);
+    }
+
+    #[test]
+    fn resolve_locale_falls_back_to_japanese_for_an_out_of_allow_list_value_without_panicking() {
+        // A value the CHECK constraint should have rejected on write, but
+        // that a defensive read path must still survive (e.g. a
+        // hand-repaired row, or a future schema slip).
+        for bad in ["fr", "EN", "", "ja-JP", "en-US", "null", "0"] {
+            assert_eq!(resolve_locale(Some(bad)), Locale::Ja, "stored={bad:?}");
+        }
+    }
 }
 
 /// Verify a membership_id is still active in a given community.
@@ -81,7 +133,6 @@ pub async fn find_active_by_id(
             role: v.get("role")?.as_str()?.to_owned(),
             display_name: v.get("display_name")?.as_str()?.to_owned(),
             is_active: true,
-            ui_language: None, // not selected by this query; not locale-resolved
         })
     }))
 }
@@ -110,7 +161,6 @@ pub async fn list_active_for_user(db: &D1Database, user_id: &str) -> Result<Vec<
                 role: v.get("role")?.as_str()?.to_owned(),
                 display_name: v.get("display_name")?.as_str()?.to_owned(),
                 is_active: true,
-                ui_language: None, // not selected by this query; not locale-resolved
             })
         })
         .collect())
@@ -141,7 +191,6 @@ pub async fn find_first_admin_for_user(
             role: v.get("role")?.as_str()?.to_owned(),
             display_name: v.get("display_name")?.as_str()?.to_owned(),
             is_active: true,
-            ui_language: None, // not selected by this query; not locale-resolved
         })
     }))
 }

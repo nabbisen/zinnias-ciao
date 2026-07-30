@@ -43,12 +43,11 @@ fn header_with_switcher_next_localized_switch_button_follows_locale() {
     let communities: Vec<(String, String)> = vec![("community-a".to_string(), "A".to_string())];
 
     // Checked as the exact button text (`>label</button>`), not a bare
-    // substring: the switcher's `<select>` carries a pre-existing,
-    // English-only `aria-label='Switch community'` unrelated to RFC-072
-    // (it predates the locale seam and is out of this slice's scope — see
-    // the review request), and `EN_NAV_SWITCH_GO` ("Switch") is itself a
-    // substring of that aria-label, which would false-positive a bare
-    // `.contains` check on the Japanese render too.
+    // substring: `EN_NAV_SWITCH_GO` ("Switch") is itself a substring of the
+    // `aria-label` value ("Switch community"), which would false-positive a
+    // bare `.contains` check on the Japanese render too. Same reasoning
+    // applies to the aria-label assertions below, checked as the exact
+    // attribute value.
     let ja = super::header_with_switcher_next_localized(
         "Title",
         "community-a",
@@ -58,6 +57,8 @@ fn header_with_switcher_next_localized_switch_button_follows_locale() {
     );
     assert!(ja.contains(&format!(">{}</button>", i18n::JA_NAV_SWITCH_GO)));
     assert!(!ja.contains(&format!(">{}</button>", i18n::EN_NAV_SWITCH_GO)));
+    assert!(ja.contains(&format!("aria-label='{}'", i18n::JA_NAV_SWITCH_ARIA_LABEL)));
+    assert!(!ja.contains(&format!("aria-label='{}'", i18n::EN_NAV_SWITCH_ARIA_LABEL)));
 
     let en = super::header_with_switcher_next_localized(
         "Title",
@@ -68,6 +69,8 @@ fn header_with_switcher_next_localized_switch_button_follows_locale() {
     );
     assert!(en.contains(&format!(">{}</button>", i18n::EN_NAV_SWITCH_GO)));
     assert!(!en.contains(&format!(">{}</button>", i18n::JA_NAV_SWITCH_GO)));
+    assert!(en.contains(&format!("aria-label='{}'", i18n::EN_NAV_SWITCH_ARIA_LABEL)));
+    assert!(!en.contains(&format!("aria-label='{}'", i18n::JA_NAV_SWITCH_ARIA_LABEL)));
 }
 
 #[test]

@@ -74,6 +74,20 @@ pub fn header_with_switcher(
     header_with_switcher_next(title, current_community_id, communities, "home")
 }
 
+/// Header with a community switcher, falling back to target Home on switch
+/// (RFC-074) with the switch button's own label locale-selected (RFC-072).
+/// Used by pages that have no cross-community equivalent to preserve (Event
+/// Detail, note-delete confirmation): a bare `next="home"` call, not
+/// [`header_with_switcher_next_localized`] with an explicit token.
+pub fn header_with_switcher_localized(
+    title: &str,
+    current_community_id: &str,
+    communities: &[(impl AsRef<str>, impl AsRef<str>)],
+    locale: Locale,
+) -> String {
+    header_with_switcher_next_localized(title, current_community_id, communities, "home", locale)
+}
+
 /// Non-migrated pages: always the Japanese "Switch" button label. Behavior
 /// unchanged by RFC-072; migrated pages call
 /// [`header_with_switcher_next_localized`] instead.
@@ -126,7 +140,9 @@ pub fn header_with_switcher_next_localized(
     h.push_str("<input type='hidden' name='next' value='");
     h.push_str(&escape_html(next));
     h.push_str("'>");
-    h.push_str("<select name='community' aria-label='Switch community' ");
+    h.push_str("<select name='community' aria-label='");
+    h.push_str(&escape_html(i18n::t(locale, i18n::NAV_SWITCH_ARIA_LABEL)));
+    h.push_str("' ");
     h.push_str("style='font-size:.8125rem;color:#6E6E73;background:none;border:none;");
     h.push_str("border-bottom:1px solid #E5E5EA;padding:.125rem .25rem;");
     h.push_str("max-width:100%;box-sizing:border-box;cursor:pointer'>");

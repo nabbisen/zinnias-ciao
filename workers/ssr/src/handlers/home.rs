@@ -25,6 +25,7 @@ pub async fn redirect_to_home(req: Request, env: &Env, _rid: &str) -> Result<Res
 pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     // Home window: today through 30 days ahead
@@ -39,7 +40,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
     let rows =
         event_db::home_upcoming_for_communities(&db, &community_ids, &from_utc, &to_utc).await?;
 
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
 
     // ── Admin first-run card (RFC-030) ────────────────────────────────
     // When admin lands on empty Home, show an actionable setup guide
@@ -50,16 +51,19 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
         && community_summaries.len() == 1;
     let (empty_html, admin_shortcuts): (String, String) =
         if rows.is_empty() && membership.is_admin() {
-            let intro = if is_first_run {
-                i18n::JA_HOME_FIRST_RUN_WELCOME
-            } else {
-                i18n::JA_HOME_FIRST_RUN_NO_EVENTS
-            };
+            let intro = i18n::t(
+                locale,
+                if is_first_run {
+                    i18n::HOME_FIRST_RUN_WELCOME
+                } else {
+                    i18n::HOME_FIRST_RUN_NO_EVENTS
+                },
+            );
             let invite_hint = if is_first_run {
                 format!(
                     "<p style=\"font-size:.875rem;color:#6e6e73;margin:.5rem 0 0\">\
                      {}</p>",
-                    i18n::JA_HOME_FIRST_RUN_INVITE_HINT
+                    i18n::t(locale, i18n::HOME_FIRST_RUN_INVITE_HINT)
                 )
             } else {
                 String::new()
@@ -86,8 +90,8 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
              </div>",
                 intro = intro,
                 cid = render::escape_html(community_id),
-                create_label = i18n::JA_HOME_FIRST_RUN_CREATE,
-                invite_label = i18n::JA_HOME_MANAGE_MEMBERS,
+                create_label = i18n::t(locale, i18n::HOME_FIRST_RUN_CREATE),
+                invite_label = i18n::t(locale, i18n::HOME_MANAGE_MEMBERS),
                 hint = invite_hint,
             );
             (card, String::new())
@@ -95,7 +99,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
             // Member empty state
             let msg = format!(
                 "<p style=\"color:#6e6e73;padding:2rem 0\">{}</p>",
-                i18n::JA_EMPTY_EVENTS_HINT
+                i18n::t(locale, i18n::EMPTY_EVENTS_HINT)
             );
             (msg, String::new())
         } else {
@@ -117,8 +121,8 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
                       {invite_label}</a>\
                  </div>",
                     cid = render::escape_html(community_id),
-                    create_label = i18n::JA_HOME_CREATE_EVENT,
-                    invite_label = i18n::JA_HOME_MANAGE_MEMBERS,
+                    create_label = i18n::t(locale, i18n::HOME_CREATE_EVENT),
+                    invite_label = i18n::t(locale, i18n::HOME_MANAGE_MEMBERS),
                 )
             } else {
                 String::new()
@@ -126,8 +130,9 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
             (String::new(), shortcuts)
         };
 
-    let community_sections = render_home_communities(&community_summaries, &rows);
+    let community_sections = render_home_communities(&community_summaries, &rows, locale);
 
+    let title = i18n::t(locale, i18n::NAV_HOME);
     let body = format!(
         "{header}\
          <main style=\"padding:1rem 1rem 5rem\">\
@@ -135,18 +140,19 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
            {shortcuts}\
          </main>\
          {nav}",
-        header = render::header(i18n::JA_NAV_HOME, ""),
+        header = render::header(title, ""),
         sections = community_sections,
         shortcuts = admin_shortcuts,
         empty = empty_html,
         nav = nav,
     );
-    render::page(i18n::JA_NAV_HOME, &body)
+    render::page_localized(locale, title, &body)
 }
 
 fn render_home_communities(
     communities: &[membership_db::CommunitySummary],
     rows: &[event_db::HomeEventRow],
+    locale: zinnias_ciao_contracts::Locale,
 ) -> String {
     let mut html = String::new();
     for community in communities {
@@ -168,11 +174,14 @@ fn render_home_communities(
                 let cancelled = if r.event_status == "cancelled" || r.occurrence_status == "cancelled" {
                     format!(
                         "<span style=\"font-size:.75rem;color:#B42318;margin-left:.35rem\">{}</span>",
-                        if r.occurrence_status == "cancelled" {
-                            i18n::JA_OCCURRENCE_CANCELLED_BADGE
-                        } else {
-                            i18n::JA_EVENT_CANCELLED_BADGE
-                        }
+                        i18n::t(
+                            locale,
+                            if r.occurrence_status == "cancelled" {
+                                i18n::OCCURRENCE_CANCELLED_BADGE
+                            } else {
+                                i18n::EVENT_CANCELLED_BADGE
+                            }
+                        )
                     )
                 } else {
                     String::new()
@@ -207,7 +216,7 @@ fn render_home_communities(
         let content = if items.is_empty() {
             format!(
                 "<p style=\"font-size:.875rem;color:#6e6e73;margin:.75rem 0 0\">{}</p>",
-                i18n::JA_HOME_CALENDAR_EMPTY
+                i18n::t(locale, i18n::HOME_CALENDAR_EMPTY)
             )
         } else {
             format!("<ul style=\"list-style:none;margin:.5rem 0 0;padding:0\">{items}</ul>")
@@ -222,3 +231,6 @@ fn render_home_communities(
     }
     html
 }
+
+#[cfg(test)]
+mod tests;

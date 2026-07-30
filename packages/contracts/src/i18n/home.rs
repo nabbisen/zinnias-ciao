@@ -1,3 +1,5 @@
+use super::Localized;
+
 // ── Home schedule view ────────────────────────────────────────────────────
 pub const EN_HOME_TODAY: &str = "Today";
 pub const EN_HOME_THIS_WEEK: &str = "This Week";
@@ -25,6 +27,36 @@ pub const JA_HOME_CALENDAR_EMPTY: &str = "これからの予定はまだあり�
 pub const JA_HOME_CALENDAR_COUNT_SUFFIX: &str = "件";
 pub const JA_HOME_AGENDA_TITLE: &str = "予定の一覧";
 
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const HOME_TODAY: Localized = Localized {
+    ja: JA_HOME_TODAY,
+    en: EN_HOME_TODAY,
+};
+pub const HOME_CALENDAR_HELPER: Localized = Localized {
+    ja: JA_HOME_CALENDAR_HELPER,
+    en: EN_HOME_CALENDAR_HELPER,
+};
+pub const HOME_CALENDAR_COUNT_SUFFIX: Localized = Localized {
+    ja: JA_HOME_CALENDAR_COUNT_SUFFIX,
+    en: EN_HOME_CALENDAR_COUNT_SUFFIX,
+};
+pub const HOME_AGENDA_TITLE: Localized = Localized {
+    ja: JA_HOME_AGENDA_TITLE,
+    en: EN_HOME_AGENDA_TITLE,
+};
+pub const HOME_CREATE_EVENT: Localized = Localized {
+    ja: JA_HOME_CREATE_EVENT,
+    en: EN_HOME_CREATE_EVENT,
+};
+pub const HOME_MANAGE_MEMBERS: Localized = Localized {
+    ja: JA_HOME_MANAGE_MEMBERS,
+    en: EN_HOME_MANAGE_MEMBERS,
+};
+pub const HOME_CALENDAR_EMPTY: Localized = Localized {
+    ja: JA_HOME_CALENDAR_EMPTY,
+    en: EN_HOME_CALENDAR_EMPTY,
+};
+
 // ── Home first-run card (RFC-030) ─────────────────────────────────────────
 pub const EN_HOME_FIRST_RUN_WELCOME: &str =
     "Welcome. Your community is set up. Here's how to get started.";
@@ -40,3 +72,21 @@ pub const JA_HOME_FIRST_RUN_NO_EVENTS: &str =
 pub const JA_HOME_FIRST_RUN_CREATE: &str = "+ 最初のイベントを作成";
 pub const JA_HOME_FIRST_RUN_INVITE_HINT: &str =
     "メンバーを招待して、イベントを見てもらいましょう。";
+
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const HOME_FIRST_RUN_WELCOME: Localized = Localized {
+    ja: JA_HOME_FIRST_RUN_WELCOME,
+    en: EN_HOME_FIRST_RUN_WELCOME,
+};
+pub const HOME_FIRST_RUN_NO_EVENTS: Localized = Localized {
+    ja: JA_HOME_FIRST_RUN_NO_EVENTS,
+    en: EN_HOME_FIRST_RUN_NO_EVENTS,
+};
+pub const HOME_FIRST_RUN_CREATE: Localized = Localized {
+    ja: JA_HOME_FIRST_RUN_CREATE,
+    en: EN_HOME_FIRST_RUN_CREATE,
+};
+pub const HOME_FIRST_RUN_INVITE_HINT: Localized = Localized {
+    ja: JA_HOME_FIRST_RUN_INVITE_HINT,
+    en: EN_HOME_FIRST_RUN_INVITE_HINT,
+};

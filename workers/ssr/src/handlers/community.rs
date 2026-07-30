@@ -225,6 +225,7 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
         "communities" => super::communities::get_communities(req, env, rid, cid).await,
         "me" => super::me::get_me(req, env, rid, cid).await,
         "me/display-name" => super::me::get_display_name(req, env, rid, cid).await,
+        "me/language" => super::me::get_language(req, env, rid, cid).await,
         "me/calendar" => super::calendar::get_me_calendar(req, env, rid, cid).await,
 
         // ── Unauthenticated ICS feed ──────────────────────────────────────
@@ -401,6 +402,7 @@ pub async fn dispatch_post(req: Request, env: &Env, rid: &str, path: &str) -> Re
         }
         "me/calendar/revoke" => super::calendar::post_revoke_calendar(req, env, rid, cid).await,
         "me/display-name" => super::me::post_display_name(req, env, rid, cid).await,
+        "me/language" => super::me::post_language(req, env, rid, cid).await,
         t if t.starts_with("admin/templates") => {
             let tail = &t[16..]; // after "admin/templates"
             if tail.is_empty() || tail == "/" {
