@@ -130,6 +130,7 @@ pub async fn get_event_detail(
             )
         } else {
             render::status_form(
+                locale,
                 community_id,
                 event_id,
                 &day.id,
@@ -188,7 +189,7 @@ pub async fn get_event_detail(
                 status: att_map.get(m.id.as_str()).copied().flatten(),
             });
         }
-        let plist = render::participant_list(&participants);
+        let plist = render::participant_list(locale, &participants);
 
         days_html.push_str(&format!(
             "<div style=\"border:1px solid #e5e5ea;border-radius:16px;padding:1rem;margin-bottom:1rem\">\
@@ -214,6 +215,7 @@ pub async fn get_event_detail(
             .await?;
 
     let note_html = render::note_form(
+        locale,
         community_id,
         event_id,
         &save_token,
@@ -234,7 +236,7 @@ pub async fn get_event_detail(
         // The hide button is now a link to GET …/notes/:mid/hide (RFC-043).
         // Token is issued on that confirmation page — no per-note DB write here.
         let hide_btn = if membership.is_admin() {
-            render::admin_note_hide_form(community_id, event_id, &n.membership_id, "")
+            render::admin_note_hide_form(locale, community_id, event_id, &n.membership_id, "")
         } else {
             String::new()
         };

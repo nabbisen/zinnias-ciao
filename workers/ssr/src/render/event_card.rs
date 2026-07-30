@@ -1,6 +1,7 @@
 use super::shell::escape_html;
 use super::status::status_display;
 use super::time::format_day_time_tz;
+use zinnias_ciao_contracts::Locale;
 
 pub struct CardDay<'a> {
     pub starts_at_utc: &'a str,
@@ -24,8 +25,12 @@ pub fn event_card(
     no_answer: u32,
     tz: &str,
 ) -> String {
-    let (_, icon, label) = status_display(my_status);
-    let (sc, _, _) = status_display(my_status);
+    // Handoff 026 §7.3: this function has no live callers (dead since
+    // introduction in 89eebb7) and is out of scope for migration. `Locale::Ja`
+    // preserves its pre-existing behavior against `status_display`'s new
+    // signature without threading a locale this dead code never had.
+    let (_, icon, label) = status_display(Locale::Ja, my_status);
+    let (sc, _, _) = status_display(Locale::Ja, my_status);
     let cancelled_badge = if is_cancelled {
         format!(
             "<span style=\"font-size:.75rem;background:#FF3B30;color:#FFFFFF;\

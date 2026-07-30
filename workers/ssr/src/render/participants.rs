@@ -1,23 +1,25 @@
 use super::shell::escape_html;
 use super::status::status_display;
+use zinnias_ciao_contracts::Locale;
+use zinnias_ciao_contracts::i18n;
 
 pub struct ParticipantEntry<'a> {
     pub display_name: &'a str,
     pub status: Option<&'a str>,
 }
 
-pub fn participant_list(participants: &[ParticipantEntry<'_>]) -> String {
+pub fn participant_list(locale: Locale, participants: &[ParticipantEntry<'_>]) -> String {
     if participants.is_empty() {
         return format!(
             "<p style=\"color:#6E6E73;font-size:.875rem\">{}</p>",
-            zinnias_ciao_contracts::i18n::JA_EVENT_MEMBER_FALLBACK
+            i18n::t(locale, i18n::EVENT_MEMBER_FALLBACK)
         );
     }
     let rows: String = participants
         .iter()
         .map(|p| {
             let initials = initials(p.display_name);
-            let (color, icon, label) = status_display(p.status);
+            let (color, icon, label) = status_display(locale, p.status);
             format!(
                 "<li style=\"display:flex;align-items:center;gap:.75rem;padding:.5rem 0;\
              border-bottom:1px solid #F5F5F7\">\

@@ -1547,6 +1547,15 @@ const RELINK_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/relink.rs"
 const RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC: &str =
     include_str!("../../../scripts/recover-community-access.mjs");
 const APP_JS_SRC: &str = include_str!("../../../workers/ssr/static/app.js");
+// Individually named so `rfc072_shared_render_helpers_have_no_half_migrated_i18n`
+// (Handoff 026) can assert per-file, rather than folding every helper into
+// one concatenated blob the way `RENDER_SRC` below does for other gates.
+const RENDER_ERRORS_SRC: &str = include_str!("../../../workers/ssr/src/render/errors.rs");
+const RENDER_EVENT_CARD_SRC: &str = include_str!("../../../workers/ssr/src/render/event_card.rs");
+const RENDER_NOTES_SRC: &str = include_str!("../../../workers/ssr/src/render/notes.rs");
+const RENDER_PARTICIPANTS_SRC: &str =
+    include_str!("../../../workers/ssr/src/render/participants.rs");
+const RENDER_STATUS_SRC: &str = include_str!("../../../workers/ssr/src/render/status.rs");
 const RENDER_SRC: &str = concat!(
     include_str!("../../../workers/ssr/src/render.rs"),
     include_str!("../../../workers/ssr/src/render/errors.rs"),
@@ -2646,13 +2655,28 @@ fn rfc072_member_facing_core_has_no_half_migrated_page() {
     // others still bare `i18n::JA_*` — is worse than not started, because
     // `html lang` would then claim a language the page doesn't fully render.
     //
+    // What this test actually checks (Handoff 026 corrects the docstring
+    // that used to overstate this): every handler file below has zero bare
+    // `i18n::JA_` references, AND every shared render helper those handlers
+    // call (status.rs, notes.rs, participants.rs) does too. It does not
+    // execute a page and inspect the rendered HTML — a handler could in
+    // principle call a not-yet-covered helper and this test would not catch
+    // it. It is a static, file-level proxy for a page-level property, kept
+    // honest by naming every file the member-facing core touches. Handoff
+    // 026 exists precisely because that proxy previously covered handlers
+    // only: `event.rs` was clean while `render::status_form` — which it
+    // calls — was not, and this test could not see the difference.
+    //
     // Slice C closed every exception Slice B had to leave open (the
     // date-format gap on Calendar/Matrix, the matrix cells screen-reader
     // sentences, and me.rs's display-name edit sub-page, which is directly
-    // linked from My Page). The only exception remaining anywhere in the
-    // member-facing core is the one documented immediately below — a
-    // pre-auth branch with no membership lookup yet to resolve a locale
-    // from, the same rationale as `render/errors.rs`.
+    // linked from My Page). The only exceptions remaining anywhere in the
+    // member-facing core are the ones documented below — a pre-auth branch
+    // with no membership lookup yet to resolve a locale from
+    // (`render/errors.rs`'s rationale, shared by communities.rs's one
+    // pre-auth reference), and `render/event_card.rs`, which Handoff 026
+    // §7.3 found to be dead code with no live caller and left unmigrated
+    // rather than editing code no page reaches.
     assert_eq!(
         ME_HANDLER_SRC.matches("i18n::JA_").count(),
         0,
@@ -2712,6 +2736,52 @@ fn rfc072_member_facing_core_has_no_half_migrated_page() {
         MATRIX_HANDLER_SRC.matches("i18n::JA_").count(),
         0,
         "communities/matrix.rs (top-level) must have no bare i18n::JA_ references"
+    );
+
+    // Handoff 026: the shared render helpers `event.rs` calls into. This is
+    // the gap the rest of this test could not see — asserted per-file, so
+    // `render/errors.rs`'s documented exception and `render/event_card.rs`'s
+    // documented dead-code exception cannot silently cover for a real
+    // regression in a live helper.
+    assert_eq!(
+        RENDER_STATUS_SRC.matches("i18n::JA_").count(),
+        0,
+        "render/status.rs must have no bare i18n::JA_ references — Handoff 026 migrated status_display/status_chip/status_form"
+    );
+    assert_eq!(
+        RENDER_NOTES_SRC.matches("i18n::JA_").count(),
+        0,
+        "render/notes.rs must have no bare i18n::JA_ references — Handoff 026 migrated note_form/admin_note_hide_form"
+    );
+    assert_eq!(
+        RENDER_PARTICIPANTS_SRC.matches("i18n::JA_").count(),
+        0,
+        "render/participants.rs must have no bare i18n::JA_ references — Handoff 026 migrated participant_list"
+    );
+
+    // Documented exception: render/errors.rs's functions take no arguments,
+    // so they have no membership and no locale to resolve (RFC-072 §6
+    // non-change scope, reaffirmed unchanged by Handoff 026 §6). Asserted at
+    // its measured count, not `> 0`, so a partial migration here — which
+    // would be a half-migrated file, the exact defect this test exists to
+    // catch — still fails it.
+    assert_eq!(
+        RENDER_ERRORS_SRC.matches("i18n::JA_").count(),
+        17,
+        "render/errors.rs must have exactly its documented 17 bare i18n::JA_ references, no more and no fewer"
+    );
+
+    // Documented exception: render/event_card.rs has no live caller anywhere
+    // in the codebase (Handoff 026 §7.3 — confirmed by grep across the full
+    // git history back to its introduction in 89eebb7, RFC-064 Phase 2; only
+    // its `CardDay` type, a separate item, is still used). It is dead, not
+    // migrated, and not deleted in this package. Pinned at its measured
+    // count so either a live caller appearing (which would make this a real
+    // gap again) or a silent partial edit shows up here.
+    assert_eq!(
+        RENDER_EVENT_CARD_SRC.matches("i18n::JA_").count(),
+        4,
+        "render/event_card.rs must have exactly its documented 4 bare i18n::JA_ references (dead code, Handoff 026 §7.3) — if this changes, re-check whether it has gained a live caller"
     );
 }
 

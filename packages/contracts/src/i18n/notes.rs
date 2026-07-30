@@ -37,3 +37,23 @@ pub const NOTE_KEEP_ACTION: super::Localized = super::Localized {
     ja: JA_NOTE_KEEP_ACTION,
     en: EN_NOTE_KEEP_ACTION,
 };
+pub const NOTE_SAVE: super::Localized = super::Localized {
+    ja: JA_NOTE_SAVE,
+    en: EN_NOTE_SAVE,
+};
+pub const NOTE_SECTION_LABEL: super::Localized = super::Localized {
+    ja: JA_NOTE_SECTION_LABEL,
+    en: EN_NOTE_SECTION_LABEL,
+};
+pub const NOTE_PLACEHOLDER_LABEL: super::Localized = super::Localized {
+    ja: JA_NOTE_PLACEHOLDER_LABEL,
+    en: EN_NOTE_PLACEHOLDER_LABEL,
+};
+pub const NOTE_CHAR_HINT: super::Localized = super::Localized {
+    ja: JA_NOTE_CHAR_HINT,
+    en: EN_NOTE_CHAR_HINT,
+};
+pub const NOTE_VISIBILITY: super::Localized = super::Localized {
+    ja: JA_NOTE_VISIBILITY,
+    en: EN_NOTE_VISIBILITY,
+};

@@ -36,6 +36,16 @@ pub const EN_STATUS_CLEAR_LABEL: &str = "Clear answer";
 pub const JA_STATUS_CLEAR: &str = "未回答に戻す";
 pub const JA_STATUS_CLEAR_LABEL: &str = "回答を未回答に戻す";
 
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const STATUS_CLEAR: super::Localized = super::Localized {
+    ja: JA_STATUS_CLEAR,
+    en: EN_STATUS_CLEAR,
+};
+pub const STATUS_CLEAR_LABEL: super::Localized = super::Localized {
+    ja: JA_STATUS_CLEAR_LABEL,
+    en: EN_STATUS_CLEAR_LABEL,
+};
+
 // ── Admin: event management ───────────────────────────────────────────────
 pub const EN_ADMIN_CREATE_EVENT_TITLE: &str = "Create Event";
 pub const EN_ADMIN_CREATE_EVENT_SUBMIT: &str = "Create Event";

@@ -1,4 +1,5 @@
 use super::shell::escape_html;
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::i18n;
 
 // CSS design tokens (RFC-011 §5 / RFC-020 v1.2 §E).
@@ -39,23 +40,32 @@ const ICON_ATTENDED: &str = "<svg aria-hidden='true' width='1em' height='1em' vi
 const ICON_NO_ANSWER: &str = "<svg aria-hidden='true' width='1em' height='1em' viewBox='0 0 16 16' fill='currentColor'>     <path d='M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0              0-13zM7.25 10.5h1.5v1.5h-1.5zm0-7h1.5v5.5h-1.5z'/></svg>";
 
 /// Colour, icon, and label for a status value — text/icon use (AA-passing fg).
-pub fn status_display(status: Option<&str>) -> (&'static str, &'static str, &'static str) {
+/// `locale` selects the label only (RFC-072); colours and icons are
+/// locale-independent.
+pub fn status_display(
+    locale: Locale,
+    status: Option<&str>,
+) -> (&'static str, &'static str, &'static str) {
     match status {
-        Some("going") => (CZ_STATUS_GOING_FG, ICON_GOING, i18n::JA_STATUS_GOING),
+        Some("going") => (
+            CZ_STATUS_GOING_FG,
+            ICON_GOING,
+            i18n::t(locale, i18n::STATUS_GOING),
+        ),
         Some("not_going") => (
             CZ_STATUS_NOT_GOING_FG,
             ICON_NOT_GOING,
-            i18n::JA_STATUS_NOT_GOING,
+            i18n::t(locale, i18n::STATUS_NOT_GOING),
         ),
         Some("attended") => (
             CZ_STATUS_ATTENDED_FG,
             ICON_ATTENDED,
-            i18n::JA_STATUS_ATTENDED,
+            i18n::t(locale, i18n::STATUS_ATTENDED),
         ),
         _ => (
             CZ_STATUS_NO_ANSWER_FG,
             ICON_NO_ANSWER,
-            i18n::JA_STATUS_NO_ANSWER,
+            i18n::t(locale, i18n::STATUS_NO_ANSWER),
         ),
     }
 }
@@ -87,8 +97,8 @@ pub fn status_triplet(status: Option<&str>) -> (&'static str, &'static str, &'st
 }
 
 /// Status chip for event cards (read-only).
-pub fn status_chip(status: Option<&str>) -> String {
-    let (color, icon, label) = status_display(status);
+pub fn status_chip(locale: Locale, status: Option<&str>) -> String {
+    let (color, icon, label) = status_display(locale, status);
     format!(
         "<span style=\"display:inline-flex;align-items:center;gap:.25rem;\
          color:{color};font-size:.8125rem;font-weight:600\">\
@@ -99,6 +109,7 @@ pub fn status_chip(status: Option<&str>) -> String {
 /// Three-button status form for Event Detail (RFC-006).
 #[allow(clippy::too_many_arguments)]
 pub fn status_form(
+    locale: Locale,
     community_id: &str,
     event_id: &str,
     day_id: &str,
@@ -130,17 +141,23 @@ pub fn status_form(
         )
     };
 
-    let going_btn = btn(Some("going"), i18n::JA_STATUS_GOING, ICON_GOING, false, "");
+    let going_btn = btn(
+        Some("going"),
+        i18n::t(locale, i18n::STATUS_GOING),
+        ICON_GOING,
+        false,
+        "",
+    );
     let notgoing_btn = btn(
         Some("not_going"),
-        i18n::JA_STATUS_NOT_GOING,
+        i18n::t(locale, i18n::STATUS_NOT_GOING),
         ICON_NOT_GOING,
         false,
         "",
     );
     let attended_btn = btn(
         Some("attended"),
-        i18n::JA_STATUS_ATTENDED,
+        i18n::t(locale, i18n::STATUS_ATTENDED),
         ICON_ATTENDED,
         !can_set_attended,
         attended_disabled_reason,
@@ -151,8 +168,8 @@ pub fn status_form(
             "<button type=\"submit\" name=\"status\" value=\"clear\" \
              style=\"font-size:.75rem;color:#6E6E73;background:none;border:none;\
              padding:.25rem;cursor:pointer\" aria-label=\"{clear_label}\">{clear}</button>",
-            clear_label = i18n::JA_STATUS_CLEAR_LABEL,
-            clear = i18n::JA_STATUS_CLEAR,
+            clear_label = i18n::t(locale, i18n::STATUS_CLEAR_LABEL),
+            clear = i18n::t(locale, i18n::STATUS_CLEAR),
         )
     } else {
         String::new()

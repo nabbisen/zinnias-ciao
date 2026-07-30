@@ -3,9 +3,12 @@ use super::status::{
     CZ_BORDER, CZ_COLOR_DANGER, CZ_COLOR_TEXT_SECONDARY, CZ_STATUS_ATTENDED_FG,
     CZ_STATUS_GOING_BORDER,
 };
+use zinnias_ciao_contracts::Locale;
+use zinnias_ciao_contracts::i18n;
 
 /// Note textarea form for Event Detail (RFC-007).
 pub fn note_form(
+    locale: Locale,
     community_id: &str,
     event_id: &str,
     save_token: &str,
@@ -27,7 +30,7 @@ pub fn note_form(
             "<a href=\"/c/{cid}/events/{eid}/my-note/delete\" \
              style=\"display:inline-block;font-size:.875rem;color:{danger};padding:.25rem;\
              min-height:44px;line-height:44px;text-decoration:none\">{del}</a>",
-            del = zinnias_ciao_contracts::i18n::JA_NOTE_DELETE,
+            del = i18n::t(locale, i18n::NOTE_DELETE),
             cid = escape_html(community_id),
             eid = escape_html(event_id),
             danger = CZ_COLOR_DANGER,
@@ -67,22 +70,23 @@ pub fn note_form(
         muted = CZ_COLOR_TEXT_SECONDARY,
         border = CZ_BORDER,
         going_border = CZ_STATUS_GOING_BORDER,
-        note_section_label = zinnias_ciao_contracts::i18n::JA_NOTE_SECTION_LABEL,
-        note_placeholder_label = zinnias_ciao_contracts::i18n::JA_NOTE_PLACEHOLDER_LABEL,
-        note_char_hint = zinnias_ciao_contracts::i18n::JA_NOTE_CHAR_HINT,
-        note_visibility = zinnias_ciao_contracts::i18n::JA_NOTE_VISIBILITY,
-        note_save = zinnias_ciao_contracts::i18n::JA_NOTE_SAVE,
+        note_section_label = i18n::t(locale, i18n::NOTE_SECTION_LABEL),
+        note_placeholder_label = i18n::t(locale, i18n::NOTE_PLACEHOLDER_LABEL),
+        note_char_hint = i18n::t(locale, i18n::NOTE_CHAR_HINT),
+        note_visibility = i18n::t(locale, i18n::NOTE_VISIBILITY),
+        note_save = i18n::t(locale, i18n::NOTE_SAVE),
     )
 }
 
 /// Admin "Remove note" button for a specific member's note on an event.
 pub fn admin_note_hide_form(
+    locale: Locale,
     community_id: &str,
     event_id: &str,
     target_membership_id: &str,
     _token: &str,
 ) -> String {
-    let label = zinnias_ciao_contracts::i18n::JA_NOTE_DELETE;
+    let label = i18n::t(locale, i18n::NOTE_DELETE);
     format!(
         "<a href=\"/c/{cid}/admin/events/{eid}/notes/{mid}/hide\" \
          style=\"font-size:.75rem;color:{danger};padding:.25rem .375rem;\

@@ -289,6 +289,14 @@ async function collect(cdp) {
         text: a.innerText,
       }));
       const dayCell = document.querySelector('a[aria-label][href*="day="]');
+      // Handoff 026: scoped specifically to the attendance-status buttons
+      // (form action '.../my-status'), not the page's general text — the
+      // Event Detail counts line ("Going 0 . No Go 0 . No answer 3") was
+      // already locale-aware before this fix and would satisfy a bare
+      // text.includes('Going') check even while the buttons themselves
+      // rendered Japanese. This is what the pre-fix scenario missed.
+      const statusButtons = [...document.querySelectorAll('form[action*="my-status"] button[name="status"]')]
+        .map((b) => b.getAttribute('aria-label'));
       return {
         path: location.pathname + location.search,
         htmlLang: document.documentElement.getAttribute('lang'),
@@ -299,6 +307,7 @@ async function collect(cdp) {
         dayCellAriaLabel: dayCell ? dayCell.getAttribute('aria-label') : null,
         monthHeaderText: document.querySelector('h2 + p')?.innerText ?? null,
         noHorizontalScroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+        statusButtons,
       };
     })()`,
   );
@@ -504,6 +513,19 @@ try {
       showsEnglishDateLabel: /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), 3 Aug\b/.test(eventDetailEnglish.text),
       showsEnglishStatusLabels:
         eventDetailEnglish.text.includes('Going') && eventDetailEnglish.text.includes('No answer'),
+      // Handoff 026: the specific defect this scenario previously missed.
+      // The two checks above are satisfied by the counts line ("Going 0 ·
+      // No Go 0 · No answer 3"), which was already locale-aware before this
+      // fix — they would have passed even while the attendance buttons
+      // themselves rendered Japanese. These checks are scoped to the
+      // buttons directly (form[action*="my-status"]).
+      attendanceButtonsRendered: eventDetailEnglish.statusButtons.length > 0,
+      attendanceButtonsAreEnglish: eventDetailEnglish.statusButtons.every(
+        (label) => label === 'Going' || label === 'No Go' || label === 'Attended',
+      ),
+      attendanceButtonsHaveNoJapanese: eventDetailEnglish.statusButtons.every(
+        (label) => !/[぀-ヿ一-鿿]/.test(label ?? ''),
+      ),
     },
   });
 
