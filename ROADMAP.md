@@ -191,11 +191,19 @@ section remains the tracked summary of record.
    language. All ten acceptance criteria met locally; no hosted-evidence
    precondition. **Slice D** — admin surfaces, `/join`, `/relink`, static
    offline HTML, `Accept-Language`, community default — remains a future RFC.
-4. **Cut `v0.60.0`** — the first tag since 2026-07-11, covering RFC-070, 071,
-   073, 074, and 072. Tag only; deployment stays No-Go. See § *Tagging is not
-   deploying* above and the release handoff. This also re-truths the stale
-   `app.js` cache-buster and service-worker `CACHE_VERSION`, and adds the gate
-   that would have caught their drift.
+4. ~~Cut `0.60.0`.~~ **Complete 2026-07-30** — tagged at `0f679ae`, the first
+   tag since 2026-07-11, covering RFC-070, 071, 072, 073, and 074. It re-truthed
+   every version-bearing artifact including the stale `app.js` cache-buster and
+   service-worker `CACHE_VERSION`, dropped the unmaintained RFC-number accretion
+   from the cache-buster, and added `cached_asset_content_matches_pinned_hash`,
+   which fires when cached-asset content changes without the pinned digest
+   moving — the drift the existing `CACHE_VERSION`-equals-package-version check
+   structurally could not catch, since both had gone stale together.
+   **Tagged locally, not pushed and not deployed;** the deployment posture is
+   unchanged. Carried follow-up: that gate *prompts* the cache-key bump rather
+   than *enforcing* it — the cheapest way to green it is re-pinning the digest
+   alone. Hashing only `app.js`/`app.css` and requiring the cache-buster to
+   embed a prefix of that digest would make the invariant structural.
 5. **RFC-075 — Render style system and inline style reduction.** Owner-selected
    2026-07-30 as the theme following RFC-072. Design review not yet started.
 6. **Choose the next user-facing theme** after RFC-075 — an owner decision.

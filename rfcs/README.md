@@ -19,10 +19,10 @@ authorize implementation.
 
 RFC numbers and the tables below are stable identifiers and lifecycle indexes,
 not execution priority. The active order is maintained in
-[ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-073,
-RFC-074, and RFC-072 Slices A–C are complete; the next steps are the `v0.60.0`
-tag and then RFC-075. The RFC-050 hosted campaign and its sink remain deferred
-to the point a pilot is scheduled.
+[ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-072,
+RFC-073, and RFC-074 shipped in `0.60.0` (tagged 2026-07-30, not deployed), and
+RFC-075 is next. The RFC-050 hosted campaign and its sink remain deferred to the
+point a pilot is scheduled.
 
 ## Accepted — approved for implementation
 
@@ -109,15 +109,19 @@ to the point a pilot is scheduled.
 | 064 | [Rust Module and Crate Boundary Cleanup](./done/064-rust-module-and-crate-boundary-cleanup.md) | v0.52.0 / v0.53.0 / v0.58.0 |
 | 069 | [Total Community Access Recovery](./done/069-total-community-access-recovery.md) | v0.59.0 |
 
-## Done — implemented on `main`, unreleased
+## Done — shipped in 0.60.0
 
-| ID | Title | Implemented baseline |
-|----|-------|----------------------|
-| 070 | [Self Display Name Editing](./done/070-self-display-name-editing.md) | `main` at `4bfe4f2`; implementation review accepted with notes. Browser smoke and hosted evidence remain release qualifications for the v0.60.0 candidate |
-| 071 | [Application Threat Model and Form Security Baseline](./done/071-application-threat-model-and-form-security-baseline.md) | `main` at `1b12d96`; implementation review accepted with notes. The baseline is active; precise checklist-versus-observed-evidence labeling remains non-blocking cleanup |
-| 073 | [Calendar Events List and Day Detail UX](./done/073-calendar-events-list-and-day-detail-ux.md) | `main` at `ed549be`; implementation review Approved. First product theme after the 2026-07-29 hold amendment. All nine acceptance criteria met locally; no hosted-evidence precondition |
-| 074 | [Community Switch Route Preservation](./done/074-community-switch-route-preservation.md) | `main` at `30e90c4`; both review points Approved. Closed `next` token grammar with target-side authorization, no open redirect, no preserved community-scoped ids, no fragment. Closes the RFC-073 review's O1 (RFC-067 gate now proven behaviorally). All nine acceptance criteria met locally; no hosted-evidence precondition |
-| 072 | [Member Language Preference and Runtime Localization](./done/072-member-language-preference-and-runtime-localization.md) | `main` at `b237788`/`93e25de`/`fcf84aa`; all three slice reviews Approved. Members choose Japanese or English per membership; the member-facing UI, dates, and screen-reader labels follow it, and `html lang` matches. Slice D (admin, anonymous routes, `Accept-Language`, community default) remains a future RFC. All ten acceptance criteria met locally; no hosted-evidence precondition |
+Tagged 2026-07-30 after 49 unreleased commits had accumulated with no version
+boundary. **Tagged, not deployed** — production, public-pilot, and
+first-real-community deployment remain No-Go while B1, B3, B4, and B5 are open.
+
+| ID | Title | Shipped in |
+|----|-------|------------|
+| 070 | [Self Display Name Editing](./done/070-self-display-name-editing.md) | 0.60.0 (`4bfe4f2`) |
+| 071 | [Application Threat Model and Form Security Baseline](./done/071-application-threat-model-and-form-security-baseline.md) | 0.60.0 (`1b12d96`) — documentation baseline, active |
+| 072 | [Member Language Preference and Runtime Localization](./done/072-member-language-preference-and-runtime-localization.md) | 0.60.0 (`b237788`/`93e25de`/`fcf84aa`) — Slices A–C; Slice D is a future RFC |
+| 073 | [Calendar Events List and Day Detail UX](./done/073-calendar-events-list-and-day-detail-ux.md) | 0.60.0 (`ed549be`) |
+| 074 | [Community Switch Route Preservation](./done/074-community-switch-route-preservation.md) | 0.60.0 (`30e90c4`) |
 
 ## Also Done
 
