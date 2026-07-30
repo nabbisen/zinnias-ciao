@@ -2,7 +2,7 @@
 
 ## Status
 
-**Current release:** 0.59.0.
+**Current release:** 0.60.0.
 
 The RFC folder is the source of truth for implementation state:
 

@@ -14,7 +14,7 @@ serde_json                  = { workspace = true }
 thiserror                   = { workspace = true }
 
 [dev-dependencies]
-# nothing extra
+sha2 = { workspace = true }
 
 [[test]]
 name = "release_gates"

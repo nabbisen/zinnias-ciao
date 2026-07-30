@@ -1373,6 +1373,8 @@ fn export_handler_await_count_within_budget() {
 
 const SW_JS_SOURCE: &str = include_str!("../../../workers/ssr/static/sw.js");
 const APP_JS_SOURCE: &str = include_str!("../../../workers/ssr/static/app.js");
+const APP_CSS_SOURCE: &str = include_str!("../../../workers/ssr/static/app.css");
+const SHELL_RS_SOURCE: &str = include_str!("../../../workers/ssr/src/render/shell.rs");
 const WORKSPACE_CARGO_TOML: &str = include_str!("../../../Cargo.toml");
 
 #[test]
@@ -1425,6 +1427,55 @@ fn sw_cache_version_matches_workspace_version() {
         cache_ver, workspace_ver,
         "sw.js CACHE_VERSION 'v{cache_ver}' does not match workspace version '{workspace_ver}'. \
          Update sw.js CACHE_VERSION when bumping the version."
+    );
+}
+
+// ── Cached-asset content-vs-cache-key drift gate (v0.60.0 release) ───────
+//
+// The check above proves `sw.js` and `Cargo.toml` agree with each other —
+// it cannot prove either one is *fresh*, because both can go stale together.
+// That is exactly what happened between v0.59.0 and v0.60.0:
+// `workers/ssr/static/app.js` gained 48 lines while its cache-buster
+// (`render/shell.rs`) and `sw.js`'s `CACHE_VERSION` both stayed at `v0.59.0`.
+//
+// This gate hashes the concatenated *content* of every cached static asset
+// plus the shell template that references it, and pins that hash here. A
+// content change with no accompanying update to this pinned hash means the
+// version bump (and therefore the cache-buster and `CACHE_VERSION`) was
+// forgotten — the gate fails on content drift, not on two numbers merely
+// disagreeing with each other.
+//
+// Updating the pinned hash is a deliberate, one-line acknowledgement that a
+// cached asset changed in this release: recompute it (this test's failure
+// message prints the actual value) and paste it in, in the same commit as
+// the version bump.
+const RELEASE_CACHE_ASSET_CONTENT_HASH: &str =
+    "34e0288706bdd6bcf84f65eb219dd98f6b5f36a3e5d5e2e0285097ee236699eb";
+
+fn cached_asset_content_hash() -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(APP_JS_SOURCE.as_bytes());
+    hasher.update(APP_CSS_SOURCE.as_bytes());
+    hasher.update(SHELL_RS_SOURCE.as_bytes());
+    hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+#[test]
+fn cached_asset_content_matches_pinned_hash() {
+    let actual = cached_asset_content_hash();
+    assert_eq!(
+        actual, RELEASE_CACHE_ASSET_CONTENT_HASH,
+        "app.js, app.css, or render/shell.rs changed content without updating \
+         RELEASE_CACHE_ASSET_CONTENT_HASH. If this is an intentional asset change for \
+         this release, update the pinned hash to {actual:?} in the same commit that \
+         bumps the version, the app.js cache-buster, and sw.js's CACHE_VERSION — a \
+         content change with no version/cache-key move is exactly the v0.59.0 drift \
+         this gate exists to catch."
     );
 }
 
@@ -2189,11 +2240,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC
-            .contains("/static/app.js?v=0.59.0-rfc056-rfc065-rfc066-rfc067-rfc068-rfc064-rfc069")
-            && STATIC_FILES_SRC.contains(
-                "/static/app.js?v=0.59.0-rfc056-rfc065-rfc066-rfc067-rfc068-rfc064-rfc069"
-            ),
+        RENDER_SRC.contains("/static/app.js?v=0.60.0")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.60.0"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(

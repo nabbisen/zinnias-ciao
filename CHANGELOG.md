@@ -2,6 +2,114 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.60.0] — 2026-07-30
+
+Self display-name editing, the application threat model and form-security
+baseline, Calendar's route-backed month/list/matrix tabs, community-switch
+route preservation, and per-membership language preference (RFC-072 Slices
+A–C). This is a tag, not a deployment — see `ROADMAP.md` §
+*Tagging is not deploying*. Production, public-pilot, and first-real-community
+deployment remain **No-Go**; nothing in this release closes an open
+architecture finding.
+
+### Added
+
+- **Members can change their own display name.**
+  `GET`/`POST /c/:cid/me/display-name`, linked from My Page, lets a member
+  update the name shown to others in their community — no admin action
+  required. Same-value submission is a no-op; token replay is detected;
+  updates are scoped to the active membership only. (RFC-070)
+
+- **Application threat model and form-security baseline.**
+  A documentation baseline, not a code change: `docs/src/developer/security-threat-model.md`
+  records the app's authentication, authorization, and form-security
+  assumptions, and every new or materially changed form is now reviewed
+  against it. (RFC-071)
+
+- **Calendar has route-backed month, list, and matrix tabs with an
+  always-present day-detail section.**
+  Clicking a date no longer bounces the reader to the top of the page — the
+  day's detail renders in a fixed section of the page that stays present
+  whether or not a day is selected, and each tab (month grid, full event
+  list, attendance matrix) is its own URL. (RFC-073)
+
+- **Switching community preserves more of what you were doing.**
+  The community switcher now keeps you on the same kind of page — Calendar
+  at the same month/day/view, Create Event with a selected day, member
+  management, and more — when the target community supports it, through a
+  closed `next` token grammar with target-side authorization. Pages with no
+  cross-community equivalent (Event Detail, admin event actions) still fall
+  back to Home, as before. No open redirect, no preserved community-scoped
+  identifiers (member/event/invite ids), no fragment. (RFC-074)
+
+- **Members can choose their own display language, Japanese or English.**
+  A new per-membership setting (`GET`/`POST /c/:cid/me/language`, linked from
+  My Page) lets a member pick their UI language. Home, Calendar (all three
+  views), Event Detail, My Page, and the display-name page all honor it —
+  including dates and times (`Mon, 3 Aug` / `August 2026`, never all-numeric)
+  and the monthly attendance matrix's screen-reader cell labels. `html lang`
+  always matches the rendered language. The setting stayed unreachable from
+  the UI until every one of those surfaces was migrated, so no member was
+  ever offered a half-honored language choice. Surfaces outside this scope —
+  admin pages, `/join`, `/relink`, static offline HTML — remain Japanese by
+  design; a future RFC covers them. (RFC-072, Slices A–C)
+
+- **A release gate that catches cached-asset drift.**
+  A new source-contract check hashes the concatenated contents of
+  `workers/ssr/static/app.js`, `workers/ssr/static/app.css`, and the HTML
+  shell template, and pins that hash next to the release version. If either
+  file's content changes without the version (and therefore the cache-buster
+  and service-worker `CACHE_VERSION`) moving, the gate fails. This is
+  additional to the existing check that `sw.js`'s `CACHE_VERSION` matches the
+  package version — that check alone cannot detect drift, because both values
+  can go stale together, which is exactly what happened between `0.59.0` and
+  this release (see Fixed, below).
+
+### Changed
+
+- **Release version bumped to v0.60.0.**
+  `Cargo.toml`, `Cargo.lock`, `package.json`, `workers/ssr/static/sw.js`, and
+  the `app.js` cache-buster are aligned.
+
+- **The `app.js` cache-buster no longer carries a running list of RFC
+  numbers.**
+  `render/shell.rs`'s cache-buster was `?v=0.59.0-rfc056-rfc065-rfc066-rfc067-rfc068-rfc064-rfc069`
+  — an unordered, unmaintained accretion that had already gone stale (see
+  Fixed). It is now `?v=0.60.0`: the version alone is the cache key.
+
+- **RFC-070, RFC-071, RFC-073, RFC-074, and RFC-072 (Slices A–C) are marked
+  complete.**
+  All five are moved to `rfcs/done/` and indexed as shipped in v0.60.0.
+
+### Fixed
+
+- **Stale cache-buster and service-worker cache version.**
+  `0.59.0` was tagged 2026-07-11; by 2026-07-30 `workers/ssr/static/app.js`
+  had gained 48 lines while its cache-buster (`render/shell.rs`) and the
+  service worker's `CACHE_VERSION` (`workers/ssr/static/sw.js`) both stayed
+  at `v0.59.0`. Had that state been deployed, a returning browser would have
+  served the old `app.js`, and a returning PWA client's cache would never
+  have invalidated. **This was latent, not live** — nothing was deployed
+  between `0.59.0` and this release, so no real client held a stale cache.
+  Both values now move with every release, and the new gate above exists so
+  content-without-key drift is caught before it can reach a deployment
+  again.
+
+### Testing
+
+- `cargo test --workspace`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo fmt --all -- --check`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `bun run build`, then `bun run smoke:calendar-views`, `smoke:matrix`,
+  `smoke:community-switch`, `smoke:language`, `smoke:display-name`
+- `mdbook build docs`
+- `git diff --check`
+
+Hosted staging/production evidence was not collected in this release — none
+is required for a tag, only for a deployment, which remains **No-Go** per the
+architecture review remediation hold.
+
 ## [0.59.0] — 2026-07-11
 
 RFC-069 total community access recovery.
