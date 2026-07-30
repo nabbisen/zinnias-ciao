@@ -64,6 +64,45 @@ candidate of that day — which will be later than today's tree. The tooling is
 committed and gated, so drift is detectable, but the campaign is not
 transferable evidence from an earlier commit.
 
+### Tagging is not deploying — clarified 2026-07-30
+
+The hold amendment separated **source remediation** from **hosted evidence** for
+feature work. That same separation was never stated for *versioning*, and the
+omission cost us: `0.59.0` was tagged 2026-07-11 and by 2026-07-30 the tree had
+**49 unreleased commits across five RFCs** (070, 071, 073, 074, 072) with no
+version boundary between them. Nothing was blocking a tag; nobody asked.
+
+**A version tag is a source-control act. A deployment is a hosted act.** B1, B3,
+B4, and B5 gate **deploying**, not **versioning**. Cutting a tag on `main`
+violates no open finding, requires no hosted access, and closes nothing.
+
+Concretely, the drift produced a real defect. `workers/ssr/static/app.js` gained
+48 lines after `0.59.0` while its cache-buster
+(`render/shell.rs`, `?v=0.59.0-…`) and the service worker's
+`CACHE_VERSION = 'v0.59.0'` both stayed put — so a returning browser would serve
+stale JavaScript and a returning PWA client's `shell-v0.59.0` cache would never
+invalidate. It is **latent, not live**: nothing is deployed, so no real client
+holds a stale cache. But it sits on the critical path, because RFC-050's
+exact-candidate campaign depends on version metadata being truthful, and a
+49-commit span covering a security remediation, three UX features, and a
+localization refactor is a poor candidate boundary.
+
+The RFC-044 service-worker gate did **not** catch this, and structurally cannot:
+it asserts `sw.js CACHE_VERSION` equals the package version, and both were stale
+at `0.59.0` together. It proves internal consistency, not freshness against the
+tree.
+
+**Standing rules from 2026-07-30:**
+
+- **Tag when an RFC reaches `rfcs/done/`.** Release boundaries then map onto
+  reviewed units, which this process already produces. The pre-hold rhythm of
+  1–2 tags per day suited smaller units; 19 days for five RFCs is the opposite
+  failure.
+- **Tagging requires no hosted authorization**; deploying, provisioning, and
+  publishing still require explicit per-instance owner approval, unchanged.
+- A release must re-truth every version-bearing artifact, including the two
+  cache keys above — not just `package.json` and `Cargo.toml`.
+
 ## Active Remediation and Release Sequence
 
 RFC numbers are stable identifiers, not execution-order numbers. Steps 1–4 of
@@ -140,20 +179,27 @@ section remains the tracked summary of record.
    RFC-073 review: RFC-067's matrix contract is now proven behaviorally in
    `ssr`, with the `release_gates.rs` source literal retained as a secondary
    tripwire.
-3. **RFC-072 — Member language preference and runtime localization.**
-   Owner-selected 2026-07-30 and accepted the same day; **RFC-075 is to follow
-   it.** The measurement that shaped the design: all 254 English string
-   constants already exist under a parity gate, and **not one is reachable from
-   the worker**. This is therefore a seam refactor, not a translation project —
-   handlers name `i18n::JA_*` directly, so there is nowhere for a locale to be
-   honoured. Implementation runs in three slices: the locale seam plus schema
-   and settings form (A), the member-facing core (B), then exposing the switcher
-   with browser and 200%-text evidence (C). The switcher is deliberately **not
-   user-reachable until Slice C**, so members are never offered a language the
-   product only half-honours. Admin surfaces, anonymous routes, and
-   `Accept-Language` are a future RFC. No hosted-evidence precondition.
-4. **Choose the next user-facing theme** after RFC-075 — an owner decision.
-5. **When a pilot is scheduled** — and not before — provision the persistent
+3. ~~RFC-072 — Member language preference and runtime localization.~~
+   **Complete 2026-07-30.** Design accepted at `1b49070`; Slices A
+   (`b237788`), B (`93e25de`), and C (`fcf84aa`) each architecture-reviewed and
+   Approved; moved to `rfcs/done/`. Members now choose Japanese or English per
+   membership, and the member-facing UI, dates, and screen-reader labels follow
+   it with `html lang` matching. The measurement that shaped it: all 254 English
+   string constants already existed under a parity gate and **not one was
+   reachable** — a seam refactor, not a translation project. The switcher stayed
+   unreachable until Slice C so members were never offered a half-honoured
+   language. All ten acceptance criteria met locally; no hosted-evidence
+   precondition. **Slice D** — admin surfaces, `/join`, `/relink`, static
+   offline HTML, `Accept-Language`, community default — remains a future RFC.
+4. **Cut `v0.60.0`** — the first tag since 2026-07-11, covering RFC-070, 071,
+   073, 074, and 072. Tag only; deployment stays No-Go. See § *Tagging is not
+   deploying* above and the release handoff. This also re-truths the stale
+   `app.js` cache-buster and service-worker `CACHE_VERSION`, and adds the gate
+   that would have caught their drift.
+5. **RFC-075 — Render style system and inline style reduction.** Owner-selected
+   2026-07-30 as the theme following RFC-072. Design review not yet started.
+6. **Choose the next user-facing theme** after RFC-075 — an owner decision.
+7. **When a pilot is scheduled** — and not before — provision the persistent
    incident sink (Logpush → R2), then build and freeze one exact immutable
    release candidate and execute the RFC-050 hosted evidence campaign for the
    remaining B1, B3, B4, and B5 claims. The campaign must include E7 canary
@@ -217,9 +263,9 @@ The paused proposed backlog is:
 | 075 | Render style system and inline style reduction | Design remains proposed. No longer held by the feature freeze (lifted 2026-07-29); simply not yet scheduled. |
 
 RFC-073 left this table on 2026-07-29 (shipped at `ed549be`), RFC-074 on
-2026-07-30 (shipped at `30e90c4`), and RFC-072 on 2026-07-30 (accepted); none of
-the three is paused proposed work any more. RFC-075 is next in the default
-order.
+2026-07-30 (`30e90c4`), and RFC-072 on 2026-07-30 (`fcf84aa`); none of the three
+is paused proposed work any more. **RFC-075 is the only entry here that is next
+in the live sequence** — it is owner-selected as the theme after RFC-072.
 
 ## Post-Hold Feature Candidates
 
@@ -261,8 +307,8 @@ RFC is.
    enforces. It gates beta.
 
 7. ~~**RFC-072: Member Language Preference and Runtime Localization**~~ —
-   **accepted** (2026-07-30), implementation pending in Slices A–C. Retained
-   here for ordering context only; it is no longer a candidate.
+   **done** (`fcf84aa`, 2026-07-30). Retained here for ordering context only;
+   it is no longer a candidate.
 
 8. ~~**RFC-073: Calendar Events List and Day Detail UX**~~ — **done**
    (`ed549be`, 2026-07-29). Retained here for ordering context only; it is no

@@ -1,8 +1,12 @@
 # RFC 072 - Member Language Preference and Runtime Localization
 
-**Status.** Accepted 2026-07-30 — design completed and architecture-reviewed;
-all five previously deferred questions resolved. Authorizes implementation in
-Slices A–C; Slice D is explicitly a future RFC.
+**Status.** Implemented — design accepted 2026-07-30 at `1b49070`; implemented
+across Slices A (`b237788`), B (`93e25de`), and C (`fcf84aa`), each
+architecture-reviewed and Approved. All ten acceptance criteria are met locally;
+this RFC has no hosted-evidence precondition. **Slice D — admin surfaces,
+anonymous routes (`/join`, `/relink`), static offline HTML, `Accept-Language`,
+and a community default — is deliberately out of scope and remains a future
+RFC.**
 
 **Target release.** Next unreleased increment on `main`; not tied to a version
 transition.

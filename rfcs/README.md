@@ -19,17 +19,16 @@ authorize implementation.
 
 RFC numbers and the tables below are stable identifiers and lifecycle indexes,
 not execution priority. The active order is maintained in
-[ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-073 and
-RFC-074 are complete, RFC-072 is the current theme with RFC-075 to follow, and
-the RFC-050 hosted campaign and its sink remain deferred to the point a pilot is
-scheduled.
+[ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-073,
+RFC-074, and RFC-072 Slices A–C are complete; the next steps are the `v0.60.0`
+tag and then RFC-075. The RFC-050 hosted campaign and its sink remain deferred
+to the point a pilot is scheduled.
 
 ## Accepted — approved for implementation
 
 | ID | Title | Accepted | Note |
 |----|-------|----------|------|
 | 050 | [Exact-Candidate Hosted Staging Evidence and Pilot Gate](./accepted/050-staging-runtime-verification-evidence-pack.md) | 2026-07-28 | B4 remediation revision architecture-reviewed and owner-accepted; authorizes local tooling implementation (RFC-050 Tooling Slices) only, not hosted execution. Slices 1–7 committed at `15b9409`/`c55787a`; Slices 8–9 remain; B4 still open because local tooling is not evidence until run against a frozen candidate. **IPv6 client support is not confirmed/implemented for this deployment** — see RFC-078 § Dated owner risk acceptances and this document's E4a |
-| 072 | [Member Language Preference and Runtime Localization](./accepted/072-member-language-preference-and-runtime-localization.md) | 2026-07-30 | Design completed and architecture-reviewed: all five deferred questions resolved (boundary, clear-to-default, audit, refactor bound, RFC-071 moot), route corrected to `/c/:cid/me/language`, and Security/Compatibility/Risks/Acceptance Criteria added. **254 EN constants already exist and none are reachable** — this is a seam refactor, not a translation project. Authorizes Slices A–C; the switcher is not user-reachable until Slice C |
 | 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Local implementation reviewed/accepted/committed at `b72f22b`; corrected isolated automation and bounded human no-JS/network evidence were architecture-reviewed and owner-accepted, closing criterion 8 locally. RFC-050 hosted evidence remains required before public/production B1 closure |
 | 078 | [Fail-Closed Strongly Consistent Abuse Controls](./accepted/078-fail-closed-strongly-consistent-abuse-controls.md) | 2026-07-23 | Corrected architecture accepted; implemented and committed at `c991b82` on 2026-07-28, including the required I-B1 concurrency-burst evidence. RFC-050 exact-candidate hosted evidence remains pending, so B3 and all staging/public/production holds remain open |
 | 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 0A–8 and the Class A telemetry correction reviewed/committed. Persistent delivery and exact-candidate hosted B5 evidence remain required |
@@ -118,6 +117,7 @@ scheduled.
 | 071 | [Application Threat Model and Form Security Baseline](./done/071-application-threat-model-and-form-security-baseline.md) | `main` at `1b12d96`; implementation review accepted with notes. The baseline is active; precise checklist-versus-observed-evidence labeling remains non-blocking cleanup |
 | 073 | [Calendar Events List and Day Detail UX](./done/073-calendar-events-list-and-day-detail-ux.md) | `main` at `ed549be`; implementation review Approved. First product theme after the 2026-07-29 hold amendment. All nine acceptance criteria met locally; no hosted-evidence precondition |
 | 074 | [Community Switch Route Preservation](./done/074-community-switch-route-preservation.md) | `main` at `30e90c4`; both review points Approved. Closed `next` token grammar with target-side authorization, no open redirect, no preserved community-scoped ids, no fragment. Closes the RFC-073 review's O1 (RFC-067 gate now proven behaviorally). All nine acceptance criteria met locally; no hosted-evidence precondition |
+| 072 | [Member Language Preference and Runtime Localization](./done/072-member-language-preference-and-runtime-localization.md) | `main` at `b237788`/`93e25de`/`fcf84aa`; all three slice reviews Approved. Members choose Japanese or English per membership; the member-facing UI, dates, and screen-reader labels follow it, and `html lang` matches. Slice D (admin, anonymous routes, `Accept-Language`, community default) remains a future RFC. All ten acceptance criteria met locally; no hosted-evidence precondition |
 
 ## Also Done
 
