@@ -1450,7 +1450,7 @@ fn sw_cache_version_matches_workspace_version() {
 // message prints the actual value) and paste it in, in the same commit as
 // the version bump.
 const RELEASE_CACHE_ASSET_CONTENT_HASH: &str =
-    "e2e8cbbc8eb3841457cacb25b1db730f8f7c78571226f64b1fc13d83afc2a6d7";
+    "8807f1ed5959778f5c82e1d364984c5811460ded7831418b2daac5123a06d5ee";
 
 fn cached_asset_content_hash() -> String {
     use sha2::{Digest, Sha256};

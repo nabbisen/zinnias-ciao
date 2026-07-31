@@ -501,8 +501,24 @@ button, a, [role="button"] { min-height: var(--cz-touch-min); }
 }
 .cz-status-form-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--cz-space-2);
 }
+/* Handoff 028: flex items default to min-width:auto, which floors an
+ * item's shrink at its own content's min-content width — this is exactly
+ * why the row overflowed instead of compressing before this fix, and it is
+ * also the mechanism this fix relies on rather than removes. `flex: 1`
+ * (basis 0%, grow 1) still asks for equal thirds; at any scale where all
+ * three labels' min-content widths fit inside a third of the row, that
+ * floor never engages and normal-scale rendering is unchanged. At 200%
+ * text, a label's min-content width can exceed its equal-thirds share, and
+ * with `flex-wrap: wrap` on the container that item now wraps to its own
+ * row instead of forcing the row wider than the viewport — `flex-grow: 1`
+ * then lets it fill that row rather than sitting at a cramped intrinsic
+ * width. Deliberately no `min-width: 0` here: that would let the button
+ * shrink below its label's content width and wrap the label vertically
+ * inside a fixed-height box instead of wrapping the button itself — the
+ * risk the handoff's §5 option 2 warns about. */
 .cz-status-btn {
   flex: 1;
   padding: var(--cz-space-3) var(--cz-space-2);
