@@ -204,8 +204,36 @@ pub const JA_CALENDAR_PRIVACY_NOTE: &str = "このカレンダーリンクは、
 pub const JA_CALENDAR_GENERATED_FLASH: &str = "カレンダーリンクを作成しました。";
 pub const JA_CALENDAR_REVOKED_FLASH: &str = "カレンダーリンクを無効化しました。";
 
-/// RFC-072 locale-aware pair; see `i18n::Localized`.
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
 pub const CALENDAR_TITLE: Localized = Localized {
     ja: JA_CALENDAR_TITLE,
     en: EN_CALENDAR_TITLE,
+};
+pub const CALENDAR_DESCRIPTION: Localized = Localized {
+    ja: JA_CALENDAR_DESCRIPTION,
+    en: EN_CALENDAR_DESCRIPTION,
+};
+pub const CALENDAR_GENERATE: Localized = Localized {
+    ja: JA_CALENDAR_GENERATE,
+    en: EN_CALENDAR_GENERATE,
+};
+pub const CALENDAR_DISABLE: Localized = Localized {
+    ja: JA_CALENDAR_DISABLE,
+    en: EN_CALENDAR_DISABLE,
+};
+pub const CALENDAR_REGENERATE: Localized = Localized {
+    ja: JA_CALENDAR_REGENERATE,
+    en: EN_CALENDAR_REGENERATE,
+};
+pub const CALENDAR_PRIVACY_NOTE: Localized = Localized {
+    ja: JA_CALENDAR_PRIVACY_NOTE,
+    en: EN_CALENDAR_PRIVACY_NOTE,
+};
+pub const CALENDAR_GENERATED_FLASH: Localized = Localized {
+    ja: JA_CALENDAR_GENERATED_FLASH,
+    en: EN_CALENDAR_GENERATED_FLASH,
+};
+pub const CALENDAR_REVOKED_FLASH: Localized = Localized {
+    ja: JA_CALENDAR_REVOKED_FLASH,
+    en: EN_CALENDAR_REVOKED_FLASH,
 };

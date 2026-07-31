@@ -69,6 +69,9 @@ pub async fn require_admin(
 /// Require that the user is an active admin in at least one community.
 /// This supports guarded bootstrap flows that are not scoped to an existing
 /// community URL, without granting access to anonymous or member-only users.
+/// `/communities/new` (Handoff 030 §7.2) resolves its locale from this same
+/// admin membership — the one that authorized access to the page — rather
+/// than from a `:cid` it does not have.
 pub async fn require_active_admin_somewhere(
     env: &Env,
     auth: &AuthContext,
@@ -84,6 +87,6 @@ pub async fn require_active_admin_somewhere(
         user_id: row.user_id,
         role: row.role,
         display_name: row.display_name,
-        locale: Locale::default(), // not a localized page; not resolved from this query
+        locale: row.locale,
     })
 }

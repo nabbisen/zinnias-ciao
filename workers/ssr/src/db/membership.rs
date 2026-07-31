@@ -18,11 +18,27 @@ pub struct MembershipRow {
 /// An active membership row that also carries a *resolved* locale
 /// (RFC-072). Only [`find_active`] produces this type — the row shape
 /// itself, not caller discipline, is what keeps a localized render path
-/// from ever taking a locale from `find_active_by_id`,
-/// `list_active_for_user`, or `find_first_admin_for_user`: those return
-/// the plain [`MembershipRow`], which has no locale field to reach for.
-/// (Slice A review, Observation O2.)
+/// from ever taking a locale from `find_active_by_id` or
+/// `list_active_for_user`: those return the plain [`MembershipRow`], which
+/// has no locale field to reach for. (Slice A review, Observation O2.)
 pub struct ActiveMembershipRow {
+    pub id: String,
+    pub community_id: String,
+    pub user_id: String,
+    pub role: String,
+    pub display_name: String,
+    pub is_active: bool,
+    pub locale: Locale,
+}
+
+/// An admin membership row that also carries a *resolved* locale (RFC-072,
+/// Handoff 030 §7.2). Only [`find_first_admin_for_user`] produces this type
+/// — same row-shape discipline as [`ActiveMembershipRow`]. Used by
+/// `/communities/new`, which has no `:cid` and therefore no "current
+/// membership" to read a locale from; the corrected rule resolves from the
+/// admin membership that authorized access to the page, not an arbitrary
+/// "earliest-joined membership of any role."
+pub struct AdminMembershipRow {
     pub id: String,
     pub community_id: String,
     pub user_id: String,
@@ -166,15 +182,18 @@ pub async fn list_active_for_user(db: &D1Database, user_id: &str) -> Result<Vec<
         .collect())
 }
 
-/// First active admin membership for a user, if any.
-/// Used by non-community-scoped flows that still require an existing admin.
+/// First active admin membership for a user, if any, with a *resolved*
+/// locale (RFC-072, Handoff 030 §7.2). Used by non-community-scoped flows
+/// that still require an existing admin — both as a presence check
+/// (`me.rs`) and, for `/communities/new`, as the locale source for a page
+/// with no `:cid` to read a "current membership" from.
 pub async fn find_first_admin_for_user(
     db: &D1Database,
     user_id: &str,
-) -> Result<Option<MembershipRow>> {
+) -> Result<Option<AdminMembershipRow>> {
     let row = db
         .prepare(
-            "SELECT id, community_id, user_id, role, display_name \
+            "SELECT id, community_id, user_id, role, display_name, ui_language \
              FROM community_memberships \
              WHERE user_id = ?1 AND role = 'admin' AND removed_at IS NULL \
              ORDER BY joined_at ASC LIMIT 1",
@@ -184,13 +203,18 @@ pub async fn find_first_admin_for_user(
         .await?;
 
     Ok(row.and_then(|v| {
-        Some(MembershipRow {
+        let ui_language = v
+            .get("ui_language")
+            .and_then(|value| value.as_str())
+            .map(str::to_owned);
+        Some(AdminMembershipRow {
             id: v.get("id")?.as_str()?.to_owned(),
             community_id: v.get("community_id")?.as_str()?.to_owned(),
             user_id: v.get("user_id")?.as_str()?.to_owned(),
             role: v.get("role")?.as_str()?.to_owned(),
             display_name: v.get("display_name")?.as_str()?.to_owned(),
             is_active: true,
+            locale: resolve_locale(ui_language.as_deref()),
         })
     }))
 }

@@ -1494,16 +1494,6 @@ fn cached_asset_content_matches_pinned_hash() {
 
 const COMMUNITIES_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/communities.rs");
-const COMMUNITIES_CALENDAR_HANDLER_SRC: &str =
-    include_str!("../../../workers/ssr/src/handlers/communities/calendar.rs");
-const CALENDAR_EVENTS_HANDLER_SRC: &str =
-    include_str!("../../../workers/ssr/src/handlers/communities/calendar/events.rs");
-const MATRIX_HANDLER_SRC: &str =
-    include_str!("../../../workers/ssr/src/handlers/communities/matrix.rs");
-const MATRIX_DETAIL_HANDLER_SRC: &str =
-    include_str!("../../../workers/ssr/src/handlers/communities/matrix/detail.rs");
-const MATRIX_CELLS_HANDLER_SRC: &str =
-    include_str!("../../../workers/ssr/src/handlers/communities/matrix/cells.rs");
 const COMMUNITIES_MATRIX_SRC: &str = concat!(
     include_str!("../../../workers/ssr/src/handlers/communities/matrix.rs"),
     include_str!("../../../workers/ssr/src/handlers/communities/matrix/cells.rs"),
@@ -1547,15 +1537,6 @@ const RELINK_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/relink.rs"
 const RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC: &str =
     include_str!("../../../scripts/recover-community-access.mjs");
 const APP_JS_SRC: &str = include_str!("../../../workers/ssr/static/app.js");
-// Individually named so `rfc072_shared_render_helpers_have_no_half_migrated_i18n`
-// (Handoff 026) can assert per-file, rather than folding every helper into
-// one concatenated blob the way `RENDER_SRC` below does for other gates.
-const RENDER_ERRORS_SRC: &str = include_str!("../../../workers/ssr/src/render/errors.rs");
-const RENDER_EVENT_CARD_SRC: &str = include_str!("../../../workers/ssr/src/render/event_card.rs");
-const RENDER_NOTES_SRC: &str = include_str!("../../../workers/ssr/src/render/notes.rs");
-const RENDER_PARTICIPANTS_SRC: &str =
-    include_str!("../../../workers/ssr/src/render/participants.rs");
-const RENDER_STATUS_SRC: &str = include_str!("../../../workers/ssr/src/render/status.rs");
 const RENDER_SRC: &str = concat!(
     include_str!("../../../workers/ssr/src/render.rs"),
     include_str!("../../../workers/ssr/src/render/errors.rs"),
@@ -2280,14 +2261,14 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
 #[test]
 fn rfc053_calendar_feed_privacy_and_revocation_ux_is_guarded() {
     assert!(
-        CALENDAR_HANDLER_SRC.contains("JA_CALENDAR_PRIVACY_NOTE")
-            && CALENDAR_HANDLER_SRC.contains("JA_CALENDAR_GENERATED_FLASH")
-            && CALENDAR_HANDLER_SRC.contains("JA_CALENDAR_REVOKED_FLASH")
+        CALENDAR_HANDLER_SRC.contains("i18n::t(locale, i18n::CALENDAR_PRIVACY_NOTE)") // RFC-072 locale-aware accessor, Handoff 030
+            && CALENDAR_HANDLER_SRC.contains("i18n::t(locale, i18n::CALENDAR_GENERATED_FLASH)")
+            && CALENDAR_HANDLER_SRC.contains("i18n::t(locale, i18n::CALENDAR_REVOKED_FLASH)")
             && CALENDAR_HANDLER_SRC.contains("calendar_flash_message")
             && CALENDAR_HANDLER_SRC.contains("?flash=generated")
             && CALENDAR_HANDLER_SRC.contains("?flash=disabled")
             && CALENDAR_HANDLER_SRC.contains("url.port()"),
-        "RFC-053 calendar feed page must use reviewed fixed copy and fixed flash codes"
+        "RFC-053 calendar feed page must use reviewed fixed copy (now locale-aware, Handoff 030) and fixed flash codes"
     );
     assert!(
         !CALENDAR_HANDLER_SRC.contains("Feed+URL+generated")
@@ -2648,140 +2629,268 @@ fn rfc072_language_settings_post_is_reject_no_op_replay_and_target_safe() {
     );
 }
 
+/// RFC-072 criterion 9, Handoff 030 §7.3: one documented exception to the
+/// default-fail localization gate below. `ja_count` is the file's exact,
+/// pinned bare `i18n::JA_` reference count; `calls_bare_page` records
+/// whether it calls the non-locale-aware `render::page(` shell (as opposed
+/// to `render::page_localized(`, or no page call at all). Both are asserted
+/// exactly, not as a floor or ceiling, so a partial edit to an excluded file
+/// — the exact defect this gate exists to catch — still fails it.
+struct LocalizationException {
+    path: &'static str,
+    ja_count: usize,
+    calls_bare_page: bool,
+    reason: &'static str,
+}
+
+// This table replaces the hand-maintained `*_SRC` constant list the old
+// `rfc072_member_facing_core_has_no_half_migrated_page` gate used. That gate
+// only checked a file if someone remembered to add it — which is exactly
+// why `calendar.rs` (Handoff 030) went unnoticed through three RFC-072
+// slices despite being linked directly from My Page. This table inverts
+// that: `rfc072_every_handler_and_render_file_is_localized_or_documented_exception`
+// below walks every file under `handlers/` and `render/` and fails on
+// anything not localized *and* not listed here, so an unlisted file is a
+// failure, not a silent pass.
+//
+// Built by walking the tree and reading every flagged file, not carried
+// over from Handoff 030's own sketch — which, checked against this walk,
+// turned out to be missing two files (`admin/events/forms.rs` and
+// `admin/events/summary.rs`, both shared admin form-rendering helpers with
+// bare Japanese strings). Reported in the review request as a finding, not
+// silently added to make a prior list "complete."
+const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
+    LocalizationException {
+        path: "handlers/admin/events/attendance.rs",
+        ja_count: 12,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/events/cancel.rs",
+        ja_count: 8,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/events/copy.rs",
+        ja_count: 19,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/events/create.rs",
+        ja_count: 6,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/events/edit.rs",
+        ja_count: 14,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/events/forms.rs",
+        ja_count: 30,
+        calls_bare_page: false,
+        reason: "shared admin event-form rendering helper, called only from admin-only surfaces above — found by this gate's walk, not carried over from any prior list",
+    },
+    LocalizationException {
+        path: "handlers/admin/events/notes.rs",
+        ja_count: 5,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/events/occurrence.rs",
+        ja_count: 5,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/events/recreate.rs",
+        ja_count: 5,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/events/summary.rs",
+        ja_count: 5,
+        calls_bare_page: false,
+        reason: "shared admin event-summary rendering helper, called only from admin-only surfaces above — found by this gate's walk, not carried over from any prior list",
+    },
+    LocalizationException {
+        path: "handlers/admin/help_signin.rs",
+        ja_count: 17,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/member_remove.rs",
+        ja_count: 8,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/members.rs",
+        ja_count: 26,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/role_transfer.rs",
+        ja_count: 10,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/calendar.rs",
+        ja_count: 2,
+        calls_bare_page: false,
+        reason: "get_ics_feed is an unauthenticated bearer-token route with no membership lookup, so no locale is resolvable yet — same rationale as render/errors.rs (Handoff 030 §7.1)",
+    },
+    LocalizationException {
+        path: "handlers/communities.rs",
+        ja_count: 1,
+        calls_bare_page: false,
+        reason: "post_matrix_export_audit's pre-auth 401 branch rejects before any membership lookup exists, so no locale is resolvable yet — same rationale as render/errors.rs",
+    },
+    LocalizationException {
+        path: "handlers/export.rs",
+        ja_count: 7,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/join.rs",
+        ja_count: 18,
+        calls_bare_page: true,
+        reason: "anonymous route, no membership/session yet, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/relink.rs",
+        ja_count: 10,
+        calls_bare_page: true,
+        reason: "anonymous route, no membership/session yet, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/templates.rs",
+        ja_count: 12,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "render/errors.rs",
+        ja_count: 17,
+        calls_bare_page: false,
+        reason: "these functions take no arguments, so they have no membership and no locale to resolve (RFC-072 §6 non-change scope)",
+    },
+    LocalizationException {
+        path: "render/event_card.rs",
+        ja_count: 4,
+        calls_bare_page: false,
+        reason: "dead code, no live caller anywhere in its history back to 89eebb7 (Handoff 026 §7.3) — not migrated, not deleted",
+    },
+];
+
+fn handlers_and_render_files() -> Vec<std::path::PathBuf> {
+    let mut files = Vec::new();
+    walk_rs_files(&workers_ssr_src_dir().join("handlers"), &mut files);
+    walk_rs_files(&workers_ssr_src_dir().join("render"), &mut files);
+    files
+        .into_iter()
+        .filter(|p| p.file_name().and_then(|n| n.to_str()) != Some("tests.rs"))
+        .collect()
+}
+
 #[test]
-fn rfc072_member_facing_core_has_no_half_migrated_page() {
-    // RFC-072 (§7.4 of Slice B's handoff, extended by Slice C's §7.2): a
-    // half-migrated page — some strings resolved via `i18n::t(locale, ...)`,
-    // others still bare `i18n::JA_*` — is worse than not started, because
-    // `html lang` would then claim a language the page doesn't fully render.
-    //
-    // What this test actually checks (Handoff 026 corrects the docstring
-    // that used to overstate this): every handler file below has zero bare
-    // `i18n::JA_` references, AND every shared render helper those handlers
-    // call (status.rs, notes.rs, participants.rs) does too. It does not
-    // execute a page and inspect the rendered HTML — a handler could in
-    // principle call a not-yet-covered helper and this test would not catch
-    // it. It is a static, file-level proxy for a page-level property, kept
-    // honest by naming every file the member-facing core touches. Handoff
-    // 026 exists precisely because that proxy previously covered handlers
-    // only: `event.rs` was clean while `render::status_form` — which it
-    // calls — was not, and this test could not see the difference.
-    //
-    // Slice C closed every exception Slice B had to leave open (the
-    // date-format gap on Calendar/Matrix, the matrix cells screen-reader
-    // sentences, and me.rs's display-name edit sub-page, which is directly
-    // linked from My Page). The only exceptions remaining anywhere in the
-    // member-facing core are the ones documented below — a pre-auth branch
-    // with no membership lookup yet to resolve a locale from
-    // (`render/errors.rs`'s rationale, shared by communities.rs's one
-    // pre-auth reference), and `render/event_card.rs`, which Handoff 026
-    // §7.3 found to be dead code with no live caller and left unmigrated
-    // rather than editing code no page reaches.
-    assert_eq!(
-        ME_HANDLER_SRC.matches("i18n::JA_").count(),
-        0,
-        "me.rs must have no bare i18n::JA_ references — RFC-072 Slice C migrated the display-name edit sub-page"
-    );
-    assert_eq!(
-        HOME_HANDLER_SRC.matches("i18n::JA_").count(),
-        0,
-        "home.rs must have no bare i18n::JA_ references — RFC-072 Slice B fully migrated it"
-    );
-    assert_eq!(
-        EVENT_HANDLER_SRC.matches("i18n::JA_").count(),
-        0,
-        "event.rs must have no bare i18n::JA_ references — RFC-072 Slice B fully migrated it"
-    );
-    assert_eq!(
-        CALENDAR_EVENTS_HANDLER_SRC.matches("i18n::JA_").count(),
-        0,
-        "communities/calendar/events.rs must have no bare i18n::JA_ references"
-    );
-    assert_eq!(
-        MATRIX_DETAIL_HANDLER_SRC.matches("i18n::JA_").count(),
-        0,
-        "communities/matrix/detail.rs must have no bare i18n::JA_ references"
+fn rfc072_every_handler_and_render_file_is_localized_or_documented_exception() {
+    // RFC-072 criterion 9: every page reachable from My Page honours the
+    // member's language, with out-of-boundary surfaces Japanese "by
+    // documented decision, not by omission." Handoff 030: the prior gate
+    // (a hand-maintained list of `*_SRC` constants) checked a file only if
+    // someone remembered to add it, and missed `calendar.rs` through three
+    // RFC-072 slices as a result. This version is default-fail: it walks
+    // every non-test file under `handlers/` and `render/`, and anything
+    // that calls the bare `render::page(` shell or contains a bare
+    // `i18n::JA_` reference must be named in `LOCALIZATION_EXCEPTIONS` with
+    // an exact pinned count and a written reason — otherwise it fails.
+    let files = handlers_and_render_files();
+    assert!(
+        files.len() > 30,
+        "expected many .rs files under handlers/ and render/, found only {} — \
+         directory walk is probably broken, not the codebase actually shrinking",
+        files.len()
     );
 
-    // Exception 1: communities.rs's post_matrix_export_audit rejects an
-    // unauthenticated request before any membership lookup exists, so there
-    // is no locale to resolve yet — same rationale as render/errors.rs
-    // (RFC-072 §6 non-change scope). Exactly one such reference is expected.
-    assert_eq!(
-        COMMUNITIES_HANDLER_SRC.matches("i18n::JA_").count(),
-        1,
-        "communities.rs must have exactly the one documented pre-auth exception, no more"
-    );
+    let src_dir = workers_ssr_src_dir();
+    let mut seen_exception_paths = std::collections::HashSet::new();
+
+    for path in &files {
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let ja_count = content.matches("i18n::JA_").count();
+        let calls_bare_page = content.contains("render::page(");
+        let rel = path
+            .strip_prefix(&src_dir)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        match LOCALIZATION_EXCEPTIONS.iter().find(|e| e.path == rel) {
+            Some(exc) => {
+                seen_exception_paths.insert(exc.path);
+                assert_eq!(
+                    ja_count, exc.ja_count,
+                    "{rel}: bare i18n::JA_ count is {ja_count}, pinned exception value is {} \
+                     ({}). Re-pin only if this is a deliberate, reviewed change — a partial \
+                     edit to an excluded file must not pass silently.",
+                    exc.ja_count, exc.reason
+                );
+                assert_eq!(
+                    calls_bare_page, exc.calls_bare_page,
+                    "{rel}: whether it calls the bare render::page( shell changed from its \
+                     pinned exception value ({}) — re-pin only if deliberate ({})",
+                    exc.calls_bare_page, exc.reason
+                );
+            }
+            None => {
+                assert_eq!(
+                    ja_count, 0,
+                    "{rel} has {ja_count} bare i18n::JA_ reference(s) and is not in \
+                     LOCALIZATION_EXCEPTIONS. RFC-072 criterion 9 requires every member-facing \
+                     page to honour locale unless excluded for a written reason — either \
+                     localize this file, or add a table entry with the exact count and why."
+                );
+                assert!(
+                    !calls_bare_page,
+                    "{rel} calls the non-locale-aware render::page( shell and is not in \
+                     LOCALIZATION_EXCEPTIONS — use render::page_localized instead, or add a \
+                     table entry with a written reason."
+                );
+            }
+        }
+    }
+
+    // Keep the table itself honest: every entry must correspond to a file
+    // the walk actually found, so a renamed or deleted file can't leave a
+    // stale, unverifiable row behind.
+    for exc in LOCALIZATION_EXCEPTIONS {
+        assert!(
+            seen_exception_paths.contains(exc.path),
+            "LOCALIZATION_EXCEPTIONS names {} but the walk never found or matched it — \
+             stale table entry?",
+            exc.path
+        );
+    }
+
+    // Preserved from the prior gate: communities.rs's one exception must be
+    // exactly the documented pre-auth 401 branch, not some other bare
+    // reference that happens to keep the count at 1.
     assert!(
         COMMUNITIES_HANDLER_SRC.contains("json_error(401, i18n::JA_SESSION_EXPIRED)"),
         "communities.rs's one bare i18n::JA_ reference must be the documented pre-auth 401 branch"
-    );
-
-    // RFC-072 Slice C closed the date-format gap (§5.1) and the matrix
-    // cells gap (§5.2): communities/calendar.rs and matrix/cells.rs now
-    // have no remaining exception either.
-    assert_eq!(
-        COMMUNITIES_CALENDAR_HANDLER_SRC
-            .matches("i18n::JA_")
-            .count(),
-        0,
-        "communities/calendar.rs must have no bare i18n::JA_ references — RFC-072 Slice C closed the date-format exception"
-    );
-    assert_eq!(
-        MATRIX_CELLS_HANDLER_SRC.matches("i18n::JA_").count(),
-        0,
-        "communities/matrix/cells.rs must have no bare i18n::JA_ references — RFC-072 Slice C migrated it"
-    );
-    assert_eq!(
-        MATRIX_HANDLER_SRC.matches("i18n::JA_").count(),
-        0,
-        "communities/matrix.rs (top-level) must have no bare i18n::JA_ references"
-    );
-
-    // Handoff 026: the shared render helpers `event.rs` calls into. This is
-    // the gap the rest of this test could not see — asserted per-file, so
-    // `render/errors.rs`'s documented exception and `render/event_card.rs`'s
-    // documented dead-code exception cannot silently cover for a real
-    // regression in a live helper.
-    assert_eq!(
-        RENDER_STATUS_SRC.matches("i18n::JA_").count(),
-        0,
-        "render/status.rs must have no bare i18n::JA_ references — Handoff 026 migrated status_display/status_chip/status_form"
-    );
-    assert_eq!(
-        RENDER_NOTES_SRC.matches("i18n::JA_").count(),
-        0,
-        "render/notes.rs must have no bare i18n::JA_ references — Handoff 026 migrated note_form/admin_note_hide_form"
-    );
-    assert_eq!(
-        RENDER_PARTICIPANTS_SRC.matches("i18n::JA_").count(),
-        0,
-        "render/participants.rs must have no bare i18n::JA_ references — Handoff 026 migrated participant_list"
-    );
-
-    // Documented exception: render/errors.rs's functions take no arguments,
-    // so they have no membership and no locale to resolve (RFC-072 §6
-    // non-change scope, reaffirmed unchanged by Handoff 026 §6). Asserted at
-    // its measured count, not `> 0`, so a partial migration here — which
-    // would be a half-migrated file, the exact defect this test exists to
-    // catch — still fails it.
-    assert_eq!(
-        RENDER_ERRORS_SRC.matches("i18n::JA_").count(),
-        17,
-        "render/errors.rs must have exactly its documented 17 bare i18n::JA_ references, no more and no fewer"
-    );
-
-    // Documented exception: render/event_card.rs has no live caller anywhere
-    // in the codebase (Handoff 026 §7.3 — confirmed by grep across the full
-    // git history back to its introduction in 89eebb7, RFC-064 Phase 2; only
-    // its `CardDay` type, a separate item, is still used). It is dead, not
-    // migrated, and not deleted in this package. Pinned at its measured
-    // count so either a live caller appearing (which would make this a real
-    // gap again) or a silent partial edit shows up here.
-    assert_eq!(
-        RENDER_EVENT_CARD_SRC.matches("i18n::JA_").count(),
-        4,
-        "render/event_card.rs must have exactly its documented 4 bare i18n::JA_ references (dead code, Handoff 026 §7.3) — if this changes, re-check whether it has gained a live caller"
     );
 }
 
@@ -2806,6 +2915,21 @@ fn rfc072_communities_and_event_pages_resolve_locale_and_html_lang_together() {
             && EVENT_HANDLER_SRC.contains("i18n::t(locale, i18n::EVENT_TITLE_HEADER)")
             && EVENT_HANDLER_SRC.contains("render::page_localized(locale, &event.title, &body)"),
         "event.rs's get_event_detail must resolve locale from require_membership and thread it into page_localized"
+    );
+    // Handoff 030 §7.1/§7.2: the two pages RFC-072 criterion 9 was missing.
+    assert!(
+        CALENDAR_HANDLER_SRC.contains("let locale = membership.locale;")
+            && CALENDAR_HANDLER_SRC.contains("i18n::t(locale, i18n::CALENDAR_TITLE)")
+            && CALENDAR_HANDLER_SRC.contains("render::page_localized(locale, title, &body)"),
+        "calendar.rs's get_me_calendar must resolve locale from require_membership and thread it into page_localized"
+    );
+    assert!(
+        COMMUNITY_CREATE_HANDLER_SRC.contains("let locale = admin.locale;")
+            && COMMUNITY_CREATE_HANDLER_SRC
+                .contains("i18n::t(locale, i18n::COMMUNITY_CREATE_TITLE)")
+            && COMMUNITY_CREATE_HANDLER_SRC
+                .contains("render::page_localized(locale, title, &body)"),
+        "community_create.rs's render_form/render_disabled must resolve locale from the authorizing admin membership (Handoff 030 §7.2) and thread it into page_localized"
     );
 }
 

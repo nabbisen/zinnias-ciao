@@ -85,7 +85,7 @@ pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Resul
                 &raw_name,
                 &raw_display_name,
                 &timezone,
-                Some(community_name_error(err)),
+                Some(community_name_error(admin.locale, err)),
             )
             .await;
         }
@@ -101,7 +101,7 @@ pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Resul
                 &raw_name,
                 &raw_display_name,
                 &timezone,
-                Some(display_name_error(err)),
+                Some(display_name_error(admin.locale, err)),
             )
             .await;
         }
@@ -115,7 +115,7 @@ pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Resul
             &raw_name,
             &raw_display_name,
             &timezone,
-            Some(i18n::JA_COMMUNITY_CREATE_TIMEZONE_ERROR),
+            Some(i18n::t(admin.locale, i18n::COMMUNITY_CREATE_TIMEZONE_ERROR)),
         )
         .await;
     }
@@ -239,7 +239,7 @@ async fn reserve_or_respond(
                 raw_name,
                 raw_display_name,
                 timezone,
-                Some(i18n::JA_COMMUNITY_CREATE_RATE_LIMITED),
+                Some(i18n::t(admin.locale, i18n::COMMUNITY_CREATE_RATE_LIMITED)),
             )
             .await?;
             Ok(Some(abuse_control::apply_blocked(
@@ -256,7 +256,7 @@ async fn reserve_or_respond(
                 raw_name,
                 raw_display_name,
                 timezone,
-                Some(i18n::JA_CONFIGURATION_UNAVAILABLE),
+                Some(i18n::t(admin.locale, i18n::CONFIGURATION_UNAVAILABLE)),
             )
             .await?;
             Ok(Some(resp.with_status(503)))
@@ -279,19 +279,21 @@ async fn refresh_form(
 }
 
 fn render_disabled(admin: &MembershipContext) -> Result<Response> {
+    let locale = admin.locale;
+    let title = i18n::t(locale, i18n::COMMUNITY_CREATE_TITLE);
     let body = format!(
         "{header}<main style=\"padding:1rem 1rem 5rem;max-width:560px;margin:0 auto\">\
            <p style=\"font-size:.9375rem;color:#6e6e73;margin:0 0 1rem\">{msg}</p>\
            <a href=\"/c/{cid}/me\" style=\"display:inline-block;color:#007AFF;\
              min-height:44px;line-height:44px;text-decoration:none\">{cancel}</a>\
          </main>{nav}",
-        header = render::header(i18n::JA_COMMUNITY_CREATE_TITLE, ""),
-        msg = i18n::JA_COMMUNITY_CREATE_DISABLED,
+        header = render::header(title, ""),
+        msg = i18n::t(locale, i18n::COMMUNITY_CREATE_DISABLED),
         cid = escape_html(&admin.community_id),
-        cancel = i18n::JA_COMMUNITY_CREATE_CANCEL,
-        nav = render::bottom_nav(&admin.community_id, "me"),
+        cancel = i18n::t(locale, i18n::COMMUNITY_CREATE_CANCEL),
+        nav = render::bottom_nav_localized(&admin.community_id, "me", locale),
     );
-    render::page(i18n::JA_COMMUNITY_CREATE_TITLE, &body)
+    render::page_localized(locale, title, &body)
 }
 
 fn render_form(
@@ -302,6 +304,8 @@ fn render_form(
     timezone: &str,
     error: Option<&str>,
 ) -> Result<Response> {
+    let locale = admin.locale;
+    let title = i18n::t(locale, i18n::COMMUNITY_CREATE_TITLE);
     let error_html = error
         .map(|e| {
             format!(
@@ -332,38 +336,46 @@ fn render_form(
            </form>\
            <a href=\"/c/{cid}/me\" style=\"display:inline-block;margin-top:.75rem;color:#007AFF;min-height:44px;line-height:44px;text-decoration:none\">{cancel}</a>\
          </main>{nav}",
-        header = render::header(i18n::JA_COMMUNITY_CREATE_TITLE, ""),
-        body = i18n::JA_COMMUNITY_CREATE_BODY,
+        header = render::header(title, ""),
+        body = i18n::t(locale, i18n::COMMUNITY_CREATE_BODY),
         error_html = error_html,
         path = COMMUNITY_CREATE_PATH,
         token = escape_html(token),
         tz = escape_html(timezone),
-        name_label = i18n::JA_COMMUNITY_CREATE_NAME_LABEL,
+        name_label = i18n::t(locale, i18n::COMMUNITY_CREATE_NAME_LABEL),
         name = escape_html(community_name),
-        display_label = i18n::JA_COMMUNITY_CREATE_DISPLAY_NAME_LABEL,
+        display_label = i18n::t(locale, i18n::COMMUNITY_CREATE_DISPLAY_NAME_LABEL),
         display = escape_html(display_name),
-        tz_label = i18n::JA_COMMUNITY_CREATE_TIMEZONE_LABEL,
-        tz_name = i18n::JA_COMMUNITY_CREATE_TIMEZONE_JAPAN,
-        submit = i18n::JA_COMMUNITY_CREATE_SUBMIT,
+        tz_label = i18n::t(locale, i18n::COMMUNITY_CREATE_TIMEZONE_LABEL),
+        tz_name = i18n::t(locale, i18n::COMMUNITY_CREATE_TIMEZONE_JAPAN),
+        submit = i18n::t(locale, i18n::COMMUNITY_CREATE_SUBMIT),
         cid = escape_html(&admin.community_id),
-        cancel = i18n::JA_COMMUNITY_CREATE_CANCEL,
-        nav = render::bottom_nav(&admin.community_id, "me"),
+        cancel = i18n::t(locale, i18n::COMMUNITY_CREATE_CANCEL),
+        nav = render::bottom_nav_localized(&admin.community_id, "me", locale),
     );
-    render::page(i18n::JA_COMMUNITY_CREATE_TITLE, &body)
+    render::page_localized(locale, title, &body)
 }
 
-fn community_name_error(err: CommunityNameError) -> &'static str {
+fn community_name_error(
+    locale: zinnias_ciao_contracts::Locale,
+    err: CommunityNameError,
+) -> &'static str {
     match err {
-        CommunityNameError::Empty => i18n::JA_COMMUNITY_CREATE_NAME_ERROR,
-        CommunityNameError::TooLong => i18n::JA_COMMUNITY_CREATE_NAME_TOO_LONG,
-        CommunityNameError::InvalidCharacter => i18n::JA_COMMUNITY_CREATE_NAME_INVALID,
+        CommunityNameError::Empty => i18n::t(locale, i18n::COMMUNITY_CREATE_NAME_ERROR),
+        CommunityNameError::TooLong => i18n::t(locale, i18n::COMMUNITY_CREATE_NAME_TOO_LONG),
+        CommunityNameError::InvalidCharacter => {
+            i18n::t(locale, i18n::COMMUNITY_CREATE_NAME_INVALID)
+        }
     }
 }
 
-fn display_name_error(err: DisplayNameError) -> &'static str {
+fn display_name_error(
+    locale: zinnias_ciao_contracts::Locale,
+    err: DisplayNameError,
+) -> &'static str {
     match err {
         DisplayNameError::Empty | DisplayNameError::TooLong | DisplayNameError::InvalidChars => {
-            i18n::JA_COMMUNITY_CREATE_DISPLAY_NAME_ERROR
+            i18n::t(locale, i18n::COMMUNITY_CREATE_DISPLAY_NAME_ERROR)
         }
     }
 }
@@ -373,3 +385,6 @@ fn redirect(url: &str) -> Result<Response> {
     resp.headers_mut().set("Location", url)?;
     Ok(resp)
 }
+
+#[cfg(test)]
+mod tests;

@@ -25,6 +25,7 @@ pub async fn get_me_calendar(
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_membership(env, &auth, community_id).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
     let pp = crate::crypto::pepper(env)?;
 
@@ -64,7 +65,7 @@ pub async fn get_me_calendar(
         .query_pairs()
         .find(|(k, _)| k == "flash")
         .map(|(_, v)| v.to_string());
-    let flash_html = calendar_flash_message(flash_code.as_deref())
+    let flash_html = calendar_flash_message(locale, flash_code.as_deref())
         .map(|message| {
             format!(
                 "<p role=\"status\" class=\"cz-note-flash\">{}</p>",
@@ -108,9 +109,9 @@ pub async fn get_me_calendar(
             cid = render::escape_html(community_id),
             rtok = render::escape_html(&revoke_token),
             gentok = render::escape_html(&regen_token),
-            privacy_note = i18n::JA_CALENDAR_PRIVACY_NOTE,
-            disable = i18n::JA_CALENDAR_DISABLE,
-            regenerate = i18n::JA_CALENDAR_REGENERATE,
+            privacy_note = i18n::t(locale, i18n::CALENDAR_PRIVACY_NOTE),
+            disable = i18n::t(locale, i18n::CALENDAR_DISABLE),
+            regenerate = i18n::t(locale, i18n::CALENDAR_REGENERATE),
         )
     } else {
         format!(
@@ -122,17 +123,18 @@ pub async fn get_me_calendar(
              </form>",
             cid = render::escape_html(community_id),
             gentok = render::escape_html(&regen_token),
-            cg = i18n::JA_CALENDAR_GENERATE,
-            desc = i18n::JA_CALENDAR_DESCRIPTION,
+            cg = i18n::t(locale, i18n::CALENDAR_GENERATE),
+            desc = i18n::t(locale, i18n::CALENDAR_DESCRIPTION),
         )
     };
 
-    let nav = render::bottom_nav(community_id, "me");
+    let nav = render::bottom_nav_localized(community_id, "me", locale);
     let back = format!(
         "<a href=\"/c/{}/me\" class=\"cz-event-back-link\">\u{2190} {}</a>",
         render::escape_html(community_id),
-        i18n::JA_NAV_ME,
+        i18n::t(locale, i18n::NAV_ME),
     );
+    let title = i18n::t(locale, i18n::CALENDAR_TITLE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -144,20 +146,21 @@ pub async fn get_me_calendar(
          {flash}\
          {feed}\
          </main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_CALENDAR_TITLE,
+        header = render::header_with_switcher_next_localized(
+            title,
             community_id,
             &community_pairs,
-            "calendar_feed"
+            "calendar_feed",
+            locale
         ),
-        cal_title = i18n::JA_CALENDAR_TITLE,
-        cal_desc = i18n::JA_CALENDAR_DESCRIPTION,
+        cal_title = title,
+        cal_desc = i18n::t(locale, i18n::CALENDAR_DESCRIPTION),
         back = back,
         flash = flash_html,
         feed = feed_section,
         nav = nav,
     );
-    render::page(i18n::JA_CALENDAR_TITLE, &body)
+    render::page_localized(locale, title, &body)
 }
 
 // ── POST /c/:cid/me/calendar/regenerate ───────────────────────────────────
@@ -320,10 +323,13 @@ fn redirect(location: &str) -> Result<Response> {
     Ok(resp.with_status(303))
 }
 
-fn calendar_flash_message(code: Option<&str>) -> Option<&'static str> {
+fn calendar_flash_message(
+    locale: zinnias_ciao_contracts::Locale,
+    code: Option<&str>,
+) -> Option<&'static str> {
     match code {
-        Some("generated") => Some(i18n::JA_CALENDAR_GENERATED_FLASH),
-        Some("disabled") => Some(i18n::JA_CALENDAR_REVOKED_FLASH),
+        Some("generated") => Some(i18n::t(locale, i18n::CALENDAR_GENERATED_FLASH)),
+        Some("disabled") => Some(i18n::t(locale, i18n::CALENDAR_REVOKED_FLASH)),
         _ => None,
     }
 }

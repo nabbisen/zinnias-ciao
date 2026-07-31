@@ -34,6 +34,12 @@ pub const GENERAL_ERROR: Localized = Localized {
 };
 pub const JA_CONFIGURATION_UNAVAILABLE: &str =
     "ただいまサービスを利用できません。しばらくしてから、もう一度お試しください。";
+
+/// RFC-072 locale-aware pair; see `i18n::Localized`.
+pub const CONFIGURATION_UNAVAILABLE: Localized = Localized {
+    ja: JA_CONFIGURATION_UNAVAILABLE,
+    en: EN_CONFIGURATION_UNAVAILABLE,
+};
 pub const EN_NOT_FOUND: &str = "Not found.";
 pub const JA_NOT_FOUND: &str = "見つかりませんでした。";
 pub const EN_INTERNAL_ERROR: &str = "Something went wrong. Please try again.";

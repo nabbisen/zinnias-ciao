@@ -105,7 +105,19 @@ function seed() {
     `INSERT INTO communities (id, name, timezone, is_active, created_at) VALUES ('${communityId}', 'RFC072 Primary', 'Asia/Tokyo', 1, '${now}')`,
     `INSERT INTO communities (id, name, timezone, is_active, created_at) VALUES ('${otherCommunityId}', 'RFC072 Other', 'Asia/Tokyo', 1, '${now}')`,
     `INSERT INTO users (id, created_at) VALUES ('${memberUserId}', '${now}')`,
-    `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${memberMembershipId}', '${communityId}', '${memberUserId}', 'member', '${esc(memberDisplayName)}', '${now}')`,
+    // 'admin' here (not 'member'): Handoff 030's create-community scenario
+    // needs this to be THE admin membership that `require_active_admin_somewhere`
+    // returns (find_first_admin_for_user, ORDER BY joined_at ASC), since §7.2
+    // resolves /communities/new's locale from that exact row. It must be the
+    // membership the test actually switches to English via
+    // /c/:cid/me/language — otherMembershipId lives in a different community
+    // and is deliberately never switched, so making IT the admin membership
+    // would leave /communities/new Japanese and the scenario would be
+    // asserting the wrong thing (membership-scoping working, not the feature).
+    `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${memberMembershipId}', '${communityId}', '${memberUserId}', 'admin', '${esc(memberDisplayName)}', '${now}')`,
+    // Deliberately left 'member' and never switched: proves the language
+    // switch and §7.2's locale resolution are both membership-scoped, not
+    // user-scoped (see 'otherMembershipUnaffectedThroughout' below).
     `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${otherMembershipId}', '${otherCommunityId}', '${memberUserId}', 'member', 'RFC072 Member Other', '${now}')`,
     `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc072_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
     `INSERT INTO events (id, community_id, created_by_membership_id, title, location, description, status, repeat_rule, repeat_count, created_at, updated_at) VALUES ('${eventId}', '${communityId}', '${memberMembershipId}', 'RFC072 Visible Event', 'RFC072 Room', '', 'scheduled', 'none', NULL, '${now}', '${now}')`,
@@ -545,20 +557,42 @@ try {
     },
   });
 
-  // The ICS feed settings page is intentionally out of RFC-072 scope and
-  // stays Japanese-only regardless of the member's language preference —
-  // confirming that invariant survived this package's styling-only
-  // migration is as important as the layout itself not overflowing.
-  logStep('confirming the calendar-feed settings page stays Japanese-only after switching to English (200% text screenshot)');
+  // Handoff 030: RFC-072 criterion 9 was violated here — the ICS feed
+  // settings page was Japanese by omission, not documented decision. Now
+  // localized; this assertion is inverted from what it asserted before this
+  // package (which was itself the defect being fixed, not a feature).
+  logStep('confirming the calendar-feed settings page renders English after switching (200% text screenshot)');
   await navigate(page, `/c/${communityId}/me/calendar`, { textScale: 2 });
   const calendarFeedAfterEnglishSwitch = await collect(page);
   results.push({
-    name: 'calendar-feed-page-stays-japanese-only-after-english-switch',
-    screenshotPath: await screenshot(page, 'calendar-feed-still-japanese-200-percent'),
+    name: 'calendar-feed-page-renders-english-after-switch',
+    screenshotPath: await screenshot(page, 'calendar-feed-english-200-percent'),
     observed: calendarFeedAfterEnglishSwitch,
     checks: {
-      htmlLangStaysJa: calendarFeedAfterEnglishSwitch.htmlLang === 'ja',
+      htmlLangEn: calendarFeedAfterEnglishSwitch.htmlLang === 'en',
+      showsEnglishGenerateOrFeedUrl:
+        calendarFeedAfterEnglishSwitch.text.includes('Generate feed URL') ||
+        calendarFeedAfterEnglishSwitch.text.includes('http'),
       noHorizontalScrollAt200Percent: calendarFeedAfterEnglishSwitch.noHorizontalScroll,
+    },
+  });
+
+  // Handoff 030: the second page RFC-072 criterion 9 was missing — linked
+  // directly from My Page, not admin/anonymous/error, so not one of the
+  // three documented exclusions. Resolves locale from the authorizing admin
+  // membership (§7.2), not a `:cid` this route doesn't have.
+  logStep('confirming the create-community page renders English after switching (200% text screenshot)');
+  await navigate(page, '/communities/new', { textScale: 2 });
+  const createCommunityEnglish = await collect(page);
+  results.push({
+    name: 'create-community-page-renders-english-after-switch',
+    screenshotPath: await screenshot(page, 'create-community-english-200-percent'),
+    observed: createCommunityEnglish,
+    checks: {
+      htmlLangEn: createCommunityEnglish.htmlLang === 'en',
+      showsEnglishTitle: createCommunityEnglish.text.includes('Create community'),
+      showsEnglishSubmit: createCommunityEnglish.text.includes('Create'),
+      noHorizontalScrollAt200Percent: createCommunityEnglish.noHorizontalScroll,
     },
   });
 
