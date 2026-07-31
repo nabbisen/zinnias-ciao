@@ -27,9 +27,9 @@ fn last_admin_demote_page(community_id: &str) -> Result<Response> {
     render::page(
         i18n::JA_GENERAL_ERROR,
         &format!(
-            "<main style=\"padding:2rem\"><p>{}</p>\
+            "<main class=\"cz-admin-error-main\"><p>{}</p>\
              <p><a href=\"/c/{cid}/admin/members\" \
-             style=\"color:#007AFF;text-decoration:none\">{back}</a></p></main>",
+             class=\"cz-admin-plain-link\">{back}</a></p></main>",
             i18n::JA_ADMIN_LAST_ADMIN_DEMOTE,
             cid = render::escape_html(community_id),
             back = i18n::JA_ADMIN_INVITES_BACK_TO_MEMBERS,
@@ -91,21 +91,19 @@ async fn get_role_change_confirm(
 
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{title}</h1>\
-         <p style=\"font-size:.9375rem;color:#6e6e73\">\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--snug\">{title}</h1>\
+         <p class=\"cz-admin-confirm-subtitle\">\
            <strong>{name}</strong><br>{consequence}\
          </p>\
-         <div style=\"display:flex;gap:.75rem;margin-top:1.5rem\">\
+         <div class=\"cz-admin-role-actions\">\
            <a href=\"/c/{cid}/admin/members\" \
-              style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
-              text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600\">\
+              class=\"cz-admin-role-keep-link\">\
               {keep}</a>\
-           <form method=\"post\" action=\"{action}\" style=\"flex:1\">\
+           <form method=\"post\" action=\"{action}\" class=\"cz-confirm-delete-form\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
              <button type=\"submit\" \
-               style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
-               border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
+               class=\"cz-admin-role-confirm-button\">\
                {confirm}</button>\
            </form>\
          </div></main>{nav}",

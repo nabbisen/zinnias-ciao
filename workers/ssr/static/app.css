@@ -1518,6 +1518,232 @@ button, a, [role="button"] { min-height: var(--cz-touch-min); }
   margin: var(--cz-space-2) 0 var(--cz-space-1);
 }
 
+/* Admin member management (RFC-075 Slice 5). Admin-only, Japanese-only
+ * surfaces (RFC-072 Slice D) — no English rendering exists for any class
+ * below. No coincidental-value tokens were needed this slice: every hex
+ * value here (#EDFAF0/#34C759/#167A34) already maps to the existing
+ * attended-status "success" palette, which Slice 4 established as a
+ * genuine repeated pattern (cz-note-flash/cz-me-flash), not a coincidence
+ * to guard against. */
+
+/* Shared confirmation-page family (role_transfer.rs, member_remove.rs,
+ * help_signin.rs) — close to, but not identical to, the cz-confirm-* /
+ * cz-admin-confirm-* families: this row never wraps (no flex-wrap), and
+ * the keep-link omits the explicit min-height/flex-centering those two
+ * families set. */
+.cz-admin-role-actions {
+  display: flex;
+  gap: var(--cz-space-3);
+  margin-top: var(--cz-space-5);
+}
+.cz-admin-role-keep-link {
+  flex: 1;
+  padding: var(--cz-space-3-5);
+  border: 2px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-button);
+  text-align: center;
+  text-decoration: none;
+  color: var(--cz-color-text-primary);
+  font-weight: 600;
+}
+.cz-admin-role-confirm-button {
+  width: 100%;
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-button);
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+}
+.cz-admin-plain-link {
+  color: var(--cz-color-focus);
+  text-decoration: none;
+}
+
+/* Reveal box (members.rs's invite-code reveal, help_signin.rs's relink-code
+ * box) — same five properties, different declaration order in the two
+ * original inline styles; CSS is order-invariant per rule, so one shared
+ * class is a genuine reuse, not a coincidence. */
+.cz-admin-reveal-box {
+  background: var(--cz-status-attended-bg);
+  border: 1px solid var(--cz-status-attended-border);
+  border-radius: var(--cz-radius-input);
+  padding: var(--cz-space-4);
+  margin: var(--cz-space-4) 0;
+}
+.cz-admin-reveal-text {
+  font-size: .8125rem;
+  color: var(--cz-status-attended-fg);
+  margin: 0 0 var(--cz-space-2);
+}
+
+/* Help sign-in (admin/help_signin.rs) — §13: the relink-code display,
+ * copy button, and status span below are class-only changes; nothing
+ * about what is rendered, how long it is shown, or the data-copy-* /
+ * aria-live wiring is touched. */
+.cz-admin-copy-status {
+  display: block;
+  margin-top: var(--cz-space-2);
+  font-size: .8125rem;
+  color: var(--cz-status-attended-fg);
+}
+.cz-admin-code-hint {
+  font-size: .9375rem;
+  color: var(--cz-color-text-secondary);
+  margin-bottom: var(--cz-space-4);
+}
+.cz-admin-relink-hint {
+  font-size: .9375rem;
+  color: var(--cz-color-text-secondary);
+  margin: 0 0 var(--cz-space-3);
+}
+.cz-admin-code-display {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  color: var(--cz-color-text-primary);
+  overflow-wrap: anywhere;
+}
+.cz-admin-copy-button {
+  margin-top: var(--cz-space-3);
+  padding: var(--cz-space-2-5) var(--cz-space-3-5);
+  background: var(--cz-color-bg);
+  color: var(--cz-color-focus);
+  border: 1px solid var(--cz-color-focus);
+  border-radius: var(--cz-radius-control);
+  font-size: .9375rem;
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+}
+
+/* Invites (admin/members.rs get_invites family) */
+.cz-admin-back-to-members-row {
+  margin: 0 0 var(--cz-space-4);
+}
+.cz-admin-back-to-members-link {
+  font-size: .875rem;
+  color: var(--cz-color-focus);
+  text-decoration: none;
+}
+.cz-admin-invites-body {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+}
+.cz-admin-invite-flash {
+  font-size: .875rem;
+  color: var(--cz-status-attended-fg);
+  margin: var(--cz-space-2) 0;
+}
+.cz-admin-submit-button--snug {
+  margin-top: var(--cz-space-2);
+}
+.cz-admin-active-codes-section {
+  margin-top: var(--cz-space-5);
+}
+.cz-admin-section-label {
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--cz-color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: var(--cz-space-2);
+}
+.cz-admin-invite-code-display {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: .2em;
+  color: var(--cz-color-text-primary);
+}
+.cz-admin-invite-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--cz-space-3) 0;
+}
+.cz-admin-invite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--cz-space-2-5) 0;
+  border-bottom: 1px solid var(--cz-color-surface);
+  gap: var(--cz-space-2);
+}
+.cz-admin-invite-code-text {
+  font-size: .875rem;
+  color: var(--cz-color-text-primary);
+}
+.cz-admin-invite-revoke-form {
+  margin: 0;
+}
+.cz-admin-revoke-button {
+  font-size: .8125rem;
+  color: var(--cz-color-danger);
+  background: none;
+  border: none;
+  padding: var(--cz-space-1-5) var(--cz-space-2);
+  cursor: pointer;
+  min-height: var(--cz-touch-min);
+}
+
+/* Member list (admin/members.rs get_members) — §7.3: the member table risk.
+ * This is actually a flex `<ul>/<li>` list, not an HTML `<table>` — see the
+ * review request for the terminology correction. cz-admin-member-row is
+ * the row measured at 200%. */
+.cz-admin-member-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.cz-admin-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--cz-space-3) 0;
+  border-bottom: 1px solid var(--cz-color-surface);
+  gap: var(--cz-space-3);
+}
+.cz-admin-member-info {
+  min-width: 0;
+}
+.cz-admin-member-name {
+  display: block;
+  font-size: .9375rem;
+  overflow-wrap: anywhere;
+}
+.cz-admin-member-role-label {
+  display: block;
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+  margin-top: var(--cz-space-hairline);
+}
+.cz-admin-member-actions {
+  flex: 0 0 auto;
+}
+.cz-admin-member-row-action {
+  display: block;
+  color: var(--cz-color-focus);
+  font-size: .875rem;
+  min-height: var(--cz-touch-min);
+  line-height: var(--cz-touch-min);
+  text-align: right;
+}
+.cz-admin-member-row-action--danger {
+  color: var(--cz-color-danger);
+}
+.cz-admin-invite-link {
+  display: block;
+  margin-top: var(--cz-space-5);
+  text-align: center;
+  padding: var(--cz-space-3-5);
+  border: 2px solid var(--cz-color-focus);
+  border-radius: var(--cz-radius-button);
+  color: var(--cz-color-focus);
+  text-decoration: none;
+  font-weight: 600;
+}
+
 /* Reduced motion — disable all non-essential animation (RFC-011 §5) */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -165,10 +165,14 @@ async fn render_invites_page(
 
     let reveal_html = reveal.map(invite_reveal_html).unwrap_or_default();
 
-    let flash_html = flash.map(|message| format!(
-        "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0\">{}</p>",
-        render::escape_html(message)
-    )).unwrap_or_default();
+    let flash_html = flash
+        .map(|message| {
+            format!(
+                "<p role=\"status\" class=\"cz-admin-invite-flash\">{}</p>",
+                render::escape_html(message)
+            )
+        })
+        .unwrap_or_default();
 
     // List active invite codes from the service-owned invite table.
     let active_codes = crate::codlet::list_active_invites(env, community_id).await;
@@ -186,14 +190,12 @@ async fn render_invites_page(
         let rev = i18n::JA_ADMIN_INVITES_REVOKE;
         let exp_display = inv.expires_at.get(..16).unwrap_or(&inv.expires_at);
         code_rows.push_str(&format!(
-            "<li style=\"display:flex;align-items:center;justify-content:space-between;\
-             padding:.625rem 0;border-bottom:1px solid #f5f5f7;gap:.5rem\">\
-             <span style=\"font-size:.875rem;color:#1D1D1F\">{exp}{role}</span>\
-             <form method=\"post\" action=\"/c/{cid}/admin/invites/{iid}/revoke\" style=\"margin:0\">\
+            "<li class=\"cz-admin-invite-row\">\
+             <span class=\"cz-admin-invite-code-text\">{exp}{role}</span>\
+             <form method=\"post\" action=\"/c/{cid}/admin/invites/{iid}/revoke\" class=\"cz-admin-invite-revoke-form\">\
                <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
                <button type=\"submit\" \
-                 style=\"font-size:.8125rem;color:#FF3B30;background:none;border:none;\
-                 padding:.375rem .5rem;cursor:pointer;min-height:44px\" \
+                 class=\"cz-admin-revoke-button\" \
                  aria-label=\"{rev}\">{rev}</button>\
              </form></li>",
             exp  = render::escape_html(exp_display),
@@ -205,33 +207,30 @@ async fn render_invites_page(
     }
     let codes_html = if active_codes.is_empty() {
         format!(
-            "<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>",
+            "<p class=\"cz-admin-invites-body\">{}</p>",
             i18n::JA_ADMIN_INVITES_NONE
         )
     } else {
-        format!("<ul style=\"list-style:none;padding:0;margin:.75rem 0\">{code_rows}</ul>")
+        format!("<ul class=\"cz-admin-invite-list\">{code_rows}</ul>")
     };
 
     let nav = render::bottom_nav(community_id, "home");
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <p style=\"margin:0 0 1rem\"><a href=\"/c/{cid}/admin/members\" \
-            style=\"font-size:.875rem;color:#007AFF;text-decoration:none\">\
+         <main class=\"cz-page-main\">\
+         <p class=\"cz-admin-back-to-members-row\"><a href=\"/c/{cid}/admin/members\" \
+            class=\"cz-admin-back-to-members-link\">\
             {back_to_members}</a></p>\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{title}</h1>\
-         <p style=\"font-size:.875rem;color:#6e6e73\">{ib}</p>\
+         <h1 class=\"cz-admin-title cz-admin-title--snug\">{title}</h1>\
+         <p class=\"cz-admin-invites-body\">{ib}</p>\
          {flash}{reveal}\
          <form method=\"post\" action=\"/c/{cid}/admin/invites\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            <button type=\"submit\" \
-             style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
-             border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-             min-height:44px;cursor:pointer;margin-top:.5rem\">{ig}</button>\
+             class=\"cz-admin-submit-button cz-admin-submit-button--snug\">{ig}</button>\
          </form>\
-         <section style=\"margin-top:1.5rem\">\
-           <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{active_lbl}</h2>\
+         <section class=\"cz-admin-active-codes-section\">\
+           <h2 class=\"cz-admin-section-label\">{active_lbl}</h2>\
            {codes}\
          </section>\
          </main>{nav}",
@@ -259,11 +258,10 @@ async fn render_invites_page(
 fn invite_reveal_html(reveal: &InviteCodeReveal) -> String {
     format!(
         "<section id=\"invite-code-reveal\" \
-           style=\"background:#edfaf0;border-radius:12px;padding:1rem;margin:1rem 0;\
-           border:1px solid #34C759\">\
-           <p style=\"font-size:.8125rem;color:#167A34;margin:0 0 .5rem\">{warning}</p>\
-           <p style=\"font-size:.8125rem;color:#167A34;margin:0 0 .5rem\">{hint}</p>\
-           <div style=\"font-size:1.5rem;font-weight:700;letter-spacing:.2em;color:#1D1D1F\" \
+           class=\"cz-admin-reveal-box\">\
+           <p class=\"cz-admin-reveal-text\">{warning}</p>\
+           <p class=\"cz-admin-reveal-text\">{hint}</p>\
+           <div class=\"cz-admin-invite-code-display\" \
              aria-label=\"{label}\">{code}</div>\
          </section>",
         warning = i18n::JA_ADMIN_INVITES_REVEAL_WARNING,
@@ -417,8 +415,7 @@ pub async fn get_members(
             } else if m.role == "admin" {
                 format!(
                     "<a href=\"/c/{cid}/admin/members/{mid}/demote\" \
-                 style=\"display:block;color:#007AFF;font-size:.875rem;min-height:44px;\
-                 line-height:44px;text-align:right\">{label}</a>",
+                 class=\"cz-admin-member-row-action\">{label}</a>",
                     cid = render::escape_html(community_id),
                     mid = render::escape_html(&m.id),
                     label = i18n::JA_ADMIN_DEMOTE_ACTION,
@@ -426,8 +423,7 @@ pub async fn get_members(
             } else {
                 format!(
                     "<a href=\"/c/{cid}/admin/members/{mid}/promote\" \
-                 style=\"display:block;color:#007AFF;font-size:.875rem;min-height:44px;\
-                 line-height:44px;text-align:right\">{label}</a>",
+                 class=\"cz-admin-member-row-action\">{label}</a>",
                     cid = render::escape_html(community_id),
                     mid = render::escape_html(&m.id),
                     label = i18n::JA_ADMIN_PROMOTE_ACTION,
@@ -435,8 +431,7 @@ pub async fn get_members(
             };
             let help_action = format!(
                 "<a href=\"/c/{cid}/admin/members/{mid}/help-signin\" \
-                 style=\"display:block;color:#007AFF;font-size:.875rem;min-height:44px;\
-                 line-height:44px;text-align:right\">{label}</a>",
+                 class=\"cz-admin-member-row-action\">{label}</a>",
                 cid = render::escape_html(community_id),
                 mid = render::escape_html(&m.id),
                 label = i18n::JA_ADMIN_HELP_SIGNIN_ACTION,
@@ -446,8 +441,7 @@ pub async fn get_members(
             } else {
                 format!(
                     "<a href=\"/c/{cid}/admin/members/{mid}/remove\" \
-                 style=\"display:block;color:#FF3B30;font-size:.875rem;min-height:44px;\
-                 line-height:44px;text-align:right\">{rc}</a>",
+                 class=\"cz-admin-member-row-action cz-admin-member-row-action--danger\">{rc}</a>",
                     cid = render::escape_html(community_id),
                     mid = render::escape_html(&m.id),
                     rc = i18n::JA_ADMIN_REMOVE_CONFIRM,
@@ -464,13 +458,12 @@ pub async fn get_members(
                 String::new()
             };
             format!(
-                "<li style=\"display:flex;align-items:center;justify-content:space-between;\
-             padding:.75rem 0;border-bottom:1px solid #f5f5f7;gap:.75rem\">\
-             <span style=\"min-width:0\">\
-             <span style=\"display:block;font-size:.9375rem;overflow-wrap:anywhere\">{name}</span>\
-             <span style=\"display:block;font-size:.8125rem;color:#6e6e73;margin-top:.125rem\">{role}{self_label}</span>\
+                "<li class=\"cz-admin-member-row\">\
+             <span class=\"cz-admin-member-info\">\
+             <span class=\"cz-admin-member-name\">{name}</span>\
+             <span class=\"cz-admin-member-role-label\">{role}{self_label}</span>\
              </span>\
-             <span style=\"flex:0 0 auto\">{role_action}{help_action}{remove_action}</span>\
+             <span class=\"cz-admin-member-actions\">{role_action}{help_action}{remove_action}</span>\
              </li>",
                 name = render::escape_html(&m.display_name),
                 role = role_label,
@@ -485,13 +478,11 @@ pub async fn get_members(
     let nav = render::bottom_nav(community_id, "home");
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">{members_h1}</h1>\
-         <ul style=\"list-style:none;padding:0;margin:0\">{rows}</ul>\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--loose\">{members_h1}</h1>\
+         <ul class=\"cz-admin-member-list\">{rows}</ul>\
          <a href=\"/c/{cid}/admin/invites\" \
-            style=\"display:block;margin-top:1.5rem;text-align:center;\
-            padding:.875rem;border:2px solid #007AFF;border-radius:14px;\
-            color:#007AFF;text-decoration:none;font-weight:600\">\
+            class=\"cz-admin-invite-link\">\
             {invite_label}</a>\
          </main>{nav}",
         header = render::header_with_switcher_next(

@@ -45,7 +45,8 @@
     "smoke:community-switch": "node scripts/smoke/community-switch-route-preservation.mjs",
     "smoke:language": "node scripts/smoke/language-preference.mjs",
     "smoke:calendar-css": "node scripts/smoke/rfc075-calendar-css-migration.mjs",
-    "smoke:admin-event-forms": "node scripts/smoke/rfc075-slice4-admin-event-forms.mjs"
+    "smoke:admin-event-forms": "node scripts/smoke/rfc075-slice4-admin-event-forms.mjs",
+    "smoke:admin-member-management": "node scripts/smoke/rfc075-slice5-admin-member-management.mjs"
   },
   "devDependencies": {
     "wrangler": "4.113.0"

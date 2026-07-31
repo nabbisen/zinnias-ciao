@@ -53,21 +53,19 @@ pub async fn get_help_signin(
 
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{title}</h1>\
-         <p style=\"font-size:.9375rem;color:#6e6e73\">\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--snug\">{title}</h1>\
+         <p class=\"cz-admin-confirm-subtitle\">\
            <strong>{name}</strong><br>{consequence}\
          </p>\
-         <div style=\"display:flex;gap:.75rem;margin-top:1.5rem\">\
+         <div class=\"cz-admin-role-actions\">\
            <a href=\"/c/{cid}/admin/members\" \
-              style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
-              text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600\">\
+              class=\"cz-admin-role-keep-link\">\
               {keep}</a>\
-           <form method=\"post\" action=\"/c/{cid}/admin/members/{mid}/help-signin\" style=\"flex:1\">\
+           <form method=\"post\" action=\"/c/{cid}/admin/members/{mid}/help-signin\" class=\"cz-confirm-delete-form\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
              <button type=\"submit\" \
-               style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
-               border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
+               class=\"cz-admin-role-confirm-button\">\
                {confirm}</button>\
            </form>\
          </div></main>{nav}",
@@ -149,27 +147,23 @@ pub async fn post_help_signin(
     let nav = render::bottom_nav(community_id, "home");
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{title}</h1>\
-         <p style=\"font-size:.9375rem;color:#6e6e73;margin-bottom:1rem\">\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--snug\">{title}</h1>\
+         <p class=\"cz-admin-code-hint\">\
            <strong>{name}</strong><br>{hint}</p>\
-         <div style=\"background:#edfaf0;border:1px solid #34C759;border-radius:12px;\
-             padding:1rem;margin:1rem 0\">\
-           <div style=\"font-size:1.5rem;font-weight:700;letter-spacing:.16em;color:#1D1D1F;\
-             overflow-wrap:anywhere\" aria-label=\"{code_label}\" data-copy-code-value=\"true\">{code}</div>\
+         <div class=\"cz-admin-reveal-box\">\
+           <div class=\"cz-admin-code-display\" aria-label=\"{code_label}\" data-copy-code-value=\"true\">{code}</div>\
            <button type=\"button\" data-copy-code-button=\"true\" hidden \
              data-copy-success=\"{copy_done}\" data-copy-error=\"{copy_failed}\" \
-             style=\"margin-top:.75rem;padding:.625rem .875rem;background:#fff;color:#007AFF;\
-             border:1px solid #007AFF;border-radius:8px;font-size:.9375rem;font-weight:600;\
-             min-height:44px;cursor:pointer\">{copy_code}</button>\
+             class=\"cz-admin-copy-button\">{copy_code}</button>\
            <span data-copy-code-status=\"true\" aria-live=\"polite\" \
-             style=\"display:block;margin-top:.5rem;font-size:.8125rem;color:#167A34\"></span>\
+             class=\"cz-admin-copy-status\"></span>\
          </div>\
-         <p style=\"font-size:.9375rem;color:#6e6e73;margin:0 0 .75rem\">{relink_hint}</p>\
+         <p class=\"cz-admin-relink-hint\">{relink_hint}</p>\
          <p><a href=\"/relink\" target=\"_blank\" rel=\"noopener\" \
-           style=\"color:#007AFF;text-decoration:none\">{relink_link}</a></p>\
+           class=\"cz-admin-plain-link\">{relink_link}</a></p>\
          <p><a href=\"/c/{cid}/admin/members\" \
-           style=\"color:#007AFF;text-decoration:none\">{back}</a></p>\
+           class=\"cz-admin-plain-link\">{back}</a></p>\
          </main>{nav}",
         header = render::header_with_switcher_next(
             i18n::JA_ADMIN_HELP_SIGNIN_TITLE,
