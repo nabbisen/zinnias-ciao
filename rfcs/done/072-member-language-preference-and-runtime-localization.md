@@ -27,6 +27,30 @@ default — is deliberately out of scope and remains a future RFC.**
 > Nothing was deployed, so no member was served this. The defect was in the claim
 > as much as the code, and the scoping error was the architect's.
 
+> **Second correction, 2026-07-31.** The correction above was **also premature**.
+> Two further pages linked directly from My Page — the ICS feed settings page
+> (`handlers/calendar.rs`) and create-community (`handlers/community_create.rs`) —
+> were still Japanese by omission, and criterion 9 was still not met when the
+> paragraph above claimed it was.
+>
+> The root cause was the same each time, and it was the *method*, not the
+> instances: the boundary was enumerated from the architect's recollection, and
+> the gate was a hand-maintained list of `*_SRC` constants, so a file nobody
+> thought to add was invisible to it. `calendar.rs` never appeared in that list
+> across three slices, which is exactly why nothing ever failed.
+>
+> Fixed at `e80fbe7`. Both pages are localized, and the gate is now
+> **default-fail**: `rfc072_every_handler_and_render_file_is_localized_or_documented_exception`
+> walks every non-test file under `handlers/` and `render/`, and any file using the
+> Japanese shell or holding a bare `i18n::JA_` must appear in
+> `LOCALIZATION_EXCEPTIONS` with an exact pinned count and a written reason. It
+> also fails on **stale** entries, so the table cannot rot in either direction.
+>
+> Criterion 9 is now met, and — the part that distinguishes this from the two
+> earlier claims — it is **provable by a mechanism that fails on omission** rather
+> than by anyone's enumeration. Nothing was deployed; no member was served either
+> defect.
+
 **Target release.** Next unreleased increment on `main`; not tied to a version
 transition.
 
@@ -248,6 +272,21 @@ The first slice implements only:
 
 1. active membership preference;
 2. Japanese fallback.
+
+**Extension recorded 2026-07-31 (`e80fbe7`).** The order above assumes a
+community-scoped route with a `:cid` and therefore a "current membership".
+`/communities/new` has neither — it is not community-scoped. Its rule, decided in
+Handoff 030 §7.2:
+
+> Resolve from **the admin membership that authorized access to the page** — the
+> row `require_active_admin_somewhere` already fetches.
+
+This is not an approximation of "some other membership's preference": the member
+is on that page *because* they hold that admin membership, so it is the context
+they are acting in. It costs no extra query — `find_first_admin_for_user` gained
+one column and returns `AdminMembershipRow`, preserving the invariant that a row
+type carries a locale **iff** its query selected `ui_language`. The
+no-membership case is unreachable, since that page is admin-gated.
 
 However, the code shape should not block later community defaults or
 `Accept-Language` handling.
