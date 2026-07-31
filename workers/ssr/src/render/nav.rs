@@ -16,22 +16,18 @@ pub fn bottom_nav_localized(community_id: &str, active: &str, locale: Locale) ->
         } else {
             ""
         };
-        let style = if id == active {
-            "color:#007AFF;font-weight:600"
+        let active_class = if id == active {
+            " cz-bottom-nav-tab--active"
         } else {
-            "color:#6E6E73"
+            ""
         };
         format!(
-            "<a href=\"{href}\" style=\"flex:1;text-align:center;padding:.75rem 0;\
-             text-decoration:none;font-size:.8125rem;{style}\"{aria}>{label}</a>",
+            "<a href=\"{href}\" class=\"cz-bottom-nav-tab{active_class}\"{aria}>{label}</a>",
             href = escape_html(href),
         )
     };
     format!(
-        "<nav role=\"navigation\" aria-label=\"Main\" \
-         style=\"position:fixed;bottom:0;left:0;right:0;display:flex;\
-         background:#FFFFFF;border-top:1px solid #E5E5EA;\
-         padding-bottom:env(safe-area-inset-bottom)\">\
+        "<nav role=\"navigation\" aria-label=\"Main\" class=\"cz-bottom-nav\">\
          {home}{communities}{me}\
          </nav>",
         home = tab(
@@ -55,10 +51,9 @@ pub fn bottom_nav_localized(community_id: &str, active: &str, locale: Locale) ->
 /// Simple header for pages that don't need a community switcher.
 pub fn header(title: &str, community_name: &str) -> String {
     format!(
-        "<header style=\"position:sticky;top:0;background:#FFFFFF;border-bottom:1px solid #E5E5EA;\
-         padding:.875rem 1rem;display:flex;justify-content:space-between;align-items:center;z-index:10\">\
-         <span style=\"font-size:1.25rem;font-weight:600\">{title}</span>\
-         <span style=\"font-size:.8125rem;color:#6E6E73\">{community}</span>\
+        "<header class=\"cz-header\">\
+         <span class=\"cz-header-title\">{title}</span>\
+         <span class=\"cz-header-community\">{community}</span>\
          </header>",
         title = escape_html(title),
         community = escape_html(community_name),
@@ -128,30 +123,21 @@ pub fn header_with_switcher_next_localized(
         .collect();
 
     let mut h = String::new();
-    h.push_str("<header style='position:sticky;top:0;background:#FFFFFF;");
-    h.push_str("border-bottom:1px solid #E5E5EA;");
-    h.push_str("padding:.875rem 1rem;display:flex;justify-content:space-between;");
-    h.push_str("align-items:center;gap:.5rem;flex-wrap:wrap;z-index:10'>");
-    h.push_str("<span style='font-size:1.25rem;font-weight:600;flex:1 1 12rem;");
-    h.push_str("min-width:0;white-space:normal;overflow-wrap:anywhere'>");
+    h.push_str("<header class='cz-header-switcher'>");
+    h.push_str("<span class='cz-header-switcher-title'>");
     h.push_str(&title_s);
     h.push_str("</span>");
-    h.push_str("<form method='get' action='/switch' style='margin:0;min-width:0;max-width:100%'>");
+    h.push_str("<form method='get' action='/switch' class='cz-header-switcher-form'>");
     h.push_str("<input type='hidden' name='next' value='");
     h.push_str(&escape_html(next));
     h.push_str("'>");
     h.push_str("<select name='community' aria-label='");
     h.push_str(&escape_html(i18n::t(locale, i18n::NAV_SWITCH_ARIA_LABEL)));
     h.push_str("' ");
-    h.push_str("style='font-size:.8125rem;color:#6E6E73;background:none;border:none;");
-    h.push_str("border-bottom:1px solid #E5E5EA;padding:.125rem .25rem;");
-    h.push_str("max-width:100%;box-sizing:border-box;cursor:pointer'>");
+    h.push_str("class='cz-header-switcher-select'>");
     h.push_str(&options);
     h.push_str("</select>");
-    h.push_str("<button type='submit' style='font-size:.8125rem;");
-    h.push_str("margin-left:.25rem;min-height:44px;cursor:pointer;");
-    h.push_str("background:#F5F5F7;color:#1D1D1F;border:1px solid #D1D1D6;");
-    h.push_str("border-radius:8px;padding:.25rem .5rem'>");
+    h.push_str("<button type='submit' class='cz-header-switcher-button'>");
     h.push_str(i18n::t(locale, i18n::NAV_SWITCH_GO));
     h.push_str("</button>");
     h.push_str("</form>");

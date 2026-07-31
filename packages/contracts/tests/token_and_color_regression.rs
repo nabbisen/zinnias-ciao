@@ -45,43 +45,124 @@ fn parse_hex_color(hex: &str) -> (u8, u8, u8) {
 /// AA normal-text threshold = 4.5:1.
 const AA_MIN: f64 = 4.5;
 
+// ── RFC-075 Slice 2: read the shipped colour, not a copy ─────────────────
+//
+// Before this slice, each test below called `parse_hex_color` on a hex
+// literal held *by this test file*, while `render/status.rs` separately
+// defined its own `CZ_STATUS_*_FG` constant with (hopefully) the same value.
+// Nothing linked them: changing the shipped constant to a low-contrast
+// colour left every test here passing, because each was checking its own
+// copy. Slice 2 moved status colour out of Rust and into `app.css` classes
+// (`cz-status-text--{suffix}`, backed by `--cz-status-*-fg` custom
+// properties) — so these tests now read the actual shipped rule from
+// `app.css`, resolve the custom property it references, and run the AA
+// maths on *that* value. A wrong value in either the class rule or the
+// `:root` token definition now fails the test that is supposed to guard it.
+
+const APP_CSS_SOURCE: &str = include_str!("../../../workers/ssr/static/app.css");
+
+/// Extract a top-level CSS rule's declaration body by selector, e.g.
+/// `css_rule_body(css, ".cz-tab--active")` returns the text between that
+/// selector's `{` and its matching `}`. Panics if the selector isn't found —
+/// callers use this only to assert on rules that must exist. (Same helper as
+/// `release_gates.rs`'s of the same name; duplicated because integration
+/// test binaries do not share code with each other.)
+fn css_rule_body<'a>(css: &'a str, selector: &str) -> &'a str {
+    let needle = format!("{selector} {{");
+    let start = css
+        .find(&needle)
+        .unwrap_or_else(|| panic!("selector `{selector}` not found in app.css"));
+    let after_brace = start + needle.len();
+    let close = css[after_brace..]
+        .find('}')
+        .unwrap_or_else(|| panic!("selector `{selector}` has no closing brace in app.css"));
+    &css[after_brace..after_brace + close]
+}
+
+/// Extract a single declaration's value from a rule body, e.g.
+/// `css_property_value(body, "color")` on `"color: var(--x); margin: 0;"`
+/// returns `"var(--x)"`. Panics if the property isn't declared in this body.
+fn css_property_value<'a>(rule_body: &'a str, property: &str) -> &'a str {
+    let needle = format!("{property}:");
+    let start = rule_body
+        .find(&needle)
+        .unwrap_or_else(|| panic!("property `{property}` not declared in rule body: {rule_body}"));
+    let after = start + needle.len();
+    let end = rule_body[after..]
+        .find(';')
+        .unwrap_or_else(|| panic!("property `{property}` has no terminating ';' in: {rule_body}"));
+    rule_body[after..after + end].trim()
+}
+
+/// Resolve a `--cz-*` custom property's literal value from `:root` in
+/// `app.css`. Panics if the property is never defined.
+fn css_custom_property_value<'a>(css: &'a str, var_name: &str) -> &'a str {
+    let needle = format!("{var_name}:");
+    let start = css
+        .find(&needle)
+        .unwrap_or_else(|| panic!("custom property `{var_name}` not found in app.css"));
+    let after = start + needle.len();
+    let end = css[after..]
+        .find(';')
+        .unwrap_or_else(|| panic!("custom property `{var_name}` has no terminating ';'"));
+    css[after..after + end].trim()
+}
+
+/// Resolve a status class selector's `color` declaration to its final hex
+/// value: reads the class rule, follows `color: var(--x)` to `--x`'s
+/// `:root` definition, and returns that literal hex string. This is the
+/// actual value a browser renders for that class — not a value asserted to
+/// equal it.
+fn resolve_status_fg_hex(css: &'static str, class_selector: &str) -> (u8, u8, u8) {
+    let rule = css_rule_body(css, class_selector);
+    let color_value = css_property_value(rule, "color");
+    let hex = match color_value
+        .strip_prefix("var(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        Some(var_name) => css_custom_property_value(css, var_name.trim()),
+        None => color_value,
+    };
+    parse_hex_color(hex)
+}
+
 #[test]
 fn status_going_fg_passes_wcag_aa() {
-    let (r, g, b) = parse_hex_color("#005BBB");
+    let (r, g, b) = resolve_status_fg_hex(APP_CSS_SOURCE, ".cz-status-text--going");
     let ratio = contrast_on_white(r, g, b);
     assert!(
         ratio >= AA_MIN,
-        "going fg #005BBB: contrast {ratio:.2}:1 < AA {AA_MIN}:1"
+        "going fg (resolved from app.css): contrast {ratio:.2}:1 < AA {AA_MIN}:1"
     );
 }
 
 #[test]
 fn status_not_going_fg_passes_wcag_aa() {
-    let (r, g, b) = parse_hex_color("#B42318");
+    let (r, g, b) = resolve_status_fg_hex(APP_CSS_SOURCE, ".cz-status-text--not-going");
     let ratio = contrast_on_white(r, g, b);
     assert!(
         ratio >= AA_MIN,
-        "not-going fg #B42318: contrast {ratio:.2}:1 < AA {AA_MIN}:1"
+        "not-going fg (resolved from app.css): contrast {ratio:.2}:1 < AA {AA_MIN}:1"
     );
 }
 
 #[test]
 fn status_attended_fg_passes_wcag_aa() {
-    let (r, g, b) = parse_hex_color("#167A34");
+    let (r, g, b) = resolve_status_fg_hex(APP_CSS_SOURCE, ".cz-status-text--attended");
     let ratio = contrast_on_white(r, g, b);
     assert!(
         ratio >= AA_MIN,
-        "attended fg #167A34: contrast {ratio:.2}:1 < AA {AA_MIN}:1"
+        "attended fg (resolved from app.css): contrast {ratio:.2}:1 < AA {AA_MIN}:1"
     );
 }
 
 #[test]
 fn status_no_answer_fg_passes_wcag_aa() {
-    let (r, g, b) = parse_hex_color("#6E6E73");
+    let (r, g, b) = resolve_status_fg_hex(APP_CSS_SOURCE, ".cz-status-text--no-answer");
     let ratio = contrast_on_white(r, g, b);
     assert!(
         ratio >= AA_MIN,
-        "no-answer fg #6E6E73: contrast {ratio:.2}:1 < AA {AA_MIN}:1"
+        "no-answer fg (resolved from app.css): contrast {ratio:.2}:1 < AA {AA_MIN}:1"
     );
 }
 

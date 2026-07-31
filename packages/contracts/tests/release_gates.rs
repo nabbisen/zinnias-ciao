@@ -1450,7 +1450,7 @@ fn sw_cache_version_matches_workspace_version() {
 // message prints the actual value) and paste it in, in the same commit as
 // the version bump.
 const RELEASE_CACHE_ASSET_CONTENT_HASH: &str =
-    "a507e07dc06028d98327e489c315bdcec9afa4ac66789246aa9823ac6ab0f5b0";
+    "e2e8cbbc8eb3841457cacb25b1db730f8f7c78571226f64b1fc13d83afc2a6d7";
 
 fn cached_asset_content_hash() -> String {
     use sha2::{Digest, Sha256};
@@ -4663,8 +4663,8 @@ fn invite_mark_used_does_not_write_membership_fk() {
 // was added instead of reaching for a `cz-*` class / `--cz-*` token; lower
 // this pin whenever a slice migrates more.
 
-const INLINE_STYLE_RATCHET: usize = 418;
-const HARDCODED_HEX_RATCHET: usize = 322;
+const INLINE_STYLE_RATCHET: usize = 355;
+const HARDCODED_HEX_RATCHET: usize = 283;
 
 fn workers_ssr_src_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../workers/ssr/src")

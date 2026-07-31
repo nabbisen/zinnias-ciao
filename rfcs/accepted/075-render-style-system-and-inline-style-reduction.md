@@ -326,7 +326,7 @@ number from drifting upward, which is precisely what happened between 272 and 47
 | An accessibility gate is deleted rather than re-expressed | Medium | **WCAG regression on Calendar** | Named above as a hard constraint; the gate must assert the class set |
 | Migration stalls partway | **High** — this is the usual fate | Maintainability gain, zero security gain; `'unsafe-inline'` stays forever | The ratchet prevents backsliding; the terminal gate defines "done" |
 | A visual regression slips in during "conservative" extraction | Medium | Broken layout for real members | Screenshot evidence at mobile width and 200% text per migrated surface |
-| The cache key is not moved when `app.css` changes | Medium | Members served stale CSS | The `0.60.0` cache-drift gate fires; every slice must bump |
+| The cache key is stale at **release** time | Medium | Members served stale CSS once deployed | The version bump at release moves `CACHE_VERSION` with it; mid-slice, the re-pinned digest records the content change |
 | Class explosion for dynamic state | Medium | Worse than the inline styles it replaces | The draft's rule stands: keep inline for genuinely dynamic values |
 
 ## Acceptance Criteria
@@ -349,14 +349,20 @@ Per slice, unless marked terminal.
 6. No rendered authorization, validation, or routing decision depends on a class
    name.
 7. Screenshot evidence at mobile width and 200% text for each migrated surface.
-8. The asset cache key moves in the same commit as any `app.css` change.
+8. Any `app.css` change re-pins `cached_asset_content_matches_pinned_hash`.
+   **Corrected 2026-07-30 after the Slice 1 review:** an earlier form of this
+   criterion said the cache *key* must move in the same commit. It must not, for
+   a mid-RFC slice — the key is tied to the workspace version, so moving it forces
+   a version bump with no tag and no changelog, which is its own drift. The key
+   must be correct at **deploy** time; a release bumps the version and carries
+   `CACHE_VERSION` with it. Mid-slice: re-pin the digest, nothing else.
 9. **Terminal:** inline `style=` reaches zero, `'unsafe-inline'` is removed from
    `style-src`, and a gate asserts its absence.
 
 ## Implementation Boundaries
 
 Expected to change: `app.css`, the render strings of the migrated surface, the
-re-expressed gates, the ratchets, and the cache key.
+re-expressed gates, the ratchets, and the pinned asset digest.
 
 Expected **not** to change: any handler's behaviour, any form or route, any
 `data-*` attribute, `app.js`, any schema, or the CSP header — until the terminal

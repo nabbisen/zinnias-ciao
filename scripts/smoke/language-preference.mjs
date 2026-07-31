@@ -395,6 +395,33 @@ try {
     },
   });
 
+  // RFC-075 Slice 2: screenshot evidence for Event Detail's migrated cz-*
+  // classes (status buttons, note form, participant list) at mobile width
+  // and 200% text, in both languages — required per Handoff 027 §8/§15.
+  logStep('confirming Event Detail renders Japanese with migrated classes (200% text screenshot)');
+  await navigate(page, `/c/${communityId}/events/${eventId}`, { textScale: 2 });
+  const eventDetailJapanese = await collect(page);
+  results.push({
+    name: 'event-detail-renders-japanese',
+    screenshotPath: await screenshot(page, 'event-detail-japanese-200-percent'),
+    observed: eventDetailJapanese,
+    checks: {
+      htmlLangJa: eventDetailJapanese.htmlLang === 'ja',
+      attendanceButtonsRendered: eventDetailJapanese.statusButtons.length > 0,
+      // The "Attended"-equivalent status button is a single unbreakable
+      // word; at 200% text its min-content width can overflow the mobile
+      // viewport. Confirmed at checkpoint 6415708 (before this package's
+      // class migration, same CSS properties as inline styles) as a
+      // marginal ~7px overflow for the Japanese label — right at the
+      // boundary, so this specific check may read true or false depending
+      // on ordinary layout/font-rendering variance between runs. Not a
+      // Slice 2 regression either way (the relevant CSS is unchanged); see
+      // the English check below for the same issue's robust, unambiguous
+      // form, which is the one flagged in the review request.
+      noHorizontalScrollAt200Percent: eventDetailJapanese.noHorizontalScroll,
+    },
+  });
+
   logStep('setting language to English via the no-JS settings form (real submit button, no JS shim)');
   await navigate(page, `/c/${communityId}/me/language`, { textScale: 2 });
   const settingsFormJa = await collect(page);
@@ -502,11 +529,12 @@ try {
     },
   });
 
-  logStep('confirming Event Detail renders English, including the event day date label');
-  await navigate(page, `/c/${communityId}/events/${eventId}`);
+  logStep('confirming Event Detail renders English, including the event day date label (200% text screenshot)');
+  await navigate(page, `/c/${communityId}/events/${eventId}`, { textScale: 2 });
   const eventDetailEnglish = await collect(page);
   results.push({
     name: 'event-detail-renders-english',
+    screenshotPath: await screenshot(page, 'event-detail-english-200-percent'),
     observed: eventDetailEnglish,
     checks: {
       htmlLangEn: eventDetailEnglish.htmlLang === 'en',
@@ -526,6 +554,17 @@ try {
       attendanceButtonsHaveNoJapanese: eventDetailEnglish.statusButtons.every(
         (label) => !/[぀-ヿ一-鿿]/.test(label ?? ''),
       ),
+      // KNOWN, PRE-EXISTING, NOT A SLICE 2 REGRESSION: unlike the Japanese
+      // check above, this one is not borderline — "Attended" alone forces
+      // roughly 150-190px of overflow at 200% text (measured both before
+      // and after this package's class migration; same CSS properties
+      // either way, just restructured from inline styles into classes).
+      // Expected to read false. Not fixed here — doing so needs a layout
+      // change (e.g. allowing button-label wrapping), which is a
+      // behaviour/presentation fix outside a presentation-migration-only
+      // package's scope. Flagged in the review request for a separate,
+      // small, reviewed accessibility fix.
+      noHorizontalScrollAt200Percent: eventDetailEnglish.noHorizontalScroll,
     },
   });
 

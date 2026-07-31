@@ -1,8 +1,4 @@
 use super::shell::escape_html;
-use super::status::{
-    CZ_BORDER, CZ_COLOR_DANGER, CZ_COLOR_TEXT_SECONDARY, CZ_STATUS_ATTENDED_FG,
-    CZ_STATUS_GOING_BORDER,
-};
 use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::i18n;
 
@@ -18,8 +14,7 @@ pub fn note_form(
     let flash_html = flash
         .map(|f| {
             format!(
-                "<p role=\"status\" style=\"font-size:.875rem;color:{};margin:.5rem 0\">{}</p>",
-                CZ_STATUS_ATTENDED_FG,
+                "<p role=\"status\" class=\"cz-note-flash\">{}</p>",
                 escape_html(f)
             )
         })
@@ -27,36 +22,30 @@ pub fn note_form(
 
     let delete_btn = if existing_note.is_some() {
         format!(
-            "<a href=\"/c/{cid}/events/{eid}/my-note/delete\" \
-             style=\"display:inline-block;font-size:.875rem;color:{danger};padding:.25rem;\
-             min-height:44px;line-height:44px;text-decoration:none\">{del}</a>",
+            "<a href=\"/c/{cid}/events/{eid}/my-note/delete\" class=\"cz-note-delete-link\">{del}</a>",
             del = i18n::t(locale, i18n::NOTE_DELETE),
             cid = escape_html(community_id),
             eid = escape_html(event_id),
-            danger = CZ_COLOR_DANGER,
         )
     } else {
         String::new()
     };
 
     format!(
-        "<section aria-label=\"{note_section_label}\" style=\"margin:1.5rem 0\">\
-         <h2 style=\"font-size:1.0625rem;font-weight:600;margin-bottom:.75rem\">{note_section_label}</h2>\
+        "<section aria-label=\"{note_section_label}\" class=\"cz-note-section\">\
+         <h2 class=\"cz-note-heading\">{note_section_label}</h2>\
          {flash}\
-         <p style=\"font-size:.75rem;color:{muted};margin-bottom:.5rem\" aria-live=\"polite\">\
+         <p class=\"cz-note-visibility\" aria-live=\"polite\">\
          {note_visibility}</p>\
          <form method=\"post\" action=\"/c/{cid}/events/{eid}/my-note\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            <textarea name=\"note\" rows=\"3\" maxlength=\"200\" \
-             style=\"width:100%;padding:.75rem;border:1px solid {border};\
-             border-radius:12px;font-size:1rem;resize:vertical;box-sizing:border-box\" \
+             class=\"cz-note-textarea\" \
              aria-label=\"{note_placeholder_label}\">{existing}</textarea>\
-           <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:.5rem\">\
-             <span class=\"note-counter\" style=\"font-size:.75rem;color:{muted}\" aria-live=\"polite\">{note_char_hint}</span>\
+           <div class=\"cz-note-footer\">\
+             <span class=\"note-counter cz-note-counter\" aria-live=\"polite\">{note_char_hint}</span>\
              <button type=\"submit\" \
-               style=\"padding:.625rem 1.25rem;background:{going_border};color:#FFFFFF;\
-               border:none;border-radius:14px;font-size:.9375rem;font-weight:600;\
-               min-height:44px;cursor:pointer\">{note_save}</button>\
+               class=\"cz-note-save-button\">{note_save}</button>\
            </div>\
          </form>\
          {delete}\
@@ -67,9 +56,6 @@ pub fn note_form(
         existing = escape_html(existing_note.unwrap_or("")),
         flash = flash_html,
         delete = delete_btn,
-        muted = CZ_COLOR_TEXT_SECONDARY,
-        border = CZ_BORDER,
-        going_border = CZ_STATUS_GOING_BORDER,
         note_section_label = i18n::t(locale, i18n::NOTE_SECTION_LABEL),
         note_placeholder_label = i18n::t(locale, i18n::NOTE_PLACEHOLDER_LABEL),
         note_char_hint = i18n::t(locale, i18n::NOTE_CHAR_HINT),
@@ -89,13 +75,11 @@ pub fn admin_note_hide_form(
     let label = i18n::t(locale, i18n::NOTE_DELETE);
     format!(
         "<a href=\"/c/{cid}/admin/events/{eid}/notes/{mid}/hide\" \
-         style=\"font-size:.75rem;color:{danger};padding:.25rem .375rem;\
-         min-height:44px;line-height:44px;display:inline-block;text-decoration:none\" \
+         class=\"cz-note-admin-hide-link\" \
          aria-label=\"{lbl}\">{lbl}</a>",
         cid = escape_html(community_id),
         eid = escape_html(event_id),
         mid = escape_html(target_membership_id),
-        danger = CZ_COLOR_DANGER,
         lbl = label,
     )
 }

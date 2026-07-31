@@ -124,8 +124,7 @@ pub async fn get_event_detail(
 
         let status_form = if occurrence_cancelled || event.status == "cancelled" {
             format!(
-                "<p role=\"status\" style=\"font-size:.875rem;color:#B42318;\
-                 background:#FFF0EF;border-radius:10px;padding:.625rem;margin:.5rem 0\">{}</p>",
+                "<p role=\"status\" class=\"cz-occurrence-cancelled-notice\">{}</p>",
                 i18n::t(locale, i18n::OCCURRENCE_CANCELLED_BADGE)
             )
         } else {
@@ -147,9 +146,7 @@ pub async fn get_event_detail(
         {
             format!(
                 "<a href=\"/c/{cid}/admin/events/{eid}/days/{did}/cancel\" \
-                     style=\"display:inline-flex;align-items:center;min-height:44px;\
-                     color:#B42318;text-decoration:none;font-size:.875rem;font-weight:600;\
-                     margin:.25rem 0 .5rem\">{label}</a>",
+                     class=\"cz-occurrence-cancel-link\">{label}</a>",
                 cid = render::escape_html(community_id),
                 eid = render::escape_html(event_id),
                 did = render::escape_html(&day.id),
@@ -161,7 +158,7 @@ pub async fn get_event_detail(
 
         let (cg, cng, cna) = (counts.going, counts.not_going, counts.no_answer);
         let counts_html = format!(
-            "<p style=\"font-size:.875rem;color:#6e6e73\">{gs} {cg} · {ns} {cng} · {nas} {cna}</p>",
+            "<p class=\"cz-event-counts\">{gs} {cg} · {ns} {cng} · {nas} {cna}</p>",
             gs = i18n::t(locale, i18n::STATUS_GOING),
             ns = i18n::t(locale, i18n::STATUS_NOT_GOING),
             nas = i18n::t(locale, i18n::STATUS_NO_ANSWER),
@@ -192,20 +189,20 @@ pub async fn get_event_detail(
         let plist = render::participant_list(locale, &participants);
 
         days_html.push_str(&format!(
-            "<div style=\"border:1px solid #e5e5ea;border-radius:16px;padding:1rem;margin-bottom:1rem\">\
-             <h3 style=\"font-size:.9375rem;font-weight:600;margin-bottom:.5rem\">{label}</h3>\
+            "<div class=\"cz-event-day-card\">\
+             <h3 class=\"cz-event-day-heading\">{label}</h3>\
              {status_form}{cancel_occurrence_action}{counts_html}\
-             <details style=\"margin-top:.75rem\">\
-               <summary style=\"font-size:.875rem;color:#007AFF;cursor:pointer\">{whos_going}</summary>\
-               <div style=\"margin-top:.5rem\">{plist}</div>\
+             <details class=\"cz-event-whos-going-details\">\
+               <summary class=\"cz-event-whos-going-summary\">{whos_going}</summary>\
+               <div class=\"cz-event-whos-going-body\">{plist}</div>\
              </details>\
              </div>",
-            label       = render::escape_html(&label),
+            label = render::escape_html(&label),
             status_form = status_form,
             cancel_occurrence_action = cancel_occurrence_action,
             counts_html = counts_html,
-            plist       = plist,
-            whos_going  = i18n::t(locale, i18n::EVENT_WHOS_GOING),
+            plist = plist,
+            whos_going = i18n::t(locale, i18n::EVENT_WHOS_GOING),
         ));
     }
 
@@ -241,12 +238,12 @@ pub async fn get_event_detail(
             String::new()
         };
         others_html.push_str(&format!(
-            "<div style=\"padding:.75rem 0;border-bottom:1px solid #f5f5f7\">\
-             <div style=\"display:flex;align-items:baseline;justify-content:space-between\">\
-               <span style=\"font-weight:600;font-size:.875rem\">{name}</span>\
+            "<div class=\"cz-event-other-note\">\
+             <div class=\"cz-event-other-note-header\">\
+               <span class=\"cz-event-other-note-name\">{name}</span>\
                {hide}\
              </div>\
-             <p style=\"margin:.25rem 0 0;font-size:.9375rem\">{note}</p>\
+             <p class=\"cz-event-other-note-text\">{note}</p>\
              </div>",
             name = render::escape_html(name),
             note = render::escape_html(&n.note),
@@ -255,8 +252,8 @@ pub async fn get_event_detail(
     }
     let notes_section = if !others_html.is_empty() {
         format!(
-            "<section style=\"margin-top:1.5rem\">\
-             <h2 style=\"font-size:1.0625rem;font-weight:600;margin-bottom:.5rem\">{notes_hd}</h2>\
+            "<section class=\"cz-event-notes-section\">\
+             <h2 class=\"cz-event-notes-heading\">{notes_hd}</h2>\
              {others_html}</section>",
             notes_hd = i18n::t(locale, i18n::EVENT_NOTES_SECTION),
         )
@@ -282,13 +279,13 @@ pub async fn get_event_detail(
         .collect();
     let nav = render::bottom_nav_localized(community_id, "home", locale);
     let back = format!(
-        "<a href=\"/c/{}/home\" style=\"color:#007AFF;font-size:.9375rem\">\u{2190} {home}</a>",
+        "<a href=\"/c/{}/home\" class=\"cz-event-back-link\">\u{2190} {home}</a>",
         render::escape_html(community_id),
         home = i18n::t(locale, i18n::NAV_HOME),
     );
     let cancelled_banner = if event.status == "cancelled" {
         &format!(
-            "<div style=\"background:#FF3B3022;color:#FF3B30;padding:.75rem;border-radius:12px;margin-bottom:1rem\">{}</div>",
+            "<div class=\"cz-event-cancelled-banner\">{}</div>",
             i18n::t(locale, i18n::EVENT_CANCELLED_BADGE)
         )
     } else {
@@ -296,12 +293,9 @@ pub async fn get_event_detail(
     };
     let recreate_action = if membership.is_admin() && event.status == "cancelled" {
         format!(
-            "<div style=\"margin:0 0 1rem\">\
+            "<div class=\"cz-event-action-row\">\
                <a href=\"/c/{cid}/admin/events/{eid}/recreate\" \
-                  style=\"display:block;box-sizing:border-box;width:100%;padding:.875rem;\
-                  border:2px solid #007AFF;border-radius:14px;text-align:center;\
-                  text-decoration:none;color:#007AFF;font-weight:600;min-height:44px;\
-                  overflow-wrap:anywhere\">{label}</a>\
+                  class=\"cz-event-action-link cz-event-action-link--primary\">{label}</a>\
              </div>",
             cid = render::escape_html(community_id),
             eid = render::escape_html(event_id),
@@ -312,12 +306,9 @@ pub async fn get_event_detail(
     };
     let copy_action = if membership.is_admin() {
         format!(
-            "<div style=\"margin:0 0 1rem\">\
+            "<div class=\"cz-event-action-row\">\
                <a href=\"/c/{cid}/admin/events/{eid}/copy\" \
-                  style=\"display:block;box-sizing:border-box;width:100%;padding:.875rem;\
-                  border:1px solid #007AFF;border-radius:14px;text-align:center;\
-                  text-decoration:none;color:#007AFF;font-weight:600;min-height:44px;\
-                  overflow-wrap:anywhere\">{label}</a>\
+                  class=\"cz-event-action-link cz-event-action-link--secondary\">{label}</a>\
              </div>",
             cid = render::escape_html(community_id),
             eid = render::escape_html(event_id),
@@ -329,10 +320,10 @@ pub async fn get_event_detail(
 
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
+         <main class=\"cz-page-main\">\
            {back}\
            {err_banner}\
-           <h1 style=\"font-size:1.25rem;font-weight:600;margin:1rem 0 .25rem\">{title}</h1>\
+           <h1 class=\"cz-event-title-heading\">{title}</h1>\
            {loc}{desc}\
            {cancelled}\
            {recreate_action}\
@@ -349,8 +340,7 @@ pub async fn get_event_detail(
         ),
         err_banner = err
             .map(|e| format!(
-                "<p role=\"alert\" style=\"background:#FFF0EF;color:#B42318;padding:.75rem;\
-             border-radius:12px;font-size:.9375rem;margin:.5rem 0\">{}</p>",
+                "<p role=\"alert\" class=\"cz-event-error-banner\">{}</p>",
                 render::escape_html(e)
             ))
             .unwrap_or_default(),
@@ -359,7 +349,7 @@ pub async fn get_event_detail(
             .location
             .as_deref()
             .map(|l| format!(
-                "<p style=\"color:#6e6e73;font-size:.875rem\">\u{1F4CD} {}</p>",
+                "<p class=\"cz-event-location\">\u{1F4CD} {}</p>",
                 render::escape_html(l)
             ))
             .unwrap_or_default(),
@@ -367,7 +357,7 @@ pub async fn get_event_detail(
             .description
             .as_deref()
             .map(|d| format!(
-                "<p style=\"font-size:.9375rem;margin:.5rem 0\">{}</p>",
+                "<p class=\"cz-event-description\">{}</p>",
                 render::escape_html(d)
             ))
             .unwrap_or_default(),
@@ -571,19 +561,16 @@ pub async fn get_delete_note_confirm(
 
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-           <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">{nd}</h1>\
-           <p style=\"font-size:.9375rem;color:#6E6E73;margin-bottom:1.5rem\">{body_text}</p>\
-           <div style=\"display:flex;gap:.75rem\">\
+         <main class=\"cz-page-main\">\
+           <h1 class=\"cz-confirm-title\">{nd}</h1>\
+           <p class=\"cz-confirm-body\">{body_text}</p>\
+           <div class=\"cz-confirm-actions\">\
              <a href=\"/c/{cid}/events/{eid}\" \
-                style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
-                text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600;min-height:44px;\
-                display:flex;align-items:center;justify-content:center\">{keep}</a>\
-             <form method=\"post\" action=\"/c/{cid}/events/{eid}/my-note/delete\" style=\"flex:1\">\
+                class=\"cz-confirm-keep-link\">{keep}</a>\
+             <form method=\"post\" action=\"/c/{cid}/events/{eid}/my-note/delete\" class=\"cz-confirm-delete-form\">\
                <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
                <button type=\"submit\" \
-                 style=\"width:100%;padding:.875rem;background:#FF3B30;color:#fff;\
-                 border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
+                 class=\"cz-confirm-delete-button\">\
                  {nd}</button>\
              </form>\
            </div>\

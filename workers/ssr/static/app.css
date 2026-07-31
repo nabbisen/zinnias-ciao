@@ -79,6 +79,29 @@
   --cz-space-page-bottom: 5rem;
   --cz-shadow-card: 0 1px 2px rgba(0, 0, 0, .04);
 
+  /* RFC-075 Slice 2: more exact pre-existing values, same rationale as
+   * above — Event Detail and the shared render helpers use spacing steps
+   * Slice 1 never needed. Named as fractional steps of the base scale
+   * (space-1=4px .. space-6=32px), matching --cz-space-3-5's convention. */
+  --cz-space-1-5: .375rem;  /* 6px */
+  --cz-space-2-5: .625rem;  /* 10px */
+  --cz-space-4-5: 1.25rem;  /* 20px */
+  --cz-radius-notice: 10px; /* rounded notice/banner boxes outside Calendar */
+
+  /* RFC-075 Slice 2: status colour-as-class ring tints (participant avatar
+   * badges) — the original inline value was computed at render time as the
+   * status fg hex with a fixed appended alpha (e.g. "#005BBB22"), which is
+   * not the same colour as the existing solid -bg tokens above. */
+  --cz-status-going-ring-bg: #005BBB22;
+  --cz-status-not-going-ring-bg: #B4231822;
+  --cz-status-attended-ring-bg: #167A3422;
+  --cz-status-no-answer-ring-bg: #6E6E7322;
+
+  /* RFC-075 Slice 2: whole-event cancelled banner tint — distinct from the
+   * per-occurrence cancelled notice, which reuses the not-going status
+   * triplet's solid -bg (a different, opaque colour). */
+  --cz-color-danger-tint-bg: #FF3B3022;
+
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 16px;
   color: var(--cz-color-text-primary);
@@ -454,6 +477,429 @@ button, a, [role="button"] { min-height: var(--cz-touch-min); }
 .cz-export-status {
   font-size: .8125rem;
   color: var(--cz-color-text-secondary);
+}
+
+/* ── Status colour-as-class (RFC-075 Slice 2) ──────────────────────────────
+ * going/not_going/attended/no_answer is a closed four-value set, not
+ * open-ended computed data, so it is expressed as classes rather than the
+ * inline colour triplets `status_triplet` used to return. */
+.cz-status-text--going { color: var(--cz-status-going-fg); }
+.cz-status-text--not-going { color: var(--cz-status-not-going-fg); }
+.cz-status-text--attended { color: var(--cz-status-attended-fg); }
+.cz-status-text--no-answer { color: var(--cz-status-no-answer-fg); }
+
+.cz-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cz-space-1);
+  font-size: .8125rem;
+  font-weight: 600;
+}
+
+.cz-status-form {
+  margin: var(--cz-space-4) 0;
+}
+.cz-status-form-buttons {
+  display: flex;
+  gap: var(--cz-space-2);
+}
+.cz-status-btn {
+  flex: 1;
+  padding: var(--cz-space-3) var(--cz-space-2);
+  border-width: 2px;
+  border-style: solid;
+  border-radius: var(--cz-radius-button);
+  background: var(--cz-color-surface);
+  font-size: .875rem;
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cz-space-1);
+}
+.cz-status-btn--going { border-color: var(--cz-status-going-border); color: var(--cz-status-going-fg); }
+.cz-status-btn--not-going { border-color: var(--cz-status-not-going-border); color: var(--cz-status-not-going-fg); }
+.cz-status-btn--attended { border-color: var(--cz-status-attended-border); color: var(--cz-status-attended-fg); }
+.cz-status-btn--going.cz-status-btn--current { background: var(--cz-status-going-bg); }
+.cz-status-btn--not-going.cz-status-btn--current { background: var(--cz-status-not-going-bg); }
+.cz-status-btn--attended.cz-status-btn--current { background: var(--cz-status-attended-bg); }
+.cz-status-clear-btn {
+  font-size: .75rem;
+  color: var(--cz-color-text-secondary);
+  background: none;
+  border: none;
+  padding: var(--cz-space-1);
+  cursor: pointer;
+}
+
+/* Note form (Event Detail, RFC-007) */
+.cz-note-section {
+  margin: var(--cz-space-5) 0;
+}
+.cz-note-heading {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin-bottom: var(--cz-space-3);
+}
+.cz-note-visibility {
+  font-size: .75rem;
+  color: var(--cz-color-text-secondary);
+  margin-bottom: var(--cz-space-2);
+}
+.cz-note-textarea {
+  width: 100%;
+  padding: var(--cz-space-3);
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-input);
+  font-size: 1rem;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.cz-note-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--cz-space-2);
+}
+.cz-note-counter {
+  font-size: .75rem;
+  color: var(--cz-color-text-secondary);
+}
+.cz-note-save-button {
+  padding: var(--cz-space-2-5) var(--cz-space-4-5);
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-button);
+  font-size: .9375rem;
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+}
+.cz-note-flash {
+  font-size: .875rem;
+  color: var(--cz-status-attended-fg);
+  margin: var(--cz-space-2) 0;
+}
+.cz-note-delete-link {
+  display: inline-block;
+  font-size: .875rem;
+  color: var(--cz-color-danger);
+  padding: var(--cz-space-1);
+  min-height: var(--cz-touch-min);
+  line-height: var(--cz-touch-min);
+  text-decoration: none;
+}
+.cz-note-admin-hide-link {
+  font-size: .75rem;
+  color: var(--cz-color-danger);
+  padding: var(--cz-space-1) var(--cz-space-1-5);
+  min-height: var(--cz-touch-min);
+  line-height: var(--cz-touch-min);
+  display: inline-block;
+  text-decoration: none;
+}
+
+/* Participants list (Event Detail) */
+.cz-participant-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.cz-participant-empty {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+}
+.cz-participant-row {
+  display: flex;
+  align-items: center;
+  gap: var(--cz-space-3);
+  padding: var(--cz-space-2) 0;
+  border-bottom: 1px solid var(--cz-color-surface);
+}
+.cz-participant-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.cz-participant-avatar--going { background: var(--cz-status-going-ring-bg); color: var(--cz-status-going-fg); }
+.cz-participant-avatar--not-going { background: var(--cz-status-not-going-ring-bg); color: var(--cz-status-not-going-fg); }
+.cz-participant-avatar--attended { background: var(--cz-status-attended-ring-bg); color: var(--cz-status-attended-fg); }
+.cz-participant-avatar--no-answer { background: var(--cz-status-no-answer-ring-bg); color: var(--cz-status-no-answer-fg); }
+.cz-participant-name {
+  flex: 1;
+  font-size: .9375rem;
+}
+.cz-participant-status {
+  font-size: .8125rem;
+}
+
+/* Event Detail (RFC-005/006) */
+.cz-occurrence-cancelled-notice {
+  font-size: .875rem;
+  color: var(--cz-status-not-going-fg);
+  background: var(--cz-status-not-going-bg);
+  border-radius: var(--cz-radius-notice);
+  padding: var(--cz-space-2-5);
+  margin: var(--cz-space-2) 0;
+}
+.cz-occurrence-cancel-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--cz-touch-min);
+  color: var(--cz-status-not-going-fg);
+  text-decoration: none;
+  font-size: .875rem;
+  font-weight: 600;
+  margin: var(--cz-space-1) 0 var(--cz-space-2);
+}
+.cz-event-counts {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+}
+.cz-event-day-card {
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-card);
+  padding: var(--cz-space-4);
+  margin-bottom: var(--cz-space-4);
+}
+.cz-event-day-heading {
+  font-size: .9375rem;
+  font-weight: 600;
+  margin-bottom: var(--cz-space-2);
+}
+.cz-event-whos-going-details {
+  margin-top: var(--cz-space-3);
+}
+.cz-event-whos-going-summary {
+  font-size: .875rem;
+  color: var(--cz-color-focus);
+  cursor: pointer;
+}
+.cz-event-whos-going-body {
+  margin-top: var(--cz-space-2);
+}
+.cz-event-other-note {
+  padding: var(--cz-space-3) 0;
+  border-bottom: 1px solid var(--cz-color-surface);
+}
+.cz-event-other-note-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.cz-event-other-note-name {
+  font-weight: 600;
+  font-size: .875rem;
+}
+.cz-event-other-note-text {
+  margin: var(--cz-space-1) 0 0;
+  font-size: .9375rem;
+}
+.cz-event-notes-section {
+  margin-top: var(--cz-space-5);
+}
+.cz-event-notes-heading {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin-bottom: var(--cz-space-2);
+}
+.cz-event-back-link {
+  color: var(--cz-color-focus);
+  font-size: .9375rem;
+}
+.cz-event-cancelled-banner {
+  background: var(--cz-color-danger-tint-bg);
+  color: var(--cz-color-danger);
+  padding: var(--cz-space-3);
+  border-radius: var(--cz-radius-input);
+  margin-bottom: var(--cz-space-4);
+}
+.cz-event-action-row {
+  margin: 0 0 var(--cz-space-4);
+}
+.cz-event-action-link {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--cz-space-3-5);
+  border-radius: var(--cz-radius-button);
+  text-align: center;
+  text-decoration: none;
+  color: var(--cz-color-focus);
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  overflow-wrap: anywhere;
+}
+.cz-event-action-link--primary {
+  border: 2px solid var(--cz-color-focus);
+}
+.cz-event-action-link--secondary {
+  border: 1px solid var(--cz-color-focus);
+}
+.cz-event-title-heading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: var(--cz-space-4) 0 var(--cz-space-1);
+}
+.cz-event-error-banner {
+  background: var(--cz-status-not-going-bg);
+  color: var(--cz-status-not-going-fg);
+  padding: var(--cz-space-3);
+  border-radius: var(--cz-radius-input);
+  font-size: .9375rem;
+  margin: var(--cz-space-2) 0;
+}
+.cz-event-location {
+  color: var(--cz-color-text-secondary);
+  font-size: .875rem;
+}
+.cz-event-description {
+  font-size: .9375rem;
+  margin: var(--cz-space-2) 0;
+}
+
+/* Note-delete confirmation page (RFC-043) */
+.cz-confirm-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: var(--cz-space-4);
+}
+.cz-confirm-body {
+  font-size: .9375rem;
+  color: var(--cz-color-text-secondary);
+  margin-bottom: var(--cz-space-5);
+}
+.cz-confirm-actions {
+  display: flex;
+  gap: var(--cz-space-3);
+}
+.cz-confirm-keep-link {
+  flex: 1;
+  padding: var(--cz-space-3-5);
+  border: 2px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-button);
+  text-align: center;
+  text-decoration: none;
+  color: var(--cz-color-text-primary);
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cz-confirm-delete-form {
+  flex: 1;
+}
+.cz-confirm-delete-button {
+  width: 100%;
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-danger);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-button);
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+}
+
+/* Bottom nav + headers (RFC-075 Slice 2 — every page renders these) */
+.cz-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: var(--cz-color-bg);
+  border-top: 1px solid var(--cz-color-surface-strong);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.cz-bottom-nav-tab {
+  flex: 1;
+  text-align: center;
+  padding: var(--cz-space-3) 0;
+  text-decoration: none;
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+}
+.cz-bottom-nav-tab--active {
+  color: var(--cz-color-focus);
+  font-weight: 600;
+}
+.cz-header {
+  position: sticky;
+  top: 0;
+  background: var(--cz-color-bg);
+  border-bottom: 1px solid var(--cz-color-surface-strong);
+  padding: var(--cz-space-3-5) var(--cz-space-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+}
+.cz-header-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.cz-header-community {
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+}
+.cz-header-switcher {
+  position: sticky;
+  top: 0;
+  background: var(--cz-color-bg);
+  border-bottom: 1px solid var(--cz-color-surface-strong);
+  padding: var(--cz-space-3-5) var(--cz-space-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--cz-space-2);
+  flex-wrap: wrap;
+  z-index: 10;
+}
+.cz-header-switcher-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  flex: 1 1 12rem;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.cz-header-switcher-form {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+.cz-header-switcher-select {
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--cz-color-surface-strong);
+  padding: var(--cz-space-hairline) var(--cz-space-1);
+  max-width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.cz-header-switcher-button {
+  font-size: .8125rem;
+  margin-left: var(--cz-space-1);
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+  background: var(--cz-color-surface);
+  color: var(--cz-color-text-primary);
+  border: 1px solid var(--cz-color-border-subtle);
+  border-radius: var(--cz-radius-control);
+  padding: var(--cz-space-1) var(--cz-space-2);
 }
 
 /* Reduced motion — disable all non-essential animation (RFC-011 §5) */

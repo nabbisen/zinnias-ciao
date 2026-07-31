@@ -11,7 +11,7 @@ pub struct ParticipantEntry<'a> {
 pub fn participant_list(locale: Locale, participants: &[ParticipantEntry<'_>]) -> String {
     if participants.is_empty() {
         return format!(
-            "<p style=\"color:#6E6E73;font-size:.875rem\">{}</p>",
+            "<p class=\"cz-participant-empty\">{}</p>",
             i18n::t(locale, i18n::EVENT_MEMBER_FALLBACK)
         );
     }
@@ -19,22 +19,19 @@ pub fn participant_list(locale: Locale, participants: &[ParticipantEntry<'_>]) -
         .iter()
         .map(|p| {
             let initials = initials(p.display_name);
-            let (color, icon, label) = status_display(locale, p.status);
+            let (class, icon, label) = status_display(locale, p.status);
             format!(
-                "<li style=\"display:flex;align-items:center;gap:.75rem;padding:.5rem 0;\
-             border-bottom:1px solid #F5F5F7\">\
-             <span style=\"width:2rem;height:2rem;border-radius:50%;background:{color}22;\
-             color:{color};display:flex;align-items:center;justify-content:center;\
-             font-size:.75rem;font-weight:700;flex-shrink:0\">{initials}</span>\
-             <span style=\"flex:1;font-size:.9375rem\">{name}</span>\
-             <span style=\"font-size:.8125rem;color:{color}\">{icon} {label}</span>\
+                "<li class=\"cz-participant-row\">\
+             <span class=\"cz-participant-avatar cz-participant-avatar--{class}\">{initials}</span>\
+             <span class=\"cz-participant-name\">{name}</span>\
+             <span class=\"cz-participant-status cz-status-text--{class}\">{icon} {label}</span>\
              </li>",
                 initials = escape_html(&initials),
                 name = escape_html(p.display_name),
             )
         })
         .collect();
-    format!("<ul style=\"list-style:none;padding:0;margin:0\">{rows}</ul>")
+    format!("<ul class=\"cz-participant-list\">{rows}</ul>")
 }
 
 pub(super) fn initials(name: &str) -> String {
