@@ -918,6 +918,284 @@ button, a, [role="button"] { min-height: var(--cz-touch-min); }
   padding: var(--cz-space-1) var(--cz-space-2);
 }
 
+/* My Page + display-name/language sub-pages (RFC-075 Slice 3) */
+.cz-me-flash {
+  font-size: .875rem;
+  color: var(--cz-status-attended-fg);
+  margin: var(--cz-space-2) 0 var(--cz-space-4);
+}
+.cz-me-section--mb {
+  margin-bottom: var(--cz-space-5);
+}
+.cz-me-section--mt {
+  margin-top: var(--cz-space-5);
+}
+.cz-me-section-heading {
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--cz-color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: var(--cz-space-2);
+}
+.cz-me-value-line {
+  font-size: 1rem;
+  margin: 0;
+}
+.cz-me-link {
+  font-size: .9375rem;
+  color: var(--cz-color-focus);
+  min-height: var(--cz-touch-min);
+  line-height: var(--cz-touch-min);
+}
+.cz-me-link--inline {
+  display: inline-block;
+  margin-top: var(--cz-space-2);
+  text-decoration: none;
+}
+.cz-me-link--block {
+  display: block;
+  text-decoration: none;
+}
+.cz-me-link--padded {
+  display: block;
+  padding: var(--cz-space-1-5) 0;
+}
+.cz-me-about-line {
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+  margin: 0;
+}
+.cz-me-about-line--gap-top {
+  margin: var(--cz-space-1) 0 0;
+}
+.cz-me-logout-form {
+  margin-top: var(--cz-space-6);
+}
+.cz-me-logout-button {
+  width: 100%;
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-bg);
+  color: var(--cz-color-danger);
+  border: 2px solid var(--cz-color-danger);
+  border-radius: var(--cz-radius-button);
+  font-size: 1rem;
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+}
+.cz-home-hint--gap-top {
+  margin: var(--cz-space-2) 0 0;
+}
+/* display-name / language forms — small centered forms, RFC-075 §7.1: these
+ * share cz-page-main's padding but add a max-width, so both classes are
+ * applied together rather than duplicating the padding in a new class. */
+.cz-me-form-main {
+  max-width: 560px;
+  margin: 0 auto;
+}
+.cz-me-form-error {
+  color: var(--cz-color-danger);
+  margin: var(--cz-space-3) 0 0;
+}
+.cz-me-form {
+  margin-top: var(--cz-space-4);
+}
+.cz-me-form-label {
+  display: block;
+  font-size: .875rem;
+  font-weight: 600;
+  margin-bottom: var(--cz-space-1-5);
+}
+.cz-me-form-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 1rem;
+  padding: var(--cz-space-3);
+  border: 1px solid var(--cz-color-border-subtle);
+  border-radius: var(--cz-radius-control);
+  min-height: var(--cz-touch-min);
+}
+.cz-me-form-submit {
+  width: 100%;
+  margin-top: var(--cz-space-4-5);
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-control);
+  font-size: 1rem;
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+}
+.cz-me-form-cancel-link {
+  display: inline-block;
+  margin-top: var(--cz-space-3);
+  color: var(--cz-color-focus);
+  min-height: var(--cz-touch-min);
+  line-height: var(--cz-touch-min);
+  text-decoration: none;
+}
+.cz-me-fieldset {
+  border: 1px solid var(--cz-color-border-subtle);
+  border-radius: var(--cz-radius-control);
+  padding: var(--cz-space-3) var(--cz-space-4);
+}
+.cz-me-legend {
+  font-size: .875rem;
+  font-weight: 600;
+  padding: 0 var(--cz-space-1);
+}
+.cz-me-radio-label {
+  display: block;
+  min-height: var(--cz-touch-min);
+  line-height: var(--cz-touch-min);
+}
+
+/* Home (RFC-075 Slice 3) */
+.cz-home-first-run-card {
+  background: var(--cz-color-surface);
+  border-radius: var(--cz-radius-card);
+  padding: var(--cz-space-4-5);
+  margin-bottom: var(--cz-space-5);
+}
+.cz-home-first-run-intro {
+  font-size: .9375rem;
+  color: var(--cz-color-text-secondary);
+  margin: 0 0 var(--cz-space-4);
+}
+.cz-home-first-run-actions {
+  display: flex;
+  gap: var(--cz-space-3);
+  flex-direction: column;
+}
+.cz-home-first-run-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cz-space-3-5);
+  border-radius: var(--cz-radius-button);
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  min-height: var(--cz-touch-min);
+}
+.cz-home-first-run-link--primary {
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+}
+.cz-home-first-run-link--secondary {
+  background: var(--cz-color-bg);
+  color: var(--cz-color-focus);
+  border: 2px solid var(--cz-color-focus);
+}
+.cz-home-empty-member {
+  color: var(--cz-color-text-secondary);
+  padding: var(--cz-space-6) 0;
+}
+.cz-home-shortcuts-row {
+  display: flex;
+  gap: var(--cz-space-3);
+  margin-bottom: var(--cz-space-4-5);
+}
+.cz-home-shortcut-link {
+  flex: 1;
+  padding: var(--cz-space-3);
+  border-radius: var(--cz-radius-button);
+  font-size: .9375rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  min-height: var(--cz-touch-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cz-home-shortcut-link--primary {
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+}
+.cz-home-shortcut-link--secondary {
+  background: var(--cz-color-surface);
+  color: var(--cz-color-text-primary);
+}
+.cz-home-event-location {
+  color: var(--cz-color-text-secondary);
+}
+.cz-home-community-section {
+  margin: 0 0 var(--cz-space-5);
+}
+
+/* ICS calendar-feed settings page (RFC-023) — /c/:cid/me/calendar. Not
+ * `communities/calendar.rs` (the Calendar page, migrated in Slice 1). This
+ * page is intentionally still Japanese-only (outside RFC-072 scope); no
+ * locale change accompanies this styling migration. */
+.cz-calendar-feed-card {
+  background: var(--cz-color-surface);
+  border-radius: var(--cz-radius-input);
+  padding: var(--cz-space-4);
+  margin: var(--cz-space-4) 0;
+}
+.cz-calendar-feed-note {
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+  margin: 0 0 var(--cz-space-2);
+}
+.cz-calendar-feed-url {
+  font-size: .75rem;
+  font-family: monospace;
+  word-break: break-all;
+  background: var(--cz-color-bg);
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-control);
+  padding: var(--cz-space-2);
+  margin: var(--cz-space-2) 0;
+}
+.cz-calendar-feed-form--inline {
+  display: inline;
+}
+.cz-calendar-feed-form--inline-gap {
+  margin-right: var(--cz-space-2);
+}
+.cz-calendar-feed-action {
+  font-size: .875rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--cz-space-1) 0;
+  min-height: var(--cz-touch-min);
+}
+.cz-calendar-feed-action--danger {
+  color: var(--cz-color-danger);
+}
+.cz-calendar-feed-action--neutral {
+  color: var(--cz-color-focus);
+}
+.cz-calendar-feed-description {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  margin: var(--cz-space-4) 0;
+}
+.cz-calendar-feed-generate-button {
+  width: 100%;
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-button);
+  font-size: 1rem;
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+}
+.cz-calendar-feed-page-desc {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  margin-bottom: var(--cz-space-4);
+}
+
 /* Reduced motion — disable all non-essential animation (RFC-011 §5) */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

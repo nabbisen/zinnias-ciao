@@ -61,7 +61,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
             );
             let invite_hint = if is_first_run {
                 format!(
-                    "<p style=\"font-size:.875rem;color:#6e6e73;margin:.5rem 0 0\">\
+                    "<p class=\"cz-hint cz-home-hint--gap-top\">\
                      {}</p>",
                     i18n::t(locale, i18n::HOME_FIRST_RUN_INVITE_HINT)
                 )
@@ -69,21 +69,14 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
                 String::new()
             };
             let card = format!(
-                "<div style=\"background:#F5F5F7;border-radius:16px;padding:1.25rem;\
-             margin-bottom:1.5rem\">\
-             <p style=\"font-size:.9375rem;color:#6e6e73;margin:0 0 1rem\">{intro}</p>\
-             <div style=\"display:flex;gap:.75rem;flex-direction:column\">\
+                "<div class=\"cz-home-first-run-card\">\
+             <p class=\"cz-home-first-run-intro\">{intro}</p>\
+             <div class=\"cz-home-first-run-actions\">\
                <a href=\"/c/{cid}/admin/events/new\" \
-                  style=\"display:flex;align-items:center;justify-content:center;\
-                  padding:.875rem;background:#007AFF;color:#fff;\
-                  border-radius:14px;font-size:1rem;font-weight:600;\
-                  text-align:center;text-decoration:none;min-height:44px\">\
+                  class=\"cz-home-first-run-link cz-home-first-run-link--primary\">\
                   {create_label}</a>\
                <a href=\"/c/{cid}/admin/members\" \
-                  style=\"display:flex;align-items:center;justify-content:center;\
-                  padding:.875rem;background:#fff;color:#007AFF;\
-                  border:2px solid #007AFF;border-radius:14px;font-size:1rem;font-weight:600;\
-                  text-align:center;text-decoration:none;min-height:44px\">\
+                  class=\"cz-home-first-run-link cz-home-first-run-link--secondary\">\
                   {invite_label}</a>\
              </div>\
              {hint}\
@@ -98,7 +91,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
         } else if rows.is_empty() {
             // Member empty state
             let msg = format!(
-                "<p style=\"color:#6e6e73;padding:2rem 0\">{}</p>",
+                "<p class=\"cz-home-empty-member\">{}</p>",
                 i18n::t(locale, i18n::EMPTY_EVENTS_HINT)
             );
             (msg, String::new())
@@ -106,18 +99,12 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
             // Events exist: show persistent admin shortcuts
             let shortcuts = if membership.is_admin() {
                 format!(
-                    "<div style=\"display:flex;gap:.75rem;margin-bottom:1.25rem\">\
+                    "<div class=\"cz-home-shortcuts-row\">\
                    <a href=\"/c/{cid}/admin/events/new\" \
-                      style=\"flex:1;padding:.75rem;background:#007AFF;color:#fff;\
-                      border-radius:14px;font-size:.9375rem;font-weight:600;\
-                      text-align:center;text-decoration:none;min-height:44px;\
-                      display:flex;align-items:center;justify-content:center\">\
+                      class=\"cz-home-shortcut-link cz-home-shortcut-link--primary\">\
                       {create_label}</a>\
                    <a href=\"/c/{cid}/admin/members\" \
-                      style=\"flex:1;padding:.75rem;background:#F5F5F7;color:#1D1D1F;\
-                      border-radius:14px;font-size:.9375rem;font-weight:600;\
-                      text-align:center;text-decoration:none;min-height:44px;\
-                      display:flex;align-items:center;justify-content:center\">\
+                      class=\"cz-home-shortcut-link cz-home-shortcut-link--secondary\">\
                       {invite_label}</a>\
                  </div>",
                     cid = render::escape_html(community_id),
@@ -135,7 +122,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
     let title = i18n::t(locale, i18n::NAV_HOME);
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
+         <main class=\"cz-page-main\">\
            {sections}{empty}\
            {shortcuts}\
          </main>\
@@ -172,38 +159,36 @@ fn render_home_communities(
                     &community.timezone,
                     locale,
                 );
-                let cancelled = if r.event_status == "cancelled" || r.occurrence_status == "cancelled" {
-                    format!(
-                        "<span style=\"font-size:.75rem;color:#B42318;margin-left:.35rem\">{}</span>",
-                        i18n::t(
-                            locale,
-                            if r.occurrence_status == "cancelled" {
-                                i18n::OCCURRENCE_CANCELLED_BADGE
-                            } else {
-                                i18n::EVENT_CANCELLED_BADGE
-                            }
+                let cancelled =
+                    if r.event_status == "cancelled" || r.occurrence_status == "cancelled" {
+                        format!(
+                            "<span class=\"cz-event-cancelled-badge\">{}</span>",
+                            i18n::t(
+                                locale,
+                                if r.occurrence_status == "cancelled" {
+                                    i18n::OCCURRENCE_CANCELLED_BADGE
+                                } else {
+                                    i18n::EVENT_CANCELLED_BADGE
+                                }
+                            )
                         )
-                    )
-                } else {
-                    String::new()
-                };
+                    } else {
+                        String::new()
+                    };
                 let location = r.event_location.as_deref().unwrap_or("");
                 let location_html = if location.is_empty() {
                     String::new()
                 } else {
                     format!(
-                        "<span style=\"color:#6e6e73\"> · {}</span>",
+                        "<span class=\"cz-home-event-location\"> · {}</span>",
                         render::escape_html(location)
                     )
                 };
                 format!(
-                    "<li style=\"border-top:1px solid #F5F5F7\">\
-                     <a href=\"/c/{cid}/events/{eid}\" style=\"display:block;\
-                     padding:.875rem 0;text-decoration:none;color:inherit\">\
-                     <span style=\"display:block;font-size:1rem;font-weight:600;\
-                     line-height:1.35\">{title}{cancelled}</span>\
-                     <span style=\"display:block;font-size:.8125rem;color:#6e6e73;\
-                     margin-top:.25rem\">{date}{location}</span>\
+                    "<li class=\"cz-event-list-item\">\
+                     <a href=\"/c/{cid}/events/{eid}\" class=\"cz-event-link\">\
+                     <span class=\"cz-event-title\">{title}{cancelled}</span>\
+                     <span class=\"cz-event-meta\">{date}{location}</span>\
                      </a></li>",
                     cid = render::escape_html(&community.community_id),
                     eid = render::escape_html(&r.event_id),
@@ -216,15 +201,15 @@ fn render_home_communities(
             .collect();
         let content = if items.is_empty() {
             format!(
-                "<p style=\"font-size:.875rem;color:#6e6e73;margin:.75rem 0 0\">{}</p>",
+                "<p class=\"cz-hint cz-hint--gap-top\">{}</p>",
                 i18n::t(locale, i18n::HOME_CALENDAR_EMPTY)
             )
         } else {
-            format!("<ul style=\"list-style:none;margin:.5rem 0 0;padding:0\">{items}</ul>")
+            format!("<ul class=\"cz-event-list\">{items}</ul>")
         };
         html.push_str(&format!(
-            "<section style=\"margin:0 0 1.5rem\">\
-             <h2 style=\"font-size:1.125rem;font-weight:700;margin:0\">{name}</h2>\
+            "<section class=\"cz-home-community-section\">\
+             <h2 class=\"cz-section-title\">{name}</h2>\
              {content}</section>",
             name = render::escape_html(&community.community_name),
             content = content

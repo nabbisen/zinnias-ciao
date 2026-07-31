@@ -67,7 +67,7 @@ pub async fn get_me_calendar(
     let flash_html = calendar_flash_message(flash_code.as_deref())
         .map(|message| {
             format!(
-                "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0\">{}</p>",
+                "<p role=\"status\" class=\"cz-note-flash\">{}</p>",
                 render::escape_html(message)
             )
         })
@@ -82,28 +82,24 @@ pub async fn get_me_calendar(
             hmac = render::escape_html(&hmac_hex(pp.as_str(), &tok.id)),
         );
         format!(
-            "<div style=\"background:#f5f5f7;border-radius:12px;padding:1rem;margin:1rem 0\">\
-             <p style=\"font-size:.8125rem;color:#6E6E73;margin:0 0 .5rem\">\
+            "<div class=\"cz-calendar-feed-card\">\
+             <p class=\"cz-calendar-feed-note\">\
                {privacy_note}\
              </p>\
-             <div style=\"font-size:.75rem;font-family:monospace;word-break:break-all;\
-               background:#fff;border:1px solid #E5E5EA;border-radius:8px;\
-               padding:.5rem;margin:.5rem 0\">{feed_url}</div>\
+             <div class=\"cz-calendar-feed-url\">{feed_url}</div>\
              <form method=\"post\" action=\"/c/{cid}/me/calendar/revoke\" \
-               style=\"display:inline;margin-right:.5rem\">\
+               class=\"cz-calendar-feed-form--inline cz-calendar-feed-form--inline-gap\">\
                <input type=\"hidden\" name=\"_token\" value=\"{rtok}\">\
                <button type=\"submit\" \
-                 style=\"font-size:.875rem;color:#FF3B30;background:none;border:none;\
-                 cursor:pointer;padding:.25rem 0;min-height:44px\">\
+                 class=\"cz-calendar-feed-action cz-calendar-feed-action--danger\">\
                  {disable}\
                </button>\
              </form>\
              <form method=\"post\" action=\"/c/{cid}/me/calendar/regenerate\" \
-               style=\"display:inline\">\
+               class=\"cz-calendar-feed-form--inline\">\
                <input type=\"hidden\" name=\"_token\" value=\"{gentok}\">\
                <button type=\"submit\" \
-                 style=\"font-size:.875rem;color:#007AFF;background:none;border:none;\
-                 cursor:pointer;padding:.25rem 0;min-height:44px\">\
+                 class=\"cz-calendar-feed-action cz-calendar-feed-action--neutral\">\
                  {regenerate}\
                </button>\
              </form>\
@@ -118,13 +114,11 @@ pub async fn get_me_calendar(
         )
     } else {
         format!(
-            "<p style=\"font-size:.875rem;color:#6E6E73;margin:1rem 0\">{desc}</p>\
+            "<p class=\"cz-calendar-feed-description\">{desc}</p>\
              <form method=\"post\" action=\"/c/{cid}/me/calendar/regenerate\">\
                <input type=\"hidden\" name=\"_token\" value=\"{gentok}\">\
                <button type=\"submit\" \
-                 style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
-                 border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-                 min-height:44px;cursor:pointer\">{cg}</button>\
+                 class=\"cz-calendar-feed-generate-button\">{cg}</button>\
              </form>",
             cid = render::escape_html(community_id),
             gentok = render::escape_html(&regen_token),
@@ -135,16 +129,16 @@ pub async fn get_me_calendar(
 
     let nav = render::bottom_nav(community_id, "me");
     let back = format!(
-        "<a href=\"/c/{}/me\" style=\"color:#007AFF;font-size:.9375rem\">\u{2190} {}</a>",
+        "<a href=\"/c/{}/me\" class=\"cz-event-back-link\">\u{2190} {}</a>",
         render::escape_html(community_id),
         i18n::JA_NAV_ME,
     );
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
+         <main class=\"cz-page-main\">\
          {back}\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin:1rem 0 .25rem\">{cal_title}</h1>\
-         <p style=\"font-size:.875rem;color:#6E6E73;margin-bottom:1rem\">\
+         <h1 class=\"cz-event-title-heading\">{cal_title}</h1>\
+         <p class=\"cz-calendar-feed-page-desc\">\
            {cal_desc}\
          </p>\
          {flash}\

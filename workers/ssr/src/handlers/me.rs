@@ -28,7 +28,7 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
     let flash_html = me_flash_message(locale, flash_code.as_deref())
         .map(|message| {
             format!(
-                "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0 1rem\">{}</p>",
+                "<p role=\"status\" class=\"cz-me-flash\">{}</p>",
                 render::escape_html(message)
             )
         })
@@ -69,7 +69,7 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
 
     let admin_tools_html: String = if membership.is_admin() {
         format!(
-            "<section style=\"margin-top:1.5rem\"><h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{admin_section}</h2><a href=\"/c/{cid}/admin/members\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{members_lbl}</a><a href=\"/c/{cid}/admin/export\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{export_lbl}</a></section>",
+            "<section class=\"cz-me-section--mt\"><h2 class=\"cz-me-section-heading\">{admin_section}</h2><a href=\"/c/{cid}/admin/members\" class=\"cz-me-link cz-me-link--padded\">{members_lbl}</a><a href=\"/c/{cid}/admin/export\" class=\"cz-me-link cz-me-link--padded\">{export_lbl}</a></section>",
             cid = render::escape_html(community_id),
             admin_section = i18n::t(locale, i18n::ME_SECTION_ADMIN),
             members_lbl = i18n::t(locale, i18n::ME_MANAGE_MEMBERS),
@@ -80,7 +80,7 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
     };
     let community_create_html = if can_create_community {
         format!(
-            "<a href=\"/communities/new\" style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;min-height:44px;line-height:44px\">{}</a>",
+            "<a href=\"/communities/new\" class=\"cz-me-link cz-me-link--padded\">{}</a>",
             i18n::t(locale, i18n::COMMUNITY_CREATE_LINK),
         )
     } else {
@@ -91,54 +91,44 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
     let title = i18n::t(locale, i18n::NAV_ME);
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-           <section style=\"margin-bottom:1.5rem\">\
-             <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{lbl_name}</h2>\
+         <main class=\"cz-page-main\">\
+           <section class=\"cz-me-section--mb\">\
+             <h2 class=\"cz-me-section-heading\">{lbl_name}</h2>\
              {flash_html}\
-             <p style=\"font-size:1rem;margin:0\">{name}</p>\
+             <p class=\"cz-me-value-line\">{name}</p>\
              <a href=\"/c/{cid}/me/display-name\" \
-               style=\"display:inline-block;font-size:.9375rem;color:#007AFF;\
-               margin-top:.5rem;min-height:44px;line-height:44px;text-decoration:none\">\
+               class=\"cz-me-link cz-me-link--inline\">\
                {change_name}</a>\
              <a href=\"/c/{cid}/me/language\" \
-               style=\"display:block;font-size:.9375rem;color:#007AFF;\
-               min-height:44px;line-height:44px;text-decoration:none\">\
+               class=\"cz-me-link cz-me-link--block\">\
                {change_language}</a>\
            </section>\
-           <section style=\"margin-bottom:1.5rem\">\
-             <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">\
+           <section class=\"cz-me-section--mb\">\
+             <h2 class=\"cz-me-section-heading\">\
              {lbl_community}</h2>\
-             <p style=\"font-size:1rem;margin:0\">{community} · {role}</p>\
+             <p class=\"cz-me-value-line\">{community} · {role}</p>\
              {community_create}\
            </section>\
-           <section style=\"margin-bottom:1.5rem\">\
-             <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-             text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{lbl_help}</h2>\
-             <p style=\"font-size:.875rem;color:#6e6e73;margin:0\">\
+           <section class=\"cz-me-section--mb\">\
+             <h2 class=\"cz-me-section-heading\">{lbl_help}</h2>\
+             <p class=\"cz-hint\">\
              {help_body}</p>\
            </section>\
-           <section style=\"margin-top:1.5rem\">\
-             <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-               text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{cal_section}</h2>\
+           <section class=\"cz-me-section--mt\">\
+             <h2 class=\"cz-me-section-heading\">{cal_section}</h2>\
              <a href=\"/c/{cid}/me/calendar\" \
-               style=\"display:block;font-size:.9375rem;color:#007AFF;padding:.375rem 0;\
-               min-height:44px;line-height:44px\">{cal_feed_lbl}</a>\
+               class=\"cz-me-link cz-me-link--padded\">{cal_feed_lbl}</a>\
            </section>\
            {admin_tools}\
-           <section style=\"margin-top:1.5rem\">\
-             <h2 style=\"font-size:.8125rem;font-weight:600;color:#6e6e73;\
-               text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem\">{lbl_about}</h2>\
-             <p style=\"font-size:.8125rem;color:#6e6e73;margin:0\">{lbl_version} {version}</p>\
-             <p style=\"font-size:.8125rem;color:#6e6e73;margin:.25rem 0 0\">{lbl_ref}: {ref_code}</p>\
+           <section class=\"cz-me-section--mt\">\
+             <h2 class=\"cz-me-section-heading\">{lbl_about}</h2>\
+             <p class=\"cz-me-about-line\">{lbl_version} {version}</p>\
+             <p class=\"cz-me-about-line cz-me-about-line--gap-top\">{lbl_ref}: {ref_code}</p>\
            </section>\
-           <form method=\"post\" action=\"/logout\" style=\"margin-top:2rem\">\
+           <form method=\"post\" action=\"/logout\" class=\"cz-me-logout-form\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
              <button type=\"submit\" \
-               style=\"width:100%;padding:.875rem;background:#fff;\
-               color:#FF3B30;border:2px solid #FF3B30;border-radius:14px;\
-               font-size:1rem;font-weight:600;min-height:44px;cursor:pointer\">\
+               class=\"cz-me-logout-button\">\
                {lbl_logout}</button>\
            </form>\
          </main>{nav}",
@@ -308,7 +298,7 @@ fn display_name_form_body(
     let error_html = error
         .map(|message| {
             format!(
-                "<p role=\"alert\" style=\"color:#FF3B30;margin:.75rem 0 0\">{}</p>",
+                "<p role=\"alert\" class=\"cz-me-form-error\">{}</p>",
                 render::escape_html(message)
             )
         })
@@ -316,16 +306,16 @@ fn display_name_form_body(
     let cid = render::escape_html(&membership.community_id);
     let locale = membership.locale;
     format!(
-        "{header}<main style=\"padding:1rem 1rem 5rem;max-width:560px;margin:0 auto\">\
+        "{header}<main class=\"cz-page-main cz-me-form-main\">\
            {error_html}\
-           <form method=\"post\" action=\"/c/{cid}/me/display-name\" style=\"margin-top:1rem\">\
+           <form method=\"post\" action=\"/c/{cid}/me/display-name\" class=\"cz-me-form\">\
              <input type=\"hidden\" name=\"_token\" value=\"{token}\">\
-             <label style=\"display:block;font-size:.875rem;font-weight:600;margin-bottom:.375rem\" for=\"display_name\">{label}</label>\
+             <label class=\"cz-me-form-label\" for=\"display_name\">{label}</label>\
              <input id=\"display_name\" name=\"display_name\" value=\"{display}\" required maxlength=\"40\" autocomplete=\"name\" \
-               style=\"width:100%;box-sizing:border-box;font-size:1rem;padding:.75rem;border:1px solid #D1D1D6;border-radius:8px;min-height:44px\">\
-             <button type=\"submit\" style=\"width:100%;margin-top:1.25rem;padding:.875rem;background:#007AFF;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;min-height:44px;cursor:pointer\">{submit}</button>\
+               class=\"cz-me-form-input\">\
+             <button type=\"submit\" class=\"cz-me-form-submit\">{submit}</button>\
            </form>\
-           <a href=\"/c/{cid}/me\" style=\"display:inline-block;margin-top:.75rem;color:#007AFF;min-height:44px;line-height:44px;text-decoration:none\">{cancel}</a>\
+           <a href=\"/c/{cid}/me\" class=\"cz-me-form-cancel-link\">{cancel}</a>\
          </main>{nav}",
         header = render::header(i18n::t(locale, i18n::ME_DISPLAY_NAME_EDIT_TITLE), ""),
         error_html = error_html,
@@ -566,7 +556,7 @@ fn language_form_body(
     let error_html = error
         .map(|message| {
             format!(
-                "<p role=\"alert\" style=\"color:#FF3B30;margin:.75rem 0 0\">{}</p>",
+                "<p role=\"alert\" class=\"cz-me-form-error\">{}</p>",
                 render::escape_html(message)
             )
         })
@@ -574,7 +564,7 @@ fn language_form_body(
     let flash_html = language_flash_message(locale, flash_code)
         .map(|message| {
             format!(
-                "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0 1rem\">{}</p>",
+                "<p role=\"status\" class=\"cz-me-flash\">{}</p>",
                 render::escape_html(message)
             )
         })
@@ -591,22 +581,22 @@ fn language_form_body(
         ""
     };
     format!(
-        "{header}<main style=\"padding:1rem 1rem 5rem;max-width:560px;margin:0 auto\">\
+        "{header}<main class=\"cz-page-main cz-me-form-main\">\
            {error_html}{flash_html}\
-           <form method=\"post\" action=\"/c/{cid}/me/language\" style=\"margin-top:1rem\">\
+           <form method=\"post\" action=\"/c/{cid}/me/language\" class=\"cz-me-form\">\
              <input type=\"hidden\" name=\"_token\" value=\"{token}\">\
-             <fieldset style=\"border:1px solid #D1D1D6;border-radius:8px;padding:.75rem 1rem\">\
-               <legend style=\"font-size:.875rem;font-weight:600;padding:0 .25rem\">{title}</legend>\
-               <label style=\"display:block;min-height:44px;line-height:44px\">\
+             <fieldset class=\"cz-me-fieldset\">\
+               <legend class=\"cz-me-legend\">{title}</legend>\
+               <label class=\"cz-me-radio-label\">\
                  <input type=\"radio\" name=\"ui_language\" value=\"ja\"{ja_checked}> {ja_label}\
                </label>\
-               <label style=\"display:block;min-height:44px;line-height:44px\">\
+               <label class=\"cz-me-radio-label\">\
                  <input type=\"radio\" name=\"ui_language\" value=\"en\"{en_checked}> {en_label}\
                </label>\
              </fieldset>\
-             <button type=\"submit\" style=\"width:100%;margin-top:1.25rem;padding:.875rem;background:#007AFF;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;min-height:44px;cursor:pointer\">{submit}</button>\
+             <button type=\"submit\" class=\"cz-me-form-submit\">{submit}</button>\
            </form>\
-           <a href=\"/c/{cid}/me\" style=\"display:inline-block;margin-top:.75rem;color:#007AFF;min-height:44px;line-height:44px;text-decoration:none\">{cancel}</a>\
+           <a href=\"/c/{cid}/me\" class=\"cz-me-form-cancel-link\">{cancel}</a>\
          </main>{nav}",
         header = render::header(i18n::t(locale, i18n::ME_LANGUAGE_TITLE), ""),
         error_html = error_html,

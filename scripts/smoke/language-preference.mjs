@@ -307,6 +307,14 @@ async function collect(cdp) {
         dayCellAriaLabel: dayCell ? dayCell.getAttribute('aria-label') : null,
         monthHeaderText: document.querySelector('h2 + p')?.innerText ?? null,
         noHorizontalScroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+        // RFC-075 Slice 3 §8 / Handoff 028 precedent: a measurement, not
+        // just a boolean, for every scenario — how much (if any) the page
+        // overflows the viewport, and how wide the viewport was.
+        pageOverflowPx: Math.max(
+          0,
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+        viewportWidth: document.documentElement.clientWidth,
         statusButtons,
         // Handoff 028 §8: a measurement, not just a boolean — the status
         // button row's right edge against the viewport width, so a
@@ -442,6 +450,37 @@ try {
     },
   });
 
+  // RFC-075 Slice 3: Home and the ICS calendar-feed settings page
+  // (/c/:cid/me/calendar — not the Calendar page), at mobile width and
+  // 200% text, both languages.
+  logStep('confirming Home renders Japanese at 200% text (screenshot)');
+  await navigate(page, `/c/${communityId}/home`, { textScale: 2 });
+  const homeJapanese200 = await collect(page);
+  results.push({
+    name: 'home-renders-japanese-200-percent',
+    screenshotPath: await screenshot(page, 'home-japanese-200-percent'),
+    observed: homeJapanese200,
+    checks: {
+      htmlLangJa: homeJapanese200.htmlLang === 'ja',
+      noHorizontalScrollAt200Percent: homeJapanese200.noHorizontalScroll,
+    },
+  });
+
+  logStep('confirming the calendar-feed settings page renders Japanese at 200% text (screenshot)');
+  await navigate(page, `/c/${communityId}/me/calendar`, { textScale: 2 });
+  const calendarFeedJapanese200 = await collect(page);
+  results.push({
+    name: 'calendar-feed-page-renders-japanese-200-percent',
+    screenshotPath: await screenshot(page, 'calendar-feed-japanese-200-percent'),
+    observed: calendarFeedJapanese200,
+    checks: {
+      htmlLangJa: calendarFeedJapanese200.htmlLang === 'ja',
+      showsGenerateOrFeedUrl:
+        calendarFeedJapanese200.text.includes('リンクを作成') || calendarFeedJapanese200.text.includes('http'),
+      noHorizontalScrollAt200Percent: calendarFeedJapanese200.noHorizontalScroll,
+    },
+  });
+
   logStep('setting language to English via the no-JS settings form (real submit button, no JS shim)');
   await navigate(page, `/c/${communityId}/me/language`, { textScale: 2 });
   const settingsFormJa = await collect(page);
@@ -491,16 +530,35 @@ try {
     },
   });
 
-  logStep('confirming Home renders English');
-  await navigate(page, `/c/${communityId}/home`);
+  logStep('confirming Home renders English at 200% text (screenshot)');
+  await navigate(page, `/c/${communityId}/home`, { textScale: 2 });
   const homeEnglish = await collect(page);
   results.push({
     name: 'home-renders-english',
+    screenshotPath: await screenshot(page, 'home-english-200-percent'),
     observed: homeEnglish,
     checks: {
       htmlLangEn: homeEnglish.htmlLang === 'en',
       showsEnglishDateLabel: /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), 3 Aug\b/.test(homeEnglish.text),
       noAllNumericDate: !/\b08\/03\/2026\b/.test(homeEnglish.text),
+      noHorizontalScrollAt200Percent: homeEnglish.noHorizontalScroll,
+    },
+  });
+
+  // The ICS feed settings page is intentionally out of RFC-072 scope and
+  // stays Japanese-only regardless of the member's language preference —
+  // confirming that invariant survived this package's styling-only
+  // migration is as important as the layout itself not overflowing.
+  logStep('confirming the calendar-feed settings page stays Japanese-only after switching to English (200% text screenshot)');
+  await navigate(page, `/c/${communityId}/me/calendar`, { textScale: 2 });
+  const calendarFeedAfterEnglishSwitch = await collect(page);
+  results.push({
+    name: 'calendar-feed-page-stays-japanese-only-after-english-switch',
+    screenshotPath: await screenshot(page, 'calendar-feed-still-japanese-200-percent'),
+    observed: calendarFeedAfterEnglishSwitch,
+    checks: {
+      htmlLangStaysJa: calendarFeedAfterEnglishSwitch.htmlLang === 'ja',
+      noHorizontalScrollAt200Percent: calendarFeedAfterEnglishSwitch.noHorizontalScroll,
     },
   });
 
