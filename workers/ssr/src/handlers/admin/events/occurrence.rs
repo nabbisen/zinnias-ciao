@@ -35,18 +35,15 @@ pub async fn get_cancel_occurrence(
     )
     .await?;
     let body = format!(
-        "<main style=\"padding:1rem 1rem 5rem;max-width:42rem;margin:0 auto\">\
-         <h1 style=\"font-size:1.25rem;font-weight:700;margin:0 0 .75rem\">{title}</h1>\
-         <p style=\"font-size:.9375rem;line-height:1.5;color:#3A3A3C;margin:0 0 1rem\">{helper}</p>\
-         <p style=\"font-size:.875rem;color:#6e6e73;margin:0 0 1rem\">{event_title} · {date}</p>\
+        "<main class=\"cz-page-main cz-page-main--narrow\">\
+         <h1 class=\"cz-admin-occurrence-title\">{title}</h1>\
+         <p class=\"cz-admin-occurrence-helper\">{helper}</p>\
+         <p class=\"cz-admin-occurrence-subtitle\">{event_title} · {date}</p>\
          <form method=\"post\" action=\"/c/{cid}/admin/events/{eid}/days/{did}/cancel\">\
            <input type=\"hidden\" name=\"_token\" value=\"{token}\">\
-           <button type=\"submit\" style=\"width:100%;padding:.875rem;background:#B42318;\
-           color:#fff;border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-           min-height:44px;cursor:pointer\">{submit}</button>\
+           <button type=\"submit\" class=\"cz-admin-occurrence-cancel-button\">{submit}</button>\
          </form>\
-         <a href=\"/c/{cid}/events/{eid}\" style=\"display:inline-flex;align-items:center;\
-         min-height:44px;margin-top:.75rem;color:#007AFF;text-decoration:none\">{back}</a>\
+         <a href=\"/c/{cid}/events/{eid}\" class=\"cz-admin-occurrence-back-link\">{back}</a>\
          </main>",
         title = i18n::JA_OCCURRENCE_CANCEL_TITLE,
         helper = i18n::JA_OCCURRENCE_CANCEL_HELPER,

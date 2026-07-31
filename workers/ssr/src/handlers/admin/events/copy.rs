@@ -52,7 +52,7 @@ pub async fn get_copy_event(
         None => {
             return render::page(
                 i18n::JA_GENERAL_ERROR,
-                &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR),
+                &format!("<p class=\"cz-admin-error-text\">{}</p>", i18n::JA_TZ_ERROR),
             );
         }
     };
@@ -83,17 +83,15 @@ pub async fn get_copy_event(
 
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{title}</h1>\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--snug\">{title}</h1>\
          <form method=\"post\" action=\"/c/{cid}/admin/events\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            {fields}\
-           <button type=\"submit\" style=\"width:100%;padding:.875rem;background:#007AFF;\
-           color:#fff;border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-           min-height:44px;cursor:pointer;margin-top:1rem\">{submit}</button>\
+           <button type=\"submit\" class=\"cz-admin-submit-button\">{submit}</button>\
          </form>\
-         <div style=\"margin-top:1.5rem\">\
-           <a href=\"/c/{cid}/events/{eid}\" style=\"color:#6E6E73;font-size:.875rem\">{back}</a>\
+         <div class=\"cz-admin-back-row\">\
+           <a href=\"/c/{cid}/events/{eid}\" class=\"cz-admin-back-link\">{back}</a>\
          </div>\
          </main>{nav}",
         header = render::header_with_switcher_next(
@@ -124,8 +122,7 @@ pub(super) fn render_copy_event_create_fields(
         .iter()
         .map(|helper| {
             format!(
-                "<p role=\"note\" style=\"font-size:.875rem;color:#6E6E73;line-height:1.5;\
-                 margin:0 0 .75rem\">{}</p>",
+                "<p role=\"note\" class=\"cz-admin-copy-helper\">{}</p>",
                 render::escape_html(helper)
             )
         })

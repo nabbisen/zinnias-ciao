@@ -46,21 +46,18 @@ pub async fn get_admin_hide_note_confirm(
 
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-           <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">{nd}</h1>\
-           <p style=\"font-size:.9375rem;color:#6E6E73;margin-bottom:1.5rem\">\
+         <main class=\"cz-page-main\">\
+           <h1 class=\"cz-confirm-title\">{nd}</h1>\
+           <p class=\"cz-confirm-body\">\
              {consequence} {name}</p>\
-           <div style=\"display:flex;gap:.75rem\">\
+           <div class=\"cz-confirm-actions\">\
              <a href=\"/c/{cid}/events/{eid}\" \
-                style=\"flex:1;padding:.875rem;border:2px solid #e5e5ea;border-radius:14px;\
-                text-align:center;text-decoration:none;color:#1D1D1F;font-weight:600;min-height:44px;\
-                display:flex;align-items:center;justify-content:center\">{keep}</a>\
+                class=\"cz-confirm-keep-link\">{keep}</a>\
              <form method=\"post\" \
-                   action=\"/c/{cid}/admin/events/{eid}/notes/{mid}/hide\" style=\"flex:1\">\
+                   action=\"/c/{cid}/admin/events/{eid}/notes/{mid}/hide\" class=\"cz-confirm-delete-form\">\
                <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
                <button type=\"submit\" \
-                 style=\"width:100%;padding:.875rem;background:#FF3B30;color:#fff;\
-                 border:none;border-radius:14px;font-weight:600;min-height:44px;cursor:pointer\">\
+                 class=\"cz-confirm-delete-button\">\
                  {nd}</button>\
              </form>\
            </div>\

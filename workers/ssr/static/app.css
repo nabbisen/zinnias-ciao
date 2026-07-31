@@ -102,6 +102,16 @@
    * triplet's solid -bg (a different, opaque colour). */
   --cz-color-danger-tint-bg: #FF3B3022;
 
+  /* RFC-075 Slice 4: admin event forms. Each of these three values happens
+   * to equal an existing token (today-fg, status-not-going-fg, today-bg
+   * respectively) — kept as separate tokens rather than reused, since the
+   * concepts are unrelated (Slice 3's cz-home-event-location precedent: a
+   * coincidental value match is not a semantic match, and reusing one would
+   * silently couple two unrelated things to the same future change). */
+  --cz-color-text-tertiary: #3A3A3C;
+  --cz-color-danger-strong: #B42318;
+  --cz-color-surface-subtle: #FAFAFB;
+
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 16px;
   color: var(--cz-color-text-primary);
@@ -1194,6 +1204,318 @@ button, a, [role="button"] { min-height: var(--cz-touch-min); }
   font-size: .875rem;
   color: var(--cz-color-text-secondary);
   margin-bottom: var(--cz-space-4);
+}
+
+/* Admin event forms (RFC-075 Slice 4). Admin-only, Japanese-only surfaces
+ * (RFC-072 Slice D) — no English rendering exists for any class below. */
+.cz-page-main--narrow {
+  max-width: 42rem;
+  margin: 0 auto;
+}
+.cz-admin-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.cz-admin-title--tight {
+  margin-bottom: var(--cz-space-1);
+}
+.cz-admin-title--snug {
+  margin-bottom: var(--cz-space-2);
+}
+.cz-admin-title--loose {
+  margin-bottom: var(--cz-space-4);
+}
+.cz-admin-occurrence-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 var(--cz-space-3);
+}
+.cz-admin-edit-section-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 var(--cz-space-2);
+}
+.cz-admin-summary-card-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+.cz-admin-subtitle {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  margin-bottom: var(--cz-space-4);
+}
+.cz-admin-back-link {
+  color: var(--cz-color-text-secondary);
+  font-size: .875rem;
+}
+.cz-admin-back-row {
+  margin-top: var(--cz-space-5);
+}
+.cz-admin-back-row--tight {
+  margin-top: var(--cz-space-4);
+}
+.cz-admin-error-text {
+  color: var(--cz-color-danger);
+}
+.cz-admin-error-main {
+  padding: var(--cz-space-6);
+}
+.cz-admin-flash-success {
+  color: var(--cz-status-attended-fg);
+  font-size: .875rem;
+  margin-bottom: var(--cz-space-4);
+}
+.cz-admin-edit-notice {
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+  margin-bottom: var(--cz-space-4);
+}
+.cz-admin-copy-helper {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  line-height: 1.5;
+  margin: 0 0 var(--cz-space-3);
+}
+.cz-admin-form-helper {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  line-height: 1.5;
+  margin: 0 0 var(--cz-space-4);
+}
+.cz-admin-template-link {
+  display: block;
+  text-align: center;
+  color: var(--cz-color-focus);
+  font-size: .875rem;
+  margin-top: var(--cz-space-4);
+  min-height: var(--cz-touch-min);
+  line-height: var(--cz-touch-min);
+}
+.cz-admin-submit-button {
+  width: 100%;
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-button);
+  font-size: 1rem;
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+  margin-top: var(--cz-space-4);
+}
+.cz-admin-submit-button--loose {
+  margin-top: var(--cz-space-5);
+}
+
+/* Admin confirmation pages (cancel-event, cancel-occurrence): distinct from
+ * the member-facing cz-confirm-* family (event.rs's note-delete confirm) —
+ * this one supports a flex-wrap-and-shrink layout the member version does
+ * not need. admin/events/notes.rs's own confirm page needs no new classes
+ * at all: it reuses cz-confirm-* byte-for-byte. */
+.cz-admin-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cz-space-3);
+  margin-top: var(--cz-space-5);
+}
+.cz-admin-confirm-keep-link {
+  flex: 1 1 9rem;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--cz-space-3-5);
+  border: 2px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-button);
+  text-align: center;
+  text-decoration: none;
+  color: var(--cz-color-text-primary);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.cz-admin-confirm-delete-form {
+  flex: 1 1 9rem;
+  min-width: 0;
+  margin: 0;
+}
+.cz-admin-confirm-delete-button {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-danger);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-button);
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.cz-admin-confirm-note {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+}
+.cz-admin-confirm-subtitle {
+  font-size: .9375rem;
+  color: var(--cz-color-text-secondary);
+}
+
+/* Cancel-occurrence confirmation */
+.cz-admin-occurrence-back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--cz-touch-min);
+  margin-top: var(--cz-space-3);
+  color: var(--cz-color-focus);
+  text-decoration: none;
+}
+.cz-admin-occurrence-subtitle {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  margin: 0 0 var(--cz-space-4);
+}
+.cz-admin-occurrence-helper {
+  font-size: .9375rem;
+  line-height: 1.5;
+  color: var(--cz-color-text-tertiary);
+  margin: 0 0 var(--cz-space-4);
+}
+.cz-admin-occurrence-cancel-button {
+  width: 100%;
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-danger-strong);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-button);
+  font-size: 1rem;
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+}
+
+/* Attendance override */
+.cz-admin-attendance-row {
+  display: flex;
+  align-items: center;
+  gap: var(--cz-space-3);
+  padding: var(--cz-space-2) 0;
+  border-bottom: 1px solid var(--cz-color-surface);
+}
+.cz-admin-attendance-name {
+  flex: 1;
+  font-size: .9375rem;
+}
+.cz-admin-attendance-select {
+  font-size: .875rem;
+  padding: var(--cz-space-1-5) var(--cz-space-2);
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-control);
+  min-height: var(--cz-touch-min);
+}
+.cz-admin-day-heading {
+  font-size: .9375rem;
+  font-weight: 600;
+  margin: var(--cz-space-4) 0 var(--cz-space-2);
+}
+
+/* Shared event-form fields (admin/events/forms.rs) */
+.cz-admin-form-error {
+  color: var(--cz-color-danger);
+  font-size: .875rem;
+}
+.cz-admin-field {
+  display: block;
+  margin-bottom: var(--cz-space-4);
+}
+.cz-admin-field-label {
+  font-size: .875rem;
+  display: block;
+  margin-bottom: var(--cz-space-1-5);
+}
+.cz-admin-field-input {
+  width: 100%;
+  padding: var(--cz-space-3);
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-input);
+  font-size: 1rem;
+}
+.cz-admin-repeat-group {
+  margin-bottom: var(--cz-space-4);
+}
+.cz-admin-repeat-row {
+  display: flex;
+  gap: var(--cz-space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cz-admin-repeat-select {
+  padding: var(--cz-space-2-5);
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-input);
+  font-size: 1rem;
+  flex: 1 1 10rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.cz-admin-repeat-count {
+  width: 6rem;
+  max-width: 100%;
+  padding: var(--cz-space-2-5);
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-input);
+  font-size: 1rem;
+}
+.cz-admin-repeat-date {
+  width: 10rem;
+  max-width: 100%;
+  padding: var(--cz-space-2-5);
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-input);
+  font-size: 1rem;
+}
+.cz-admin-repeat-hint {
+  font-size: .75rem;
+  color: var(--cz-color-text-secondary);
+  margin: var(--cz-space-1) 0 0;
+}
+.cz-admin-edit-section {
+  margin: var(--cz-space-4-5) 0 var(--cz-space-4);
+}
+.cz-admin-edit-helper {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  line-height: 1.5;
+  margin: var(--cz-space-1) 0 var(--cz-space-4);
+}
+.cz-admin-edit-note {
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+  line-height: 1.5;
+  margin: var(--cz-space-1) 0 var(--cz-space-4);
+}
+
+/* Schedule summary card (admin/events/summary.rs) */
+.cz-admin-summary-card {
+  margin: 0 0 var(--cz-space-4-5);
+  padding: var(--cz-space-4);
+  border: 1px solid var(--cz-color-surface-strong);
+  border-radius: var(--cz-radius-input);
+  background: var(--cz-color-surface-subtle);
+}
+.cz-admin-summary-list {
+  margin: var(--cz-space-2) 0 0;
+  padding-left: var(--cz-space-4-5);
+}
+.cz-admin-summary-line {
+  font-size: .875rem;
+  color: var(--cz-color-text-primary);
+  margin: var(--cz-space-1) 0;
+}
+.cz-admin-summary-total {
+  font-size: .875rem;
+  color: var(--cz-color-text-primary);
+  margin: var(--cz-space-2) 0 var(--cz-space-1);
 }
 
 /* Reduced motion — disable all non-essential animation (RFC-011 §5) */

@@ -76,8 +76,7 @@ pub async fn get_create_event(
 
     let templates_link = format!(
         "<a href=\"/c/{cid}/admin/templates\" \
-           style=\"display:block;text-align:center;color:#007AFF;\
-           font-size:.875rem;margin-top:1rem;min-height:44px;line-height:44px\">\
+           class=\"cz-admin-template-link\">\
            Use a template</a>",
         cid = render::escape_html(community_id),
     );
@@ -85,14 +84,12 @@ pub async fn get_create_event(
     let cet = i18n::JA_ADMIN_CREATE_EVENT_TITLE;
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:1rem\">{cet}</h1>\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--loose\">{cet}</h1>\
          <form method=\"post\" action=\"/c/{cid}/admin/events\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            {fields}\
-           <button type=\"submit\" style=\"width:100%;padding:.875rem;background:#007AFF;\
-           color:#fff;border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-           min-height:44px;cursor:pointer;margin-top:1rem\">{submit}</button>\
+           <button type=\"submit\" class=\"cz-admin-submit-button\">{submit}</button>\
          </form>\
          {tmpl_link}\
          </main>{nav}",
@@ -230,7 +227,7 @@ pub async fn post_create_event(
         None => {
             return render::page(
                 i18n::JA_GENERAL_ERROR,
-                &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR),
+                &format!("<p class=\"cz-admin-error-text\">{}</p>", i18n::JA_TZ_ERROR),
             );
         }
     };

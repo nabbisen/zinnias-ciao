@@ -113,8 +113,7 @@ pub(super) fn render_recreate_event_create_fields(
     format!(
         "<input type=\"hidden\" name=\"copy_source_event_id\" value=\"{eid}\">\
          <input type=\"hidden\" name=\"copy_mode\" value=\"cancelled_recreate\">\
-         <p role=\"note\" style=\"font-size:.875rem;color:#6E6E73;line-height:1.5;\
-         margin:0 0 1rem\">{helper}</p>\
+         <p role=\"note\" class=\"cz-admin-form-helper\">{helper}</p>\
          {fields}",
         eid = render::escape_html(&event.id),
         helper = i18n::JA_ADMIN_RECREATE_EVENT_HELPER,
@@ -204,12 +203,10 @@ pub(super) fn render_details_only_event_edit_fields(
     format!(
         "{err}\
          {summary}\
-         <section style=\"margin:1.25rem 0 1rem\">\
-         <h2 style=\"font-size:1rem;font-weight:700;margin:0 0 .5rem\">{heading}</h2>\
-         <p style=\"font-size:.875rem;color:#6e6e73;line-height:1.5;margin:.25rem 0 1rem\">\
-         {helper}</p>\
-         <p style=\"font-size:.8125rem;color:#6e6e73;line-height:1.5;margin:.25rem 0 1rem\">\
-         {preserved}</p>\
+         <section class=\"cz-admin-edit-section\">\
+         <h2 class=\"cz-admin-edit-section-heading\">{heading}</h2>\
+         <p class=\"cz-admin-edit-helper\">{helper}</p>\
+         <p class=\"cz-admin-edit-note\">{preserved}</p>\
          {title}{loc}{desc}</section>",
         err = render_error_html(error),
         summary = render_schedule_summary(days, community_tz),
@@ -238,7 +235,7 @@ fn render_error_html(error: Option<&str>) -> String {
     error
         .map(|e| {
             format!(
-                "<p role=\"alert\" style=\"color:#FF3B30;font-size:.875rem\">{}</p>",
+                "<p role=\"alert\" class=\"cz-admin-form-error\">{}</p>",
                 render::escape_html(e)
             )
         })
@@ -248,11 +245,10 @@ fn render_error_html(error: Option<&str>) -> String {
 fn form_field(label: &str, name: &str, ftype: &str, val: &str, required: bool) -> String {
     let req_attr = if required { " required" } else { "" };
     format!(
-        "<label style=\"display:block;margin-bottom:1rem\">\
-         <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{label}</span>\
+        "<label class=\"cz-admin-field\">\
+         <span class=\"cz-admin-field-label\">{label}</span>\
          <input type=\"{ftype}\" name=\"{name}\" value=\"{val}\" \
-           style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
-           border-radius:12px;font-size:1rem\"{req_attr}>\
+           class=\"cz-admin-field-input\"{req_attr}>\
          </label>",
         label = label,
         ftype = ftype,
@@ -264,12 +260,11 @@ fn form_field(label: &str, name: &str, ftype: &str, val: &str, required: bool) -
 fn description_field(description: Option<&str>) -> String {
     let dval = render::escape_html(description.unwrap_or(""));
     format!(
-        "<label style=\"display:block;margin-bottom:1rem\">\
-         <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">\
+        "<label class=\"cz-admin-field\">\
+         <span class=\"cz-admin-field-label\">\
          {desc_lbl}</span>\
          <textarea name=\"description\" rows=\"3\" \
-           style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
-           border-radius:12px;font-size:1rem\">{dval}</textarea>\
+           class=\"cz-admin-field-input\">{dval}</textarea>\
          </label>",
         desc_lbl = i18n::JA_FORM_FIELD_DESC,
     )
@@ -277,31 +272,27 @@ fn description_field(description: Option<&str>) -> String {
 
 fn render_repeat_fields(repeat: &RepeatFieldPrefill) -> String {
     format!(
-        "<div style=\"margin-bottom:1rem\">\
-         <label style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{repeat_lbl}</label>\
-         <div style=\"display:flex;gap:.75rem;align-items:center;flex-wrap:wrap\">\
-           <select name=\"repeat_rule\" style=\"padding:.625rem;border:1px solid #e5e5ea;\
-             border-radius:12px;font-size:1rem;flex:1 1 10rem;min-width:0;max-width:100%\">\
+        "<div class=\"cz-admin-repeat-group\">\
+         <label class=\"cz-admin-field-label\">{repeat_lbl}</label>\
+         <div class=\"cz-admin-repeat-row\">\
+           <select name=\"repeat_rule\" class=\"cz-admin-repeat-select\">\
              {opt_none}\
              {opt_weekly}\
              {opt_biweekly}\
              {opt_monthly}\
            </select>\
-           <select name=\"repeat_end_mode\" style=\"padding:.625rem;border:1px solid #e5e5ea;\
-             border-radius:12px;font-size:1rem;flex:1 1 10rem;min-width:0;max-width:100%\">\
+           <select name=\"repeat_end_mode\" class=\"cz-admin-repeat-select\">\
              {end_open}\
              {end_until}\
              {end_count}\
            </select>\
            <input type=\"number\" name=\"repeat_count\" value=\"{repeat_count}\" min=\"1\" max=\"52\"\
              placeholder=\"{count_ph}\" aria-label=\"{count_lbl}\"\
-             style=\"width:6rem;max-width:100%;padding:.625rem;border:1px solid #e5e5ea;\
-             border-radius:12px;font-size:1rem\">\
+             class=\"cz-admin-repeat-count\">\
            <input type=\"date\" name=\"repeat_until\" value=\"{repeat_until}\" aria-label=\"{until_lbl}\"\
-             style=\"width:10rem;max-width:100%;padding:.625rem;border:1px solid #e5e5ea;\
-             border-radius:12px;font-size:1rem\">\
+             class=\"cz-admin-repeat-date\">\
          </div>\
-         <p style=\"font-size:.75rem;color:#6e6e73;margin:.25rem 0 0\">{hint}</p>\
+         <p class=\"cz-admin-repeat-hint\">{hint}</p>\
          </div>",
         repeat_lbl = i18n::JA_REPEAT_LABEL,
         opt_none = option_html("none", i18n::JA_REPEAT_NONE, &repeat.repeat_rule),

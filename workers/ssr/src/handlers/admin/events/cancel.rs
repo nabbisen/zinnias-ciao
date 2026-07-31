@@ -46,23 +46,19 @@ pub async fn get_cancel_event(
 
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{cat}</h1>\
-         <p style=\"font-size:.9375rem;color:#6e6e73\"><strong>{title}</strong></p>\
-         <p style=\"font-size:.875rem;color:#6e6e73\">{body_text}</p>\
-         <div style=\"display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.5rem\">\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--snug\">{cat}</h1>\
+         <p class=\"cz-admin-confirm-subtitle\"><strong>{title}</strong></p>\
+         <p class=\"cz-admin-confirm-note\">{body_text}</p>\
+         <div class=\"cz-admin-confirm-actions\">\
            <a href=\"/c/{cid}/events/{eid}\" \
-              style=\"flex:1 1 9rem;min-width:0;box-sizing:border-box;padding:.875rem;\
-              border:2px solid #e5e5ea;border-radius:14px;text-align:center;\
-              text-decoration:none;color:#1D1D1F;font-weight:600;overflow-wrap:anywhere\">\
+              class=\"cz-admin-confirm-keep-link\">\
               {keep}</a>\
            <form method=\"post\" action=\"/c/{cid}/admin/events/{eid}/cancel\" \
-             style=\"flex:1 1 9rem;min-width:0;margin:0\">\
+             class=\"cz-admin-confirm-delete-form\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
              <button type=\"submit\" \
-               style=\"width:100%;box-sizing:border-box;padding:.875rem;background:#FF3B30;\
-               color:#fff;border:none;border-radius:14px;font-weight:600;min-height:44px;\
-               cursor:pointer;white-space:normal;overflow-wrap:anywhere\">\
+               class=\"cz-admin-confirm-delete-button\">\
                {confirm}</button>\
            </form>\
          </div></main>{nav}",

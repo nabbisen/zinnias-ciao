@@ -31,7 +31,7 @@ pub async fn get_attendance(
         return render::page(
             i18n::JA_GENERAL_ERROR,
             &format!(
-                "<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
+                "<main class=\"cz-admin-error-main\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
                 i18n::JA_ADMIN_ATTEND_CANCELLED,
                 i18n::JA_GENERAL_BACK
             ),
@@ -67,19 +67,17 @@ pub async fn get_attendance(
 
         let day_label = render::escape_html(&day.day_date);
         days_html.push_str(&format!(
-            "<h3 style=\"font-size:.9375rem;font-weight:600;margin:1rem 0 .5rem\">{day_label}</h3>"
+            "<h3 class=\"cz-admin-day-heading\">{day_label}</h3>"
         ));
 
         for m in &members {
             let current = att_map.get(m.id.as_str()).copied().flatten();
             let sel = |v: &str| if current == Some(v) { " selected" } else { "" };
             days_html.push_str(&format!(
-                "<div style=\"display:flex;align-items:center;gap:.75rem;padding:.5rem 0;\
-                 border-bottom:1px solid #F5F5F7\">\
-                 <span style=\"flex:1;font-size:.9375rem\">{name}</span>\
+                "<div class=\"cz-admin-attendance-row\">\
+                 <span class=\"cz-admin-attendance-name\">{name}</span>\
                  <select name=\"att_{day_id}_{mid}\" \
-                   style=\"font-size:.875rem;padding:.375rem .5rem;border:1px solid #E5E5EA;\
-                   border-radius:8px;min-height:44px\" \
+                   class=\"cz-admin-attendance-select\" \
                    aria-label=\"Attendance for {name_raw}\">\
                    <option value=\"\"{no_ans}>{opt_na}</option>\
                    <option value=\"going\"{going}>{opt_go}</option>\
@@ -111,7 +109,7 @@ pub async fn get_attendance(
     let flash_html = flash
         .map(|f| {
             format!(
-                "<p role=\"status\" style=\"color:#167A34;font-size:.875rem;margin-bottom:1rem\">{}</p>",
+                "<p role=\"status\" class=\"cz-admin-flash-success\">{}</p>",
                 render::escape_html(&f)
             )
         })
@@ -119,20 +117,18 @@ pub async fn get_attendance(
 
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.25rem\">{at}</h1>\
-         <p style=\"font-size:.875rem;color:#6E6E73;margin-bottom:1rem\">{title}</p>\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--tight\">{at}</h1>\
+         <p class=\"cz-admin-subtitle\">{title}</p>\
          {flash}\
          <form method=\"post\" action=\"/c/{cid}/admin/events/{eid}/attendance\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            {days}\
            <button type=\"submit\" \
-             style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
-             border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-             min-height:44px;cursor:pointer;margin-top:1.5rem\">{aas}</button>\
+             class=\"cz-admin-submit-button cz-admin-submit-button--loose\">{aas}</button>\
          </form>\
-         <div style=\"margin-top:1rem\">\
-           <a href=\"/c/{cid}/events/{eid}\" style=\"color:#6E6E73;font-size:.875rem\">\
+         <div class=\"cz-admin-back-row--tight\">\
+           <a href=\"/c/{cid}/events/{eid}\" class=\"cz-admin-back-link\">\
              {back}</a>\
          </div>\
          </main>{nav}",

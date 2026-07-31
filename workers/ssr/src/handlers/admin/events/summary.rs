@@ -28,21 +28,21 @@ pub(super) fn render_schedule_summary(
             .iter()
             .map(|label| {
                 format!(
-                    "<li style=\"font-size:.875rem;color:#1D1D1F;margin:.25rem 0\">{}</li>",
+                    "<li class=\"cz-admin-summary-line\">{}</li>",
                     render::escape_html(label)
                 )
             })
             .collect();
-        format!("<ul style=\"margin:.5rem 0 0;padding-left:1.25rem\">{items}</ul>")
+        format!("<ul class=\"cz-admin-summary-list\">{items}</ul>")
     } else {
         let first = labels.first().map(String::as_str).unwrap_or("");
         let last = labels.last().map(String::as_str).unwrap_or("");
         format!(
-            "<p style=\"font-size:.875rem;color:#1D1D1F;margin:.5rem 0 .25rem\">\
+            "<p class=\"cz-admin-summary-total\">\
              {total_prefix}{count}{total_suffix}</p>\
-             <p style=\"font-size:.875rem;color:#1D1D1F;margin:.25rem 0\">\
+             <p class=\"cz-admin-summary-line\">\
              {first_label}: {first}</p>\
-             <p style=\"font-size:.875rem;color:#1D1D1F;margin:.25rem 0\">\
+             <p class=\"cz-admin-summary-line\">\
              {last_label}: {last}</p>",
             total_prefix = i18n::JA_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX,
             count = labels.len(),
@@ -55,9 +55,8 @@ pub(super) fn render_schedule_summary(
     };
 
     format!(
-        "<section aria-label=\"{heading}\" style=\"margin:0 0 1.25rem;padding:1rem;\
-         border:1px solid #E5E5EA;border-radius:12px;background:#FAFAFB\">\
-         <h2 style=\"font-size:1rem;font-weight:700;margin:0\">{heading}</h2>\
+        "<section aria-label=\"{heading}\" class=\"cz-admin-summary-card\">\
+         <h2 class=\"cz-admin-summary-card-heading\">{heading}</h2>\
          {content}</section>",
         heading = i18n::JA_ADMIN_EDIT_SCHEDULE_HEADING,
         content = content,

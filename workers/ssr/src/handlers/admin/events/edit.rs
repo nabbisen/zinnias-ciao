@@ -35,7 +35,7 @@ pub async fn get_edit_event(
         return render::page(
             i18n::JA_GENERAL_ERROR,
             &format!(
-                "<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
+                "<main class=\"cz-admin-error-main\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
                 i18n::JA_ADMIN_EDIT_CANCELLED,
                 i18n::JA_GENERAL_BACK
             ),
@@ -51,7 +51,7 @@ pub async fn get_edit_event(
         return render::page(
             i18n::JA_GENERAL_ERROR,
             &format!(
-                "<main style=\"padding:2rem\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
+                "<main class=\"cz-admin-error-main\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
                 i18n::JA_ADMIN_EDIT_STARTED,
                 i18n::JA_GENERAL_BACK
             ),
@@ -115,20 +115,18 @@ pub async fn get_edit_event(
     let ees = i18n::JA_ADMIN_EDIT_EVENT_SUBMIT;
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{eet}</h1>\
-         <p style=\"font-size:.8125rem;color:{muted};margin-bottom:1rem\">\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--snug\">{eet}</h1>\
+         <p class=\"cz-admin-edit-notice\">\
            Members will see the updated event details.</p>\
          <form method=\"post\" action=\"/c/{cid}/admin/events/{eid}/edit\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            {fields}\
-           <button type=\"submit\" style=\"width:100%;padding:.875rem;background:{going};\
-           color:#fff;border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-           min-height:44px;cursor:pointer;margin-top:1rem\">{ees}</button>\
+           <button type=\"submit\" class=\"cz-admin-submit-button\">{ees}</button>\
          </form>\
-         <div style=\"margin-top:1.5rem\">\
+         <div class=\"cz-admin-back-row\">\
            <a href=\"/c/{cid}/events/{eid}\" \
-              style=\"color:{muted};font-size:.875rem\">{back}</a>\
+              class=\"cz-admin-back-link\">{back}</a>\
          </div>\
          </main>{nav}",
         header = render::header_with_switcher(
@@ -139,9 +137,7 @@ pub async fn get_edit_event(
         cid = render::escape_html(community_id),
         eid = render::escape_html(event_id),
         tok = render::escape_html(&token),
-        muted = "#6E6E73",
         back = i18n::JA_NAV_BACK,
-        going = "#007AFF",
         fields = fields,
         nav = nav,
     );
@@ -220,7 +216,7 @@ pub async fn post_edit_event(
             None => {
                 return render::page(
                     i18n::JA_GENERAL_ERROR,
-                    &format!("<p style=\"color:#FF3B30\">{}</p>", i18n::JA_TZ_ERROR),
+                    &format!("<p class=\"cz-admin-error-text\">{}</p>", i18n::JA_TZ_ERROR),
                 );
             }
         };
