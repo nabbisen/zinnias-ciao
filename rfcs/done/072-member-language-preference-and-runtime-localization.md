@@ -2,9 +2,10 @@
 
 **Status.** Implemented — design accepted 2026-07-30 at `1b49070`; implemented
 across Slices A (`b237788`), B (`93e25de`), and C (`fcf84aa`), each
-architecture-reviewed and Approved, **plus a post-completion residue correction
-at `ced6ae4`**. All ten acceptance criteria are met locally; this RFC has no
-hosted-evidence precondition. **Slice D — admin surfaces, anonymous routes
+architecture-reviewed and Approved, **plus three post-completion corrections**:
+shared render helpers at `ced6ae4`, the boundary and its gate at `e80fbe7`, and
+flash messages at `2d2be47`. All ten acceptance criteria are met locally; this
+RFC has no hosted-evidence precondition. **Slice D — admin surfaces, anonymous routes
 (`/join`, `/relink`), static offline HTML, `Accept-Language`, and a community
 default — is deliberately out of scope and remains a future RFC.**
 
@@ -50,6 +51,37 @@ default — is deliberately out of scope and remains a future RFC.**
 > earlier claims — it is **provable by a mechanism that fails on omission** rather
 > than by anyone's enumeration. Nothing was deployed; no member was served either
 > defect.
+
+> **Third correction, 2026-08-01.** The second correction was also incomplete — but
+> for a different reason than the first two, and the difference is the point.
+>
+> The default-fail gate added at `e80fbe7` scans **rendered templates** for bare
+> `i18n::JA_` references and non-localized shells. It cannot see a leak whose
+> English exists only at *runtime*. Eight handler redirects carried prose in a
+> query string — `?flash=saved`, `?flash=Note+removed` — which was then echoed
+> verbatim into `<p role="status">`. Three of those rendered on Event Detail, a
+> localized member-facing page, so **a member saving a note saw the English word
+> "saved" whatever language they had chosen.**
+>
+> This was not another omission from an enumeration. It was a **data-flow leak**
+> that no static scan of templates could have caught: at the source level the
+> template is `{}`, a placeholder, which such a gate must never flag.
+>
+> Fixed at `2d2be47`. All eight sites now redirect with lowercase snake_case codes
+> resolved through per-surface mappers against the locale — the pattern `me.rs` and
+> `calendar.rs` already used. Unknown codes render nothing rather than echoing.
+> A second default-fail gate,
+> `rfc072_flash_query_values_are_lowercase_snake_case_codes_not_prose`, catches the
+> class **where the prose is written** rather than where it renders, which is the
+> only place it is statically visible.
+>
+> **What distinguishes this from the two earlier claims:** criterion 9 is now
+> demonstrated by a *rendered* assertion — `smoke:language` saves a note on Event
+> Detail in each locale and reads back `メモを保存しました。` and `Note saved.` —
+> rather than by source inspection. The first claim rested on my recollection, the
+> second on a static gate; this one on what a member actually sees.
+>
+> Nothing was deployed; no member was served any of the three defects.
 
 **Target release.** Next unreleased increment on `main`; not tied to a version
 transition.
