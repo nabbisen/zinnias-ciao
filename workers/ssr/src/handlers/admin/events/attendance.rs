@@ -10,6 +10,32 @@ use crate::render;
 
 use super::support::redirect;
 
+/// Substitute a template's `{}` placeholders positionally, in order. Mirrors
+/// `matrix::cells::substitute_positional` (RFC-072 Slice C) — duplicated
+/// rather than imported since that helper is `pub(super)` to the `matrix`
+/// module tree. Not `format!` (the template is a runtime `&str`, not a
+/// literal). Excess values are ignored; a template asking for more values
+/// than given leaves that placeholder's `{}` in the output rather than
+/// panicking.
+fn substitute_positional(template: &str, values: &[&str]) -> String {
+    let mut result = String::with_capacity(template.len());
+    let mut chars = template.chars().peekable();
+    let mut next = values.iter();
+    while let Some(c) = chars.next() {
+        if c == '{' && chars.peek() == Some(&'}') {
+            chars.next();
+            if let Some(value) = next.next() {
+                result.push_str(value);
+            } else {
+                result.push_str("{}");
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 pub async fn get_attendance(
     req: Request,
     env: &Env,
@@ -78,7 +104,7 @@ pub async fn get_attendance(
                  <span class=\"cz-admin-attendance-name\">{name}</span>\
                  <select name=\"att_{day_id}_{mid}\" \
                    class=\"cz-admin-attendance-select\" \
-                   aria-label=\"Attendance for {name_raw}\">\
+                   aria-label=\"{aria_label}\">\
                    <option value=\"\"{no_ans}>{opt_na}</option>\
                    <option value=\"going\"{going}>{opt_go}</option>\
                    <option value=\"not_going\"{notgoing}>{opt_ng}</option>\
@@ -86,7 +112,10 @@ pub async fn get_attendance(
                  </select>\
                  </div>",
                 name = render::escape_html(&m.display_name),
-                name_raw = render::escape_html(&m.display_name),
+                aria_label = substitute_positional(
+                    i18n::JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL,
+                    &[&render::escape_html(&m.display_name)]
+                ),
                 day_id = render::escape_html(&day.id),
                 mid = render::escape_html(&m.id),
                 no_ans = if current.is_none() { " selected" } else { "" },

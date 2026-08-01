@@ -1486,11 +1486,16 @@ fn cached_asset_content_matches_pinned_hash() {
 // "Invite members" / "Manage members"). These were inline literals, not i18n
 // constants, so the i18n parity gate did not catch them.
 //
-// This gate scans the handler/render sources for the specific regressions that
-// occurred and a few obvious English UI words appearing as element text. It is
-// deliberately narrow: it matches ">Word</a>" or ">Word</button>" shapes with a
-// known English UI vocabulary, not arbitrary English (comments, code, ARIA
-// values, and HTTP header literals must remain unflagged).
+// The `_SRC` constants below back several other gates in this file. The
+// leak-detection gate itself has moved past them: it used to scan only this
+// hand-picked list of eight files for a hand-maintained vocabulary of past
+// regressions (`>Word</a>` shapes with a known-bad word list) — which is why
+// it never had a chance to catch Handoff 036's six leaks. Five of those six
+// were `aria-label` attribute values, a shape the old gate's element-text-only
+// vocabulary could not have matched even if it had scanned the right files.
+// See `rfc049_no_english_leaks_in_rendered_text_or_attributes` below (near
+// `ENGLISH_LEAK_EXCEPTIONS`), which walks every non-test file under
+// `handlers/` and `render/` and is default-fail like `LOCALIZATION_EXCEPTIONS`.
 
 const COMMUNITIES_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/communities.rs");
@@ -1550,34 +1555,214 @@ const RENDER_SRC: &str = concat!(
 );
 const STATIC_FILES_SRC: &str = include_str!("../../../workers/ssr/src/handlers/static_files.rs");
 
-#[test]
-fn no_known_english_ui_leaks_in_rendered_text() {
-    // Exact regressions that previously shipped — keep them from returning.
-    let forbidden: &[&str] = &[
-        ">Invite members<",
-        ">Manage members<",
-        "\u{2190} Home<", // "← Home" — must be "← ホーム"
-        ">Home</a>",
-        ">Members</a>",
-        ">Go</button>", // bare English fallback button (use JA)
-    ];
-    for src in [
-        EVENT_HANDLER_SRC,
-        COMMUNITIES_SRC,
-        RENDER_SRC,
-        HOME_HANDLER_SRC,
-        COMMUNITY_CREATE_HANDLER_SRC,
-        MEMBERS_HANDLER_SRC,
-        ROLE_TRANSFER_HANDLER_SRC,
-        MEMBER_REMOVE_HANDLER_SRC,
-    ] {
-        for needle in forbidden {
-            assert!(
-                !src.contains(needle),
-                "English UI text leaked into rendered output: {needle:?}. \
-                 Pilot is Japanese-only (RFC-049) — use a JA_* i18n constant."
-            );
+/// Handoff 036, Handoff 030's `LOCALIZATION_EXCEPTIONS` pattern: a pinned
+/// exact leak count and a written reason, asserted exactly (not a ceiling)
+/// so a partial edit to an excluded file still fails. `count` is the total
+/// number of findings from both `english_leak_element_text_findings` and
+/// `english_leak_attr_findings` combined.
+struct EnglishLeakException {
+    path: &'static str,
+    count: usize,
+    reason: &'static str,
+}
+
+// Pre-seeded with the brand name, the only known-correct English left after
+// fixing Handoff 036's six leaks. Anything else this gate finds is a finding
+// to report (§5.3/§7.4), not a row to add here.
+const ENGLISH_LEAK_EXCEPTIONS: &[EnglishLeakException] = &[
+    EnglishLeakException {
+        path: "render/shell.rs",
+        count: 1,
+        reason: "the \"zinnias\" brand name in the <title>, not a translatable UI string",
+    },
+    EnglishLeakException {
+        path: "handlers/static_files.rs",
+        count: 1,
+        reason: "the \"zinnias\" brand name in the offline page's <title>, not a translatable UI string",
+    },
+];
+
+/// Rust's `\`-continued string literals join the next line's content (minus
+/// leading whitespace) into the same literal — the exact shape that hid
+/// Handoff 036's six leaks from a naive single-line search. Collapsing it
+/// first lets both finders below treat a wrapped literal as the one string
+/// it compiles to.
+fn collapse_rust_line_continuations(src: &str) -> String {
+    let mut out = String::with_capacity(src.len());
+    let mut chars = src.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' && chars.peek() == Some(&'\n') {
+            chars.next();
+            while matches!(chars.peek(), Some(' ') | Some('\t')) {
+                chars.next();
+            }
+        } else {
+            out.push(c);
         }
+    }
+    out
+}
+
+/// A contiguous run of 4+ ASCII letters/spaces immediately before `</` —
+/// element text sitting right against its closing tag, independent of where
+/// the tag it belongs to opened. `{interpolation}` placeholders break the
+/// run at `{`, so a bare `{label}</a>` is never flagged; numbers and symbols
+/// break it too, so `42</span>` is never flagged.
+fn english_leak_element_text_findings(collapsed: &str) -> Vec<String> {
+    let chars: Vec<char> = collapsed.chars().collect();
+    let mut findings = Vec::new();
+    let mut i = 0;
+    while i + 1 < chars.len() {
+        if chars[i] == '<' && chars[i + 1] == '/' {
+            let mut j = i;
+            while j > 0 && (chars[j - 1].is_ascii_alphabetic() || chars[j - 1] == ' ') {
+                j -= 1;
+            }
+            if i - j >= 4 {
+                let run: String = chars[j..i].iter().collect();
+                if run.chars().any(|c| c.is_ascii_alphabetic()) {
+                    findings.push(run.trim().to_string());
+                }
+            }
+        }
+        i += 1;
+    }
+    findings
+}
+
+const USER_VISIBLE_ATTRS: &[&str] = &["aria-label", "title", "placeholder", "alt"];
+
+/// Removes every `{...}` span from an attribute value, so a mixed literal
+/// like `"Attendance for {name}"` still surfaces its literal half while a
+/// pure `"{main_label}"` interpolation does not.
+fn strip_placeholders(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '{' {
+            for c2 in chars.by_ref() {
+                if c2 == '}' {
+                    break;
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// `after_name` starts right after an attribute-name match, e.g.
+/// `="Save"...`. Recognises both the bare `="..."` and `\"`-escaped forms
+/// this codebase's `format!` string literals produce. The single-quoted
+/// `aria-label='` site in `render/nav.rs::header_with_switcher_next_localized`
+/// builds its value across separate `push_str` calls with no literal text
+/// between the quotes in the source — it cannot leak a static English string
+/// by construction, so single-quoted attributes are intentionally out of
+/// scope here.
+fn quoted_attr_value(after_name: &str) -> Option<&str> {
+    let s = after_name.strip_prefix('=')?;
+    let s = s.strip_prefix('\\').unwrap_or(s);
+    let s = s.strip_prefix('"')?;
+    let end = s.find('"')?;
+    let value = &s[..end];
+    Some(value.strip_suffix('\\').unwrap_or(value))
+}
+
+/// User-visible attribute values (`aria-label`, `title`, `placeholder`,
+/// `alt`) whose non-placeholder remainder still contains an ASCII letter
+/// run of 3+ characters — the shape of five of Handoff 036's six leaks, and
+/// explicitly "not optional" per that handoff (§4/§5.2).
+fn english_leak_attr_findings(collapsed: &str) -> Vec<String> {
+    let mut findings = Vec::new();
+    for attr in USER_VISIBLE_ATTRS {
+        for (idx, _) in collapsed.match_indices(attr) {
+            let after = &collapsed[idx + attr.len()..];
+            let Some(value) = quoted_attr_value(after) else {
+                continue;
+            };
+            let stripped = strip_placeholders(value);
+            let max_letter_run = stripped
+                .split(|c: char| !c.is_ascii_alphabetic())
+                .map(str::len)
+                .max()
+                .unwrap_or(0);
+            if max_letter_run >= 3 {
+                findings.push(format!("{attr}=\"{value}\""));
+            }
+        }
+    }
+    findings
+}
+
+#[test]
+fn rfc049_no_english_leaks_in_rendered_text_or_attributes() {
+    // Handoff 036: replaces the hand-maintained forbidden-string/file-list
+    // gate above with a default-fail walk, the same move Handoff 030 made
+    // for LOCALIZATION_EXCEPTIONS — a file this gate doesn't scan, or a leak
+    // shape its vocabulary doesn't know about, used to pass silently. Now an
+    // unlisted file with a real leak fails, and an unrecognised leak shape
+    // (element text or a user-visible attribute) is caught in every file the
+    // walk finds, not just eight hand-picked ones.
+    let files = handlers_and_render_files();
+    let src_dir = workers_ssr_src_dir();
+    let mut seen_exception_paths = std::collections::HashSet::new();
+    let mut unexpected: Vec<String> = Vec::new();
+
+    for path in &files {
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let collapsed = collapse_rust_line_continuations(&content);
+        let mut findings = english_leak_element_text_findings(&collapsed);
+        findings.extend(english_leak_attr_findings(&collapsed));
+
+        let rel = path
+            .strip_prefix(&src_dir)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        match ENGLISH_LEAK_EXCEPTIONS.iter().find(|e| e.path == rel) {
+            Some(exc) => {
+                seen_exception_paths.insert(exc.path);
+                assert_eq!(
+                    findings.len(),
+                    exc.count,
+                    "{rel}: found {} English leak(s) {:?}, pinned exception count is {} \
+                     ({}). Re-pin only if this is a deliberate, reviewed change — a partial \
+                     edit to an excluded file must not pass silently.",
+                    findings.len(),
+                    findings,
+                    exc.count,
+                    exc.reason
+                );
+            }
+            None => {
+                if !findings.is_empty() {
+                    unexpected.push(format!("{rel}: {findings:?}"));
+                }
+            }
+        }
+    }
+
+    assert!(
+        unexpected.is_empty(),
+        "English text leaked into rendered element text or a user-visible attribute \
+         (aria-label/title/placeholder/alt) and is not in ENGLISH_LEAK_EXCEPTIONS:\n{}\n\
+         Either localize it with a JA_*/Localized i18n constant, or — if it is a brand \
+         name or otherwise correctly not translated — add a table entry with the exact \
+         count and a written reason. If this is unexpected, report it — do not silently \
+         add a row.",
+        unexpected.join("\n")
+    );
+
+    for exc in ENGLISH_LEAK_EXCEPTIONS {
+        assert!(
+            seen_exception_paths.contains(exc.path),
+            "ENGLISH_LEAK_EXCEPTIONS names {} but the walk never found or matched it — \
+             stale table entry?",
+            exc.path
+        );
     }
 }
 
@@ -2662,7 +2847,7 @@ struct LocalizationException {
 const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     LocalizationException {
         path: "handlers/admin/events/attendance.rs",
-        ja_count: 12,
+        ja_count: 13,
         calls_bare_page: true,
         reason: "admin-only surface, RFC-072 Slice D",
     },
@@ -2680,7 +2865,7 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     },
     LocalizationException {
         path: "handlers/admin/events/create.rs",
-        ja_count: 6,
+        ja_count: 7,
         calls_bare_page: true,
         reason: "admin-only surface, RFC-072 Slice D",
     },
@@ -2758,7 +2943,7 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     },
     LocalizationException {
         path: "handlers/export.rs",
-        ja_count: 7,
+        ja_count: 8,
         calls_bare_page: true,
         reason: "admin-only surface, RFC-072 Slice D",
     },

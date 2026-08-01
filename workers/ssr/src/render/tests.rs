@@ -53,11 +53,17 @@ fn bottom_nav_localized_labels_switch_with_locale() {
     assert!(ja.contains(i18n::JA_NAV_HOME));
     assert!(ja.contains(i18n::JA_NAV_ME));
     assert!(!ja.contains(i18n::EN_NAV_HOME));
+    // Handoff 036: was a bare `aria-label="Main"` on every page's bottom
+    // nav — a screen-reader leak, checked as the exact attribute value.
+    assert!(ja.contains(&format!("aria-label=\"{}\"", i18n::JA_NAV_MAIN_ARIA_LABEL)));
+    assert!(!ja.contains(&format!("aria-label=\"{}\"", i18n::EN_NAV_MAIN_ARIA_LABEL)));
 
     let en = super::bottom_nav_localized("community-a", "me", Locale::En);
     assert!(en.contains(i18n::EN_NAV_HOME));
     assert!(en.contains(i18n::EN_NAV_ME));
     assert!(!en.contains(i18n::JA_NAV_HOME));
+    assert!(en.contains(&format!("aria-label=\"{}\"", i18n::EN_NAV_MAIN_ARIA_LABEL)));
+    assert!(!en.contains(&format!("aria-label=\"{}\"", i18n::JA_NAV_MAIN_ARIA_LABEL)));
 }
 
 #[test]

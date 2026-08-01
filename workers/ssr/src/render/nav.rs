@@ -27,9 +27,10 @@ pub fn bottom_nav_localized(community_id: &str, active: &str, locale: Locale) ->
         )
     };
     format!(
-        "<nav role=\"navigation\" aria-label=\"Main\" class=\"cz-bottom-nav\">\
+        "<nav role=\"navigation\" aria-label=\"{main_label}\" class=\"cz-bottom-nav\">\
          {home}{communities}{me}\
          </nav>",
+        main_label = i18n::t(locale, i18n::NAV_MAIN_ARIA_LABEL),
         home = tab(
             i18n::t(locale, i18n::NAV_HOME),
             &format!("/c/{community_id}/home"),

@@ -289,3 +289,43 @@ fn cell_label_templates_have_matching_placeholder_counts() {
         );
     }
 }
+
+// Handoff 036 §4.2: JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL is a bare constant (not
+// a Localized pair — this admin page is Japanese-only by RFC-072 Slice D
+// decision, so there is no `en` counterpart to compare against). The stable
+// invariant to pin instead is its own placeholder count, matching
+// `attendance.rs`'s `substitute_positional(..., &[&name])` call — one value,
+// one placeholder — so a future edit can't silently change the arity out
+// from under that call.
+#[test]
+fn admin_attend_member_aria_label_has_one_placeholder() {
+    assert_eq!(
+        super::JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL
+            .matches("{}")
+            .count(),
+        1,
+        "JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL must have exactly one {{}} placeholder, matching \
+         attendance.rs's single-value substitute_positional call"
+    );
+}
+
+// Handoff 036 §A: JA_ADMIN_EXPORT_SUMMARY_COUNTS is substituted by name
+// (`.replace("{events}", ...)`/`.replace("{members}", ...)` in export.rs),
+// not positionally — pin both placeholders present, in the reviewer-specified
+// order (events, then members), so a future edit can't silently drop one or
+// swap the order out from under export.rs's two `.replace()` calls.
+#[test]
+fn admin_export_summary_counts_has_both_named_placeholders_in_order() {
+    let s = super::JA_ADMIN_EXPORT_SUMMARY_COUNTS;
+    let events_pos = s
+        .find("{events}")
+        .expect("JA_ADMIN_EXPORT_SUMMARY_COUNTS must contain the {events} placeholder");
+    let members_pos = s
+        .find("{members}")
+        .expect("JA_ADMIN_EXPORT_SUMMARY_COUNTS must contain the {members} placeholder");
+    assert!(
+        events_pos < members_pos,
+        "JA_ADMIN_EXPORT_SUMMARY_COUNTS must keep {{events}} before {{members}}, matching the \
+         original literal's order"
+    );
+}

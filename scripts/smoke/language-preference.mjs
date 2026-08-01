@@ -301,6 +301,10 @@ async function collect(cdp) {
         text: a.innerText,
       }));
       const dayCell = document.querySelector('a[aria-label][href*="day="]');
+      // Handoff 036: the rendered attribute, not just the source i18n
+      // constant, is what a screen reader actually announces — this is the
+      // bottom nav landmark present on every member-facing page.
+      const bottomNavAriaLabel = document.querySelector('nav.cz-bottom-nav')?.getAttribute('aria-label') ?? null;
       // Handoff 026: scoped specifically to the attendance-status buttons
       // (form action '.../my-status'), not the page's general text — the
       // Event Detail counts line ("Going 0 . No Go 0 . No answer 3") was
@@ -317,6 +321,7 @@ async function collect(cdp) {
         links,
         values: Object.fromEntries(fields.map((el) => [el.getAttribute('name'), el.value])),
         dayCellAriaLabel: dayCell ? dayCell.getAttribute('aria-label') : null,
+        bottomNavAriaLabel,
         monthHeaderText: document.querySelector('h2 + p')?.innerText ?? null,
         noHorizontalScroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
         // RFC-075 Slice 3 §8 / Handoff 028 precedent: a measurement, not
@@ -425,6 +430,10 @@ try {
       htmlLangJa: meBeforeJa.htmlLang === 'ja',
       linksToLanguageSetting: meBeforeJa.hrefs.includes(`/c/${communityId}/me/language`),
       noHorizontalScrollAt200Percent: meBeforeJa.noHorizontalScroll,
+      // Handoff 036: proves the RENDERED attribute is Japanese, not just
+      // that the source constant exists — a screen reader reads this exact
+      // string on every page's bottom nav.
+      bottomNavAriaLabelIsJapanese: meBeforeJa.bottomNavAriaLabel === 'メインナビゲーション',
     },
   });
 
@@ -526,6 +535,9 @@ try {
       htmlLangEn: meEnglish.htmlLang === 'en',
       showsEnglishNav: meEnglish.text.includes('Home') && meEnglish.text.includes('Calendar'),
       noHorizontalScrollAt200Percent: meEnglish.noHorizontalScroll,
+      // Handoff 036: the rendered attribute must follow locale too, not
+      // just stay Japanese from before the switch.
+      bottomNavAriaLabelIsEnglish: meEnglish.bottomNavAriaLabel === 'Main navigation',
     },
   });
 

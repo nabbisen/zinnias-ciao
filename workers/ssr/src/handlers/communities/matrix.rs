@@ -92,19 +92,20 @@ pub(super) fn render_mode_tabs(
     };
 
     format!(
-        "<nav aria-label=\"Calendar view\" class=\"cz-tabs\">{}{}{}\
+        "<nav aria-label=\"{nav_label}\" class=\"cz-tabs\">{month_tab}{list_tab}{matrix_tab}\
          </nav>",
-        tab(
+        nav_label = i18n::t(locale, i18n::CALENDAR_VIEW_NAV_ARIA_LABEL),
+        month_tab = tab(
             &month_href,
             i18n::t(locale, i18n::CALENDAR_VIEW_MONTH),
             current == CalendarView::Month
         ),
-        tab(
+        list_tab = tab(
             &list_href,
             i18n::t(locale, i18n::CALENDAR_VIEW_LIST),
             current == CalendarView::List
         ),
-        tab(
+        matrix_tab = tab(
             &matrix_href,
             i18n::t(locale, i18n::CALENDAR_VIEW_MATRIX),
             current == CalendarView::Matrix
@@ -280,7 +281,7 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
          <div class=\"cz-matrix-header\">\
          <h2 class=\"cz-section-title\">{title}</h2>\
          <p class=\"cz-month-subtitle\">{month_header}</p>{export_controls}</div>\
-         <nav aria-label=\"Calendar month\" class=\"cz-calendar-nav\">\
+         <nav aria-label=\"{nav_label}\" class=\"cz-calendar-nav\">\
          <a href=\"{prev_url}\" class=\"cz-link cz-link--nav\">{prev_label}</a>\
          <a href=\"{current_url}\" class=\"cz-link cz-link--nav\">{current_label}</a>\
          <a href=\"{next_url}\" class=\"cz-link cz-link--nav\">{next_label}</a>\
@@ -292,6 +293,7 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
          {member_col}</th>{header_cells}</tr></thead>\
          <tbody>{body_rows}</tbody></table></div>{detail}</section>",
         title = i18n::t(locale, i18n::CALENDAR_MATRIX_TITLE),
+        nav_label = i18n::t(locale, i18n::CALENDAR_MONTH_NAV_ARIA_LABEL),
         month_header = month_header,
         prev_url = render::escape_html(&month_url(prev_year, prev_month)),
         next_url = render::escape_html(&month_url(next_year, next_month)),

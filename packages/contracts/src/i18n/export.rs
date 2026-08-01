@@ -13,3 +13,9 @@ pub const JA_EXPORT_PRIVACY_NOTE: &str =
     "メンバー名とメモが含まれます。ログイン情報や招待コードは含まれません。";
 pub const JA_EXPORT_DOWNLOAD_BTN: &str = "ファイルをダウンロード";
 pub const JA_EXPORT_SINGLE_USE: &str = "このリンクは1回限りで、5分後に無効になります。";
+// Handoff 036 §A: was a bare "{events} events · {members} active members" —
+// found by the new default-fail gate, unnamed by the handoff itself. A bare
+// constant, not a Localized pair: this admin-only page (RFC-072 Slice D) has
+// no English rendering to pair against. Two positional placeholders, order
+// preserved (events, then members) — see `substitute_positional`.
+pub const JA_ADMIN_EXPORT_SUMMARY_COUNTS: &str = "予定{events}件 · 有効メンバー{members}人";

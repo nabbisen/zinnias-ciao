@@ -107,6 +107,10 @@ pub const EN_ADMIN_ATTEND_SUBMIT: &str = "Save Attendance";
 
 pub const JA_ADMIN_CREATE_EVENT_TITLE: &str = "イベントを作成";
 pub const JA_ADMIN_CREATE_EVENT_SUBMIT: &str = "イベントを作成";
+// Handoff 036: was a bare "Use a template" link on this Japanese-only admin
+// page (RFC-072 Slice D). A bare constant, not a Localized pair, since this
+// page has no English rendering to pair against.
+pub const JA_ADMIN_USE_TEMPLATE_LINK: &str = "テンプレートを使う";
 pub const JA_REPEAT_END_OPEN: &str = "終了日を決めない";
 pub const JA_REPEAT_END_UNTIL: &str = "この日まで";
 pub const JA_REPEAT_END_COUNT: &str = "回数を指定";
@@ -163,6 +167,12 @@ pub const JA_ADMIN_CANNOT_ATTEND_CANCELLED: &str =
     "キャンセル済みのイベントの出席は修正できません。";
 pub const JA_ADMIN_ATTEND_TITLE: &str = "出席を記録";
 pub const JA_ADMIN_ATTEND_SUBMIT: &str = "出席を保存";
+// Handoff 036: was a bare English aria-label ("Attendance for {name}") on
+// this Japanese-only admin page (RFC-072 Slice D). A format template with
+// one positional placeholder, following matrix/cells.rs's
+// substitute_positional convention — not a Localized pair, since this page
+// has no English rendering to pair against.
+pub const JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL: &str = "{}の出欠";
 
 // ── Recurrence fields (RFC-022) ───────────────────────────────────────────
 pub const EN_REPEAT_LABEL: &str = "Repeat";

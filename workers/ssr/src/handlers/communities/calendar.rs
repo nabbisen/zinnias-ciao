@@ -74,11 +74,12 @@ pub(super) fn render_calendar_list(
         |y: i32, m: i32| format!("/c/{community_id}/communities?month={y:04}-{m:02}&view=list");
     let current_url = format!("/c/{community_id}/communities?view=list");
     let nav = format!(
-        "<nav aria-label=\"Calendar month\" class=\"cz-calendar-nav\">\
+        "<nav aria-label=\"{nav_label}\" class=\"cz-calendar-nav\">\
          <a href=\"{prev_url}\" class=\"cz-link cz-link--nav\">{prev_label}</a>\
          <a href=\"{current_url}\" class=\"cz-link cz-link--nav\">{current_label}</a>\
          <a href=\"{next_url}\" class=\"cz-link cz-link--nav\">{next_label}</a>\
          </nav>",
+        nav_label = i18n::t(locale, i18n::CALENDAR_MONTH_NAV_ARIA_LABEL),
         prev_url = render::escape_html(&month_url(prev_year, prev_month)),
         next_url = render::escape_html(&month_url(next_year, next_month)),
         current_url = render::escape_html(&current_url),
@@ -269,7 +270,7 @@ pub(super) fn render_calendar_month(
          <h2 class=\"cz-section-title cz-section-title--lg\">{title}</h2>\
          <p class=\"cz-month-subtitle\">{month_header}</p>\
          </div>\
-         <nav aria-label=\"Calendar month\" class=\"cz-calendar-nav\">\
+         <nav aria-label=\"{nav_label}\" class=\"cz-calendar-nav\">\
          <a href=\"{prev_url}\" class=\"cz-link cz-link--nav\">{prev_label}</a>\
          <a href=\"{current_url}\" class=\"cz-link cz-link--nav\">{current_label}</a>\
          <a href=\"{next_url}\" class=\"cz-link cz-link--nav\">{next_label}</a>\
@@ -280,6 +281,7 @@ pub(super) fn render_calendar_month(
          <div class=\"cz-calendar-clear-filter-row\">{clear_filter}</div>\
          </section>",
         title = i18n::t(locale, i18n::CALENDAR_MONTH_TITLE),
+        nav_label = i18n::t(locale, i18n::CALENDAR_MONTH_NAV_ARIA_LABEL),
         helper = i18n::t(locale, i18n::HOME_CALENDAR_HELPER),
         month_header = month_header,
         prev_url = render::escape_html(&month_url(prev_year, prev_month)),

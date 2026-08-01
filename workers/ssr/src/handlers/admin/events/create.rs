@@ -77,8 +77,9 @@ pub async fn get_create_event(
     let templates_link = format!(
         "<a href=\"/c/{cid}/admin/templates\" \
            class=\"cz-admin-template-link\">\
-           Use a template</a>",
+           {label}</a>",
         cid = render::escape_html(community_id),
+        label = i18n::JA_ADMIN_USE_TEMPLATE_LINK,
     );
 
     let cet = i18n::JA_ADMIN_CREATE_EVENT_TITLE;

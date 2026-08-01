@@ -78,6 +78,10 @@ pub const EN_NAV_SWITCH_GO: &str = "Switch";
 pub const JA_NAV_SWITCH_GO: &str = "切り替え";
 pub const EN_NAV_SWITCH_ARIA_LABEL: &str = "Switch community";
 pub const JA_NAV_SWITCH_ARIA_LABEL: &str = "コミュニティを切り替え";
+// Handoff 036: was a bare "Main" aria-label on every page's bottom nav —
+// the string a screen reader announces there, not just page text.
+pub const EN_NAV_MAIN_ARIA_LABEL: &str = "Main navigation";
+pub const JA_NAV_MAIN_ARIA_LABEL: &str = "メインナビゲーション";
 
 /// RFC-072 locale-aware pairs; see `i18n::Localized`.
 pub const NAV_HOME: Localized = Localized {
@@ -99,6 +103,10 @@ pub const NAV_SWITCH_GO: Localized = Localized {
 pub const NAV_SWITCH_ARIA_LABEL: Localized = Localized {
     ja: JA_NAV_SWITCH_ARIA_LABEL,
     en: EN_NAV_SWITCH_ARIA_LABEL,
+};
+pub const NAV_MAIN_ARIA_LABEL: Localized = Localized {
+    ja: JA_NAV_MAIN_ARIA_LABEL,
+    en: EN_NAV_MAIN_ARIA_LABEL,
 };
 
 // ── Role labels ───────────────────────────────────────────────────────────

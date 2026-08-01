@@ -25,6 +25,13 @@ pub const EN_CALENDAR_DAY_EVENTS_COUNT: &str = "events: ";
 // RFC-072 Slice C: own pair, not a reuse of ROLE_MEMBER — a role badge and
 // a table column header are different contexts (§5.4 of the handoff).
 pub const EN_CALENDAR_MATRIX_MEMBER_COLUMN: &str = "Member";
+// Handoff 036: two more bare aria-label leaks — the month-switcher <nav>
+// (calendar.rs's two sites and matrix.rs's one share this pair) and the
+// month/list/matrix tab <nav>. English improved over the literal that was
+// there ("Calendar month"/"Calendar view") to name the landmark's purpose
+// rather than its noun, per the handoff's own note.
+pub const EN_CALENDAR_MONTH_NAV_ARIA_LABEL: &str = "Month navigation";
+pub const EN_CALENDAR_VIEW_NAV_ARIA_LABEL: &str = "View selection";
 
 pub const JA_CALENDAR_MONTH_TITLE: &str = "今月の予定";
 pub const JA_CALENDAR_PREV_MONTH: &str = "前の月";
@@ -45,6 +52,8 @@ pub const JA_CALENDAR_MATRIX_NO_MEMBERS: &str = "有効なメンバーがいま�
 pub const JA_CALENDAR_MATRIX_CSV_EXPORT: &str = "CSVを保存";
 pub const JA_CALENDAR_DAY_EVENTS_COUNT: &str = "予定";
 pub const JA_CALENDAR_MATRIX_MEMBER_COLUMN: &str = "メンバー";
+pub const JA_CALENDAR_MONTH_NAV_ARIA_LABEL: &str = "月の切り替え";
+pub const JA_CALENDAR_VIEW_NAV_ARIA_LABEL: &str = "表示の切り替え";
 pub const JA_CALENDAR_MATRIX_CSV_ERROR: &str =
     "CSVを保存できませんでした。もう一度お試しください。";
 
@@ -124,6 +133,14 @@ pub const CALENDAR_DAY_EVENTS_COUNT: Localized = Localized {
 pub const CALENDAR_MATRIX_MEMBER_COLUMN: Localized = Localized {
     ja: JA_CALENDAR_MATRIX_MEMBER_COLUMN,
     en: EN_CALENDAR_MATRIX_MEMBER_COLUMN,
+};
+pub const CALENDAR_MONTH_NAV_ARIA_LABEL: Localized = Localized {
+    ja: JA_CALENDAR_MONTH_NAV_ARIA_LABEL,
+    en: EN_CALENDAR_MONTH_NAV_ARIA_LABEL,
+};
+pub const CALENDAR_VIEW_NAV_ARIA_LABEL: Localized = Localized {
+    ja: JA_CALENDAR_VIEW_NAV_ARIA_LABEL,
+    en: EN_CALENDAR_VIEW_NAV_ARIA_LABEL,
 };
 
 // ── Matrix cell aria-label templates (RFC-072 Slice C) ────────────────────

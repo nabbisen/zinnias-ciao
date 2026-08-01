@@ -55,6 +55,15 @@ pub async fn get_export_page(
         .unwrap_or(0);
 
     let nav = render::bottom_nav(community_id, "home");
+    // Handoff 036 §A: was a bare "{events} events · {members} active
+    // members" literal. `JA_ADMIN_EXPORT_SUMMARY_COUNTS` is a runtime &str
+    // (an i18n constant), so it can't sit inside the outer format!'s
+    // compile-time literal — substituted by name here instead of via
+    // `substitute_positional` (positional `{}`, not this template's named
+    // `{events}`/`{members}`).
+    let summary_counts = i18n::JA_ADMIN_EXPORT_SUMMARY_COUNTS
+        .replace("{events}", &event_count.to_string())
+        .replace("{members}", &member_count.to_string());
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -65,7 +74,7 @@ pub async fn get_export_page(
          <div class=\"cz-export-summary-card\">\
            <p class=\"cz-export-summary-name\"><strong>{name}</strong></p>\
            <p class=\"cz-export-summary-meta\">\
-             {events} events · {members} active members\
+             {summary_counts}\
            </p>\
          </div>\
          <a href=\"/c/{cid}/admin/export/json?token={token}\" \
@@ -89,8 +98,7 @@ pub async fn get_export_page(
             "admin_export"
         ),
         name = render::escape_html(&community_name),
-        events = event_count,
-        members = member_count,
+        summary_counts = summary_counts,
         cid = render::escape_html(community_id),
         token = render::escape_html(&dl_token),
         slug = render::escape_html(&slugify(&community_name)),
