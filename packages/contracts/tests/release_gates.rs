@@ -2786,12 +2786,6 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
         calls_bare_page: false,
         reason: "these functions take no arguments, so they have no membership and no locale to resolve (RFC-072 §6 non-change scope)",
     },
-    LocalizationException {
-        path: "render/event_card.rs",
-        ja_count: 4,
-        calls_bare_page: false,
-        reason: "dead code, no live caller anywhere in its history back to 89eebb7 (Handoff 026 §7.3) — not migrated, not deleted",
-    },
 ];
 
 fn handlers_and_render_files() -> Vec<std::path::PathBuf> {
@@ -4787,8 +4781,8 @@ fn invite_mark_used_does_not_write_membership_fk() {
 // was added instead of reaching for a `cz-*` class / `--cz-*` token; lower
 // this pin whenever a slice migrates more.
 
-const INLINE_STYLE_RATCHET: usize = 11;
-const HARDCODED_HEX_RATCHET: usize = 32;
+const INLINE_STYLE_RATCHET: usize = 1;
+const HARDCODED_HEX_RATCHET: usize = 25;
 
 fn workers_ssr_src_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../workers/ssr/src")

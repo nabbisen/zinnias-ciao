@@ -18,6 +18,17 @@ pub fn format_day_time_tz_localized(day: &CardDay<'_>, tz: &str, locale: Locale)
 }
 
 /// Format a day's time range for display (UTC — used when timezone is unknown).
+///
+/// Handoff 035 (dead-code sweep) finding: dead in production (no caller
+/// anywhere), surfaced by removing render.rs's module-wide
+/// `#![allow(dead_code)]`, pre-existing and unrelated to this sweep's three
+/// authorized deletions. `parse_utc_display`/`parse_utc_time` below are
+/// dead-in-production for the same reason (this function was their only
+/// production caller) but are exercised directly by `render/tests.rs` —
+/// the same "dead code with test coverage" shape as `status_chip`, which
+/// this handoff explicitly named for deletion. This one was not named, so
+/// it is a finding for the review request, not a deletion.
+#[allow(dead_code)]
 fn format_day_time(day: &CardDay<'_>) -> String {
     let starts = parse_utc_display(day.starts_at_utc);
     let ends = parse_utc_time(day.ends_at_utc);
@@ -36,6 +47,10 @@ fn utc_to_local_parts(utc: &str, offset_mins: i32) -> (String, String) {
 
 /// Apply a UTC offset and return "Mon D, HH:MM" in local time. Non-migrated
 /// pages: always Japanese. Behavior unchanged by RFC-072.
+///
+/// Handoff 035 (dead-code sweep) finding: dead in production, surfaced by
+/// the same allow removal — see `format_day_time` above.
+#[allow(dead_code)]
 fn apply_offset_display(utc: &str, offset_mins: i32) -> String {
     apply_offset_display_localized(utc, offset_mins, Locale::Ja)
 }
@@ -60,6 +75,11 @@ fn apply_offset_time(utc: &str, offset_mins: i32) -> String {
 }
 
 /// Non-migrated pages: always Japanese. Behavior unchanged by RFC-072.
+///
+/// Handoff 035 (dead-code sweep) finding: dead in production (only caller
+/// was `format_day_time`, itself dead) but exercised directly by
+/// `render/tests.rs` — see `format_day_time` above.
+#[allow(dead_code)]
 pub(super) fn parse_utc_display(utc: &str) -> String {
     parse_utc_display_localized(utc, Locale::Ja)
 }
@@ -80,6 +100,9 @@ pub(super) fn parse_utc_display_localized(utc: &str, locale: Locale) -> String {
     format!("{date_label} {time}")
 }
 
+/// Handoff 035 (dead-code sweep) finding: same shape as `parse_utc_display`
+/// above — dead in production, exercised directly by `render/tests.rs`.
+#[allow(dead_code)]
 pub(super) fn parse_utc_time(utc: &str) -> String {
     utc.split_once('T')
         .map(|(_, time)| time)

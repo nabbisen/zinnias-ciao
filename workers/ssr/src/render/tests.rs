@@ -229,19 +229,6 @@ fn status_display_follows_locale() {
 }
 
 #[test]
-fn status_chip_follows_locale() {
-    use zinnias_ciao_contracts::{Locale, i18n};
-
-    let ja = super::status::status_chip(Locale::Ja, Some("going"));
-    assert!(ja.contains(i18n::JA_STATUS_GOING));
-    assert!(!ja.contains(i18n::EN_STATUS_GOING));
-
-    let en = super::status::status_chip(Locale::En, Some("going"));
-    assert!(en.contains(i18n::EN_STATUS_GOING));
-    assert!(!en.contains(i18n::JA_STATUS_GOING));
-}
-
-#[test]
 fn status_form_follows_locale() {
     use zinnias_ciao_contracts::{Locale, i18n};
 

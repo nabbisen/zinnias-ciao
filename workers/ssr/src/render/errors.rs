@@ -2,6 +2,11 @@ use super::shell::shell;
 use worker::{Response, Result};
 use zinnias_ciao_contracts::i18n;
 
+/// Handoff 035 (dead-code sweep) finding: no caller anywhere in the tree,
+/// pre-existing and unrelated to this sweep's three authorized deletions —
+/// surfaced only by removing render.rs's module-wide
+/// `#![allow(dead_code)]`.
+#[allow(dead_code)]
 pub fn placeholder() -> Result<Response> {
     let body = format!(
         "<main class=\"cz-anon-main\">\

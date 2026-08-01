@@ -4,33 +4,68 @@ use zinnias_ciao_contracts::i18n;
 
 // CSS design tokens (RFC-011 §5 / RFC-020 v1.2 §E).
 // Must stay in sync with workers/ssr/static/app.css --cz-* custom properties.
+//
+// Handoff 035 (dead-code sweep) finding: every constant in this block is
+// dead. The 8 base tokens and the 4 "raw status colors" were already dead
+// before this sweep, hidden by render.rs's now-removed module-wide
+// `#![allow(dead_code)]`. The 12 status-triplet constants became dead as a
+// direct result of this sweep deleting `status_triplet`, their only
+// caller. Deleting these 24 constants is beyond this handoff's authorized
+// scope (§3 names three items; this block is not one of them) — flagged
+// in the review request as a follow-up, not removed here.
+#[allow(dead_code)]
 const CZ_COLOR_BG: &str = "#FFFFFF";
+#[allow(dead_code)]
 pub(super) const CZ_COLOR_SURFACE: &str = "#F5F5F7";
+#[allow(dead_code)]
 const CZ_COLOR_SURFACE_STRONG: &str = "#E5E5EA";
+#[allow(dead_code)]
 const CZ_COLOR_TEXT_PRIMARY: &str = "#1D1D1F";
+#[allow(dead_code)]
 pub(super) const CZ_COLOR_TEXT_SECONDARY: &str = "#6E6E73";
+#[allow(dead_code)]
 pub(super) const CZ_COLOR_DANGER: &str = "#FF3B30";
+#[allow(dead_code)]
 pub(super) const CZ_BORDER: &str = "#E5E5EA";
+#[allow(dead_code)]
 const CZ_BORDER_LIGHT: &str = "#F5F5F7";
 
 // Status triplets — fg passes WCAG AA (>=4.5:1) on white and on its own bg.
+// Dead since this sweep deleted status_triplet, their only caller.
+#[allow(dead_code)]
 const CZ_STATUS_GOING_FG: &str = "#005BBB";
+#[allow(dead_code)]
 const CZ_STATUS_GOING_BG: &str = "#EAF3FF";
+#[allow(dead_code)]
 pub(super) const CZ_STATUS_GOING_BORDER: &str = "#007AFF";
+#[allow(dead_code)]
 const CZ_STATUS_NOT_GOING_FG: &str = "#B42318";
+#[allow(dead_code)]
 const CZ_STATUS_NOT_GOING_BG: &str = "#FFF0EF";
+#[allow(dead_code)]
 const CZ_STATUS_NOT_GOING_BORDER: &str = "#FF3B30";
+#[allow(dead_code)]
 pub(super) const CZ_STATUS_ATTENDED_FG: &str = "#167A34";
+#[allow(dead_code)]
 const CZ_STATUS_ATTENDED_BG: &str = "#EDFAF0";
+#[allow(dead_code)]
 const CZ_STATUS_ATTENDED_BORDER: &str = "#34C759";
+#[allow(dead_code)]
 const CZ_STATUS_NO_ANSWER_FG: &str = "#6E6E73";
+#[allow(dead_code)]
 const CZ_STATUS_NO_ANSWER_BG: &str = "#F5F5F7";
+#[allow(dead_code)]
 const CZ_STATUS_NO_ANSWER_BORDER: &str = "#D1D1D6";
 
-// Raw status colors — decorative use only (avatar rings, tints).
+// Raw status colors — decorative use only (avatar rings, tints). Already
+// dead before this sweep.
+#[allow(dead_code)]
 const CZ_COLOR_GOING: &str = "#007AFF";
+#[allow(dead_code)]
 const CZ_COLOR_NOT_GOING: &str = "#FF3B30";
+#[allow(dead_code)]
 const CZ_COLOR_ATTENDED: &str = "#34C759";
+#[allow(dead_code)]
 const CZ_COLOR_NO_ANSWER: &str = "#8E8E93";
 
 // Status icons (RFC-011 §4).
@@ -79,48 +114,6 @@ pub fn status_display(
             i18n::t(locale, i18n::STATUS_NO_ANSWER),
         ),
     }
-}
-
-/// Full triplet (fg, bg, border) for a status.
-///
-/// **RFC-075 Slice 2 note:** this was `status_form`'s only caller, computing
-/// the inline `border`/`background`/`color` values its buttons used to carry.
-/// Those are now `cz-status-btn--{suffix}` classes plus a `--current`
-/// modifier (app.css) instead, so this function has no caller left anywhere
-/// in the tree as of this slice. Left in place rather than deleted — the
-/// same reasoning §7.4 applies to `event_card.rs`: removing a now-unused
-/// function is a distinct decision from a presentation migration and
-/// deserves its own small, reviewed step, not a silent deletion bundled in
-/// here. Flagged in the review request.
-pub fn status_triplet(status: Option<&str>) -> (&'static str, &'static str, &'static str) {
-    match status {
-        Some("going") => (
-            CZ_STATUS_GOING_FG,
-            CZ_STATUS_GOING_BG,
-            CZ_STATUS_GOING_BORDER,
-        ),
-        Some("not_going") => (
-            CZ_STATUS_NOT_GOING_FG,
-            CZ_STATUS_NOT_GOING_BG,
-            CZ_STATUS_NOT_GOING_BORDER,
-        ),
-        Some("attended") => (
-            CZ_STATUS_ATTENDED_FG,
-            CZ_STATUS_ATTENDED_BG,
-            CZ_STATUS_ATTENDED_BORDER,
-        ),
-        _ => (
-            CZ_STATUS_NO_ANSWER_FG,
-            CZ_STATUS_NO_ANSWER_BG,
-            CZ_STATUS_NO_ANSWER_BORDER,
-        ),
-    }
-}
-
-/// Status chip for event cards (read-only).
-pub fn status_chip(locale: Locale, status: Option<&str>) -> String {
-    let (class, icon, label) = status_display(locale, status);
-    format!("<span class=\"cz-status-chip cz-status-text--{class}\">{icon} {label}</span>")
 }
 
 /// Three-button status form for Event Detail (RFC-006).
