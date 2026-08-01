@@ -472,7 +472,6 @@ fn i18n_en_ja_parity_count() {
         (EN_TEMPLATES_SAVE_BTN, JA_TEMPLATES_SAVE_BTN),
         (EN_TEMPLATES_USE_BTN, JA_TEMPLATES_USE_BTN),
         (EN_TEMPLATES_DELETE_BTN, JA_TEMPLATES_DELETE_BTN),
-        (EN_TEMPLATES_USE_LINK, JA_TEMPLATES_USE_LINK),
         (EN_EXPORT_TITLE, JA_EXPORT_TITLE),
         (EN_EXPORT_DESCRIPTION, JA_EXPORT_DESCRIPTION),
         (EN_EXPORT_PRIVACY_NOTE, JA_EXPORT_PRIVACY_NOTE),
@@ -1766,6 +1765,125 @@ fn rfc049_no_english_leaks_in_rendered_text_or_attributes() {
     }
 }
 
+/// Handoff 037 §5: same exceptions-table shape as `LOCALIZATION_EXCEPTIONS`/
+/// `ENGLISH_LEAK_EXCEPTIONS` (explicit path, stale-entry assertion) — minus
+/// a count and a written reason, since a flash code is binary right-or-wrong
+/// with no legitimate reason to differ per file (unlike a brand name or an
+/// admin-only exception), so there is nothing for a reason to justify. Add
+/// both back if a real exception is ever needed. Expected to stay empty.
+const FLASH_CODE_EXCEPTIONS: &[&str] = &[];
+
+/// Text before a file's first `#[cfg(test)]` marker — every file in this
+/// tree that has an inline test module puts it once, at the end (confirmed
+/// by inspection, not assumed), so this reliably excludes test fixture data
+/// (e.g. `admin/members.rs`'s own `invite_get_preflight` test, which uses
+/// `"flash=Code+revoked"` as unrelated example query data) from production
+/// scanning. Files with a separate sibling `tests.rs` never match here since
+/// `handlers_and_render_files()` already excludes files named `tests.rs`.
+fn production_region(content: &str) -> &str {
+    match content.find("#[cfg(test)]") {
+        Some(idx) => &content[..idx],
+        None => content,
+    }
+}
+
+/// Drops `//...` line-comment text before scanning — a doc comment
+/// mentioning `` `?flash=Code+revoked` `` as an example (exactly what this
+/// gate's own source does, a few lines above) is not a redirect literal.
+/// No production string literal in this tree contains `//` on the same line
+/// as a `flash=` value, so this cannot hide a real site.
+fn strip_line_comments(content: &str) -> String {
+    content
+        .lines()
+        .map(|line| line.split("//").next().unwrap_or(""))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// A `?flash=`/`&flash=` value that is not a lowercase-snake-case code and
+/// not a `{...}` dynamic REF interpolation (the already-correct `me.rs`
+/// pattern — dynamic per-request, nothing static to check) is a violation:
+/// an uppercase letter, `+`, `%20`, or any other character prose would
+/// produce but a code never would.
+fn flash_code_violations(production: &str) -> Vec<String> {
+    let mut violations = Vec::new();
+    for anchor in ["?flash=", "&flash="] {
+        for (idx, _) in production.match_indices(anchor) {
+            let after = &production[idx + anchor.len()..];
+            let end = after.find('"').unwrap_or(after.len());
+            let value = &after[..end];
+            if value.starts_with('{') {
+                continue;
+            }
+            let is_snake_case = !value.is_empty()
+                && value
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+            if !is_snake_case {
+                violations.push(value.to_string());
+            }
+        }
+    }
+    violations
+}
+
+#[test]
+fn rfc072_flash_query_values_are_lowercase_snake_case_codes_not_prose() {
+    // Handoff 037 §5: the new English-leak gate scans rendered templates and
+    // cannot see this class — the source-level template at each flash site
+    // is just `{}`, a bare interpolation placeholder; the English only
+    // exists at runtime, in a query string built by the redirecting
+    // handler. But the redirect side IS static text
+    // (`"...?flash=Note+removed"`), so a gate can catch the whole class at
+    // the point a redirect is written, default-fail like its siblings.
+    let files = handlers_and_render_files();
+    let src_dir = workers_ssr_src_dir();
+    let mut seen_exception_paths = std::collections::HashSet::new();
+    let mut unexpected: Vec<String> = Vec::new();
+
+    for path in &files {
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let stripped = strip_line_comments(&content);
+        let violations = flash_code_violations(production_region(&stripped));
+
+        let rel = path
+            .strip_prefix(&src_dir)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        match FLASH_CODE_EXCEPTIONS.iter().find(|&&p| p == rel) {
+            Some(&path) => {
+                seen_exception_paths.insert(path);
+            }
+            None => {
+                if !violations.is_empty() {
+                    unexpected.push(format!("{rel}: {violations:?}"));
+                }
+            }
+        }
+    }
+
+    assert!(
+        unexpected.is_empty(),
+        "?flash= query value is not a lowercase snake_case code (or is missing entirely) and \
+         is not in FLASH_CODE_EXCEPTIONS:\n{}\n\
+         Prose in a flash query string is exactly how English leaked into rendered flash text \
+         (Handoff 037) — map it through a per-surface code mapper (see \
+         `calendar_flash_message`/`note_flash_message`) instead.",
+        unexpected.join("\n")
+    );
+
+    for &exc_path in FLASH_CODE_EXCEPTIONS {
+        assert!(
+            seen_exception_paths.contains(exc_path),
+            "FLASH_CODE_EXCEPTIONS names {exc_path} but the walk never found or matched it — \
+             stale table entry?"
+        );
+    }
+}
+
 #[test]
 fn rfc061_member_management_is_discoverable_from_admin_workflows() {
     assert!(
@@ -2847,7 +2965,7 @@ struct LocalizationException {
 const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     LocalizationException {
         path: "handlers/admin/events/attendance.rs",
-        ja_count: 13,
+        ja_count: 14,
         calls_bare_page: true,
         reason: "admin-only surface, RFC-072 Slice D",
     },
@@ -2919,7 +3037,7 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     },
     LocalizationException {
         path: "handlers/admin/members.rs",
-        ja_count: 26,
+        ja_count: 28,
         calls_bare_page: true,
         reason: "admin-only surface, RFC-072 Slice D",
     },
@@ -2961,7 +3079,7 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     },
     LocalizationException {
         path: "handlers/templates.rs",
-        ja_count: 12,
+        ja_count: 15,
         calls_bare_page: true,
         reason: "admin-only surface, RFC-072 Slice D",
     },

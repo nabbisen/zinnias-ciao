@@ -194,7 +194,6 @@ fn en_ja_parity() {
         "TEMPLATES_SAVE_BTN",
         "TEMPLATES_USE_BTN",
         "TEMPLATES_DELETE_BTN",
-        "TEMPLATES_USE_LINK",
         // Export (RFC-027)
         "EXPORT_TITLE",
         "EXPORT_DESCRIPTION",
@@ -227,7 +226,7 @@ fn en_ja_parity() {
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
     ];
-    assert_eq!(en_keys.len(), 202, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 201, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

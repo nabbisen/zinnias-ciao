@@ -14,6 +14,21 @@ use crate::form_token::ConsumeResult;
 use crate::render;
 use zinnias_ciao_contracts::i18n;
 
+/// Handoff 037: the `calendar_flash_message` pattern, admin-only Japanese
+/// (RFC-072 Slice D — no locale to resolve). Unknown codes return `None`;
+/// the caller must render no flash element in that case, not echo the code.
+/// Replaces a prior inline match against the mixed-case, space-containing
+/// value `"Code revoked"` (this file's redirect emitted `?flash=Code+revoked`,
+/// which `query_pairs()` decodes back to a space) — that arm resolved to
+/// `i18n::JA_ADMIN_INVITES_REVOKED`, now unused as a direct result of this
+/// change (reported, not deleted, in the review request).
+fn invites_flash_message(code: Option<&str>) -> Option<&'static str> {
+    match code {
+        Some("invite_revoked") => Some(i18n::JA_ADMIN_INVITE_REVOKED_FLASH),
+        _ => None,
+    }
+}
+
 fn redirect(url: &str) -> Result<Response> {
     let mut r = Response::empty()?;
     r.headers_mut().set("Location", url)?;
@@ -122,10 +137,11 @@ pub async fn get_invites(
 ) -> Result<Response> {
     let url = req.url()?;
     match run_invite_get_preflight(invite_get_preflight(url.query(), community_id), || {
-        let flash = url
+        let flash_code = url
             .query_pairs()
-            .any(|(key, value)| key == "flash" && value == "Code revoked")
-            .then_some(i18n::JA_ADMIN_INVITES_REVOKED);
+            .find(|(key, _)| key == "flash")
+            .map(|(_, value)| value.into_owned());
+        let flash = invites_flash_message(flash_code.as_deref());
         get_invites_authenticated(req, env, community_id, flash)
     }) {
         ControlFlow::Break(location) => legacy_query_redirect(&location),
@@ -380,7 +396,7 @@ pub async fn post_revoke_invite(
         .await?;
 
     redirect(&format!(
-        "/c/{community_id}/admin/invites?flash=Code+revoked"
+        "/c/{community_id}/admin/invites?flash=invite_revoked"
     ))
 }
 
@@ -505,6 +521,24 @@ pub async fn get_members(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invites_flash_message_matches_known_code() {
+        assert_eq!(
+            invites_flash_message(Some("invite_revoked")),
+            Some(i18n::JA_ADMIN_INVITE_REVOKED_FLASH)
+        );
+    }
+
+    #[test]
+    fn invites_flash_message_ignores_unknown_query_text() {
+        assert_eq!(invites_flash_message(Some("Code revoked")), None);
+        assert_eq!(
+            invites_flash_message(Some("<script>alert(1)</script>")),
+            None
+        );
+        assert_eq!(invites_flash_message(None), None);
+    }
 
     #[test]
     fn canonical_invite_path_encodes_every_non_allowlisted_byte() {

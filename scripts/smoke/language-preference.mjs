@@ -322,6 +322,10 @@ async function collect(cdp) {
         values: Object.fromEntries(fields.map((el) => [el.getAttribute('name'), el.value])),
         dayCellAriaLabel: dayCell ? dayCell.getAttribute('aria-label') : null,
         bottomNavAriaLabel,
+        // Handoff 037: the rendered flash text after saving a note on Event
+        // Detail — proves the code->locale mapping actually reaches the
+        // page, not just that the mapper function returns the right string.
+        noteFlashText: document.querySelector('.cz-note-flash')?.innerText ?? null,
         monthHeaderText: document.querySelector('h2 + p')?.innerText ?? null,
         noHorizontalScroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
         // RFC-075 Slice 3 §8 / Handoff 028 precedent: a measurement, not
@@ -369,6 +373,27 @@ async function selectRadioAndSubmit(cdp, radioSelector, formAction) {
     })()`,
   );
   if (!submitted) throw new Error(`Radio or form not found: ${radioSelector} / ${formAction}`);
+  await withTimeout(loaded, `submit form to ${formAction}`);
+}
+
+async function fillFieldAndSubmit(cdp, fieldSelector, value, formAction) {
+  const loaded = cdp.once('Page.loadEventFired');
+  const submitted = await evalExpr(
+    cdp,
+    `(() => {
+      const field = document.querySelector(${JSON.stringify(fieldSelector)});
+      if (!field) return false;
+      field.value = ${JSON.stringify(value)};
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      const form = [...document.querySelectorAll('form[action]')].find(
+        (item) => item.getAttribute('action') === ${JSON.stringify(formAction)},
+      );
+      if (!form) return false;
+      form.requestSubmit();
+      return true;
+    })()`,
+  );
+  if (!submitted) throw new Error(`Field or form not found: ${fieldSelector} / ${formAction}`);
   await withTimeout(loaded, `submit form to ${formAction}`);
 }
 
@@ -468,6 +493,28 @@ try {
       htmlLangJa: eventDetailJapanese.htmlLang === 'ja',
       attendanceButtonsRendered: eventDetailJapanese.statusButtons.length > 0,
       noHorizontalScrollAt200Percent: eventDetailJapanese.noHorizontalScroll,
+    },
+  });
+
+  // Handoff 037: saving a note is a real `?flash=note_saved` redirect round
+  // trip, not a mapper unit test — proves the member actually sees the
+  // Japanese flash text, not just that `note_flash_message` returns it.
+  logStep('confirming saving a note on Event Detail shows the Japanese flash message');
+  await fillFieldAndSubmit(
+    page,
+    'textarea[name="note"]',
+    'RFC072 smoke note (ja)',
+    `/c/${communityId}/events/${eventId}/my-note`,
+  );
+  const eventDetailNoteSavedJapanese = await collect(page);
+  results.push({
+    name: 'event-detail-note-save-flash-is-japanese',
+    observed: eventDetailNoteSavedJapanese,
+    checks: {
+      htmlLangJa: eventDetailNoteSavedJapanese.htmlLang === 'ja',
+      redirectedWithFlashCode: eventDetailNoteSavedJapanese.path ===
+        `/c/${communityId}/events/${eventId}?flash=note_saved`,
+      noteFlashIsJapanese: eventDetailNoteSavedJapanese.noteFlashText === 'メモを保存しました。',
     },
   });
 
@@ -679,6 +726,26 @@ try {
         (label) => !/[぀-ヿ一-鿿]/.test(label ?? ''),
       ),
       noHorizontalScrollAt200Percent: eventDetailEnglish.noHorizontalScroll,
+    },
+  });
+
+  logStep('confirming saving a note on Event Detail shows the English flash message');
+  await fillFieldAndSubmit(
+    page,
+    'textarea[name="note"]',
+    'RFC072 smoke note (en)',
+    `/c/${communityId}/events/${eventId}/my-note`,
+  );
+  const eventDetailNoteSavedEnglish = await collect(page);
+  results.push({
+    name: 'event-detail-note-save-flash-is-english',
+    observed: eventDetailNoteSavedEnglish,
+    checks: {
+      htmlLangEn: eventDetailNoteSavedEnglish.htmlLang === 'en',
+      redirectedWithFlashCode: eventDetailNoteSavedEnglish.path ===
+        `/c/${communityId}/events/${eventId}?flash=note_saved`,
+      noteFlashIsEnglish: eventDetailNoteSavedEnglish.noteFlashText === 'Note saved.',
+      noteFlashHasNoJapanese: !/[぀-ヿ一-鿿]/.test(eventDetailNoteSavedEnglish.noteFlashText ?? ''),
     },
   });
 

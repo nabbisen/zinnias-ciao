@@ -20,6 +20,18 @@ fn redirect(location: &str) -> Result<Response> {
     Ok(resp.with_status(303))
 }
 
+/// Handoff 037: the `calendar_flash_message` pattern, admin-only Japanese
+/// (RFC-072 Slice D — no locale to resolve). Unknown codes return `None`;
+/// the caller must render no flash element in that case, not echo the code.
+fn templates_flash_message(code: Option<&str>) -> Option<&'static str> {
+    match code {
+        Some("title_required") => Some(i18n::JA_ADMIN_TEMPLATE_TITLE_REQUIRED_FLASH),
+        Some("template_saved") => Some(i18n::JA_ADMIN_TEMPLATE_SAVED_FLASH),
+        Some("template_deleted") => Some(i18n::JA_ADMIN_TEMPLATE_DELETED_FLASH),
+        _ => None,
+    }
+}
+
 // ── GET /c/:cid/admin/templates ───────────────────────────────────────────
 
 pub async fn get_templates(
@@ -52,15 +64,15 @@ pub async fn get_templates(
         .collect();
 
     let url = req.url()?;
-    let flash: Option<String> = url
+    let flash_code: Option<String> = url
         .query_pairs()
         .find(|(k, _)| k == "flash")
         .map(|(_, v)| v.to_string());
-    let flash_html = flash
-        .map(|f| {
+    let flash_html = templates_flash_message(flash_code.as_deref())
+        .map(|message| {
             format!(
                 "<p role=\"status\" class=\"cz-admin-invite-flash\">{}</p>",
-                render::escape_html(&f)
+                render::escape_html(message)
             )
         })
         .unwrap_or_default();
@@ -219,7 +231,7 @@ pub async fn post_create_template(
     let title = title.trim();
     if title.is_empty() || title.len() > 80 {
         return redirect(&format!(
-            "/c/{community_id}/admin/templates?flash=Title+required"
+            "/c/{community_id}/admin/templates?flash=title_required"
         ));
     }
 
@@ -254,7 +266,7 @@ pub async fn post_create_template(
     }
 
     redirect(&format!(
-        "/c/{community_id}/admin/templates?flash=Template+saved"
+        "/c/{community_id}/admin/templates?flash=template_saved"
     ))
 }
 
@@ -295,6 +307,9 @@ pub async fn post_delete_template(
     .await?;
 
     redirect(&format!(
-        "/c/{community_id}/admin/templates?flash=Template+deleted"
+        "/c/{community_id}/admin/templates?flash=template_deleted"
     ))
 }
+
+#[cfg(test)]
+mod tests;

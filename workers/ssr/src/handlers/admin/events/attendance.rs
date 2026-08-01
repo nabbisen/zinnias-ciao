@@ -10,6 +10,16 @@ use crate::render;
 
 use super::support::redirect;
 
+/// Handoff 037: the `calendar_flash_message` pattern, admin-only Japanese
+/// (RFC-072 Slice D — no locale to resolve). Unknown codes return `None`;
+/// the caller must render no flash element in that case, not echo the code.
+fn attendance_flash_message(code: Option<&str>) -> Option<&'static str> {
+    match code {
+        Some("attendance_saved") => Some(i18n::JA_ADMIN_ATTENDANCE_SAVED_FLASH),
+        _ => None,
+    }
+}
+
 /// Substitute a template's `{}` placeholders positionally, in order. Mirrors
 /// `matrix::cells::substitute_positional` (RFC-072 Slice C) — duplicated
 /// rather than imported since that helper is `pub(super)` to the `matrix`
@@ -130,16 +140,16 @@ pub async fn get_attendance(
         }
     }
 
-    let flash: Option<String> = req
+    let flash_code: Option<String> = req
         .url()?
         .query_pairs()
         .find(|(k, _)| k == "flash")
         .map(|(_, v)| v.to_string());
-    let flash_html = flash
-        .map(|f| {
+    let flash_html = attendance_flash_message(flash_code.as_deref())
+        .map(|message| {
             format!(
                 "<p role=\"status\" class=\"cz-admin-flash-success\">{}</p>",
-                render::escape_html(&f)
+                render::escape_html(message)
             )
         })
         .unwrap_or_default();
@@ -254,6 +264,10 @@ pub async fn post_attendance(
     .await?;
 
     redirect(&format!(
-        "/c/{community_id}/admin/events/{event_id}/attendance?flash=Saved"
+        "/c/{community_id}/admin/events/{event_id}/attendance?flash=attendance_saved"
     ))
 }
+
+#[cfg(test)]
+#[path = "attendance/tests.rs"]
+mod tests;

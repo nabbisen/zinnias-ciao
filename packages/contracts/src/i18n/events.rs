@@ -173,6 +173,9 @@ pub const JA_ADMIN_ATTEND_SUBMIT: &str = "出席を保存";
 // substitute_positional convention — not a Localized pair, since this page
 // has no English rendering to pair against.
 pub const JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL: &str = "{}の出欠";
+// Handoff 037: was a raw-English `?flash=Saved` query value echoed verbatim
+// into rendered text on this Japanese-only admin page.
+pub const JA_ADMIN_ATTENDANCE_SAVED_FLASH: &str = "保存しました。";
 
 // ── Recurrence fields (RFC-022) ───────────────────────────────────────────
 pub const EN_REPEAT_LABEL: &str = "Repeat";

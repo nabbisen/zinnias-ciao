@@ -120,6 +120,6 @@ pub async fn post_admin_hide_note(
     .await?;
 
     redirect(&format!(
-        "/c/{community_id}/events/{event_id}?flash=Note+removed"
+        "/c/{community_id}/events/{event_id}?flash=note_hidden"
     ))
 }

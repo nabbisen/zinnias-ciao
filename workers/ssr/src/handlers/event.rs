@@ -21,6 +21,22 @@ fn redirect(url: &str) -> Result<Response> {
     Ok(r.with_status(303))
 }
 
+/// Handoff 037: the `calendar_flash_message`/`me_flash_message` pattern — a
+/// lowercase snake_case code in the query, matched (not echoed) against a
+/// locale-aware string. Unknown codes return `None`, same as those two; the
+/// caller must render no flash element in that case, not fall back to
+/// echoing the raw code.
+fn note_flash_message(
+    locale: zinnias_ciao_contracts::Locale,
+    code: Option<&str>,
+) -> Option<&'static str> {
+    match code {
+        Some("note_saved") => Some(i18n::t(locale, i18n::NOTE_SAVED_FLASH)),
+        Some("note_hidden") => Some(i18n::t(locale, i18n::NOTE_HIDDEN_FLASH)),
+        _ => None,
+    }
+}
+
 // ── GET /c/:cid/events/:eid ──────────────────────────────────────────────
 
 pub async fn get_event_detail(
@@ -217,7 +233,7 @@ pub async fn get_event_detail(
         event_id,
         &save_token,
         my_note.as_ref().map(|n| n.note.as_str()),
-        flash,
+        note_flash_message(locale, flash),
     );
 
     // ── Other members' notes (admin gets a link to the confirmation page) ────
@@ -502,7 +518,9 @@ pub async fn post_my_note(
     )
     .await?;
     if matches!(replay, crate::codlet::ConsumeResult::Replay(_)) {
-        return redirect(&format!("/c/{community_id}/events/{event_id}?flash=saved"));
+        return redirect(&format!(
+            "/c/{community_id}/events/{event_id}?flash=note_saved"
+        ));
     }
 
     let note: String = match validate_note(&raw_note) {
@@ -514,7 +532,9 @@ pub async fn post_my_note(
     };
 
     note_db::upsert(&db, event_id, &membership.membership_id, &note).await?;
-    redirect(&format!("/c/{community_id}/events/{event_id}?flash=saved"))
+    redirect(&format!(
+        "/c/{community_id}/events/{event_id}?flash=note_saved"
+    ))
 }
 
 // ── GET /c/:cid/events/:eid/my-note/delete ───────────────────────────────

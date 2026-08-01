@@ -24,6 +24,17 @@ pub const EN_NOTE_KEEP_ACTION: &str = "Keep note";
 pub const JA_NOTE_KEEP_ACTION: &str = "メモを保持";
 pub const EN_NOTE_DELETE_BODY: &str = "Your note will be removed. This cannot be undone.";
 
+// Handoff 037: were raw-English `?flash=saved`/`?flash=Note+removed` query
+// values echoed verbatim into rendered text on Event Detail — member-facing,
+// so `Localized` pairs, resolved through a per-surface code mapper
+// (`note_flash_message`, `event.rs`), the `calendar_flash_message` pattern.
+// "Hidden", not "removed": the action is `ADMIN_HIDE_NOTE` — the note is
+// hidden, not deleted, and the old English said something untrue.
+pub const EN_NOTE_SAVED_FLASH: &str = "Note saved.";
+pub const EN_NOTE_HIDDEN_FLASH: &str = "Note hidden.";
+pub const JA_NOTE_SAVED_FLASH: &str = "メモを保存しました。";
+pub const JA_NOTE_HIDDEN_FLASH: &str = "メモを非表示にしました。";
+
 /// RFC-072 locale-aware pairs; see `i18n::Localized`.
 pub const NOTE_DELETE: super::Localized = super::Localized {
     ja: JA_NOTE_DELETE,
@@ -56,4 +67,12 @@ pub const NOTE_CHAR_HINT: super::Localized = super::Localized {
 pub const NOTE_VISIBILITY: super::Localized = super::Localized {
     ja: JA_NOTE_VISIBILITY,
     en: EN_NOTE_VISIBILITY,
+};
+pub const NOTE_SAVED_FLASH: super::Localized = super::Localized {
+    ja: JA_NOTE_SAVED_FLASH,
+    en: EN_NOTE_SAVED_FLASH,
+};
+pub const NOTE_HIDDEN_FLASH: super::Localized = super::Localized {
+    ja: JA_NOTE_HIDDEN_FLASH,
+    en: EN_NOTE_HIDDEN_FLASH,
 };

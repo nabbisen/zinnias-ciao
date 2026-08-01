@@ -10,7 +10,6 @@ pub const EN_TEMPLATES_DUR_LABEL: &str = "Default duration in minutes (optional)
 pub const EN_TEMPLATES_SAVE_BTN: &str = "Save template";
 pub const EN_TEMPLATES_USE_BTN: &str = "Use";
 pub const EN_TEMPLATES_DELETE_BTN: &str = "Delete";
-pub const EN_TEMPLATES_USE_LINK: &str = "Use a template";
 
 pub const JA_TEMPLATES_TITLE: &str = "イベントテンプレート";
 pub const JA_TEMPLATES_DESCRIPTION: &str =
@@ -23,4 +22,11 @@ pub const JA_TEMPLATES_DUR_LABEL: &str = "デフォルトの所要時間（分�
 pub const JA_TEMPLATES_SAVE_BTN: &str = "テンプレートを保存";
 pub const JA_TEMPLATES_USE_BTN: &str = "使用";
 pub const JA_TEMPLATES_DELETE_BTN: &str = "削除";
-pub const JA_TEMPLATES_USE_LINK: &str = "テンプレートを使用";
+
+// Handoff 037: were raw-English `?flash=Title+required`/`Template+saved`/
+// `Template+deleted` query values echoed verbatim into rendered text. This
+// admin-only page is Japanese-only by RFC-072 Slice D decision, so bare
+// constants, not Localized pairs.
+pub const JA_ADMIN_TEMPLATE_TITLE_REQUIRED_FLASH: &str = "タイトルを入力してください。";
+pub const JA_ADMIN_TEMPLATE_SAVED_FLASH: &str = "テンプレートを保存しました。";
+pub const JA_ADMIN_TEMPLATE_DELETED_FLASH: &str = "テンプレートを削除しました。";

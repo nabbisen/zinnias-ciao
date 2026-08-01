@@ -23,6 +23,13 @@ pub const JA_ADMIN_INVITES_REVEAL_WARNING: &str = "このコードを今コピ�
 pub const JA_ADMIN_INVITES_REVOKE: &str = "無効化";
 pub const JA_ADMIN_INVITES_REVOKED: &str = "コードを無効化しました";
 pub const JA_ADMIN_INVITES_BACK_TO_MEMBERS: &str = "メンバー管理へ戻る";
+// Handoff 037: was a raw-English `?flash=Code+revoked` query value matched
+// (not echoed) against `JA_ADMIN_INVITES_REVOKED` above — matched by an
+// improperly-cased key, not a lowercase snake_case code. This new constant
+// replaces that match arm; `JA_ADMIN_INVITES_REVOKED`/`EN_ADMIN_INVITES_REVOKED`
+// above are now unused as a direct result — reported, not deleted here (see
+// review request).
+pub const JA_ADMIN_INVITE_REVOKED_FLASH: &str = "招待コードを無効にしました。";
 
 // ── Admin: member management ──────────────────────────────────────────────
 pub const EN_ADMIN_MEMBERS_TITLE: &str = "Members";
