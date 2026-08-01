@@ -130,24 +130,23 @@ fn render_relink_form(token: &str, error: Option<&str>) -> Result<Response> {
     let error_html = error
         .map(|e| {
             format!(
-                "<p role=\"alert\" style=\"color:#FF3B30;margin:.75rem 0\">{}</p>",
+                "<p role=\"alert\" class=\"cz-relink-error-text\">{}</p>",
                 escape_html(e)
             )
         })
         .unwrap_or_default();
     let body = format!(
-        "<main style=\"padding:2rem;max-width:480px;margin:auto;font-family:system-ui,sans-serif\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600\">{title}</h1>\
-         <p style=\"color:#6e6e73\">{body}</p>\
+        "<main class=\"cz-anon-main\">\
+         <h1 class=\"cz-anon-title\">{title}</h1>\
+         <p class=\"cz-anon-subtitle\">{body}</p>\
          {error_html}\
-         <form method=\"post\" action=\"/relink\" style=\"margin-top:1.5rem\">\
+         <form method=\"post\" action=\"/relink\" class=\"cz-anon-form\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
-           <label for=\"code\" style=\"display:block;font-size:.875rem;margin-bottom:.375rem\">{code_label}</label>\
+           <label for=\"code\" class=\"cz-relink-label\">{code_label}</label>\
            <input id=\"code\" name=\"code\" inputmode=\"text\" autocomplete=\"one-time-code\" required \
-             style=\"width:100%;font-size:1.25rem;padding:.75rem;border:1px solid #d1d1d6;border-radius:12px;box-sizing:border-box;text-transform:uppercase\">\
+             class=\"cz-relink-code-input\">\
            <button type=\"submit\" \
-             style=\"width:100%;margin-top:1rem;padding:.875rem;background:#007AFF;color:#fff;\
-             border:none;border-radius:14px;font-size:1rem;font-weight:600;min-height:44px;cursor:pointer\">\
+             class=\"cz-anon-submit-button cz-anon-submit-button--sized\">\
              {submit}</button>\
          </form>\
          </main>",

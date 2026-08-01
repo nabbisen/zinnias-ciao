@@ -276,29 +276,26 @@ fn render_join_form(token: &str, error: Option<&str>) -> Result<Response> {
     let error_html = error
         .map(|e| {
             format!(
-                "<p role=\"alert\" style=\"color:#FF3B30\">{}</p>",
+                "<p role=\"alert\" class=\"cz-anon-error-text\">{}</p>",
                 escape_html(e)
             )
         })
         .unwrap_or_default();
     let body = format!(
-        "<main style=\"padding:2rem;max-width:480px;margin:auto;font-family:system-ui,sans-serif\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600\">{heading}</h1>\
-         <p style=\"color:#6e6e73\">{sub}</p>\
+        "<main class=\"cz-anon-main\">\
+         <h1 class=\"cz-anon-title\">{heading}</h1>\
+         <p class=\"cz-anon-subtitle\">{sub}</p>\
          {error_html}\
-         <form method=\"post\" action=\"/join\" style=\"margin-top:1.5rem\">\
-           <label style=\"display:block;margin-bottom:.5rem;font-size:.875rem\">{label}</label>\
+         <form method=\"post\" action=\"/join\" class=\"cz-anon-form\">\
+           <label class=\"cz-anon-label\">{label}</label>\
            <input name=\"code\" type=\"text\" autocomplete=\"off\" inputmode=\"text\" \
-                  maxlength=\"16\" style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
-                  border-radius:12px;font-size:1rem\" required>\
+                  maxlength=\"16\" class=\"cz-admin-field-input\" required>\
            <input type=\"hidden\" name=\"_token\" value=\"{token}\">\
-           <button type=\"submit\" style=\"margin-top:1rem;width:100%;padding:.875rem;\
-                   background:#007AFF;color:#fff;border:none;border-radius:14px;\
-                   font-size:1rem;font-weight:600;cursor:pointer\">{submit}</button>\
+           <button type=\"submit\" class=\"cz-anon-submit-button\">{submit}</button>\
          </form>\
-         <p style=\"margin-top:1.5rem;color:#6e6e73;font-size:.8125rem\">{hint}</p>\
-         <p style=\"margin-top:.75rem;color:#6e6e73;font-size:.8125rem\">\
-           {relink_hint} <a href=\"/relink\" style=\"color:#007AFF;text-decoration:none\">\
+         <p class=\"cz-join-code-hint\">{hint}</p>\
+         <p class=\"cz-join-relink-hint\">\
+           {relink_hint} <a href=\"/relink\" class=\"cz-admin-plain-link\">\
            {relink_link}</a></p>\
          </main>",
         heading = i18n::JA_JOIN_HEADING,
@@ -317,25 +314,22 @@ fn render_profile_form(token: &str, error: Option<&'static str>) -> Result<Respo
     let error_html = error
         .map(|e| {
             format!(
-                "<p role=\"alert\" style=\"color:#FF3B30\">{}</p>",
+                "<p role=\"alert\" class=\"cz-anon-error-text\">{}</p>",
                 escape_html(e)
             )
         })
         .unwrap_or_default();
     let body = format!(
-        "<main style=\"padding:2rem;max-width:480px;margin:auto;font-family:system-ui,sans-serif\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600\">{heading}</h1>\
-         <p style=\"color:#6e6e73;font-size:.875rem\">{hint}</p>\
+        "<main class=\"cz-anon-main\">\
+         <h1 class=\"cz-anon-title\">{heading}</h1>\
+         <p class=\"cz-anon-hint-text\">{hint}</p>\
          {error_html}\
-         <form method=\"post\" action=\"/join/profile\" style=\"margin-top:1.5rem\">\
-           <label style=\"display:block;margin-bottom:.5rem;font-size:.875rem\">{label}</label>\
+         <form method=\"post\" action=\"/join/profile\" class=\"cz-anon-form\">\
+           <label class=\"cz-anon-label\">{label}</label>\
            <input name=\"display_name\" type=\"text\" autocomplete=\"nickname\" \
-                  maxlength=\"40\" style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
-                  border-radius:12px;font-size:1rem\" required>\
+                  maxlength=\"40\" class=\"cz-admin-field-input\" required>\
            <input type=\"hidden\" name=\"_token\" value=\"{token}\">\
-           <button type=\"submit\" style=\"margin-top:1rem;width:100%;padding:.875rem;\
-                   background:#007AFF;color:#fff;border:none;border-radius:14px;\
-                   font-size:1rem;font-weight:600;cursor:pointer\">{submit}</button>\
+           <button type=\"submit\" class=\"cz-anon-submit-button\">{submit}</button>\
          </form>\
          </main>",
         heading = i18n::JA_JOIN_PROFILE_HEADING,

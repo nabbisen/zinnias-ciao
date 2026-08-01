@@ -56,10 +56,14 @@ pub async fn get_templates(
         .query_pairs()
         .find(|(k, _)| k == "flash")
         .map(|(_, v)| v.to_string());
-    let flash_html = flash.map(|f| format!(
-        "<p role=\"status\" style=\"font-size:.875rem;color:#167A34;margin:.5rem 0\">{}</p>",
-        render::escape_html(&f)
-    )).unwrap_or_default();
+    let flash_html = flash
+        .map(|f| {
+            format!(
+                "<p role=\"status\" class=\"cz-admin-invite-flash\">{}</p>",
+                render::escape_html(&f)
+            )
+        })
+        .unwrap_or_default();
 
     // Build template list rows
     let mut list_html = String::new();
@@ -83,23 +87,20 @@ pub async fn get_templates(
             .unwrap_or_default();
 
         list_html.push_str(&format!(
-            "<li style=\"display:flex;align-items:center;justify-content:space-between;\
-             padding:.75rem 0;border-bottom:1px solid #f5f5f7;gap:.5rem\">\
+            "<li class=\"cz-templates-row\">\
              <div>\
-               <span style=\"font-weight:600;font-size:.9375rem\">{title}</span>\
-               <span style=\"font-size:.8125rem;color:#6e6e73\">{loc}{dur}</span>\
+               <span class=\"cz-templates-item-title\">{title}</span>\
+               <span class=\"cz-templates-meta\">{loc}{dur}</span>\
              </div>\
-             <div style=\"display:flex;gap:.5rem;align-items:center\">\
+             <div class=\"cz-templates-row-actions\">\
                <a href=\"/c/{cid}/admin/events/new?template={tid}\" \
-                  style=\"font-size:.875rem;color:#007AFF;text-decoration:none;\
-                  padding:.375rem .625rem;min-height:44px;display:flex;align-items:center\">\
+                  class=\"cz-templates-use-link\">\
                   {use_btn}</a>\
                <form method=\"post\" \
-                 action=\"/c/{cid}/admin/templates/{tid}/delete\" style=\"margin:0\">\
+                 action=\"/c/{cid}/admin/templates/{tid}/delete\" class=\"cz-templates-delete-form\">\
                  <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
                  <button type=\"submit\" \
-                   style=\"font-size:.8125rem;color:#FF3B30;background:none;border:none;\
-                   cursor:pointer;padding:.375rem .5rem;min-height:44px\"\
+                   class=\"cz-templates-delete-button\"\
                    aria-label=\"{del_btn}\">\
                    {del_btn}</button>\
                </form>\
@@ -118,7 +119,7 @@ pub async fn get_templates(
 
     let empty_msg = if templates.is_empty() {
         &format!(
-            "<p style=\"font-size:.875rem;color:#6e6e73\">{}</p>",
+            "<p class=\"cz-admin-invites-body\">{}</p>",
             i18n::JA_TEMPLATES_EMPTY
         )
     } else {
@@ -128,40 +129,35 @@ pub async fn get_templates(
     let nav = render::bottom_nav(community_id, "home");
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.25rem\">{title_h1}</h1>\
-         <p style=\"font-size:.875rem;color:#6e6e73;margin-bottom:1rem\">\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--tight\">{title_h1}</h1>\
+         <p class=\"cz-templates-description\">\
            {desc}\
          </p>\
          {flash}\
          {empty}\
          {list}\
-         <section style=\"margin-top:2rem\">\
-           <h2 style=\"font-size:1rem;font-weight:600;margin-bottom:.75rem\">{save_section_h2}</h2>\
+         <section class=\"cz-templates-save-section\">\
+           <h2 class=\"cz-templates-save-heading\">{save_section_h2}</h2>\
            <form method=\"post\" action=\"/c/{cid}/admin/templates\">\
              <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
-             <label style=\"display:block;margin-bottom:.75rem\">\
-               <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{lbl_title}</span>\
+             <label class=\"cz-templates-field\">\
+               <span class=\"cz-admin-field-label\">{lbl_title}</span>\
                <input type=\"text\" name=\"title\" required maxlength=\"80\"\
-                 style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
-                 border-radius:12px;font-size:1rem\">\
+                 class=\"cz-admin-field-input\">\
              </label>\
-             <label style=\"display:block;margin-bottom:.75rem\">\
-               <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{lbl_loc}</span>\
+             <label class=\"cz-templates-field\">\
+               <span class=\"cz-admin-field-label\">{lbl_loc}</span>\
                <input type=\"text\" name=\"location\" maxlength=\"120\"\
-                 style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
-                 border-radius:12px;font-size:1rem\">\
+                 class=\"cz-admin-field-input\">\
              </label>\
-             <label style=\"display:block;margin-bottom:.75rem\">\
-               <span style=\"font-size:.875rem;display:block;margin-bottom:.375rem\">{lbl_dur}</span>\
+             <label class=\"cz-templates-field\">\
+               <span class=\"cz-admin-field-label\">{lbl_dur}</span>\
                <input type=\"number\" name=\"duration_minutes\" min=\"1\" max=\"1440\"\
-                 style=\"width:100%;padding:.75rem;border:1px solid #e5e5ea;\
-                 border-radius:12px;font-size:1rem\">\
+                 class=\"cz-admin-field-input\">\
              </label>\
              <button type=\"submit\"\
-               style=\"width:100%;padding:.875rem;background:#007AFF;color:#fff;\
-               border:none;border-radius:14px;font-size:1rem;font-weight:600;\
-               min-height:44px;cursor:pointer\">\
+               class=\"cz-templates-save-button\">\
                {btn_save}</button>\
            </form>\
          </section>\
@@ -184,7 +180,7 @@ pub async fn get_templates(
         list = if list_html.is_empty() {
             String::new()
         } else {
-            format!("<ul style=\"list-style:none;padding:0;margin:0\">{list_html}</ul>")
+            format!("<ul class=\"cz-templates-list\">{list_html}</ul>")
         },
         cid = render::escape_html(community_id),
         tok = render::escape_html(&create_token),

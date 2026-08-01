@@ -57,26 +57,23 @@ pub async fn get_export_page(
     let nav = render::bottom_nav(community_id, "home");
     let body = format!(
         "{header}\
-         <main style=\"padding:1rem 1rem 5rem\">\
-         <h1 style=\"font-size:1.25rem;font-weight:600;margin-bottom:.5rem\">{exp_title}</h1>\
-         <p style=\"font-size:.875rem;color:#6E6E73;margin-bottom:1.5rem\">\
+         <main class=\"cz-page-main\">\
+         <h1 class=\"cz-admin-title cz-admin-title--snug\">{exp_title}</h1>\
+         <p class=\"cz-export-description\">\
            {exp_desc} {privacy_note}\
          </p>\
-         <div style=\"background:#F5F5F7;border-radius:12px;padding:1rem;margin-bottom:1.5rem\">\
-           <p style=\"font-size:.875rem;margin:0 0 .25rem\"><strong>{name}</strong></p>\
-           <p style=\"font-size:.8125rem;color:#6E6E73;margin:0\">\
+         <div class=\"cz-export-summary-card\">\
+           <p class=\"cz-export-summary-name\"><strong>{name}</strong></p>\
+           <p class=\"cz-export-summary-meta\">\
              {events} events · {members} active members\
            </p>\
          </div>\
          <a href=\"/c/{cid}/admin/export/json?token={token}\" \
             download=\"{slug}-export.json\" \
-            style=\"display:flex;align-items:center;justify-content:center;\
-           padding:.875rem;background:#007AFF;color:#fff;\
-           border-radius:14px;font-size:1rem;font-weight:600;\
-           text-decoration:none;min-height:44px;margin-bottom:1rem\">\
+            class=\"cz-export-download-link\">\
             {download_btn}\
          </a>\
-         <p style=\"font-size:.75rem;color:#6E6E73;text-align:center\">\
+         <p class=\"cz-export-single-use-notice\">\
            {single_use}\
          </p>\
          </main>{nav}",

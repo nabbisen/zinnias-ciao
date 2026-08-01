@@ -282,10 +282,9 @@ fn render_disabled(admin: &MembershipContext) -> Result<Response> {
     let locale = admin.locale;
     let title = i18n::t(locale, i18n::COMMUNITY_CREATE_TITLE);
     let body = format!(
-        "{header}<main style=\"padding:1rem 1rem 5rem;max-width:560px;margin:0 auto\">\
-           <p style=\"font-size:.9375rem;color:#6e6e73;margin:0 0 1rem\">{msg}</p>\
-           <a href=\"/c/{cid}/me\" style=\"display:inline-block;color:#007AFF;\
-             min-height:44px;line-height:44px;text-decoration:none\">{cancel}</a>\
+        "{header}<main class=\"cz-page-main cz-page-main--narrow-560\">\
+           <p class=\"cz-community-create-body\">{msg}</p>\
+           <a href=\"/c/{cid}/me\" class=\"cz-community-create-cancel-link\">{cancel}</a>\
          </main>{nav}",
         header = render::header(title, ""),
         msg = i18n::t(locale, i18n::COMMUNITY_CREATE_DISABLED),
@@ -309,32 +308,32 @@ fn render_form(
     let error_html = error
         .map(|e| {
             format!(
-                "<p role=\"alert\" style=\"color:#FF3B30;margin:.75rem 0 0\">{}</p>",
+                "<p role=\"alert\" class=\"cz-community-create-error-text\">{}</p>",
                 escape_html(e)
             )
         })
         .unwrap_or_default();
 
     let body = format!(
-        "{header}<main style=\"padding:1rem 1rem 5rem;max-width:560px;margin:0 auto\">\
-           <p style=\"font-size:.9375rem;color:#6e6e73;margin:0 0 1rem\">{body}</p>\
+        "{header}<main class=\"cz-page-main cz-page-main--narrow-560\">\
+           <p class=\"cz-community-create-body\">{body}</p>\
            {error_html}\
-           <form method=\"post\" action=\"{path}\" style=\"margin-top:1rem\">\
+           <form method=\"post\" action=\"{path}\" class=\"cz-community-create-form\">\
              <input type=\"hidden\" name=\"_token\" value=\"{token}\">\
              <input type=\"hidden\" name=\"timezone\" value=\"{tz}\">\
-             <label style=\"display:block;font-size:.875rem;font-weight:600;margin-bottom:.375rem\" for=\"community_name\">{name_label}</label>\
+             <label class=\"cz-community-create-label\" for=\"community_name\">{name_label}</label>\
              <input id=\"community_name\" name=\"community_name\" value=\"{name}\" required maxlength=\"80\" autocomplete=\"organization\" \
-               style=\"width:100%;box-sizing:border-box;font-size:1rem;padding:.75rem;border:1px solid #D1D1D6;border-radius:8px;min-height:44px\">\
-             <label style=\"display:block;font-size:.875rem;font-weight:600;margin:1rem 0 .375rem\" for=\"display_name\">{display_label}</label>\
+               class=\"cz-community-create-input\">\
+             <label class=\"cz-community-create-label cz-community-create-label--spaced\" for=\"display_name\">{display_label}</label>\
              <input id=\"display_name\" name=\"display_name\" value=\"{display}\" required maxlength=\"40\" autocomplete=\"name\" \
-               style=\"width:100%;box-sizing:border-box;font-size:1rem;padding:.75rem;border:1px solid #D1D1D6;border-radius:8px;min-height:44px\">\
-             <div style=\"margin-top:1rem\">\
-               <span style=\"display:block;font-size:.875rem;font-weight:600;margin-bottom:.375rem\">{tz_label}</span>\
-               <span style=\"display:inline-block;font-size:.9375rem;color:#1D1D1F;padding:.625rem .75rem;background:#F5F5F7;border-radius:8px\">{tz_name}</span>\
+               class=\"cz-community-create-input\">\
+             <div class=\"cz-community-create-tz-row\">\
+               <span class=\"cz-community-create-label\">{tz_label}</span>\
+               <span class=\"cz-community-create-tz-value\">{tz_name}</span>\
              </div>\
-             <button type=\"submit\" style=\"width:100%;margin-top:1.25rem;padding:.875rem;background:#007AFF;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;min-height:44px;cursor:pointer\">{submit}</button>\
+             <button type=\"submit\" class=\"cz-community-create-submit-button\">{submit}</button>\
            </form>\
-           <a href=\"/c/{cid}/me\" style=\"display:inline-block;margin-top:.75rem;color:#007AFF;min-height:44px;line-height:44px;text-decoration:none\">{cancel}</a>\
+           <a href=\"/c/{cid}/me\" class=\"cz-community-create-cancel-link cz-community-create-cancel-link--spaced\">{cancel}</a>\
          </main>{nav}",
         header = render::header(title, ""),
         body = i18n::t(locale, i18n::COMMUNITY_CREATE_BODY),

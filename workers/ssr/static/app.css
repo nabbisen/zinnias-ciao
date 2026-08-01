@@ -1744,6 +1744,281 @@ button, a, [role="button"] { min-height: var(--cz-touch-min); }
   font-weight: 600;
 }
 
+/* Admin tools and onboarding (RFC-075 Slice 6). Zero new tokens this
+ * slice — every hex value already maps to an existing generic token. */
+
+/* Event templates (handlers/templates.rs) */
+.cz-templates-field {
+  display: block;
+  margin-bottom: var(--cz-space-3);
+}
+.cz-templates-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--cz-space-3) 0;
+  border-bottom: 1px solid var(--cz-color-surface);
+  gap: var(--cz-space-2);
+}
+.cz-templates-row-actions {
+  display: flex;
+  gap: var(--cz-space-2);
+  align-items: center;
+}
+.cz-templates-meta {
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+}
+.cz-templates-delete-button {
+  font-size: .8125rem;
+  color: var(--cz-color-danger);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--cz-space-1-5) var(--cz-space-2);
+  min-height: var(--cz-touch-min);
+}
+.cz-templates-use-link {
+  font-size: .875rem;
+  color: var(--cz-color-focus);
+  text-decoration: none;
+  padding: var(--cz-space-1-5) var(--cz-space-2-5);
+  min-height: var(--cz-touch-min);
+  display: flex;
+  align-items: center;
+}
+.cz-templates-description {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  margin-bottom: var(--cz-space-4);
+}
+.cz-templates-save-heading {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: var(--cz-space-3);
+}
+.cz-templates-item-title {
+  font-weight: 600;
+  font-size: .9375rem;
+}
+.cz-templates-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.cz-templates-save-section {
+  margin-top: var(--cz-space-6);
+}
+.cz-templates-delete-form {
+  margin: 0;
+}
+.cz-templates-save-button {
+  width: 100%;
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-button);
+  font-size: 1rem;
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+}
+
+/* Community data export (handlers/export.rs) */
+.cz-export-summary-card {
+  background: var(--cz-color-surface);
+  border-radius: var(--cz-radius-input);
+  padding: var(--cz-space-4);
+  margin-bottom: var(--cz-space-5);
+}
+.cz-export-summary-name {
+  font-size: .875rem;
+  margin: 0 0 var(--cz-space-1);
+}
+.cz-export-summary-meta {
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+  margin: 0;
+}
+.cz-export-description {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  margin-bottom: var(--cz-space-5);
+}
+.cz-export-download-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+  border-radius: var(--cz-radius-button);
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  min-height: var(--cz-touch-min);
+  margin-bottom: var(--cz-space-4);
+}
+.cz-export-single-use-notice {
+  font-size: .75rem;
+  color: var(--cz-color-text-secondary);
+  text-align: center;
+}
+
+/* Anonymous shell (handlers/join.rs, handlers/relink.rs) — no session, no
+ * membership, no locale; correctly Japanese-only and excluded from
+ * localization (RFC-072). Original font-family value preserved exactly
+ * (system-ui,sans-serif — a shorter stack than :root's own), not
+ * conformed to the root stack, since that would be a real value change. */
+.cz-anon-main {
+  padding: var(--cz-space-6);
+  max-width: 480px;
+  margin: auto;
+  font-family: system-ui,sans-serif;
+}
+.cz-anon-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.cz-anon-subtitle {
+  color: var(--cz-color-text-secondary);
+}
+.cz-anon-hint-text {
+  color: var(--cz-color-text-secondary);
+  font-size: .875rem;
+}
+.cz-anon-error-text {
+  color: var(--cz-color-danger);
+}
+.cz-anon-form {
+  margin-top: var(--cz-space-5);
+}
+.cz-anon-label {
+  display: block;
+  margin-bottom: var(--cz-space-2);
+  font-size: .875rem;
+}
+.cz-anon-submit-button {
+  width: 100%;
+  margin-top: var(--cz-space-4);
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-button);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cz-anon-submit-button--sized {
+  min-height: var(--cz-touch-min);
+}
+
+/* Join (handlers/join.rs) — RFC-076/RFC-078 security surface: class-only
+ * changes, no attribute/structure/response-shape change anywhere below. */
+.cz-join-code-hint {
+  margin-top: var(--cz-space-5);
+  color: var(--cz-color-text-secondary);
+  font-size: .8125rem;
+}
+.cz-join-relink-hint {
+  margin-top: var(--cz-space-3);
+  color: var(--cz-color-text-secondary);
+  font-size: .8125rem;
+}
+
+/* Relink (handlers/relink.rs) — anonymous, first-impression page. */
+.cz-relink-error-text {
+  color: var(--cz-color-danger);
+  margin: var(--cz-space-3) 0;
+}
+.cz-relink-label {
+  display: block;
+  font-size: .875rem;
+  margin-bottom: var(--cz-space-1-5);
+}
+.cz-relink-code-input {
+  width: 100%;
+  font-size: 1.25rem;
+  padding: var(--cz-space-3);
+  border: 1px solid var(--cz-color-border-subtle);
+  border-radius: var(--cz-radius-input);
+  box-sizing: border-box;
+  text-transform: uppercase;
+}
+
+/* Community creation (handlers/community_create.rs) — its one CSS touch,
+ * promised when its language was fixed in Handoff 030. */
+.cz-page-main--narrow-560 {
+  max-width: 560px;
+  margin: 0 auto;
+}
+.cz-community-create-body {
+  font-size: .9375rem;
+  color: var(--cz-color-text-secondary);
+  margin: 0 0 var(--cz-space-4);
+}
+.cz-community-create-error-text {
+  color: var(--cz-color-danger);
+  margin: var(--cz-space-3) 0 0;
+}
+.cz-community-create-form {
+  margin-top: var(--cz-space-4);
+}
+.cz-community-create-tz-row {
+  margin-top: var(--cz-space-4);
+}
+.cz-community-create-label {
+  display: block;
+  font-size: .875rem;
+  font-weight: 600;
+  margin-bottom: var(--cz-space-1-5);
+}
+.cz-community-create-label--spaced {
+  margin: var(--cz-space-4) 0 var(--cz-space-1-5);
+}
+.cz-community-create-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 1rem;
+  padding: var(--cz-space-3);
+  border: 1px solid var(--cz-color-border-subtle);
+  border-radius: var(--cz-radius-control);
+  min-height: var(--cz-touch-min);
+}
+.cz-community-create-tz-value {
+  display: inline-block;
+  font-size: .9375rem;
+  color: var(--cz-color-text-primary);
+  padding: var(--cz-space-2-5) var(--cz-space-3);
+  background: var(--cz-color-surface);
+  border-radius: var(--cz-radius-control);
+}
+.cz-community-create-submit-button {
+  width: 100%;
+  margin-top: var(--cz-space-4-5);
+  padding: var(--cz-space-3-5);
+  background: var(--cz-color-focus);
+  color: var(--cz-color-bg);
+  border: none;
+  border-radius: var(--cz-radius-control);
+  font-size: 1rem;
+  font-weight: 600;
+  min-height: var(--cz-touch-min);
+  cursor: pointer;
+}
+.cz-community-create-cancel-link {
+  display: inline-block;
+  color: var(--cz-color-focus);
+  min-height: var(--cz-touch-min);
+  line-height: var(--cz-touch-min);
+  text-decoration: none;
+}
+.cz-community-create-cancel-link--spaced {
+  margin-top: var(--cz-space-3);
+}
+
 /* Reduced motion — disable all non-essential animation (RFC-011 §5) */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
