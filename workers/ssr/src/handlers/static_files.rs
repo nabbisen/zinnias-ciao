@@ -56,9 +56,9 @@ pub async fn get_offline(_req: Request, _env: &Env) -> Result<Response> {
 </head>
 <body>
   <div id="offline-banner">オフライン — 最後に読み込んだ情報を表示しています</div>
-  <main style="padding:2rem;max-width:480px;margin:auto;font-family:system-ui,sans-serif">
-    <h1 style="font-size:1.25rem;font-weight:600">オフラインです</h1>
-    <p style="color:#6e6e73">電波がある場所で再度開いてください。</p>
+  <main class="cz-anon-main">
+    <h1 class="cz-anon-title">オフラインです</h1>
+    <p class="cz-anon-subtitle">電波がある場所で再度開いてください。</p>
   </main>
   <script src="/static/app.js?v=0.60.0" defer></script>
 </body>

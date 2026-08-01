@@ -4,9 +4,9 @@ use zinnias_ciao_contracts::i18n;
 
 pub fn placeholder() -> Result<Response> {
     let body = format!(
-        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
-  <h1 style=\"font-size:1.25rem;font-weight:600\">{}</h1>\
-  <p style=\"color:#6E6E73;font-size:.875rem\">{}</p>\
+        "<main class=\"cz-anon-main\">\
+  <h1 class=\"cz-anon-title\">{}</h1>\
+  <p class=\"cz-anon-hint-text\">{}</p>\
 </main>",
         i18n::JA_JOIN_HEADING,
         i18n::JA_GENERAL_ERROR,
@@ -16,7 +16,7 @@ pub fn placeholder() -> Result<Response> {
 
 pub fn not_found() -> Result<Response> {
     let body = format!(
-        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+        "<main class=\"cz-anon-main\">\
          <p>{}</p>{}</main>",
         i18n::JA_NOT_FOUND,
         recovery_links()
@@ -26,7 +26,7 @@ pub fn not_found() -> Result<Response> {
 
 pub fn internal_error() -> Result<Response> {
     let body = format!(
-        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+        "<main class=\"cz-anon-main\">\
          <p>{}</p>{}</main>",
         i18n::JA_INTERNAL_ERROR,
         recovery_links()
@@ -36,7 +36,7 @@ pub fn internal_error() -> Result<Response> {
 
 pub fn service_unavailable() -> Result<Response> {
     let body = format!(
-        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+        "<main class=\"cz-anon-main\">\
          <p>{}</p>{}</main>",
         i18n::JA_GENERAL_ERROR,
         recovery_links()
@@ -48,7 +48,7 @@ pub fn service_unavailable() -> Result<Response> {
 /// It intentionally contains no recovery links or configuration details.
 pub fn configuration_unavailable() -> Result<Response> {
     let body = format!(
-        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
+        "<main class=\"cz-anon-main\">\
          <p>{}</p></main>",
         i18n::JA_CONFIGURATION_UNAVAILABLE,
     );
@@ -57,12 +57,12 @@ pub fn configuration_unavailable() -> Result<Response> {
 
 pub fn session_expired() -> Result<Response> {
     let body = format!(
-        "<main style=\"padding:2rem;font-family:system-ui,sans-serif;max-width:480px;margin:auto\">\
-         <p style=\"color:#FF3B30\">{msg}</p>\
-         <div style=\"display:flex;flex-direction:column;gap:.75rem;margin-top:1rem\">\
-           <a href=\"/relink\" style=\"display:block;color:#007AFF;text-decoration:none\">\
+        "<main class=\"cz-anon-main\">\
+         <p class=\"cz-anon-error-text\">{msg}</p>\
+         <div class=\"cz-error-recovery-links\">\
+           <a href=\"/relink\" class=\"cz-error-recovery-link\">\
              {relink}</a>\
-           <a href=\"/join\" style=\"display:block;color:#007AFF;text-decoration:none\">\
+           <a href=\"/join\" class=\"cz-error-recovery-link\">\
              {join}</a>\
          </div></main>",
         msg = i18n::JA_SESSION_EXPIRED,
@@ -74,9 +74,9 @@ pub fn session_expired() -> Result<Response> {
 
 fn recovery_links() -> String {
     format!(
-        "<div style=\"display:flex;flex-direction:column;gap:.75rem;margin-top:1rem\">\
-           <a href=\"/\" style=\"display:block;color:#007AFF;text-decoration:none\">{home}</a>\
-           <a href=\"/join\" style=\"display:block;color:#007AFF;text-decoration:none\">{join}</a>\
+        "<div class=\"cz-error-recovery-links\">\
+           <a href=\"/\" class=\"cz-error-recovery-link\">{home}</a>\
+           <a href=\"/join\" class=\"cz-error-recovery-link\">{join}</a>\
          </div>",
         home = i18n::JA_NAV_HOME,
         join = i18n::JA_JOIN_SUBMIT,

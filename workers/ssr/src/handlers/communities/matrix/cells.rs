@@ -7,8 +7,11 @@ pub(super) struct CellSummary {
     pub(super) visual: String,
     pub(super) export_value: String,
     pub(super) label: String,
-    pub(super) color: &'static str,
-    pub(super) background: &'static str,
+    /// A `cz-matrix-cell--{state}` modifier suffix (RFC-075 Slice 7). Was a
+    /// pair of raw hex colours until this slice — this is a genuinely
+    /// computed, per-cell value, not the static styling Handoff 034 §3.3
+    /// described for the rest of this file's neighbours.
+    pub(super) state: &'static str,
 }
 
 /// Substitute a template's `{}` placeholders positionally, in order. Not
@@ -52,8 +55,7 @@ pub(super) fn cell_summary(
                 i18n::t(locale, i18n::CALENDAR_MATRIX_CELL_NO_EVENTS),
                 &[day_date, &member.display_name],
             ),
-            color: "#8E8E93",
-            background: "#FAFAFB",
+            state: "empty",
         };
     }
 
@@ -67,12 +69,11 @@ pub(super) fn cell_summary(
                     i18n::t(locale, i18n::CALENDAR_MATRIX_CELL_CANCELLED),
                     &[day_date, &member.display_name],
                 ),
-                color: "#6E6E73",
-                background: "#F5F5F7",
+                state: "cancelled",
             };
         }
         let status = status_for_member(&row.day_id, &member.id, attendances);
-        let (visual, label_status, color, bg) = single_status_display(locale, status);
+        let (visual, label_status, state) = single_status_display(locale, status);
         return CellSummary {
             visual: visual.to_string(),
             export_value: visual.to_string(),
@@ -80,8 +81,7 @@ pub(super) fn cell_summary(
                 i18n::t(locale, i18n::CALENDAR_MATRIX_CELL_SINGLE_STATUS),
                 &[day_date, &member.display_name, label_status],
             ),
-            color,
-            background: bg,
+            state,
         };
     }
 
@@ -120,8 +120,7 @@ pub(super) fn cell_summary(
                     "0",
                 ],
             ),
-            color: "#6E6E73",
-            background: "#F5F5F7",
+            state: "cancelled",
         };
     }
     let answered = going + not_going + attended;
@@ -142,40 +141,23 @@ pub(super) fn cell_summary(
                 &no_reply.to_string(),
             ],
         ),
-        color: if no_reply == 0 { "#0A7F43" } else { "#3A3A3C" },
-        background: "#FFFFFF",
+        state: if no_reply == 0 {
+            "breakdown-complete"
+        } else {
+            "breakdown-partial"
+        },
     }
 }
 
 fn single_status_display(
     locale: Locale,
     status: Option<&str>,
-) -> (&'static str, &'static str, &'static str, &'static str) {
+) -> (&'static str, &'static str, &'static str) {
     match status {
-        Some("going") => (
-            "○",
-            i18n::t(locale, i18n::STATUS_GOING),
-            "#0A7F43",
-            "#F0FFF6",
-        ),
-        Some("not_going") => (
-            "×",
-            i18n::t(locale, i18n::STATUS_NOT_GOING),
-            "#B42318",
-            "#FFF5F3",
-        ),
-        Some("attended") => (
-            "済",
-            i18n::t(locale, i18n::STATUS_ATTENDED),
-            "#0057B8",
-            "#F0F7FF",
-        ),
-        _ => (
-            "?",
-            i18n::t(locale, i18n::STATUS_NO_ANSWER),
-            "#6E6E73",
-            "#FFFFFF",
-        ),
+        Some("going") => ("○", i18n::t(locale, i18n::STATUS_GOING), "going"),
+        Some("not_going") => ("×", i18n::t(locale, i18n::STATUS_NOT_GOING), "not-going"),
+        Some("attended") => ("済", i18n::t(locale, i18n::STATUS_ATTENDED), "attended"),
+        _ => ("?", i18n::t(locale, i18n::STATUS_NO_ANSWER), "no-answer"),
     }
 }
 

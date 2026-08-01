@@ -112,6 +112,26 @@
   --cz-color-danger-strong: #B42318;
   --cz-color-surface-subtle: #FAFAFB;
 
+  /* RFC-075 Slice 7: matrix per-cell attendance-state colours. Handoff 034
+   * §3.3 claimed these four remaining files had no computed style= values;
+   * matrix.rs's <td> is the exception — cells.rs computes one of these
+   * eight (colour, background) pairs per cell from attendance status. Two
+   * are genuinely shared, non-coincidental reuses of existing tokens
+   * (not-going matches --cz-status-not-going-fg; cancelled/no-answer text
+   * match --cz-color-text-secondary; their backgrounds match
+   * --cz-color-surface/--cz-color-bg) — the rest are new, since matrix
+   * cells have never shared the app-wide status palette (e.g. "going" here
+   * is #0A7F43, not --cz-status-going-fg's #005BBB) and inventing that
+   * shared palette now would be a visual redesign, not an extraction. */
+  --cz-matrix-cell-empty-fg: #8E8E93;
+  --cz-matrix-cell-empty-bg: #FAFAFB;
+  --cz-matrix-cell-going-fg: #0A7F43;
+  --cz-matrix-cell-going-bg: #F0FFF6;
+  --cz-matrix-cell-not-going-bg: #FFF5F3;
+  --cz-matrix-cell-attended-fg: #0057B8;
+  --cz-matrix-cell-attended-bg: #F0F7FF;
+  --cz-matrix-cell-breakdown-partial-fg: #3A3A3C;
+
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 16px;
   color: var(--cz-color-text-primary);
@@ -2017,6 +2037,159 @@ button, a, [role="button"] { min-height: var(--cz-touch-min); }
 }
 .cz-community-create-cancel-link--spaced {
   margin-top: var(--cz-space-3);
+}
+
+/* Error pages (render/errors.rs) — reuses Slice 6's cz-anon-* family
+ * directly (differently-ordered identical declarations, a genuine match). */
+.cz-error-recovery-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cz-space-3);
+  margin-top: var(--cz-space-4);
+}
+.cz-error-recovery-link {
+  display: block;
+  color: var(--cz-color-focus);
+  text-decoration: none;
+}
+
+/* Matrix table (handlers/communities/matrix.rs) — RFC-067. A real <table>
+ * with scope="col"/scope="row", unlike Slice 5's members.rs. The two
+ * sticky header cells are static except their selected/not-selected
+ * state; the body cell's colour/background are genuinely computed
+ * per-cell by cells.rs (see the token comment above) and expressed here
+ * as a base class plus one of eight state modifiers. */
+.cz-matrix-header-cell {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0;
+  min-width: 3.25rem;
+  text-align: center;
+  background: var(--cz-color-surface);
+  border: 1px solid var(--cz-color-surface-strong);
+}
+.cz-matrix-header-cell--selected {
+  background: var(--cz-color-selected-bg);
+  border: 1px solid var(--cz-color-focus);
+}
+.cz-matrix-header-link {
+  display: flex;
+  min-height: var(--cz-touch-min);
+  align-items: center;
+  justify-content: center;
+  color: var(--cz-color-text-primary);
+  text-decoration: none;
+  font-size: .8125rem;
+  font-weight: 700;
+}
+.cz-matrix-member-header {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--cz-color-bg);
+  border: 1px solid var(--cz-color-surface-strong);
+  text-align: left;
+  min-width: 8rem;
+  max-width: 10rem;
+  padding: var(--cz-space-2);
+  font-size: .875rem;
+  line-height: 1.3;
+  white-space: normal;
+}
+.cz-matrix-cell {
+  border: 1px solid var(--cz-color-surface-strong);
+  min-width: 3.25rem;
+  height: 2.75rem;
+  text-align: center;
+  vertical-align: middle;
+  font-size: .875rem;
+  font-weight: 700;
+}
+.cz-matrix-cell--empty {
+  color: var(--cz-matrix-cell-empty-fg);
+  background: var(--cz-matrix-cell-empty-bg);
+}
+.cz-matrix-cell--cancelled {
+  color: var(--cz-color-text-secondary);
+  background: var(--cz-color-surface);
+}
+.cz-matrix-cell--going {
+  color: var(--cz-matrix-cell-going-fg);
+  background: var(--cz-matrix-cell-going-bg);
+}
+.cz-matrix-cell--not-going {
+  color: var(--cz-status-not-going-fg);
+  background: var(--cz-matrix-cell-not-going-bg);
+}
+.cz-matrix-cell--attended {
+  color: var(--cz-matrix-cell-attended-fg);
+  background: var(--cz-matrix-cell-attended-bg);
+}
+.cz-matrix-cell--no-answer {
+  color: var(--cz-color-text-secondary);
+  background: var(--cz-color-bg);
+}
+.cz-matrix-cell--breakdown-complete {
+  color: var(--cz-matrix-cell-going-fg);
+  background: var(--cz-color-bg);
+}
+.cz-matrix-cell--breakdown-partial {
+  color: var(--cz-matrix-cell-breakdown-partial-fg);
+  background: var(--cz-color-bg);
+}
+
+/* Matrix day-detail (handlers/communities/matrix/detail.rs) — static. */
+.cz-matrix-detail-section {
+  max-width: 42rem;
+  margin: var(--cz-space-4) auto 0;
+}
+.cz-matrix-detail-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+.cz-matrix-detail-empty-text {
+  font-size: .875rem;
+  color: var(--cz-color-text-secondary);
+  margin: var(--cz-space-2) 0 0;
+}
+.cz-matrix-detail-cancelled-badge {
+  font-size: .75rem;
+  color: var(--cz-status-not-going-fg);
+  margin-left: var(--cz-space-tight);
+}
+.cz-matrix-detail-list {
+  list-style: none;
+  margin: var(--cz-space-2) 0 0;
+  padding: 0;
+}
+.cz-matrix-detail-item {
+  border-top: 1px solid var(--cz-color-surface);
+  padding: var(--cz-space-3) 0;
+}
+.cz-matrix-detail-item-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.cz-matrix-detail-item-title {
+  display: block;
+  font-size: .9375rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.cz-matrix-detail-item-date {
+  display: block;
+  font-size: .8125rem;
+  color: var(--cz-color-text-secondary);
+  margin-top: var(--cz-space-1);
+}
+.cz-matrix-detail-item-counts {
+  display: block;
+  font-size: .8125rem;
+  color: var(--cz-matrix-cell-breakdown-partial-fg);
+  margin-top: var(--cz-space-tight);
 }
 
 /* Reduced motion — disable all non-essential animation (RFC-011 §5) */

@@ -198,20 +198,19 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
             render::escape_html(&month_key),
             render::escape_html(&day_date)
         );
-        let bg = if selected { "#EAF3FF" } else { "#F5F5F7" };
-        let border = if selected { "#007AFF" } else { "#E5E5EA" };
+        let header_class = if selected {
+            "cz-matrix-header-cell cz-matrix-header-cell--selected"
+        } else {
+            "cz-matrix-header-cell"
+        };
         let aria_current = if selected {
             " aria-current=\"date\""
         } else {
             ""
         };
         header_cells.push_str(&format!(
-            "<th scope=\"col\"{date_attr} style=\"position:sticky;top:0;z-index:2;\
-             background:{bg};border:1px solid {border};padding:0;min-width:3.25rem;\
-             text-align:center\">\
-             <a href=\"{href}\"{aria_current} style=\"display:flex;min-height:44px;\
-             align-items:center;justify-content:center;color:#1D1D1F;text-decoration:none;\
-             font-size:.8125rem;font-weight:700\">{day}</a></th>",
+            "<th scope=\"col\"{date_attr} class=\"{header_class}\">\
+             <a href=\"{href}\"{aria_current} class=\"cz-matrix-header-link\">{day}</a></th>",
             date_attr = export_attr(
                 "data-date",
                 &day_date,
@@ -231,9 +230,7 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
                 .unwrap_or(&[]);
             let cell = cell_summary(&day_date, member, events, attendances, locale);
             cells.push_str(&format!(
-                "<td aria-label=\"{label}\"{export_value_attr} style=\"border:1px solid #E5E5EA;\
-                 min-width:3.25rem;height:2.75rem;text-align:center;vertical-align:middle;\
-                 font-size:.875rem;font-weight:700;color:{color};background:{bg}\">\
+                "<td aria-label=\"{label}\"{export_value_attr} class=\"cz-matrix-cell cz-matrix-cell--{state}\">\
                  {visual}</td>",
                 label = render::escape_html(&cell.label),
                 export_value_attr = export_attr(
@@ -241,16 +238,12 @@ pub(super) fn render_matrix(input: MatrixRenderInput<'_>) -> String {
                     &cell.export_value,
                     can_export_csv && export_token.is_some()
                 ),
-                color = cell.color,
-                bg = cell.background,
+                state = cell.state,
                 visual = cell.visual
             ));
         }
         body_rows.push_str(&format!(
-            "<tr><th scope=\"row\"{member_attr} style=\"position:sticky;left:0;z-index:1;\
-             background:#FFFFFF;border:1px solid #E5E5EA;text-align:left;\
-             min-width:8rem;max-width:10rem;padding:.5rem;font-size:.875rem;\
-             line-height:1.3;white-space:normal\">{name}</th>{cells}</tr>",
+            "<tr><th scope=\"row\"{member_attr} class=\"cz-matrix-member-header\">{name}</th>{cells}</tr>",
             member_attr = export_attr(
                 "data-member-name",
                 &member.display_name,

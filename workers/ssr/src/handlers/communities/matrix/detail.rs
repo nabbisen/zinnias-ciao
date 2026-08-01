@@ -17,9 +17,9 @@ pub(super) fn render_date_detail(
 ) -> String {
     let Some(day) = detail_day else {
         return format!(
-            "<section style=\"max-width:42rem;margin:1rem auto 0\">\
-             <h3 style=\"font-size:1rem;font-weight:700;margin:0\">{}</h3>\
-             <p style=\"font-size:.875rem;color:#6e6e73;margin:.5rem 0 0\">{}</p>\
+            "<section class=\"cz-matrix-detail-section\">\
+             <h3 class=\"cz-matrix-detail-heading\">{}</h3>\
+             <p class=\"cz-matrix-detail-empty-text\">{}</p>\
              </section>",
             i18n::t(locale, i18n::HOME_AGENDA_TITLE),
             i18n::t(locale, i18n::CALENDAR_EMPTY_MONTH)
@@ -28,9 +28,9 @@ pub(super) fn render_date_detail(
     let events = rows_by_date.get(day).map(Vec::as_slice).unwrap_or(&[]);
     if events.is_empty() {
         return format!(
-            "<section style=\"max-width:42rem;margin:1rem auto 0\">\
-             <h3 style=\"font-size:1rem;font-weight:700;margin:0\">{day}</h3>\
-             <p style=\"font-size:.875rem;color:#6e6e73;margin:.5rem 0 0\">{}</p>\
+            "<section class=\"cz-matrix-detail-section\">\
+             <h3 class=\"cz-matrix-detail-heading\">{day}</h3>\
+             <p class=\"cz-matrix-detail-empty-text\">{}</p>\
              </section>",
             i18n::t(locale, i18n::CALENDAR_EMPTY_DAY)
         );
@@ -50,7 +50,7 @@ pub(super) fn render_date_detail(
         let counts = aggregate_counts(&row.day_id, member_count, attendances);
         let cancelled = if event_day_cancelled(row) {
             format!(
-                "<span style=\"font-size:.75rem;color:#B42318;margin-left:.35rem\">{}</span>",
+                "<span class=\"cz-matrix-detail-cancelled-badge\">{}</span>",
                 i18n::t(
                     locale,
                     if row.occurrence_status == "cancelled" {
@@ -64,15 +64,11 @@ pub(super) fn render_date_detail(
             String::new()
         };
         items.push_str(&format!(
-            "<li style=\"border-top:1px solid #F5F5F7;padding:.75rem 0\">\
-             <a href=\"/c/{cid}/events/{eid}\" style=\"display:block;\
-             text-decoration:none;color:inherit\">\
-             <span style=\"display:block;font-size:.9375rem;font-weight:700;\
-             line-height:1.35\">{title}{cancelled}</span>\
-             <span style=\"display:block;font-size:.8125rem;color:#6e6e73;\
-             margin-top:.25rem\">{date}</span></a>\
-             <span style=\"display:block;font-size:.8125rem;color:#3A3A3C;\
-             margin-top:.35rem\">{going} {going_count} · {not_going} {not_going_count} · \
+            "<li class=\"cz-matrix-detail-item\">\
+             <a href=\"/c/{cid}/events/{eid}\" class=\"cz-matrix-detail-item-link\">\
+             <span class=\"cz-matrix-detail-item-title\">{title}{cancelled}</span>\
+             <span class=\"cz-matrix-detail-item-date\">{date}</span></a>\
+             <span class=\"cz-matrix-detail-item-counts\">{going} {going_count} · {not_going} {not_going_count} · \
              {attended} {attended_count} · {no_answer} {no_answer_count}</span></li>",
             cid = render::escape_html(community_id),
             eid = render::escape_html(&row.event_id),
@@ -90,9 +86,9 @@ pub(super) fn render_date_detail(
         ));
     }
     format!(
-        "<section style=\"max-width:42rem;margin:1rem auto 0\">\
-         <h3 style=\"font-size:1rem;font-weight:700;margin:0\">{day}</h3>\
-         <ul style=\"list-style:none;margin:.5rem 0 0;padding:0\">{items}</ul>\
+        "<section class=\"cz-matrix-detail-section\">\
+         <h3 class=\"cz-matrix-detail-heading\">{day}</h3>\
+         <ul class=\"cz-matrix-detail-list\">{items}</ul>\
          </section>"
     )
 }
