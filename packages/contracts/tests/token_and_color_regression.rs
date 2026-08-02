@@ -67,12 +67,25 @@ const APP_CSS_SOURCE: &str = include_str!("../../../workers/ssr/static/app.css")
 /// callers use this only to assert on rules that must exist. (Same helper as
 /// `release_gates.rs`'s of the same name; duplicated because integration
 /// test binaries do not share code with each other.)
+///
+/// Handoff 040 §7.3: tolerates any run of whitespace (including none)
+/// between the selector and its opening brace — a rule written with
+/// aligned braces (`.foo       { color: … }`) is not a different selector,
+/// and the helper's job is to tolerate that formatting, not constrain it.
+/// Still not a real CSS parser: if `selector` occurs as a substring not
+/// immediately followed by whitespace-then-`{`, this reports "not found"
+/// rather than searching further, the same narrowness the exact-string
+/// version had.
 fn css_rule_body<'a>(css: &'a str, selector: &str) -> &'a str {
-    let needle = format!("{selector} {{");
     let start = css
-        .find(&needle)
+        .find(selector)
         .unwrap_or_else(|| panic!("selector `{selector}` not found in app.css"));
-    let after_brace = start + needle.len();
+    let after_selector = &css[start + selector.len()..];
+    let brace_offset = after_selector
+        .find('{')
+        .filter(|&i| after_selector[..i].chars().all(char::is_whitespace))
+        .unwrap_or_else(|| panic!("selector `{selector}` not found in app.css"));
+    let after_brace = start + selector.len() + brace_offset + 1;
     let close = css[after_brace..]
         .find('}')
         .unwrap_or_else(|| panic!("selector `{selector}` has no closing brace in app.css"));

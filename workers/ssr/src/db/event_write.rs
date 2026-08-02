@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Event creation, edit, and cancellation (RFC-009).
 
 use crate::audit::{self, AuditAction, AuditMetadata, EventEditScope};

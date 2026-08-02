@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Event and EventDay table access (RFC-002 / RFC-005).
 
 use worker::{D1Database, Result};

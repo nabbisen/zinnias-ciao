@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Active-member help-signin code table access — RFC-024.
 
 use worker::{D1Database, Result};

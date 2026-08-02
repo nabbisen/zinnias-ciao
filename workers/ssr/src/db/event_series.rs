@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Recurrence-series access and materialization (RFC-065).
 
 use crate::crypto::random_token;

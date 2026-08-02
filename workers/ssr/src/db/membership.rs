@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Membership and user table access — RFC-002 / RFC-004.
 
 use crate::audit::{self, AuditAction, AuditMetadata};

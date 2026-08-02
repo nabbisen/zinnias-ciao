@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Attendance table access (RFC-002 / RFC-006).
 //!
 //! Status is per (event_day, membership). NULL = No answer — never fabricated.

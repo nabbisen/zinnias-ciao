@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Event note table access (RFC-002 / RFC-007).
 //!
 //! One note per (event, membership). Soft-deleted by note_deleted_at.

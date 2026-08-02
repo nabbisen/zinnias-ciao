@@ -1453,7 +1453,7 @@ button, a, [role="button"] { min-height: var(--cz-touch-min); }
   display: block;
   margin-bottom: var(--cz-space-1-5);
 }
-.cz-admin-field-input {
+.cz-field-input {
   width: 100%;
   padding: var(--cz-space-3);
   border: 1px solid var(--cz-color-surface-strong);

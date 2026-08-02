@@ -289,7 +289,7 @@ fn render_join_form(token: &str, error: Option<&str>) -> Result<Response> {
          <form method=\"post\" action=\"/join\" class=\"cz-anon-form\">\
            <label class=\"cz-anon-label\">{label}</label>\
            <input name=\"code\" type=\"text\" autocomplete=\"off\" inputmode=\"text\" \
-                  maxlength=\"16\" class=\"cz-admin-field-input\" required>\
+                  maxlength=\"16\" class=\"cz-field-input\" required>\
            <input type=\"hidden\" name=\"_token\" value=\"{token}\">\
            <button type=\"submit\" class=\"cz-anon-submit-button\">{submit}</button>\
          </form>\
@@ -327,7 +327,7 @@ fn render_profile_form(token: &str, error: Option<&'static str>) -> Result<Respo
          <form method=\"post\" action=\"/join/profile\" class=\"cz-anon-form\">\
            <label class=\"cz-anon-label\">{label}</label>\
            <input name=\"display_name\" type=\"text\" autocomplete=\"nickname\" \
-                  maxlength=\"40\" class=\"cz-admin-field-input\" required>\
+                  maxlength=\"40\" class=\"cz-field-input\" required>\
            <input type=\"hidden\" name=\"_token\" value=\"{token}\">\
            <button type=\"submit\" class=\"cz-anon-submit-button\">{submit}</button>\
          </form>\

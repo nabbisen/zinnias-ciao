@@ -248,7 +248,7 @@ fn form_field(label: &str, name: &str, ftype: &str, val: &str, required: bool) -
         "<label class=\"cz-admin-field\">\
          <span class=\"cz-admin-field-label\">{label}</span>\
          <input type=\"{ftype}\" name=\"{name}\" value=\"{val}\" \
-           class=\"cz-admin-field-input\"{req_attr}>\
+           class=\"cz-field-input\"{req_attr}>\
          </label>",
         label = label,
         ftype = ftype,
@@ -264,7 +264,7 @@ fn description_field(description: Option<&str>) -> String {
          <span class=\"cz-admin-field-label\">\
          {desc_lbl}</span>\
          <textarea name=\"description\" rows=\"3\" \
-           class=\"cz-admin-field-input\">{dval}</textarea>\
+           class=\"cz-field-input\">{dval}</textarea>\
          </label>",
         desc_lbl = i18n::JA_FORM_FIELD_DESC,
     )

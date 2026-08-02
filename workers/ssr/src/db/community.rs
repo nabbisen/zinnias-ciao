@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Community table access.
 
 use worker::{D1Database, Result};

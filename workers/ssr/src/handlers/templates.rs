@@ -156,17 +156,17 @@ pub async fn get_templates(
              <label class=\"cz-templates-field\">\
                <span class=\"cz-admin-field-label\">{lbl_title}</span>\
                <input type=\"text\" name=\"title\" required maxlength=\"80\"\
-                 class=\"cz-admin-field-input\">\
+                 class=\"cz-field-input\">\
              </label>\
              <label class=\"cz-templates-field\">\
                <span class=\"cz-admin-field-label\">{lbl_loc}</span>\
                <input type=\"text\" name=\"location\" maxlength=\"120\"\
-                 class=\"cz-admin-field-input\">\
+                 class=\"cz-field-input\">\
              </label>\
              <label class=\"cz-templates-field\">\
                <span class=\"cz-admin-field-label\">{lbl_dur}</span>\
                <input type=\"number\" name=\"duration_minutes\" min=\"1\" max=\"1440\"\
-                 class=\"cz-admin-field-input\">\
+                 class=\"cz-field-input\">\
              </label>\
              <button type=\"submit\"\
                class=\"cz-templates-save-button\">\
