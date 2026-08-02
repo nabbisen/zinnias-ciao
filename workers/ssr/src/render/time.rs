@@ -17,24 +17,6 @@ pub fn format_day_time_tz_localized(day: &CardDay<'_>, tz: &str, locale: Locale)
     format!("{starts}–{ends}")
 }
 
-/// Format a day's time range for display (UTC — used when timezone is unknown).
-///
-/// Handoff 035 (dead-code sweep) finding: dead in production (no caller
-/// anywhere), surfaced by removing render.rs's module-wide
-/// `#![allow(dead_code)]`, pre-existing and unrelated to this sweep's three
-/// authorized deletions. `parse_utc_display`/`parse_utc_time` below are
-/// dead-in-production for the same reason (this function was their only
-/// production caller) but are exercised directly by `render/tests.rs` —
-/// the same "dead code with test coverage" shape as `status_chip`, which
-/// this handoff explicitly named for deletion. This one was not named, so
-/// it is a finding for the review request, not a deletion.
-#[allow(dead_code)]
-fn format_day_time(day: &CardDay<'_>) -> String {
-    let starts = parse_utc_display(day.starts_at_utc);
-    let ends = parse_utc_time(day.ends_at_utc);
-    format!("{starts}–{ends}")
-}
-
 /// Fixed UTC-offset map for IANA names — delegates to contracts::tz (RFC-018).
 fn tz_offset_minutes(tz: &str) -> i32 {
     zinnias_ciao_contracts::tz::offset_minutes_or_utc(tz)
@@ -43,16 +25,6 @@ fn tz_offset_minutes(tz: &str) -> i32 {
 /// Apply a UTC offset and return ("YYYY-MM-DD", "HH:MM") in local time.
 fn utc_to_local_parts(utc: &str, offset_mins: i32) -> (String, String) {
     zinnias_ciao_contracts::tz::to_local_parts(utc, offset_mins)
-}
-
-/// Apply a UTC offset and return "Mon D, HH:MM" in local time. Non-migrated
-/// pages: always Japanese. Behavior unchanged by RFC-072.
-///
-/// Handoff 035 (dead-code sweep) finding: dead in production, surfaced by
-/// the same allow removal — see `format_day_time` above.
-#[allow(dead_code)]
-fn apply_offset_display(utc: &str, offset_mins: i32) -> String {
-    apply_offset_display_localized(utc, offset_mins, Locale::Ja)
 }
 
 /// Apply a UTC offset and return the date label plus time in local time,
@@ -74,16 +46,6 @@ fn apply_offset_time(utc: &str, offset_mins: i32) -> String {
     utc_to_local_parts(utc, offset_mins).1
 }
 
-/// Non-migrated pages: always Japanese. Behavior unchanged by RFC-072.
-///
-/// Handoff 035 (dead-code sweep) finding: dead in production (only caller
-/// was `format_day_time`, itself dead) but exercised directly by
-/// `render/tests.rs` — see `format_day_time` above.
-#[allow(dead_code)]
-pub(super) fn parse_utc_display(utc: &str) -> String {
-    parse_utc_display_localized(utc, Locale::Ja)
-}
-
 /// Date label plus time, in UTC (used when timezone is unknown), with the
 /// date label following `locale` (RFC-072 Slice C).
 pub(super) fn parse_utc_display_localized(utc: &str, locale: Locale) -> String {
@@ -98,17 +60,6 @@ pub(super) fn parse_utc_display_localized(utc: &str, locale: Locale) -> String {
         Locale::En => zinnias_ciao_contracts::tz::date_label_en(date),
     };
     format!("{date_label} {time}")
-}
-
-/// Handoff 035 (dead-code sweep) finding: same shape as `parse_utc_display`
-/// above — dead in production, exercised directly by `render/tests.rs`.
-#[allow(dead_code)]
-pub(super) fn parse_utc_time(utc: &str) -> String {
-    utc.split_once('T')
-        .map(|(_, time)| time)
-        .and_then(|t| t.get(..5))
-        .unwrap_or("")
-        .to_owned()
 }
 
 /// Public re-export for handlers that need offset arithmetic (e.g. event.rs).

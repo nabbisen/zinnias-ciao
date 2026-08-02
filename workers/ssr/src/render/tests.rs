@@ -2,7 +2,7 @@ use super::event_card::CardDay;
 use super::participants::initials;
 use super::shell::{escape_html, shell_with_lang};
 use super::status::status_display;
-use super::time::{format_day_time_tz_localized, parse_utc_display, parse_utc_time};
+use super::time::format_day_time_tz_localized;
 
 // RFC-072 Slice C: the date label inside a formatted day/time range must
 // follow `locale`, not always Japanese.
@@ -146,24 +146,6 @@ fn initials_one_word() {
 fn initials_japanese_name() {
     // Each kanji is one Unicode char; we take the first two.
     assert_eq!(initials("田中 花子"), "田花");
-}
-
-#[test]
-fn parse_utc_time_basic() {
-    assert_eq!(parse_utc_time("2026-06-14T10:30:00.000Z"), "10:30");
-}
-
-#[test]
-fn parse_utc_display_uses_ja_format() {
-    // Home card date display must use Japanese convention, not "Jun 14".
-    let out = parse_utc_display("2026-06-14T09:00:00.000Z");
-    assert!(
-        !out.contains("Jun"),
-        "must not contain English month: {out}"
-    );
-    assert!(out.contains("月"), "must contain 月: {out}");
-    assert!(out.contains("日"), "must contain 日: {out}");
-    assert!(out.contains("09:00"), "must contain time: {out}");
 }
 
 #[test]

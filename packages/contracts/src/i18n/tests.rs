@@ -25,7 +25,6 @@ fn en_ja_parity() {
         // Note
         "NOTE_SAVE",
         "NOTE_DELETE",
-        "NOTE_SAVED",
         "NOTE_TOO_LONG",
         "NOTE_SECTION_LABEL",
         "NOTE_PLACEHOLDER_LABEL",
@@ -120,7 +119,6 @@ fn en_ja_parity() {
         "ADMIN_INVITES_NONE",
         "ADMIN_INVITES_NEW_CODE_HINT",
         "ADMIN_INVITES_REVOKE",
-        "ADMIN_INVITES_REVOKED",
         "ADMIN_INVITES_BACK_TO_MEMBERS",
         // Admin: members
         "ADMIN_MEMBERS_TITLE",
@@ -226,7 +224,7 @@ fn en_ja_parity() {
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
     ];
-    assert_eq!(en_keys.len(), 201, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 199, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

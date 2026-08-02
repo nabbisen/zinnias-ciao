@@ -158,7 +158,6 @@ fn i18n_en_ja_parity_count() {
         (EN_STATUS_ATTENDED_DISABLED, JA_STATUS_ATTENDED_DISABLED),
         (EN_NOTE_SAVE, JA_NOTE_SAVE),
         (EN_NOTE_DELETE, JA_NOTE_DELETE),
-        (EN_NOTE_SAVED, JA_NOTE_SAVED),
         (EN_NOTE_TOO_LONG, JA_NOTE_TOO_LONG),
         (EN_SESSION_EXPIRED, JA_SESSION_EXPIRED),
         (EN_LOGOUT, JA_LOGOUT),
@@ -343,7 +342,6 @@ fn i18n_en_ja_parity_count() {
             JA_ADMIN_INVITES_REVEAL_WARNING,
         ),
         (EN_ADMIN_INVITES_REVOKE, JA_ADMIN_INVITES_REVOKE),
-        (EN_ADMIN_INVITES_REVOKED, JA_ADMIN_INVITES_REVOKED),
         (
             EN_ADMIN_INVITES_BACK_TO_MEMBERS,
             JA_ADMIN_INVITES_BACK_TO_MEMBERS,
@@ -3037,7 +3035,7 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     },
     LocalizationException {
         path: "handlers/admin/members.rs",
-        ja_count: 28,
+        ja_count: 27,
         calls_bare_page: true,
         reason: "admin-only surface, RFC-072 Slice D",
     },
@@ -5073,18 +5071,20 @@ fn invite_mark_used_does_not_write_membership_fk() {
     );
 }
 
-// ── RFC-075 ratchets: inline styling and hardcoded hex may only shrink ──────
+// ── RFC-075: hardcoded hex may only shrink; inline styling must stay zero ──
 //
-// Not a threshold (Resolved Decision 2) — a ratchet. Both counts are
-// re-measured against the whole `workers/ssr/src` tree at test time (a
-// filesystem walk, not `include_str!`, so a new file or an untouched
-// existing one is covered automatically, not just the handful of files
-// already `include_str!`-ed elsewhere in this suite) and pinned here. A
-// count that increases means new inline styling or a new hardcoded colour
-// was added instead of reaching for a `cz-*` class / `--cz-*` token; lower
-// this pin whenever a slice migrates more.
+// Hardcoded hex is a ratchet (Resolved Decision 2): not a threshold, a count
+// that may only shrink, re-measured against the whole `workers/ssr/src` tree
+// at test time (a filesystem walk, not `include_str!`, so a new file or an
+// untouched existing one is covered automatically) and pinned here. A count
+// that increases means a new hardcoded colour was added instead of reaching
+// for a `--cz-*` token; lower this pin whenever a slice migrates more.
+//
+// Inline styling is no longer a ratchet (Handoff 038, RFC-075's terminal
+// slice): `style-src` no longer carries `'unsafe-inline'`, so any inline
+// `style=` attribute reintroduced now is a CSP regression, not an
+// incomplete migration — asserted at exactly zero, not "never increases".
 
-const INLINE_STYLE_RATCHET: usize = 1;
 const HARDCODED_HEX_RATCHET: usize = 25;
 
 fn workers_ssr_src_dir() -> std::path::PathBuf {
@@ -5125,8 +5125,16 @@ fn count_over_tree(count_in_file: impl Fn(&str) -> usize) -> usize {
         .sum()
 }
 
+/// Handoff 038 §7.3: comments stripped first — this counter previously
+/// treated `lib.rs`'s own CSP comment (which mentioned `style=` while
+/// explaining the directive) as an inline style, which is why this sat at 1
+/// instead of the true 0. `strip_line_comments` was built for the flash
+/// gate (`rfc072_flash_query_values_are_lowercase_snake_case_codes_not_prose`)
+/// and is reused here rather than wording comments to dodge the literal —
+/// making a comment's phrasing load-bearing was rejected in Handoff 034 §3.1
+/// and is not repeated here.
 fn count_inline_styles(content: &str) -> usize {
-    content.matches("style=").count()
+    strip_line_comments(content).matches("style=").count()
 }
 
 /// Count `#RRGGBB` / `#RGB` hex-colour literals: a `#` followed by exactly 3
@@ -5161,14 +5169,47 @@ fn count_hex_literals(content: &str) -> usize {
 }
 
 #[test]
-fn inline_style_count_never_increases() {
+fn inline_style_count_is_zero() {
+    // Handoff 038: RFC-075's terminal criterion. `style-src` no longer
+    // carries `'unsafe-inline'` (see `style_src_has_no_unsafe_inline`
+    // below), so a reintroduced inline style is a CSP regression, not an
+    // incomplete migration — asserted at exactly zero, not ratcheted.
     let count = count_over_tree(count_inline_styles);
+    assert_eq!(
+        count, 0,
+        "inline `style=` count is {count}, expected 0. RFC-075 removed every inline style \
+         across seven slices and the terminal slice dropped 'unsafe-inline' from style-src — a \
+         reintroduced inline style now fails silently in the browser (CSP drops it) as well as \
+         here. Use a cz-* class from app.css instead."
+    );
+}
+
+#[test]
+fn style_src_has_no_unsafe_inline() {
+    // Handoff 038 §7.6: RFC-075's terminal criterion. Seven slices removed
+    // every inline style from the SSR templates specifically so this
+    // directive could be dropped; reintroducing it would silently undo that
+    // work — a rendered inline style would simply start working again
+    // instead of being dropped by the browser and caught by every smoke's
+    // `no-csp-violations` check (Handoff 038 §7.1).
+    //
+    // Comments stripped first — this gate's own doc comment mentions
+    // 'unsafe-inline' while explaining what it checks (caught when this
+    // gate was first written: it failed against its own file, the same
+    // self-referential trap `count_inline_styles` and the flash gate hit).
+    let code = strip_line_comments(LIB_SRC);
     assert!(
-        count <= INLINE_STYLE_RATCHET,
-        "inline `style=` count is {count}, above the RFC-075 ratchet of {INLINE_STYLE_RATCHET}. \
-         This count may only go down. If you added a new inline style, use a cz-* class from \
-         app.css instead; if you migrated more of the tree and lowered the real count, lower \
-         INLINE_STYLE_RATCHET to match — never raise it."
+        !code.contains("'unsafe-inline'"),
+        "lib.rs's Content-Security-Policy header contains 'unsafe-inline'. RFC-075 removed every \
+         inline style across seven slices specifically so this directive could be dropped — \
+         reintroducing it undoes that work. If a new inline style is genuinely required, that is \
+         a design decision for the RFC owner, not something to fix by loosening this header."
+    );
+    assert!(
+        code.contains("style-src 'self';"),
+        "expected the literal `style-src 'self';` directive in lib.rs's Content-Security-Policy \
+         header — has the header's formatting changed? Update this gate's expected substring if \
+         so, but do not weaken what it checks."
     );
 }
 

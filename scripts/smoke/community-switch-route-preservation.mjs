@@ -2,6 +2,7 @@
 // Scenario smoke for RFC-074 community switch route preservation. Local wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
 import { createHmac } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -230,8 +231,12 @@ class Cdp {
         this.events.set(method, list.filter((item) => item !== cb));
         resolve(params);
       };
-      this.events.set(method, [...(this.events.get(method) ?? []), cb]);
+      this.on(method, cb);
     });
+  }
+
+  on(method, cb) {
+    this.events.set(method, [...(this.events.get(method) ?? []), cb]);
   }
 
   close() {
@@ -246,6 +251,7 @@ async function newPage() {
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   await cdp.send('Network.enable');
+  await attachCspViolationCapture(cdp);
   await setSession(cdp);
   return cdp;
 }
@@ -505,6 +511,13 @@ try {
       noEventIdPreserved: !eventDetailResult.path.includes(eventId),
       emitsNoFragment: eventDetailResult.hash === '',
     },
+  });
+
+  const cspViolations = await readCspViolations(page);
+  results.push({
+    name: 'no-csp-violations',
+    observed: { cspViolations },
+    checks: { zeroCspViolations: cspViolations.length === 0 },
   });
 
   page.close();

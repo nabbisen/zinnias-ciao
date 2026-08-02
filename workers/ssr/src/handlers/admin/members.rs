@@ -19,9 +19,9 @@ use zinnias_ciao_contracts::i18n;
 /// the caller must render no flash element in that case, not echo the code.
 /// Replaces a prior inline match against the mixed-case, space-containing
 /// value `"Code revoked"` (this file's redirect emitted `?flash=Code+revoked`,
-/// which `query_pairs()` decodes back to a space) — that arm resolved to
-/// `i18n::JA_ADMIN_INVITES_REVOKED`, now unused as a direct result of this
-/// change (reported, not deleted, in the review request).
+/// which `query_pairs()` decodes back to a space) — that arm's constant,
+/// `JA_ADMIN_INVITES_REVOKED`, was orphaned by this change and deleted in
+/// Handoff 038 (RFC-075 terminal slice).
 fn invites_flash_message(code: Option<&str>) -> Option<&'static str> {
     match code {
         Some("invite_revoked") => Some(i18n::JA_ADMIN_INVITE_REVOKED_FLASH),

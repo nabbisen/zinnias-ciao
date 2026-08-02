@@ -12,6 +12,7 @@
 // the required visual evidence and numeric 200% margins.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
 import { createHmac } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -210,8 +211,12 @@ class Cdp {
         this.events.set(method, list.filter((item) => item !== cb));
         resolve(params);
       };
-      this.events.set(method, [...(this.events.get(method) ?? []), cb]);
+      this.on(method, cb);
     });
+  }
+
+  on(method, cb) {
+    this.events.set(method, [...(this.events.get(method) ?? []), cb]);
   }
 
   close() {
@@ -226,6 +231,7 @@ async function newPage(sessionSecret) {
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   await cdp.send('Network.enable');
+  await attachCspViolationCapture(cdp);
   await setSession(cdp, sessionSecret);
   return cdp;
 }
@@ -446,6 +452,48 @@ try {
       checks: { formFound: false },
     });
   }
+
+  // Handoff 038 §7.1: clicking the one-time code copy button exercises the
+  // remaining three app.js CSSOM style writes — `fallbackCopyText`'s
+  // `position`/`top` (reached when `navigator.clipboard.writeText` is
+  // unavailable or unpermitted, as is typical for a script-triggered click
+  // in headless Chromium) and `status.style.color` either way.
+  logStep('clicking the one-time code copy button (exercises the remaining app.js CSSOM style writes)');
+  const copyClicked = await evalExpr(
+    page,
+    `(() => {
+      const button = document.querySelector('[data-copy-code-button]');
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  await sleep(150);
+  const copyObserved = await evalExpr(
+    page,
+    `(() => {
+      const status = document.querySelector('[data-copy-code-status]');
+      return {
+        statusText: status ? status.textContent : null,
+        statusColor: status ? getComputedStyle(status).color : null,
+      };
+    })()`,
+  );
+  results.push({
+    name: 'help-signin-copy-button-style-write',
+    observed: { copyClicked, copyObserved },
+    checks: {
+      buttonFound: copyClicked,
+      statusColorApplied: !!copyObserved.statusColor,
+    },
+  });
+
+  const cspViolations = await readCspViolations(page);
+  results.push({
+    name: 'no-csp-violations',
+    observed: { cspViolations },
+    checks: { zeroCspViolations: cspViolations.length === 0 },
+  });
 
   page.close();
 

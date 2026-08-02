@@ -4,6 +4,7 @@
 // wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
 import { createHmac } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -223,8 +224,12 @@ class Cdp {
         this.events.set(method, list.filter((item) => item !== cb));
         resolve(params);
       };
-      this.events.set(method, [...(this.events.get(method) ?? []), cb]);
+      this.on(method, cb);
     });
+  }
+
+  on(method, cb) {
+    this.events.set(method, [...(this.events.get(method) ?? []), cb]);
   }
 
   close() {
@@ -239,6 +244,7 @@ async function newPage(sessionSecret) {
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   await cdp.send('Network.enable');
+  await attachCspViolationCapture(cdp);
   await setSession(cdp, sessionSecret);
   return cdp;
 }
@@ -493,6 +499,39 @@ try {
       htmlLangJa: eventDetailJapanese.htmlLang === 'ja',
       attendanceButtonsRendered: eventDetailJapanese.statusButtons.length > 0,
       noHorizontalScrollAt200Percent: eventDetailJapanese.noHorizontalScroll,
+    },
+  });
+
+  // Handoff 038 §7.1: exercises app.js's note-character-limit CSSOM write
+  // (`ta.style.borderColor`) under the real page, then resets the textarea
+  // before the actual (valid-length) note below — this interaction is never
+  // submitted, so it cannot affect the flash assertions that follow.
+  logStep('typing past the note character limit to exercise the borderColor CSSOM write');
+  const overLimitStyleCheck = await evalExpr(
+    page,
+    `(() => {
+      const ta = document.querySelector('textarea[name="note"]');
+      if (!ta) return { found: false };
+      const original = ta.value;
+      ta.value = 'x'.repeat(201);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      const borderColorOverLimit = getComputedStyle(ta).borderColor;
+      ta.value = original;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      const borderColorAfterReset = getComputedStyle(ta).borderColor;
+      return { found: true, borderColorOverLimit, borderColorAfterReset };
+    })()`,
+  );
+  results.push({
+    name: 'note-character-limit-style-write',
+    observed: overLimitStyleCheck,
+    checks: {
+      textareaFound: overLimitStyleCheck.found,
+      // #FF3B30 → rgb(255, 59, 48): proves the browser actually applied the
+      // CSSOM write, not that CSP silently dropped it while the page kept
+      // rendering — the failure mode §12 warns is otherwise invisible.
+      borderTurnedRedOverLimit: overLimitStyleCheck.borderColorOverLimit === 'rgb(255, 59, 48)',
+      borderResetAfterFix: overLimitStyleCheck.borderColorAfterReset !== 'rgb(255, 59, 48)',
     },
   });
 
@@ -769,6 +808,13 @@ try {
       showsJapaneseText: homeAfterFlipBack.text.includes('ホーム'),
       otherMembershipUnaffectedThroughout: otherStillNull,
     },
+  });
+
+  const cspViolations = await readCspViolations(page);
+  results.push({
+    name: 'no-csp-violations',
+    observed: { cspViolations },
+    checks: { zeroCspViolations: cspViolations.length === 0 },
   });
 
   page.close();

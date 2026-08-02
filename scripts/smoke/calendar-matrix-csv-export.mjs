@@ -3,6 +3,7 @@
 // Local wrangler dev only; launches sandboxed incognito Chromium.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
 import { createHmac } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
@@ -264,6 +265,7 @@ async function newPage(sessionSecret) {
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   await cdp.send('Network.enable');
+  await attachCspViolationCapture(cdp);
   await setSession(cdp, sessionSecret);
   return cdp;
 }
@@ -484,6 +486,16 @@ try {
         auditOutput.includes('2026-07'),
       pageDoesNotOverflow: adminMatrix.pageDoesNotOverflow,
     },
+  });
+
+  const cspViolations = [
+    ...(await readCspViolations(memberPage)),
+    ...(await readCspViolations(adminPage)),
+  ];
+  results.push({
+    name: 'no-csp-violations',
+    observed: { cspViolations },
+    checks: { zeroCspViolations: cspViolations.length === 0 },
   });
 
   memberPage.close();

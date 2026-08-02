@@ -1,12 +1,10 @@
 // ── Note editor ───────────────────────────────────────────────────────────
 pub const EN_NOTE_SAVE: &str = "Save Note";
 pub const EN_NOTE_DELETE: &str = "Delete Note";
-pub const EN_NOTE_SAVED: &str = "Saved.";
 pub const EN_NOTE_TOO_LONG: &str = "Your note is too long. Please keep it under 200 characters.";
 
 pub const JA_NOTE_SAVE: &str = "メモを保存";
 pub const JA_NOTE_DELETE: &str = "メモを削除";
-pub const JA_NOTE_SAVED: &str = "保存しました。";
 pub const JA_NOTE_TOO_LONG: &str = "メモが長すぎます。200文字以内にしてください。";
 
 // ── Note editor (additional) ──────────────────────────────────────────────

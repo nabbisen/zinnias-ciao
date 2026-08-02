@@ -12,6 +12,7 @@
 // extraction itself.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
 import { createHmac } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -207,8 +208,12 @@ class Cdp {
         this.events.set(method, list.filter((item) => item !== cb));
         resolve(params);
       };
-      this.events.set(method, [...(this.events.get(method) ?? []), cb]);
+      this.on(method, cb);
     });
+  }
+
+  on(method, cb) {
+    this.events.set(method, [...(this.events.get(method) ?? []), cb]);
   }
 
   close() {
@@ -223,6 +228,7 @@ async function newPage(sessionSecret) {
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   await cdp.send('Network.enable');
+  await attachCspViolationCapture(cdp);
   if (sessionSecret) await setSession(cdp, sessionSecret);
   return cdp;
 }
@@ -354,6 +360,8 @@ try {
   await waitForDebugger(() => chromeStderr);
   logStep('sandboxed incognito Chromium is ready');
 
+  const cspViolations = [];
+
   // §7.3: join and relink are anonymous — no session cookie set at all,
   // the same as a real first-time visitor.
   const anonPage = await newPage(null);
@@ -373,6 +381,7 @@ try {
       },
     });
   }
+  cspViolations.push(...(await readCspViolations(anonPage)));
   anonPage.close();
 
   const adminPage = await newPage(adminSessionSecret);
@@ -392,7 +401,14 @@ try {
       },
     });
   }
+  cspViolations.push(...(await readCspViolations(adminPage)));
   adminPage.close();
+
+  results.push({
+    name: 'no-csp-violations',
+    observed: { cspViolations },
+    checks: { zeroCspViolations: cspViolations.length === 0 },
+  });
 
   for (const result of results) {
     result.passed = allChecksPass(result.checks);

@@ -9,7 +9,6 @@ pub const EN_ADMIN_INVITES_NEW_CODE_HINT: &str =
 pub const EN_ADMIN_INVITES_REVEAL_WARNING: &str =
     "Copy this code now. It will not be shown again after you leave or reload this page.";
 pub const EN_ADMIN_INVITES_REVOKE: &str = "Revoke";
-pub const EN_ADMIN_INVITES_REVOKED: &str = "Code revoked";
 pub const EN_ADMIN_INVITES_BACK_TO_MEMBERS: &str = "Back to member management";
 
 pub const JA_ADMIN_INVITES_TITLE: &str = "メンバーを招待";
@@ -21,14 +20,12 @@ pub const JA_ADMIN_INVITES_NEW_CODE_HINT: &str =
     "一人だけに共有してください — 24時間で失効します。";
 pub const JA_ADMIN_INVITES_REVEAL_WARNING: &str = "このコードを今コピーしてください。このページを離れたり再読み込みしたりすると、二度と表示されません。";
 pub const JA_ADMIN_INVITES_REVOKE: &str = "無効化";
-pub const JA_ADMIN_INVITES_REVOKED: &str = "コードを無効化しました";
 pub const JA_ADMIN_INVITES_BACK_TO_MEMBERS: &str = "メンバー管理へ戻る";
 // Handoff 037: was a raw-English `?flash=Code+revoked` query value matched
-// (not echoed) against `JA_ADMIN_INVITES_REVOKED` above — matched by an
-// improperly-cased key, not a lowercase snake_case code. This new constant
-// replaces that match arm; `JA_ADMIN_INVITES_REVOKED`/`EN_ADMIN_INVITES_REVOKED`
-// above are now unused as a direct result — reported, not deleted here (see
-// review request).
+// (not echoed) against the now-deleted `JA_ADMIN_INVITES_REVOKED` — matched
+// by an improperly-cased key, not a lowercase snake_case code. This
+// constant replaced that match arm; the orphaned pair it left behind was
+// deleted in Handoff 038 (RFC-075 terminal slice).
 pub const JA_ADMIN_INVITE_REVOKED_FLASH: &str = "招待コードを無効にしました。";
 
 // ── Admin: member management ──────────────────────────────────────────────

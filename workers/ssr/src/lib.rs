@@ -187,12 +187,14 @@ fn generate_request_id() -> String {
 fn attach_security_headers(resp: &mut Response, request_id: &str) -> Result<()> {
     let h = resp.headers_mut();
     // Content Security Policy.
-    // style-src 'unsafe-inline': the SSR templates use inline style= attributes
-    // pervasively (~272 occurrences). Removing them requires a full CSS extraction
-    // pass; tracked for a future RFC. All other directives are strict.
+    // RFC-075 removed every inline `style=` attribute from the SSR templates
+    // across seven slices (486 at the peak, 0 now — release_gates.rs's
+    // `inline_style_count_is_zero` asserts this stays true, not just that it
+    // never increases). `style-src` therefore carries no 'unsafe-inline':
+    // every directive here is strict.
     h.set(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
+        "default-src 'self'; script-src 'self'; style-src 'self'; \
          img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; \
          form-action 'self'; object-src 'none'",
     )?;

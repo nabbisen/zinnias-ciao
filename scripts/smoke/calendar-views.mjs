@@ -2,6 +2,7 @@
 // Scenario smoke for RFC-073 Calendar events list and day-detail UX. Local wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
 import { createHmac } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -229,8 +230,12 @@ class Cdp {
         this.events.set(method, list.filter((item) => item !== cb));
         resolve(params);
       };
-      this.events.set(method, [...(this.events.get(method) ?? []), cb]);
+      this.on(method, cb);
     });
+  }
+
+  on(method, cb) {
+    this.events.set(method, [...(this.events.get(method) ?? []), cb]);
   }
 
   close() {
@@ -245,6 +250,7 @@ async function newPage(sessionSecret) {
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
   await cdp.send('Network.enable');
+  await attachCspViolationCapture(cdp);
   await setSession(cdp, sessionSecret);
   return cdp;
 }
@@ -464,6 +470,16 @@ try {
       emitsNoFragment: switched.hash === '',
       pageDoesNotOverflow: switched.noPageHorizontalScroll,
     },
+  });
+
+  const cspViolations = [
+    ...(await readCspViolations(memberPage)),
+    ...(await readCspViolations(adminPage)),
+  ];
+  results.push({
+    name: 'no-csp-violations',
+    observed: { cspViolations },
+    checks: { zeroCspViolations: cspViolations.length === 0 },
   });
 
   memberPage.close();
