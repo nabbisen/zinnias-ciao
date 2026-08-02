@@ -41,8 +41,8 @@ weaker part of the product.
 
 Accordingly:
 
-- **product-feature work resumes** — RFC-073 and RFC-074 are complete and
-  RFC-072 is in progress (see Active Themes);
+- **product-feature work resumes** — RFC-072, RFC-073, RFC-074, and RFC-075 are
+  all complete (see Active Themes);
 - the RFC-050 hosted evidence campaign is **deferred, not cancelled**, and
   remains mandatory before any real community uses the service;
 - persistent-incident-sink provisioning (Logpush → R2) is deferred with it, since
@@ -204,22 +204,31 @@ section remains the tracked summary of record.
    than *enforcing* it — the cheapest way to green it is re-pinning the digest
    alone. Hashing only `app.js`/`app.css` and requiring the cache-buster to
    embed a prefix of that digest would make the invariant structural.
-5. **RFC-075 — Render style system and inline style reduction.** Owner-selected
-   2026-07-30 as the theme following RFC-072, and accepted the same day. The
-   measurements that shaped the design: **477 inline `style=` occurrences, 356
-   hardcoded hex colours, and zero `--cz-*` token references from Rust** — the
-   35-token design system in `app.css` is decorative, consumed by nothing that
-   renders the UI. Inline styling has also nearly **doubled** since `lib.rs`'s
-   CSP comment recorded "~272 occurrences", so this is accumulating, not static.
-   It carries a **security deliverable** the original draft did not name:
-   `style-src 'unsafe-inline'` exists solely because of these inline styles and
-   can be dropped only at **zero**, which makes that the terminal slice rather
-   than a nice-to-have. Migration is per-surface starting with Calendar, guarded
-   by two ratchets (inline-style count and hardcoded-colour count may only
-   decrease) rather than an arguable threshold. Hard constraint: the Calendar
-   accessibility gate at `release_gates.rs:2378` must be **re-expressed against
-   the rendered class set, never deleted**.
-6. **Choose the next user-facing theme** after RFC-075 — an owner decision.
+5. ~~RFC-075 — Render style system and inline style reduction.~~ **Complete
+   2026-08-01.** Design accepted at `96e3de5`; delivered across seven migration
+   slices, a dead-code sweep, two English-leak packages, and a terminal CSP
+   slice (`b5a88e1`…`f32ba3a`), every package architecture-reviewed and
+   Approved; moved to `rfcs/done/`.
+
+   **Inline `style=`: 486 → 0**, now asserted rather than ratcheted. Hardcoded
+   hex in Rust: 383 → 25. `app.css` went from 96 lines of tokens that nothing
+   consumed to a real component layer.
+
+   **The security deliverable landed:** `style-src` no longer carries
+   `'unsafe-inline'`, and a gate blocks reintroduction. That directive existed
+   solely because the SSR templates used inline styles, and could only be
+   dropped at zero — which is why the migration had to finish rather than stop
+   at the interesting surfaces. Removal was proven safe with browser evidence:
+   violation capture was built, shown to fire on a known-bad case, and all ten
+   smokes report zero violations, with the three `app.js` CSSOM writes exercised
+   under the strict header. It was never an active vulnerability — output is
+   escaped throughout — so the honest framing is *a strict directive restored*.
+
+   Along the way the work also closed three English leaks classes and replaced
+   three hand-maintained gate lists with default-fail mechanisms.
+
+6. **Choose the next user-facing theme** — an owner decision. `0.61.0` is
+   also due: the cadence rule is to tag when an RFC reaches `rfcs/done/`.
 7. **When a pilot is scheduled** — and not before — provision the persistent
    incident sink (Logpush → R2), then build and freeze one exact immutable
    release candidate and execute the RFC-050 hosted evidence campaign for the
@@ -283,7 +292,8 @@ The paused proposed backlog is:
 | 054 | Japanese UX copy review | Needs native-speaker review and copy-quality pass. |
 
 RFC-073, RFC-074, and RFC-072 left this table and shipped in `0.60.0`;
-RFC-075 left it on acceptance 2026-07-30. None of the four is paused proposed
+RFC-075 left it on acceptance 2026-07-30 and is now complete. None of the four
+is paused proposed
 work any more, and this table now holds only genuinely unscheduled backlog.
 
 ## Post-Hold Feature Candidates
@@ -337,9 +347,9 @@ RFC is.
    (`30e90c4`, 2026-07-30). Retained here for ordering context only; it is no
    longer a candidate.
 
-10. ~~**RFC-075: Render Style System and Inline Style Reduction**~~ —
-    **accepted** (2026-07-30), implementation pending. Retained here for
-    ordering context only; it is no longer a candidate.
+10. ~~**RFC-075: Render Style System and Inline Style Reduction**~~ — **done**
+    (`f32ba3a`, 2026-08-01). Retained here for ordering context only; it is no
+    longer a candidate.
     Inline styling across server-rendered Rust strings is now a maintenance
     risk. Start with a reviewed CSS/class strategy and migrate by surface,
     likely beginning with Calendar.

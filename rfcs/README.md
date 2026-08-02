@@ -20,16 +20,16 @@ authorize implementation.
 RFC numbers and the tables below are stable identifiers and lifecycle indexes,
 not execution priority. The active order is maintained in
 [ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-072,
-RFC-073, and RFC-074 shipped in `0.60.0` (tagged 2026-07-30, not deployed), and
-RFC-075 is the current theme. The RFC-050 hosted campaign and its sink remain
-deferred to the point a pilot is scheduled.
+RFC-073, and RFC-074 shipped in `0.60.0` (tagged 2026-07-30, not deployed);
+RFC-075 is complete on `main` and unreleased, so a `0.61.0` tag is due. No next
+theme is selected. The RFC-050 hosted campaign and its sink remain deferred to
+the point a pilot is scheduled.
 
 ## Accepted — approved for implementation
 
 | ID | Title | Accepted | Note |
 |----|-------|----------|------|
 | 050 | [Exact-Candidate Hosted Staging Evidence and Pilot Gate](./accepted/050-staging-runtime-verification-evidence-pack.md) | 2026-07-28 | B4 remediation revision architecture-reviewed and owner-accepted; authorizes local tooling implementation (RFC-050 Tooling Slices) only, not hosted execution. Slices 1–7 committed at `15b9409`/`c55787a`; Slices 8–9 remain; B4 still open because local tooling is not evidence until run against a frozen candidate. **IPv6 client support is not confirmed/implemented for this deployment** — see RFC-078 § Dated owner risk acceptances and this document's E4a |
-| 075 | [Render Style System and Inline Style Reduction](./accepted/075-render-style-system-and-inline-style-reduction.md) | 2026-07-30 | Design completed and architecture-reviewed; both open questions resolved (two releases, settled by RFC-073 shipping; ratchets rather than a threshold). **Measured: 477 inline `style=`, 356 hardcoded hex, and zero `--cz-*` token references from Rust** — the design system is decorative. Carries a security deliverable: `style-src 'unsafe-inline'` can be dropped only at zero inline styles, which is the terminal slice |
 | 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Local implementation reviewed/accepted/committed at `b72f22b`; corrected isolated automation and bounded human no-JS/network evidence were architecture-reviewed and owner-accepted, closing criterion 8 locally. RFC-050 hosted evidence remains required before public/production B1 closure |
 | 078 | [Fail-Closed Strongly Consistent Abuse Controls](./accepted/078-fail-closed-strongly-consistent-abuse-controls.md) | 2026-07-23 | Corrected architecture accepted; implemented and committed at `c991b82` on 2026-07-28, including the required I-B1 concurrency-burst evidence. RFC-050 exact-candidate hosted evidence remains pending, so B3 and all staging/public/production holds remain open |
 | 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 0A–8 and the Class A telemetry correction reviewed/committed. Persistent delivery and exact-candidate hosted B5 evidence remain required |
@@ -123,6 +123,7 @@ first-real-community deployment remain No-Go while B1, B3, B4, and B5 are open.
 | 072 | [Member Language Preference and Runtime Localization](./done/072-member-language-preference-and-runtime-localization.md) | 0.60.0 (`b237788`/`93e25de`/`fcf84aa`) — Slices A–C; Slice D is a future RFC |
 | 073 | [Calendar Events List and Day Detail UX](./done/073-calendar-events-list-and-day-detail-ux.md) | 0.60.0 (`ed549be`) |
 | 074 | [Community Switch Route Preservation](./done/074-community-switch-route-preservation.md) | 0.60.0 (`30e90c4`) |
+| 075 | [Render Style System and Inline Style Reduction](./done/075-render-style-system-and-inline-style-reduction.md) | `main`, seven slices plus a dead-code sweep, two leak packages, and the terminal slice (`b5a88e1`…`f32ba3a`); every package Approved. **Inline `style=` 486 → 0**, asserted not ratcheted; hardcoded hex 383 → 25. **`style-src` no longer carries `'unsafe-inline'`**, gated against reintroduction. No hosted-evidence precondition |
 
 ## Also Done
 

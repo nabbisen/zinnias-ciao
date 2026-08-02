@@ -1,8 +1,29 @@
 # RFC 075 - Render Style System and Inline Style Reduction
 
-**Status.** Accepted 2026-07-30 — design completed and architecture-reviewed;
-both open questions resolved. Authorizes incremental per-surface migration; the
-terminal CSP tightening ships only when inline `style=` reaches zero.
+**Status.** Implemented — design accepted 2026-07-30 at `96e3de5`; delivered
+across **seven migration slices, a dead-code sweep, two English-leak packages,
+and a terminal CSP slice**, each architecture-reviewed and Approved:
+
+| Package | Commit |
+|---|---|
+| Slice 1 — Calendar | `b5a88e1` |
+| Slice 2 — Event Detail and shared chrome | `86981a5` |
+| Slice 3 — My Page, Home, feed settings | `322f715` |
+| Slice 4 — admin event surfaces | `ed9764e` |
+| Slice 5 — admin member management | `705a8cb` |
+| Slice 6 — admin tools and onboarding | `97810a9` |
+| Slice 7 — matrix, errors, offline page | `9bacbdf` |
+| Dead-code sweep | `4cf7bd3` |
+| Terminal slice — `'unsafe-inline'` removed | `f32ba3a` |
+
+**Inline `style=`: 486 → 0**, now asserted rather than ratcheted. Hardcoded hex
+in Rust: 383 → 25. `app.css` grew from 96 lines of decorative tokens to a
+consumed component layer. **`style-src` no longer carries `'unsafe-inline'`**,
+gated against reintroduction — the security deliverable this RFC's Background
+identified and the reason the migration had to reach zero rather than stop at
+"most of it".
+
+This RFC has no hosted-evidence precondition.
 
 **Target release.** Next unreleased increment after `0.60.0`; the terminal CSP
 tightening is a later release and is called out separately below.
