@@ -1447,7 +1447,7 @@ fn sw_cache_version_matches_workspace_version() {
 // message prints the actual value) and paste it in, in the same commit as
 // the version bump.
 const RELEASE_CACHE_ASSET_CONTENT_HASH: &str =
-    "eb8def8eeb71c272bf51b24cd609fce3699744a5d3415da4ceca7f8251735b8f";
+    "174acb8c8e8c7ae6b0e7ce8a9434d1c4601b2701ec3fc897642962321c72194e";
 
 fn cached_asset_content_hash() -> String {
     use sha2::{Digest, Sha256};
@@ -2531,8 +2531,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.60.0")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.60.0"),
+        RENDER_SRC.contains("/static/app.js?v=0.61.0")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.61.0"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(

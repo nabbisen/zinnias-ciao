@@ -2,6 +2,94 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.61.0] — 2026-08-02
+
+RFC-075's internal CSS architecture migration is complete, and `style-src` no
+longer permits inline styles. Language-correctness fixes across Event Detail,
+the ICS feed settings and create-community pages, several screen-reader
+labels, and eight flash messages. This is a tag, not a deployment — see
+`ROADMAP.md` § *Tagging is not deploying*. Production, public-pilot, and
+first-real-community deployment remain **No-Go**; nothing in this release
+closes an open architecture finding.
+
+### Added
+
+- **Three hand-maintained lists that could silently miss a real problem are
+  now default-fail checks that walk the tree instead.** A file the
+  localization boundary gate never scanned, an English string the leak
+  gate's word list didn't know, or a `?flash=` value the redirect gate
+  never saw could previously pass unnoticed; now an unlisted file or an
+  unrecognized leak is the failure, not a silent pass. Covers: which pages
+  honor a member's language choice, English text leaking into rendered
+  output (element text and, now, user-visible attributes like
+  `aria-label`), and flash-message values (must be a lowercase snake_case
+  code, never prose).
+- **A release gate that keeps `style-src` strict.** Asserts the directive
+  contains `'self'` and never `'unsafe-inline'`, and that no inline
+  `style=` attribute exists anywhere in the SSR templates — both proven with
+  a mutation test that reintroduces the regression and confirms the gate
+  catches it.
+
+### Changed
+
+- **RFC-075 is complete: every inline `style=` attribute is gone (486 at
+  its peak, 0 now), replaced by a `cz-*` class layer backed by design
+  tokens.** This is the bulk of this release. Internal — no rendered output
+  changed as a result — but it is what makes the change below possible.
+  RFC-075 is marked complete and moved to `rfcs/done/`.
+- **`style-src` no longer permits inline styles.** The `'unsafe-inline'`
+  keyword existed solely because the SSR templates used inline `style=`
+  attributes; now that none remain, it is dropped. Framed precisely: this
+  restores a strict directive, it does not fix a vulnerability — output was
+  escaped throughout before this change, so `'unsafe-inline'` was a
+  weakened mitigation layer, never an active hole. Verified with real
+  browser evidence: a violation-capture mechanism was proven to catch a
+  deliberately injected inline style under the stricter policy, then all
+  three of `app.js`'s script-driven style writes (the note character-limit
+  warning, the one-time-code copy button) were exercised under that same
+  policy and confirmed unaffected — CSP `style-src` governs markup, not
+  CSSOM property assignment.
+- **Release version bumped to v0.61.0.** `Cargo.toml`, `Cargo.lock`,
+  `package.json`, `workers/ssr/static/sw.js`, and both the `app.js`
+  cache-buster and the offline page's matching `<script>` tag are aligned.
+
+### Fixed
+
+- **A member who chose a display language was sometimes still seeing the
+  other one.** Event Detail's attendance buttons, note form, and
+  participant list; the ICS calendar-feed settings page and the
+  create-community page — all previously fell through a gap between the
+  original per-membership language rollout and its follow-up gate. Four
+  `aria-label` values a screen reader announces (the bottom navigation
+  landmark, the calendar month and view switchers, and an admin attendance
+  control) were bare English regardless of the member's chosen language.
+  Eight flash messages shown after an action (saving a note, hiding a note,
+  admin actions on templates, attendance, and invites) were raw English
+  text echoed from the redirect URL instead of resolved through the
+  member's language — three of those eight render on the member-facing
+  Event Detail page.
+- **Event Detail's status buttons no longer force horizontal scroll at
+  200% text size.** They now reflow instead of overflowing the viewport.
+
+### Testing
+
+- `cargo test --workspace`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo fmt --all -- --check`
+- `cargo check -p zinnias-ciao-ssr --target wasm32-unknown-unknown`
+- `bun run build`, then all ten smokes (`smoke:language`,
+  `smoke:calendar-views`, `smoke:matrix`, `smoke:matrix-csv`,
+  `smoke:community-switch`, `smoke:display-name`,
+  `smoke:admin-event-forms`, `smoke:admin-member-management`,
+  `smoke:admin-tools-onboarding`, `smoke:final-migration`), each reporting
+  zero CSP violations
+- `mdbook build docs`
+- `git diff --check`
+
+Hosted staging/production evidence was not collected in this release — none
+is required for a tag, only for a deployment, which remains **No-Go** per the
+architecture review remediation hold.
+
 ## [0.60.0] — 2026-07-30
 
 Self display-name editing, the application threat model and form-security
