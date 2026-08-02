@@ -20,9 +20,8 @@ authorize implementation.
 RFC numbers and the tables below are stable identifiers and lifecycle indexes,
 not execution priority. The active order is maintained in
 [ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-072,
-RFC-073, and RFC-074 shipped in `0.60.0` (tagged 2026-07-30, not deployed);
-RFC-075 is complete on `main` and unreleased, so a `0.61.0` tag is due. No next
-theme is selected. The RFC-050 hosted campaign and its sink remain deferred to
+RFC-073, and RFC-074 shipped in `0.60.0` and RFC-075 in `0.61.0` (tagged
+2026-08-02, neither deployed). No next theme is selected. The RFC-050 hosted campaign and its sink remain deferred to
 the point a pilot is scheduled.
 
 ## Accepted — approved for implementation
@@ -110,6 +109,20 @@ the point a pilot is scheduled.
 | 064 | [Rust Module and Crate Boundary Cleanup](./done/064-rust-module-and-crate-boundary-cleanup.md) | v0.52.0 / v0.53.0 / v0.58.0 |
 | 069 | [Total Community Access Recovery](./done/069-total-community-access-recovery.md) | v0.59.0 |
 
+## Done — shipped in 0.61.0
+
+Tagged 2026-08-02 at `4764c2a`, triggered by RFC-075 reaching `done/` — the
+cadence rule working rather than another accumulation. **Tagged, not deployed**;
+B1, B3, B4, and B5 remain open.
+
+| ID | Title | Shipped in |
+|----|-------|------------|
+| 075 | [Render Style System and Inline Style Reduction](./done/075-render-style-system-and-inline-style-reduction.md) | 0.61.0 (`b5a88e1`…`f32ba3a`) — seven migration slices, a dead-code sweep, two English-leak packages, and the terminal CSP slice, every one Approved. **Inline `style=` 486 → 0**, asserted not ratcheted; hardcoded hex 383 → 25. **`style-src` no longer carries `'unsafe-inline'`**, gated against reintroduction and proven with browser evidence |
+
+This release also carried RFC-072's three post-completion corrections
+(`ced6ae4`, `e80fbe7`, `2d2be47`), the Event Detail 200%-text reflow fix, and
+three hand-maintained gate lists replaced with default-fail mechanisms.
+
 ## Done — shipped in 0.60.0
 
 Tagged 2026-07-30 after 49 unreleased commits had accumulated with no version
@@ -120,10 +133,9 @@ first-real-community deployment remain No-Go while B1, B3, B4, and B5 are open.
 |----|-------|------------|
 | 070 | [Self Display Name Editing](./done/070-self-display-name-editing.md) | 0.60.0 (`4bfe4f2`) |
 | 071 | [Application Threat Model and Form Security Baseline](./done/071-application-threat-model-and-form-security-baseline.md) | 0.60.0 (`1b12d96`) — documentation baseline, active |
-| 072 | [Member Language Preference and Runtime Localization](./done/072-member-language-preference-and-runtime-localization.md) | 0.60.0 (`b237788`/`93e25de`/`fcf84aa`) — Slices A–C; Slice D is a future RFC |
+| 072 | [Member Language Preference and Runtime Localization](./done/072-member-language-preference-and-runtime-localization.md) | 0.60.0 (`b237788`/`93e25de`/`fcf84aa`) — Slices A–C. **Its three post-completion corrections shipped in `0.61.0`** — acceptance criterion 9 did not actually hold until then. Slice D is a future RFC |
 | 073 | [Calendar Events List and Day Detail UX](./done/073-calendar-events-list-and-day-detail-ux.md) | 0.60.0 (`ed549be`) |
 | 074 | [Community Switch Route Preservation](./done/074-community-switch-route-preservation.md) | 0.60.0 (`30e90c4`) |
-| 075 | [Render Style System and Inline Style Reduction](./done/075-render-style-system-and-inline-style-reduction.md) | `main`, seven slices plus a dead-code sweep, two leak packages, and the terminal slice (`b5a88e1`…`f32ba3a`); every package Approved. **Inline `style=` 486 → 0**, asserted not ratcheted; hardcoded hex 383 → 25. **`style-src` no longer carries `'unsafe-inline'`**, gated against reintroduction. No hosted-evidence precondition |
 
 ## Also Done
 

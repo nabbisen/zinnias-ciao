@@ -227,9 +227,12 @@ section remains the tracked summary of record.
    Along the way the work also closed three English leaks classes and replaced
    three hand-maintained gate lists with default-fail mechanisms.
 
-6. **Choose the next user-facing theme** — an owner decision. `0.61.0` is
-   also due: the cadence rule is to tag when an RFC reaches `rfcs/done/`.
-7. **When a pilot is scheduled** — and not before — provision the persistent
+6. ~~Cut `0.61.0`.~~ **Complete 2026-08-02** — tagged at `4764c2a`, triggered by
+   RFC-075 reaching `rfcs/done/`. The cadence rule worked as intended: 21 commits
+   and one RFC, not 49 commits and five. Tagged locally, **not pushed and not
+   deployed**.
+7. **Choose the next user-facing theme** — an owner decision.
+8. **When a pilot is scheduled** — and not before — provision the persistent
    incident sink (Logpush → R2), then build and freeze one exact immutable
    release candidate and execute the RFC-050 hosted evidence campaign for the
    remaining B1, B3, B4, and B5 claims. The campaign must include E7 canary
