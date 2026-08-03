@@ -295,7 +295,7 @@ fn render_join_form(token: &str, error: Option<&str>) -> Result<Response> {
          </form>\
          <p class=\"cz-join-code-hint\">{hint}</p>\
          <p class=\"cz-join-relink-hint\">\
-           {relink_hint} <a href=\"/relink\" class=\"cz-admin-plain-link\">\
+           {relink_hint} <a href=\"/relink\" class=\"cz-plain-link\">\
            {relink_link}</a></p>\
          </main>",
         heading = i18n::JA_JOIN_HEADING,

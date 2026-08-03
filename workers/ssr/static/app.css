@@ -1577,7 +1577,7 @@ button, a, [role="button"] { min-height: var(--cz-touch-min); }
   min-height: var(--cz-touch-min);
   cursor: pointer;
 }
-.cz-admin-plain-link {
+.cz-plain-link {
   color: var(--cz-color-focus);
   text-decoration: none;
 }

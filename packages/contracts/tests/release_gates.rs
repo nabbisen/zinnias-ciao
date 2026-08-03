@@ -1443,11 +1443,14 @@ fn sw_cache_version_matches_workspace_version() {
 // disagreeing with each other.
 //
 // Updating the pinned hash is a deliberate, one-line acknowledgement that a
-// cached asset changed in this release: recompute it (this test's failure
-// message prints the actual value) and paste it in, in the same commit as
-// the version bump.
+// cached asset changed: recompute it (this test's failure message prints
+// the actual value) and paste it in, in the same commit that changes the
+// asset — mid-cycle, not only at a release. Re-pin whenever content
+// changes; the cache key and version move at release, not per package
+// (Handoff 040 §7.3 re-pinned this digest with no version bump, and that
+// was correct — the prior wording here said otherwise and was wrong).
 const RELEASE_CACHE_ASSET_CONTENT_HASH: &str =
-    "0a3cb3e5d98d2b4ad65e65ea2f6a77e555c14c28e25075c5aa9b5e92379ec725";
+    "ae2f31bb1d75bffb0b2636148e3e841ab5d9ec2b2fa3a7a22d81d9507f1506c3";
 
 fn cached_asset_content_hash() -> String {
     use sha2::{Digest, Sha256};
@@ -2705,10 +2708,19 @@ fn calendar_overview_contract_is_explicit() {
 /// between the selector and its opening brace — a rule written with
 /// aligned braces (`.foo       { color: … }`) is not a different selector,
 /// and the helper's job is to tolerate that formatting, not constrain it.
-/// Still not a real CSS parser: if `selector` occurs as a substring not
-/// immediately followed by whitespace-then-`{`, this reports "not found"
-/// rather than searching further, the same narrowness the exact-string
-/// version had.
+///
+/// Still not a real CSS parser, and — corrected in Handoff 041 §7.3, which
+/// found the prior wording here wrong — not the same narrowness the old
+/// exact-string version had, either. The old version searched for the
+/// literal `"{selector} {"`; an occurrence of `selector` not immediately
+/// followed by `" {"` simply didn't match that literal, and `find` walked
+/// on to the next occurrence of the full string. This version takes the
+/// **first** occurrence of `selector` and panics if what follows isn't
+/// whitespace-then-`{` — it does not search further. That is an
+/// acceptable narrowing, not a hidden regression: the failure mode is a
+/// loud panic naming the selector, never a silently wrong rule body, and
+/// every selector these two files read (six today) occurs exactly once in
+/// `app.css`.
 fn css_rule_body<'a>(css: &'a str, selector: &str) -> &'a str {
     let start = css
         .find(selector)
@@ -3200,6 +3212,142 @@ fn rfc072_every_handler_and_render_file_is_localized_or_documented_exception() {
         COMMUNITIES_HANDLER_SRC.contains("json_error(401, i18n::JA_SESSION_EXPIRED)"),
         "communities.rs's one bare i18n::JA_ reference must be the documented pre-auth 401 branch"
     );
+}
+
+/// Handoff 041 §7.4: same shape as `LOCALIZATION_EXCEPTIONS` (explicit key,
+/// written reason, stale-entry assertion). Keyed by class name, not by
+/// file: the property is about the class being safe to rename/restyle
+/// without checking every caller, and one class can be legitimately used
+/// from more than one non-admin-directory file (`cz-admin-title`, from both
+/// `templates.rs` and `export.rs`).
+///
+/// **What this proves, and what it does not.** The property that actually
+/// matters is "an admin-named class is rendered on a non-admin surface" —
+/// a page-level fact. This gate's proxy is "referenced from a file outside
+/// `handlers/admin/`" — a file-level fact. They differ in both directions:
+/// `templates.rs` and `export.rs` are themselves admin-only surfaces that
+/// merely live outside the `admin/` directory, so the proxy flags them
+/// anyway, which is why they are exceptions here rather than renames. A
+/// class referenced only from a shared `render/` helper would be invisible
+/// to the page-level question (which page is it rendered on?) but *would*
+/// trip this file-level proxy — correctly, since a helper's callers are not
+/// enumerable by reading the helper alone, and that is exactly the case
+/// that needs a human decision, not a silent pass.
+struct AdminClassLeakException {
+    class: &'static str,
+    reason: &'static str,
+}
+
+const ADMIN_CLASS_LEAK_EXCEPTIONS: &[AdminClassLeakException] = &[
+    AdminClassLeakException {
+        class: "cz-admin-field-label",
+        reason: "admin surface outside the admin/ directory",
+    },
+    AdminClassLeakException {
+        class: "cz-admin-invite-flash",
+        reason: "admin surface outside the admin/ directory",
+    },
+    AdminClassLeakException {
+        class: "cz-admin-invites-body",
+        reason: "admin surface outside the admin/ directory",
+    },
+    AdminClassLeakException {
+        class: "cz-admin-title",
+        reason: "admin surface outside the admin/ directory",
+    },
+    AdminClassLeakException {
+        class: "cz-admin-title--snug",
+        reason: "admin surface outside the admin/ directory",
+    },
+    AdminClassLeakException {
+        class: "cz-admin-title--tight",
+        reason: "admin surface outside the admin/ directory",
+    },
+];
+
+/// Every `cz-admin-*` token in `content`, comments stripped first — the
+/// third time a gate in this family has needed that discipline (the flash
+/// gate and `count_inline_styles` both hit the same trap: a doc comment
+/// *about* the pattern matching the pattern itself).
+fn find_admin_classes(content: &str) -> Vec<String> {
+    let stripped = strip_line_comments(content);
+    let mut found = Vec::new();
+    let mut search_from = 0;
+    while let Some(rel_idx) = stripped[search_from..].find("cz-admin-") {
+        let start = search_from + rel_idx;
+        let end = stripped[start..]
+            .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+            .map(|i| start + i)
+            .unwrap_or(stripped.len());
+        found.push(stripped[start..end].to_string());
+        search_from = end;
+    }
+    found
+}
+
+#[test]
+fn rfc041_admin_named_classes_stay_inside_the_admin_directory_or_are_excepted() {
+    // Handoff 041: `cz-admin-field-input` was rendered on `join.rs` — the
+    // anonymous, unauthenticated invite-redemption page — for as long as
+    // RFC-075 Slice 4 existed, and hand-enumeration missed it (Handoff 040
+    // renamed the one instance a review happened to spot). `cz-admin-plain-link`
+    // had the identical shape and was found only because the same review
+    // swept every `cz-admin-*` class afterward. Default-fail, so a third
+    // instance cannot happen the same way: any `cz-admin-*` class referenced
+    // from a file outside `handlers/admin/` must be named in
+    // `ADMIN_CLASS_LEAK_EXCEPTIONS` with a reason, or the walk fails.
+    let files = handlers_and_render_files();
+    let src_dir = workers_ssr_src_dir();
+    let mut seen_exception_classes = std::collections::HashSet::new();
+    let mut unexpected: Vec<String> = Vec::new();
+
+    for path in &files {
+        let rel = path
+            .strip_prefix(&src_dir)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        if rel.starts_with("handlers/admin/") {
+            continue;
+        }
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        for class in find_admin_classes(&content) {
+            match ADMIN_CLASS_LEAK_EXCEPTIONS
+                .iter()
+                .find(|e| e.class == class)
+            {
+                Some(exc) => {
+                    seen_exception_classes.insert(exc.class);
+                }
+                None => {
+                    unexpected.push(format!("{rel}: {class}"));
+                }
+            }
+        }
+    }
+
+    assert!(
+        unexpected.is_empty(),
+        "an admin-named class is referenced from a file outside handlers/admin/ and is not in \
+         ADMIN_CLASS_LEAK_EXCEPTIONS:\n{}\n\
+         Either this class is only ever meant for handlers/admin/ — in which case the reference \
+         above is a real leak (RFC-075 Slice 4's cz-admin-field-input on join.rs, and \
+         cz-admin-plain-link, were both exactly this shape) and should be renamed to drop the \
+         admin- prefix — or this file is itself an admin-only surface that happens to live \
+         outside admin/, in which case add a table entry with a written reason.",
+        unexpected.join("\n")
+    );
+
+    for exc in ADMIN_CLASS_LEAK_EXCEPTIONS {
+        assert!(
+            seen_exception_classes.contains(exc.class),
+            "ADMIN_CLASS_LEAK_EXCEPTIONS names `{}` ({}) but the walk never found it referenced \
+             from any qualifying file — stale table entry?",
+            exc.class,
+            exc.reason
+        );
+    }
 }
 
 #[test]

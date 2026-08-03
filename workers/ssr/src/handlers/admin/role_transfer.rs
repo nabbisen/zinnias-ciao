@@ -29,7 +29,7 @@ fn last_admin_demote_page(community_id: &str) -> Result<Response> {
         &format!(
             "<main class=\"cz-admin-error-main\"><p>{}</p>\
              <p><a href=\"/c/{cid}/admin/members\" \
-             class=\"cz-admin-plain-link\">{back}</a></p></main>",
+             class=\"cz-plain-link\">{back}</a></p></main>",
             i18n::JA_ADMIN_LAST_ADMIN_DEMOTE,
             cid = render::escape_html(community_id),
             back = i18n::JA_ADMIN_INVITES_BACK_TO_MEMBERS,

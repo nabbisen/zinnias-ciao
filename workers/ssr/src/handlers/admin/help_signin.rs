@@ -161,9 +161,9 @@ pub async fn post_help_signin(
          </div>\
          <p class=\"cz-admin-relink-hint\">{relink_hint}</p>\
          <p><a href=\"/relink\" target=\"_blank\" rel=\"noopener\" \
-           class=\"cz-admin-plain-link\">{relink_link}</a></p>\
+           class=\"cz-plain-link\">{relink_link}</a></p>\
          <p><a href=\"/c/{cid}/admin/members\" \
-           class=\"cz-admin-plain-link\">{back}</a></p>\
+           class=\"cz-plain-link\">{back}</a></p>\
          </main>{nav}",
         header = render::header_with_switcher_next(
             i18n::JA_ADMIN_HELP_SIGNIN_TITLE,

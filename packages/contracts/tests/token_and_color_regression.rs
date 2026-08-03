@@ -72,10 +72,19 @@ const APP_CSS_SOURCE: &str = include_str!("../../../workers/ssr/static/app.css")
 /// between the selector and its opening brace — a rule written with
 /// aligned braces (`.foo       { color: … }`) is not a different selector,
 /// and the helper's job is to tolerate that formatting, not constrain it.
-/// Still not a real CSS parser: if `selector` occurs as a substring not
-/// immediately followed by whitespace-then-`{`, this reports "not found"
-/// rather than searching further, the same narrowness the exact-string
-/// version had.
+///
+/// Still not a real CSS parser, and — corrected in Handoff 041 §7.3, which
+/// found the prior wording here wrong — not the same narrowness the old
+/// exact-string version had, either. The old version searched for the
+/// literal `"{selector} {"`; an occurrence of `selector` not immediately
+/// followed by `" {"` simply didn't match that literal, and `find` walked
+/// on to the next occurrence of the full string. This version takes the
+/// **first** occurrence of `selector` and panics if what follows isn't
+/// whitespace-then-`{` — it does not search further. That is an
+/// acceptable narrowing, not a hidden regression: the failure mode is a
+/// loud panic naming the selector, never a silently wrong rule body, and
+/// every selector these two files read (six today) occurs exactly once in
+/// `app.css`.
 fn css_rule_body<'a>(css: &'a str, selector: &str) -> &'a str {
     let start = css
         .find(selector)
