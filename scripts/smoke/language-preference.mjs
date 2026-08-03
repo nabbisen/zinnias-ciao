@@ -21,6 +21,75 @@ const isolated = await prepareIsolatedWorkerTest("language-preference");
 const pepper = isolated.pepper;
 const now = '2026-07-30T00:00:00.000Z';
 
+// Handoff 042 §7.1: the visible event is seeded 3 days ahead of this run, at
+// 03:00 UTC — never a fixed calendar instant. +3 days keeps it comfortably
+// upcoming for the whole run (the old fixed-date fixture failed by 13
+// minutes once real time caught up to it; do not design a margin that thin
+// again). 03:00 UTC is 12:00 JST the same day, so the UTC calendar date and
+// the JST calendar date this app renders in are identical for this instant
+// — midnight UTC, the old fixture's choice, is exactly what makes them
+// diverge.
+const WEEKDAY_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_ABBR_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_NAME_EN = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+const runAt = new Date();
+const eventDate = new Date(Date.UTC(
+  runAt.getUTCFullYear(),
+  runAt.getUTCMonth(),
+  runAt.getUTCDate() + 3,
+  3, 0, 0, 0,
+));
+const eventYear = eventDate.getUTCFullYear();
+const eventMonth = eventDate.getUTCMonth() + 1; // 1-12
+const eventDay = eventDate.getUTCDate();
+const eventWeekdayIndex = eventDate.getUTCDay(); // 0=Sun..6=Sat — JS's own weekday computation, independent of tz.rs's Zeller's-congruence one
+
+const eventDayDate = `${eventYear}-${pad2(eventMonth)}-${pad2(eventDay)}`;
+const eventStartsAtUtc = eventDate.toISOString();
+const eventEndsAtUtc = new Date(eventDate.getTime() + 60 * 60 * 1000).toISOString();
+const eventMonthParam = `${eventYear}-${pad2(eventMonth)}`;
+
+// Handoff 042 §7.2: built from literal arrays and Date.UTC/getUTCDay, to
+// match packages/contracts/src/tz.rs's date_label_en ("{weekday}, {day}
+// {month abbr}" — no year, day not zero-padded). Deliberately not
+// Intl.DateTimeFormat (depends on the host's ICU data, not the project's
+// format decision) and not read from the app itself — agreement with the
+// app's own, differently-implemented weekday computation means something.
+const expectedDateLabelEn = `${WEEKDAY_EN[eventWeekdayIndex]}, ${eventDay} ${MONTH_ABBR_EN[eventMonth - 1]}`;
+const expectedDateLabelEnPattern = new RegExp(`\\b${expectedDateLabelEn}\\b`);
+// The all-numeric US-style rendering this smoke guards against never
+// appearing — also derived, so the guard stays meaningful as the seeded
+// date moves with each run instead of vacuously passing forever.
+const expectedAllNumericDatePattern = new RegExp(`\\b${pad2(eventMonth)}/${pad2(eventDay)}/${eventYear}\\b`);
+const expectedMonthHeaderEn = `${MONTH_NAME_EN[eventMonth - 1]} ${eventYear}`;
+const expectedMonthHeaderJa = `${eventYear}年${eventMonth}月`;
+
+// Handoff 042 §7.3: with the relative seed above in place this should never
+// fire. It exists only so that a future re-pin back to a literal date fails
+// with a message naming the fixture and the reason, instead of an opaque
+// content mismatch. It guards this file only — one assertion in one smoke
+// does not guard the class of "smokes that hardcode dates."
+function assertFixtureStillUpcoming() {
+  const startMs = Date.parse(eventStartsAtUtc);
+  if (!(Date.now() < startMs)) {
+    throw new Error(
+      `language-preference smoke fixture has expired: scripts/smoke/language-preference.mjs's ` +
+      `seeded event (day_date=${eventDayDate}, starts_at_utc=${eventStartsAtUtc}) is no longer in ` +
+      `the future relative to this run (now=${new Date().toISOString()}). This should be ` +
+      `impossible with the relative-date seed in place — check that the +3 day derivation above ` +
+      `is intact and has not been re-pinned to a literal date.`,
+    );
+  }
+}
+
 const communityId = 'com_rfc072_primary';
 const otherCommunityId = 'com_rfc072_other';
 const memberUserId = 'usr_rfc072_member';
@@ -33,6 +102,7 @@ const memberSessionHmac = hmac(memberSessionSecret);
 const memberDisplayName = 'RFC072 Member';
 
 assertLocalOnly();
+assertFixtureStillUpcoming();
 await mkdir(outDir, { recursive: true });
 await rm(userDataDir, { recursive: true, force: true });
 
@@ -122,9 +192,10 @@ function seed() {
     `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${otherMembershipId}', '${otherCommunityId}', '${memberUserId}', 'member', 'RFC072 Member Other', '${now}')`,
     `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc072_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
     `INSERT INTO events (id, community_id, created_by_membership_id, title, location, description, status, repeat_rule, repeat_count, created_at, updated_at) VALUES ('${eventId}', '${communityId}', '${memberMembershipId}', 'RFC072 Visible Event', 'RFC072 Room', '', 'scheduled', 'none', NULL, '${now}', '${now}')`,
-    // 2026-08-03T00:00:00Z is 09:00 JST on Monday, 3 Aug 2026 — matches the
-    // native tz.rs/render.rs tests exercising the same date.
-    `INSERT INTO event_days (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at, occurrence_status) VALUES ('${eventDayId}', '${eventId}', '${communityId}', 1, '2026-08-03', '2026-08-03T00:00:00.000Z', '2026-08-03T01:00:00.000Z', '${now}', 'scheduled')`,
+    // Handoff 042 §7.1: seeded relative to this run (see the derivation
+    // above `now`), not a fixed calendar instant — this fixture cannot
+    // expire the way the old 2026-08-03 pin did.
+    `INSERT INTO event_days (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at, occurrence_status) VALUES ('${eventDayId}', '${eventId}', '${communityId}', 1, '${eventDayDate}', '${eventStartsAtUtc}', '${eventEndsAtUtc}', '${now}', 'scheduled')`,
   ];
   for (const statement of statements) sql(statement);
 }
@@ -649,8 +720,8 @@ try {
     observed: homeEnglish,
     checks: {
       htmlLangEn: homeEnglish.htmlLang === 'en',
-      showsEnglishDateLabel: /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), 3 Aug\b/.test(homeEnglish.text),
-      noAllNumericDate: !/\b08\/03\/2026\b/.test(homeEnglish.text),
+      showsEnglishDateLabel: expectedDateLabelEnPattern.test(homeEnglish.text),
+      noAllNumericDate: !expectedAllNumericDatePattern.test(homeEnglish.text),
       noHorizontalScrollAt200Percent: homeEnglish.noHorizontalScroll,
     },
   });
@@ -695,7 +766,7 @@ try {
   });
 
   logStep('confirming Calendar month view renders English (month header + day-cell aria-label)');
-  await navigate(page, `/c/${communityId}/communities?month=2026-08`, { textScale: 2 });
+  await navigate(page, `/c/${communityId}/communities?month=${eventMonthParam}`, { textScale: 2 });
   const calendarMonthEnglish = await collect(page);
   results.push({
     name: 'calendar-month-renders-english',
@@ -703,8 +774,8 @@ try {
     observed: calendarMonthEnglish,
     checks: {
       htmlLangEn: calendarMonthEnglish.htmlLang === 'en',
-      monthHeaderIsEnglish: calendarMonthEnglish.monthHeaderText === 'August 2026',
-      monthHeaderNotJapanese: calendarMonthEnglish.monthHeaderText !== '2026年8月',
+      monthHeaderIsEnglish: calendarMonthEnglish.monthHeaderText === expectedMonthHeaderEn,
+      monthHeaderNotJapanese: calendarMonthEnglish.monthHeaderText !== expectedMonthHeaderJa,
       dayCellAriaLabelIsEnglish:
         calendarMonthEnglish.dayCellAriaLabel != null &&
         !calendarMonthEnglish.dayCellAriaLabel.includes('年') &&
@@ -715,26 +786,26 @@ try {
   });
 
   logStep('confirming Calendar list view renders English');
-  await navigate(page, `/c/${communityId}/communities?month=2026-08&view=list`);
+  await navigate(page, `/c/${communityId}/communities?month=${eventMonthParam}&view=list`);
   const calendarListEnglish = await collect(page);
   results.push({
     name: 'calendar-list-renders-english',
     observed: calendarListEnglish,
     checks: {
       htmlLangEn: calendarListEnglish.htmlLang === 'en',
-      showsEnglishDateLabel: /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), 3 Aug\b/.test(calendarListEnglish.text),
+      showsEnglishDateLabel: expectedDateLabelEnPattern.test(calendarListEnglish.text),
     },
   });
 
   logStep('confirming Calendar matrix view renders English (month header + member column)');
-  await navigate(page, `/c/${communityId}/communities?month=2026-08&view=matrix`);
+  await navigate(page, `/c/${communityId}/communities?month=${eventMonthParam}&view=matrix`);
   const calendarMatrixEnglish = await collect(page);
   results.push({
     name: 'calendar-matrix-renders-english',
     observed: calendarMatrixEnglish,
     checks: {
       htmlLangEn: calendarMatrixEnglish.htmlLang === 'en',
-      monthHeaderIsEnglish: calendarMatrixEnglish.monthHeaderText === 'August 2026',
+      monthHeaderIsEnglish: calendarMatrixEnglish.monthHeaderText === expectedMonthHeaderEn,
       showsEnglishMemberColumn: calendarMatrixEnglish.text.includes('Member'),
     },
   });
@@ -748,7 +819,7 @@ try {
     observed: eventDetailEnglish,
     checks: {
       htmlLangEn: eventDetailEnglish.htmlLang === 'en',
-      showsEnglishDateLabel: /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), 3 Aug\b/.test(eventDetailEnglish.text),
+      showsEnglishDateLabel: expectedDateLabelEnPattern.test(eventDetailEnglish.text),
       showsEnglishStatusLabels:
         eventDetailEnglish.text.includes('Going') && eventDetailEnglish.text.includes('No answer'),
       // Handoff 026: the specific defect this scenario previously missed.

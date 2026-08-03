@@ -704,3 +704,75 @@ behaviour, route, form, `data-*`, i18n, CSS value, version, or CSP change.
 - [x] Both `css_rule_body` doc comments corrected: they claimed the whitespace-tolerant version has "the same narrowness" as the old exact-string version. It does not — the old version, on a near-miss, let `find` walk on to the next occurrence of the full literal; the new version takes the *first* occurrence of the bare selector and panics if it isn't followed by whitespace-then-`{`, without searching further. Stated why that's acceptable (a loud panic naming the selector, never a silently wrong rule body) and confirmed all six selectors these two files read occur exactly once in `app.css` today. Comment-only; the function bodies were confirmed byte-identical to each other both before and after, via `diff` on the extracted function text.
 - [x] `RELEASE_CACHE_ASSET_CONTENT_HASH` re-pinned once, from the gate's own failure message, after the `cz-plain-link` rename changed `app.css`'s content — done after the comment correction above, so the corrected instruction was the one actually followed. No version bump; `0.61.0` was just cut and this is mid-cycle.
 - [x] Full suite green, test count moved by exactly +1 (the new §7.4 gate, nothing else): `cargo test --workspace`, clippy (`-D warnings`), fmt, wasm check, and `mdbook build docs` all pass clean; `git diff --check` reports no whitespace errors; `bun run build` succeeds. All ten smokes pass with no rendered change and zero CSP violations reported on every one. *(evidence `.git-exclude/evidence/handoff041-admin-class-leak/`)*
+
+## The language smoke's expired date fixture (Handoff 042)
+
+Not a numbered RFC — a test-fixture repair. `smoke:language`'s
+`home-renders-english` check was proven, during the Handoff 041 review, to be
+a pre-existing, non-regression failure: the fixture seeded a real calendar
+instant (`2026-08-03T00:00:00Z`), and Home lists **upcoming** events
+(`starts_at_utc >= now`) against the real clock — once that instant passed,
+the event fell off Home and the check went red, with no package change
+involved. No production code, route, form, or i18n wording changed.
+
+- [x] `scripts/smoke/language-preference.mjs`'s fixture now seeds the visible
+      event at **run time + 3 days, 03:00 UTC**, never a fixed calendar
+      instant — it cannot expire the way the old pin did. +3 days keeps it
+      comfortably upcoming for the whole run (the old fixture failed by 13
+      minutes once real time caught up to it). 03:00 UTC is 12:00 JST the
+      same day, so the UTC calendar date and the JST calendar date this app
+      renders in are identical for this instant — midnight UTC, the old
+      fixture's choice, is exactly what made them diverge.
+- [x] Every date-derived expectation (the English date label on Home,
+      Calendar list, and Event Detail; both month headers, English and
+      Japanese; all three `month=` URL parameters; the all-numeric-date
+      negative check) is now computed from that same seeded date, built from
+      literal weekday/month-abbreviation arrays and `Date.UTC`/`getUTCDay` —
+      not `Intl.DateTimeFormat` (host-ICU-dependent, not this project's
+      format decision) and not read back from the rendered page. Agreement
+      with `packages/contracts/src/tz.rs`'s `date_label_en` (a differently
+      implemented, Zeller's-congruence weekday computation) means something
+      precisely because the two are independent.
+- [x] A precondition assertion (`assertFixtureStillUpcoming`) runs before
+      seeding and fails loudly, naming the fixture and the expired date, if
+      the seeded event is ever not in the future relative to the run. With
+      the relative seed in place this should never fire — it exists so a
+      future re-pin back to a literal date is self-describing instead of an
+      opaque content mismatch. It guards this one file only.
+- [x] **Two-run proof, with a discrepancy flagged to the architect rather
+      than resolved unilaterally.** Two independent invocations of the real
+      smoke, both 20/20: `generatedAt` `2026-08-03T02:05:26Z` and
+      `2026-08-03T02:28:10Z`, both deriving `Thu, 6 Aug` (today + 3 days) on
+      Home. Because the seed is quantized to whole UTC calendar days by
+      design (§7.1's fixed 03:00 UTC), any two runs on the same UTC day
+      necessarily derive the identical date — no faketime/libfaketime was
+      available and the system clock was deliberately not touched (invasive,
+      affects other processes and TLS validation), and a real day-boundary
+      wait was ~22 hours away. In its place: a standalone scratch proof
+      (`.git-exclude/tmp/handoff042-proofs/boundary-derivation-proof.mjs`,
+      not shipped) exercised the identical derivation formula against three
+      contrived boundary instants — a month rollover (Aug→Sep 2026), a year
+      rollover (Dec 2026→Jan 2027), and a leap-year month rollover (Feb→Mar
+      2028) — and every one of the nine derived values matched a scratch
+      `cargo test` call into `tz.rs`'s real `date_label_en` exactly. The
+      scratch Rust test file was deleted before commit; nothing under
+      `packages/contracts/` changed.
+- [x] **Why the other seventeen smokes were left alone.** A hardcoded past
+      date is harmless by itself — most of the eighteen smokes that hardcode
+      a `2026-MM-DD` literal pin a date already in the past and pass fine. It
+      becomes a time bomb only when an assertion *also* depends on the
+      page's `>= now` upcoming-events filter. Cross-referencing every smoke
+      that visits `/home` against every smoke asserting a date label leaves
+      exactly one file: this one. `rfc075-slice7-final-migration.mjs` seeds
+      the same kind of date and visits Home too, but asserts no date text
+      there, so it was never exposed to the bug.
+- [x] Full suite green, test count unchanged at **513** (no Rust touched):
+      `cargo test --workspace`, clippy (`-D warnings`), fmt, wasm check, and
+      `mdbook build docs` all pass clean; `git diff --check` reports no
+      whitespace errors; `bun run build` succeeds. The digest gate
+      (`cached_asset_content_matches_pinned_hash`) passed **without a
+      re-pin** — nothing under `workers/ssr/static/` or `render/shell.rs`
+      changed. The other nine required smokes all pass with zero CSP
+      violations reported on every one. *(evidence
+      `.git-exclude/evidence/rfc072/`,
+      `.git-exclude/tmp/handoff042-proofs/`)*
