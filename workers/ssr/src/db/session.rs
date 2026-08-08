@@ -6,9 +6,8 @@
 //! token exp (regression note, RFC-003 §8).
 
 use worker::{D1Database, Result};
-use zinnias_ciao_contracts::SESSION_TTL_SECONDS;
 
-use crate::db::{add_seconds_to_now, now_utc};
+use crate::db::now_utc;
 
 pub struct SessionRow {
     pub id: String,
@@ -42,28 +41,6 @@ pub async fn find_active(db: &D1Database, session_hmac: &str) -> Result<Option<S
     }))
 }
 
-/// Insert a new session row.
-/// `session_hmac` is HMAC-SHA256(pepper, secret); never the raw secret.
-pub async fn insert(db: &D1Database, id: &str, user_id: &str, session_hmac: &str) -> Result<()> {
-    let now = now_utc();
-    // Session lifetime set from constant only — never from a token exp (RFC-003).
-    let expires_at = add_seconds_to_now(SESSION_TTL_SECONDS);
-    db.prepare(
-        "INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?4)",
-    )
-    .bind(&[
-        id.into(),
-        user_id.into(),
-        session_hmac.into(),
-        now.as_str().into(),
-        expires_at.as_str().into(),
-    ])?
-    .run()
-    .await?;
-    Ok(())
-}
-
 /// Revoke a session (logout / admin incident).
 pub async fn revoke(db: &D1Database, session_id: &str) -> Result<()> {
     let now = now_utc();
@@ -71,27 +48,6 @@ pub async fn revoke(db: &D1Database, session_id: &str) -> Result<()> {
         .bind(&[now.as_str().into(), session_id.into()])?
         .run()
         .await?;
-    Ok(())
-}
-
-/// Revoke every other active session for a user after successful help-signin.
-pub async fn revoke_others_for_user(
-    db: &D1Database,
-    user_id: &str,
-    keep_session_id: &str,
-) -> Result<()> {
-    let now = now_utc();
-    db.prepare(
-        "UPDATE sessions \
-         SET revoked_at = ?1 \
-         WHERE user_id = ?2 \
-           AND id != ?3 \
-           AND revoked_at IS NULL \
-           AND expires_at > ?1",
-    )
-    .bind(&[now.as_str().into(), user_id.into(), keep_session_id.into()])?
-    .run()
-    .await?;
     Ok(())
 }
 

@@ -16,14 +16,6 @@ fn hmac_hex_different_peppers() {
 }
 
 #[test]
-fn hmac_hex_eq_constant_time() {
-    let a = hmac_hex("p", "v");
-    let b = hmac_hex("p", "v");
-    assert!(hmac_hex_eq(&a, &b));
-    assert!(!hmac_hex_eq(&a, "deadbeef"));
-}
-
-#[test]
 fn constant_time_eq_requires_equal_strings() {
     assert!(constant_time_eq("same-secret", "same-secret"));
     assert!(!constant_time_eq("same-secret", "other-secret"));

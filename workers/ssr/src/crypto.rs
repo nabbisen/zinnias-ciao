@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Cryptographic helpers.
 //!
 //! All secrets are stored as HMAC-SHA256(pepper, value) — fast enough for the
@@ -107,11 +106,6 @@ pub fn constant_time_eq(a: &str, b: &str) -> bool {
         .zip(b.bytes())
         .fold(0u8, |acc, (x, y)| acc | (x ^ y))
         == 0
-}
-
-/// Constant-time comparison of two hex strings.
-pub fn hmac_hex_eq(a: &str, b: &str) -> bool {
-    constant_time_eq(a, b)
 }
 
 /// Generate a cryptographically random URL-safe token (32 bytes → 64 hex chars).

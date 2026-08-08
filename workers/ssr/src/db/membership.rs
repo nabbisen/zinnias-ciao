@@ -1,7 +1,6 @@
 //! Membership and user table access — RFC-002 / RFC-004.
 
 use crate::audit::{self, AuditAction, AuditMetadata};
-use crate::db::now_utc;
 use worker::{D1Database, Result};
 use zinnias_ciao_contracts::Locale;
 
@@ -216,44 +215,6 @@ pub async fn find_first_admin_for_user(
             locale: resolve_locale(ui_language.as_deref()),
         })
     }))
-}
-
-/// Create a user row (used during invite redemption for new users).
-pub async fn insert_user(db: &D1Database, user_id: &str) -> Result<()> {
-    let now = now_utc();
-    db.prepare("INSERT OR IGNORE INTO users (id, created_at) VALUES (?1, ?2)")
-        .bind(&[user_id.into(), now.as_str().into()])?
-        .run()
-        .await?;
-    Ok(())
-}
-
-/// Create a community membership row.
-pub async fn insert_membership(
-    db: &D1Database,
-    id: &str,
-    community_id: &str,
-    user_id: &str,
-    role: &str,
-    display_name: &str,
-) -> Result<()> {
-    let now = now_utc();
-    db.prepare(
-        "INSERT INTO community_memberships \
-         (id, community_id, user_id, role, display_name, joined_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-    )
-    .bind(&[
-        id.into(),
-        community_id.into(),
-        user_id.into(),
-        role.into(),
-        display_name.into(),
-        now.as_str().into(),
-    ])?
-    .run()
-    .await?;
-    Ok(())
 }
 
 /// Count active memberships in a community (for no_answer calculation).

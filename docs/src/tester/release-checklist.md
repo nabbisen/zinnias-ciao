@@ -895,3 +895,66 @@ package. Full per-item table:
       28.4kb; the digest gate passes without a re-pin. The ten smokes were
       deliberately not run — no source changed, so they could not have
       told us anything. *(evidence `.git-exclude/tmp/handoff044-proofs/`)*
+
+## Delete the unguarded duplicate writers (Handoff 045)
+
+Not a numbered RFC — a deletion driven directly by the Handoff 044 audit.
+**This is guard preservation, not tidiness.** None of the 16 `duplicate`
+items the audit found was equivalent to its live counterpart: every live
+version carries at least one `EXISTS` guard (active membership, active
+admin, matching community) the dead one lacked. A future contributor
+reaching for the obviously-named dead helper (`session::insert`,
+`invite::mark_used`, …) would have bypassed that guard silently — deleting
+removes a way to pick the wrong function name, not just unused code.
+
+- [x] **16 items deleted**, each verified against its live counterpart
+      immediately before deletion (still present at the audit's named
+      `file:line`, still performing the equivalent write; the dead item
+      still genuinely unreferenced per the compiler, not a grep):
+      `crypto::hmac_hex_eq`; `errors::to_worker_err` and
+      `errors::IntoWorkerResult` (plus its impl — this leaves
+      `errors.rs` as a doc-comment-only file, `mod errors;` left in place);
+      `db/attendance.rs::counts_for_day`; `db/calendar.rs::insert` and
+      `::revoke_for_membership`; `db/event.rs::home_upcoming`;
+      `db/invite.rs::mark_used` and `::assign_used_membership`;
+      `db/membership.rs::insert_user` and `::insert_membership`;
+      `db/relink.rs::revoke_unused_for_membership`, `::insert`, and
+      `::mark_used`; `db/session.rs::insert` and
+      `::revoke_others_for_user`. No pair inverted the audit's
+      finding — in every case the **live** version was the better-guarded
+      one, never the dead one.
+- [x] Fallout cleaned up alongside each deletion: two now-unused imports
+      removed (`db/session.rs`'s `SESSION_TTL_SECONDS`/`add_seconds_to_now`,
+      `db/membership.rs`'s `now_utc`) — both were used only by a function
+      just deleted; `clippy -D warnings` confirms nothing else went stale.
+- [x] `crypto::hmac_hex_eq`'s test (`hmac_hex_eq_constant_time`) deleted
+      with the function, **not migrated** — it duplicated
+      `constant_time_eq_requires_equal_strings`, asserting nothing the
+      surviving test doesn't already cover. **Test count: 513 → 512**,
+      exactly the one deletion; nothing else moved.
+- [x] Allows re-measured per file after deletion, on both targets, by the
+      audit's JSON-diagnostic method (not a grep): **`crypto.rs`'s
+      `#![allow(dead_code)]` removed** — zero dead items remained, so the
+      compiler is now the real guard for this file. **`errors.rs`'s allow
+      was already gone** (removed along with the rest of the file's
+      content). **`authz.rs`, `abuse_limiter.rs`, and `db.rs` keep their
+      allows** — each still has real remaining items this package doesn't
+      touch (`authz.rs`'s `user_id`, `abuse_limiter.rs`'s five
+      `deliberate` items, and `db.rs`'s own orphaned `Db` alias plus every
+      `db/` submodule's still-unread field). **`db.rs`'s allow in
+      particular stays because its inner attribute covers the whole `db/`
+      tree** — stated explicitly per Handoff 044's own correction, so this
+      package doesn't repeat Handoff 040's unstated-mechanism mistake.
+- [x] Dead-code counts, both targets, JSON method: native **40 → 24**,
+      `wasm32-unknown-unknown` **35 → 19** — both down by exactly 16, and
+      the five `abuse_limiter` items remain live-on-wasm32 throughout,
+      confirming this package touched none of them.
+- [x] Full suite green: `cargo test --workspace` **512 passed** (513 − the
+      one accounted-for deletion); clippy (`-D warnings`), fmt, wasm check,
+      and `mdbook build docs` all pass clean; `git diff --check` reports no
+      whitespace errors; `bun run build` succeeds at 28.4kb. The digest gate
+      passes **without** a re-pin — nothing under `workers/ssr/static/` or
+      `render/shell.rs` changed. All ten smokes pass, deliberately run in
+      full this time (unlike the audit) since this package deletes code
+      from the session, invite, relink, membership, and calendar paths.
+      *(evidence `.git-exclude/tmp/handoff045-proofs/`)*

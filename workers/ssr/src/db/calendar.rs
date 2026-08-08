@@ -73,53 +73,6 @@ pub async fn find_active_for_membership(
     }))
 }
 
-/// Insert a new calendar token. Caller has already revoked any previous token.
-pub async fn insert(
-    db: &D1Database,
-    id: &str,
-    community_id: &str,
-    membership_id: &str,
-    token_hmac: &str,
-    created_at: &str,
-) -> Result<()> {
-    db.prepare(
-        "INSERT INTO calendar_tokens \
-         (id, community_id, membership_id, token_hmac, created_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-    )
-    .bind(&[
-        id.into(),
-        community_id.into(),
-        membership_id.into(),
-        token_hmac.into(),
-        created_at.into(),
-    ])?
-    .run()
-    .await?;
-    Ok(())
-}
-
-/// Revoke all active tokens for a membership in a community.
-/// Called before inserting a replacement (rotate) or when the member
-/// explicitly disables the feed.
-pub async fn revoke_for_membership(
-    db: &D1Database,
-    membership_id: &str,
-    community_id: &str,
-    revoked_at: &str,
-) -> Result<()> {
-    db.prepare(
-        "UPDATE calendar_tokens \
-         SET revoked_at = ?1 \
-         WHERE membership_id = ?2 AND community_id = ?3 \
-           AND revoked_at IS NULL",
-    )
-    .bind(&[revoked_at.into(), membership_id.into(), community_id.into()])?
-    .run()
-    .await?;
-    Ok(())
-}
-
 #[allow(clippy::too_many_arguments)]
 pub async fn rotate_required(
     db: &D1Database,

@@ -135,45 +135,6 @@ pub async fn list_for_event_days(
     Ok(out)
 }
 
-/// Status counts for one day. `active_member_count` is used to derive `no_answer`.
-pub async fn counts_for_day(
-    db: &D1Database,
-    event_day_id: &str,
-    active_member_count: u32,
-) -> Result<DayCountRow> {
-    let row = db
-        .prepare(
-            "SELECT \
-               SUM(CASE WHEN status = 'going'     THEN 1 ELSE 0 END) AS going, \
-               SUM(CASE WHEN status = 'not_going' THEN 1 ELSE 0 END) AS not_going, \
-               SUM(CASE WHEN status = 'attended'  THEN 1 ELSE 0 END) AS attended, \
-               COUNT(*) AS total_rows \
-             FROM attendances \
-             WHERE event_day_id = ?1",
-        )
-        .bind(&[event_day_id.into()])?
-        .first::<serde_json::Value>(None)
-        .await?;
-
-    let (going, not_going, attended, total_rows) = row
-        .map(|v| {
-            let g = v.get("going").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
-            let ng = v.get("not_going").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
-            let a = v.get("attended").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
-            let t = v.get("total_rows").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
-            (g, ng, a, t)
-        })
-        .unwrap_or((0, 0, 0, 0));
-
-    let no_answer = active_member_count.saturating_sub(total_rows);
-    Ok(DayCountRow {
-        going,
-        not_going,
-        attended,
-        no_answer,
-    })
-}
-
 /// Upsert a status for (event_day, membership). `status` = None clears to No answer.
 pub async fn upsert(
     db: &D1Database,
