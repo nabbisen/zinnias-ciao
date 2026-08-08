@@ -776,3 +776,57 @@ involved. No production code, route, form, or i18n wording changed.
       violations reported on every one. *(evidence
       `.git-exclude/evidence/rfc072/`,
       `.git-exclude/tmp/handoff042-proofs/`)*
+
+## Realign the `worker` crate with `worker-build` (Handoff 043)
+
+Not a numbered RFC — one lockfile update, touching a release artifact, so the
+owner authorized it explicitly. No `Cargo.toml` edit, no exact pin, no
+version bump, no production source, migration, or CSP change.
+
+- [x] **What broke.** `bun run build` failed with
+      `error: unexpected argument '--force-enable-abort-handler' found`. The
+      host's globally installed `worker-build` binary updated itself to
+      **0.8.5** on 2026-08-03, which now passes
+      `--force-enable-abort-handler` to the `wasm-bindgen` CLI it fetches — a
+      flag the CLI matching this repo's then-pinned `wasm-bindgen 0.2.123`
+      does not accept. Proven, during the Handoff 042 review, not caused by
+      any repo change: stashed every working-tree change and rebuilt on
+      committed `4c7c2b9`, identical failure. `Cargo.lock` had not moved
+      since the `0.61.0` release commit `4764c2a`.
+- [x] **Why the first two diagnoses published were both wrong** — recorded
+      here because the dead end fails silently and looks like a no-op, so
+      the next person to hit this needs to be steered around it, not just
+      told the fix. First diagnosis: pin `worker-build` back — impossible to
+      express in this repo at all, since it is a globally installed binary,
+      not a dependency; the breakage would recur on any machine with a
+      current one. Second diagnosis: move `wasm-bindgen` forward alone —
+      does nothing, because `js-sys 0.3.100` carries
+      `wasm-bindgen = "=0.2.123"` as an **upstream exact pin** that isn't
+      ours to move; `cargo update -p wasm-bindgen` locks 0 packages and
+      exits clean, which is what made it look like a no-op rather than a
+      failure. The actual mismatch was `worker` 0.8.4 (library) against
+      `worker-build` 0.8.5 (tool) — they ship in lockstep, and bringing the
+      library forward releases the upstream pin along with everything else.
+- [x] **The fix, one command**: `cargo update -p worker`. Ten packages
+      moved: `worker` 0.8.4→0.8.5, `worker-macros` 0.8.4→0.8.5, `worker-sys`
+      0.8.4→0.8.5, `js-sys` 0.3.100→0.3.104, `web-sys` 0.3.100→0.3.104,
+      `wasm-bindgen` 0.2.123→0.2.127, and the `wasm-bindgen-futures`/
+      `-macro`/`-macro-support`/`-shared` family alongside it. `worker`
+      resolved to exactly 0.8.5, as expected. `Cargo.toml:20`'s
+      `worker = { version = "0.8", ... }` and
+      `workers/ssr/Cargo.toml:32`'s `wasm-bindgen = "0.2"` were already the
+      semver ranges house style requires and did not need to change — only
+      `Cargo.lock` moved, confirmed by `git diff --stat`.
+- [x] `bun run build` now succeeds; bundle size **28.4kb**, up from 28.3kb —
+      expected from newer generated glue, not a regression.
+- [x] Full suite green, test count unchanged at **513**: `cargo test
+      --workspace`, clippy (`-D warnings` — no new lint from the regenerated
+      bindings), fmt, wasm check, and `mdbook build docs` all pass clean;
+      `git diff --check` reports no whitespace errors. The digest gate
+      (`cached_asset_content_matches_pinned_hash`) passed **without a
+      re-pin** — nothing under `workers/ssr/static/` or `render/shell.rs`
+      changed, consistent with this being a toolchain-only update. All ten
+      smokes pass with zero CSP violations reported on every one, the
+      guard against a behavioural change in the regenerated bindings that
+      unit tests alone would not catch. *(evidence
+      `.git-exclude/tmp/handoff043-proofs/`)*
