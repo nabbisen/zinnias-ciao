@@ -685,7 +685,7 @@ Not a numbered RFC — three mechanical items deliberately deferred out of
 RFC-075 so its migration packages wouldn't absorb unrelated work. No
 behaviour, route, form, `data-*`, i18n, CSS value, version, or CSP change.
 
-- [x] Nine module-wide `#![allow(dead_code)]` directives deleted from `workers/ssr/src/db/{attendance,community,event_note,event,event_series,event_write,membership,relink,session}.rs`, each re-measured independently before deletion (comment out, build, count warnings, restore) rather than trusting the prior day's measurement — all nine still guard exactly zero items. The measurement technique itself was validated against `db.rs` (out of scope, known to guard 9 real items) as a control, confirming a real warning would have been caught if one existed. `clippy -D warnings` is clean on all nine with the allows gone — the compiler is now the guard, the same move Handoff 035 made for `render.rs`. The five allows that guard real items (`db.rs`, `abuse_limiter.rs`, `errors.rs`, `crypto.rs`, `authz.rs`) are untouched, a separate package.
+- [x] Nine module-wide `#![allow(dead_code)]` directives deleted from `workers/ssr/src/db/{attendance,community,event_note,event,event_series,event_write,membership,relink,session}.rs`, each re-measured independently before deletion (comment out, build, count warnings, restore) rather than trusting the prior day's measurement — all nine still guard exactly zero items. The measurement technique itself was validated against `db.rs` (out of scope, known to guard 9 real items) as a control, confirming a real warning would have been caught if one existed. The deletions were correct and the zero-warning measurement was correct. **Corrected by Handoff 044**: the sentence that followed here — "`clippy -D warnings` is clean on all nine with the allows gone — the compiler is now the guard" — was false. `db.rs`'s own `#![allow(dead_code)]` is an inner attribute and therefore already covers its entire module tree, submodules included, so it was suppressing warnings under all nine of these files the whole time; removing the nine redundant per-file allows changed no enforcement, because the module-wide allow one level up was never touched. The compiler is not the guard for these nine modules — `db.rs`'s allow is, and it stayed in place (correctly: it guards real items). Handoff 044's audit measured 31 of its 40 dead-code items living under `db/` as direct confirmation.
 - [x] `cz-admin-field-input` renamed to `cz-field-input` across all seven call sites (`admin/events/forms.rs` ×2, `templates.rs` ×3, `join.rs` ×2) plus the `app.css` rule — the class was in use on `join.rs`, the anonymous unauthenticated invite-redemption page, so an "admin" name was actively misleading and risked a future admin-scoped restyle silently reaching the one page a surprise is least welcome. Rename only, confirmed by diff: no CSS declaration and no other markup attribute changed at any of the eight sites.
 - [x] Both copies of `css_rule_body` (`release_gates.rs`, `token_and_color_regression.rs` — duplicated because integration test binaries share no code) now tolerate any run of whitespace between a selector and its opening brace, rather than requiring the exact literal `"{selector} {{"`. Proven with both gates that actually read a rule (`calendar_overview_contract_is_explicit` via `.cz-calendar-day--today`; `status_going_fg_passes_wcag_aa` via `.cz-status-text--going`): temporarily reformatted both rules with aligned extra whitespace before the brace in `app.css`, confirmed both gates still passed, restored the file (`cmp`-verified byte-identical), confirmed both gates still pass on the original formatting too.
 - [x] `RELEASE_CACHE_ASSET_CONTENT_HASH` re-pinned once, from the gate's own failure message, after the `cz-field-input` rename changed `app.css`'s content — no version bump; the `0.61.0` tag had just been cut and this is mid-cycle.
@@ -830,3 +830,68 @@ version bump, no production source, migration, or CSP change.
       guard against a behavioural change in the regenerated bindings that
       unit tests alone would not catch. *(evidence
       `.git-exclude/tmp/handoff043-proofs/`)*
+
+## The dead-code audit (Handoff 044)
+
+An audit, not a cleanup — no source file changed. Classifies every item the
+five remaining `#![allow(dead_code)]` directives (`db.rs`, `abuse_limiter.rs`,
+`errors.rs`, `crypto.rs`, `authz.rs`) suppress. Deletions follow in a later
+package. Full per-item table:
+`.git-exclude/audits/zinnias-ciao-main-2026-08-08-handoff044-dead-code-audit.md`.
+
+- [x] **Re-measured counts differ from the handoff's**: 40 dead in a plain
+      build (handoff claimed 39), 34 with `cfg(test)` on (handoff claimed
+      33), 6 rescued by unit tests (exact match, same six items). Verified
+      via `--message-format=json` filtered to `dead_code` diagnostics and
+      cross-checked with a fully clean `cargo clean -p zinnias-ciao-ssr`
+      rebuild. The `db/`-tree count matches the handoff's stated 31
+      exactly — the extra item sits outside `db/`, in `authz.rs` or
+      `errors.rs`. Flagged to the architect per the handoff's own §15 stop
+      condition rather than resolved unilaterally.
+- [x] **RFC-078's abuse limiting is enforced**, not missing. The five
+      `abuse_limiter.rs` items (`Row`, `is_json_media_type`, `policy_limits`,
+      `TransitionOutcome`, `transition`) are called only from Durable-Object
+      glue gated `#[cfg(target_arch = "wasm32")]`, invisible to a native
+      `cargo build`. Confirmed on the real deployment target: with the
+      allow removed, `cargo check -p zinnias-ciao-ssr --target
+      wasm32-unknown-unknown` produces zero dead-code warnings in the file.
+      Three handlers (`join.rs`, `relink.rs`, `community_create.rs`) call
+      `abuse_control::reserve`/`reset`, which crosses the DO boundary via
+      the `ABUSE_LIMITER` binding declared in every `wrangler.toml`
+      environment. All five: `deliberate`.
+- [x] `crypto::hmac_hex_eq`: `duplicate` of `constant_time_eq` (live at
+      `handlers/operator.rs:105`), confirmed. Its own test duplicates
+      `constant_time_eq`'s. A dedicated search for any hand-rolled `==`
+      comparison on an HMAC/digest/token/secret anywhere in production
+      found none — every real comparison already routes through
+      `constant_time_eq`.
+- [x] 16 of the 40 items are `duplicate` — a live, guarded/atomic
+      "`*_required`" transaction superseding an older standalone
+      insert/revoke/mark-used helper. **None of the 16 pairs are
+      byte-equivalent**: every live version adds an `EXISTS` guard (active
+      membership, active admin, matching community) the dead version
+      lacks, so deleting the dead copy loses no coverage. The two named
+      worked examples (`db/session.rs::insert`, `db/membership.rs::insert_user`/
+      `insert_membership`) confirmed exactly as the handoff stated.
+- [x] 24 items across 12 `SELECT`s are unread struct fields, grouped by
+      query per §7.5 — the eventual deletion decision is per query, not
+      per field. Three additional `is_active` items in
+      `db/membership.rs` are **not** `SELECT` columns at all: Rust-side
+      literals hardcoded `true` at every construction site, redundant with
+      the row's existence (`removed_at IS NULL` already gates it).
+- [x] **No `finding` verdict was needed.** §7.3 — the question the handoff
+      called "most likely to change what the project does next" — resolved
+      to enforced, not missing.
+- [x] `docs/src/tester/release-checklist.md`'s Handoff 040 entry corrected
+      (§7.1): the claim that "the compiler is now the guard" for the nine
+      deleted per-file allows was false — `db.rs`'s allow is an inner
+      attribute covering the whole `db/` tree and was never touched, so it
+      was already suppressing those nine files' warnings throughout. The
+      nine deletions and the zero-warning measurement were both still
+      correct; only the stated reason was wrong.
+- [x] No `.rs` file changed (`git diff --stat` confirms). Full suite green
+      at 513, unchanged; clippy, fmt, wasm check, `mdbook build docs`,
+      `git diff --check` all pass clean; `bun run build` succeeds at
+      28.4kb; the digest gate passes without a re-pin. The ten smokes were
+      deliberately not run — no source changed, so they could not have
+      told us anything. *(evidence `.git-exclude/tmp/handoff044-proofs/`)*
