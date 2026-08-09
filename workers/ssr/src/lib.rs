@@ -7,7 +7,6 @@ mod authz;
 mod codlet;
 mod crypto;
 mod db;
-mod errors;
 mod form_token;
 mod render;
 mod session;

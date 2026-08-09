@@ -704,9 +704,6 @@ fn event_row(
         starts_at_utc: format!("{day_date}T00:00:00Z"),
         ends_at_utc: format!("{day_date}T01:00:00Z"),
         occurrence_status: occurrence_status.to_string(),
-        series_id: None,
-        seq: 1,
-        total_days: 1,
     }
 }
 
@@ -719,7 +716,6 @@ fn attendance_row(
         event_day_id: day_id.to_string(),
         membership_id: member_id.to_string(),
         status: status.map(str::to_string),
-        status_updated_at: Some("2026-07-01T00:00:00Z".to_string()),
     }
 }
 

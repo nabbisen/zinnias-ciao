@@ -7,10 +7,7 @@ use zinnias_ciao_contracts::Locale;
 pub struct MembershipRow {
     pub id: String,
     pub community_id: String,
-    pub user_id: String,
     pub role: String,
-    pub display_name: String,
-    pub is_active: bool,
 }
 
 /// An active membership row that also carries a *resolved* locale
@@ -25,7 +22,6 @@ pub struct ActiveMembershipRow {
     pub user_id: String,
     pub role: String,
     pub display_name: String,
-    pub is_active: bool,
     pub locale: Locale,
 }
 
@@ -42,7 +38,6 @@ pub struct AdminMembershipRow {
     pub user_id: String,
     pub role: String,
     pub display_name: String,
-    pub is_active: bool,
     pub locale: Locale,
 }
 
@@ -88,7 +83,6 @@ pub async fn find_active(
             user_id: v.get("user_id")?.as_str()?.to_owned(),
             role: v.get("role")?.as_str()?.to_owned(),
             display_name: v.get("display_name")?.as_str()?.to_owned(),
-            is_active: true,
             locale: resolve_locale(ui_language.as_deref()),
         })
     }))
@@ -130,7 +124,7 @@ pub async fn find_active_by_id(
 ) -> Result<Option<MembershipRow>> {
     let row = db
         .prepare(
-            "SELECT id, community_id, user_id, role, display_name \
+            "SELECT id, community_id, role \
              FROM community_memberships \
              WHERE id = ?1 AND community_id = ?2 AND removed_at IS NULL \
              LIMIT 1",
@@ -143,10 +137,7 @@ pub async fn find_active_by_id(
         Some(MembershipRow {
             id: v.get("id")?.as_str()?.to_owned(),
             community_id: v.get("community_id")?.as_str()?.to_owned(),
-            user_id: v.get("user_id")?.as_str()?.to_owned(),
             role: v.get("role")?.as_str()?.to_owned(),
-            display_name: v.get("display_name")?.as_str()?.to_owned(),
-            is_active: true,
         })
     }))
 }
@@ -155,7 +146,7 @@ pub async fn find_active_by_id(
 pub async fn list_active_for_user(db: &D1Database, user_id: &str) -> Result<Vec<MembershipRow>> {
     let rows = db
         .prepare(
-            "SELECT id, community_id, user_id, role, display_name \
+            "SELECT id, community_id, role \
              FROM community_memberships \
              WHERE user_id = ?1 AND removed_at IS NULL \
              ORDER BY joined_at ASC",
@@ -171,10 +162,7 @@ pub async fn list_active_for_user(db: &D1Database, user_id: &str) -> Result<Vec<
             Some(MembershipRow {
                 id: v.get("id")?.as_str()?.to_owned(),
                 community_id: v.get("community_id")?.as_str()?.to_owned(),
-                user_id: v.get("user_id")?.as_str()?.to_owned(),
                 role: v.get("role")?.as_str()?.to_owned(),
-                display_name: v.get("display_name")?.as_str()?.to_owned(),
-                is_active: true,
             })
         })
         .collect())
@@ -211,7 +199,6 @@ pub async fn find_first_admin_for_user(
             user_id: v.get("user_id")?.as_str()?.to_owned(),
             role: v.get("role")?.as_str()?.to_owned(),
             display_name: v.get("display_name")?.as_str()?.to_owned(),
-            is_active: true,
             locale: resolve_locale(ui_language.as_deref()),
         })
     }))

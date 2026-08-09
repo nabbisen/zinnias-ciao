@@ -12,7 +12,6 @@ use crate::db::now_utc;
 pub struct SessionRow {
     pub id: String,
     pub user_id: String,
-    pub expires_at: String,
 }
 
 /// Look up a session by its HMAC.
@@ -21,7 +20,7 @@ pub async fn find_active(db: &D1Database, session_hmac: &str) -> Result<Option<S
     let now = now_utc();
     let row = db
         .prepare(
-            "SELECT id, user_id, expires_at \
+            "SELECT id, user_id \
              FROM sessions \
              WHERE session_hmac = ?1 \
                AND revoked_at IS NULL \
@@ -36,7 +35,6 @@ pub async fn find_active(db: &D1Database, session_hmac: &str) -> Result<Option<S
         Some(SessionRow {
             id: v.get("id")?.as_str()?.to_owned(),
             user_id: v.get("user_id")?.as_str()?.to_owned(),
-            expires_at: v.get("expires_at")?.as_str()?.to_owned(),
         })
     }))
 }
@@ -52,6 +50,10 @@ pub async fn revoke(db: &D1Database, session_id: &str) -> Result<()> {
 }
 
 /// Touch `last_seen_at` (periodic, not on every request — guards privacy).
+/// RFC-038: `last_seen_at` remains available but is deliberately not
+/// written per-request under the fixed-window decision — available, not
+/// wired to a periodic caller. Handoff 044 audit verdict: `deliberate`.
+#[allow(dead_code)]
 pub async fn touch(db: &D1Database, session_id: &str) -> Result<()> {
     let now = now_utc();
     db.prepare("UPDATE sessions SET last_seen_at = ?1 WHERE id = ?2")

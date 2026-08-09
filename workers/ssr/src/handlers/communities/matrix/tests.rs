@@ -92,9 +92,6 @@ fn cell_summary_breakdown_avoids_pluralization_in_english() {
         starts_at_utc: "2026-07-05T00:00:00Z".to_string(),
         ends_at_utc: "2026-07-05T01:00:00Z".to_string(),
         occurrence_status: "scheduled".to_string(),
-        series_id: None,
-        seq: 1,
-        total_days: 1,
     };
     let row_b = event_db::HomeEventRow {
         community_id: "community-a".to_string(),
@@ -107,9 +104,6 @@ fn cell_summary_breakdown_avoids_pluralization_in_english() {
         starts_at_utc: "2026-07-05T02:00:00Z".to_string(),
         ends_at_utc: "2026-07-05T03:00:00Z".to_string(),
         occurrence_status: "scheduled".to_string(),
-        series_id: None,
-        seq: 1,
-        total_days: 1,
     };
     let events: Vec<&event_db::HomeEventRow> = vec![&row_a, &row_b];
     let attendances: HashMap<String, Vec<attendance::AttendanceRow>> = HashMap::from([(
@@ -118,7 +112,6 @@ fn cell_summary_breakdown_avoids_pluralization_in_english() {
             event_day_id: "day_1".to_string(),
             membership_id: "mem_a".to_string(),
             status: Some("going".to_string()),
-            status_updated_at: Some("2026-07-01T00:00:00Z".to_string()),
         }],
     )]);
 

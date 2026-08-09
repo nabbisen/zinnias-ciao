@@ -13,8 +13,6 @@ pub struct InviteRow {
     pub community_id: String,
     /// Role to grant the joining user — 'admin' or 'member'.
     pub grants_role: String,
-    /// Whether the code has already been used or revoked or is expired
-    pub is_valid: bool,
 }
 
 /// Look up an invite code by HMAC.
@@ -44,7 +42,6 @@ pub async fn find_valid(db: &D1Database, code_hmac: &str) -> Result<Option<Invit
                 .and_then(|x| x.as_str())
                 .unwrap_or("member")
                 .to_owned(),
-            is_valid: true,
         })
     }))
 }
@@ -75,7 +72,6 @@ pub async fn find_by_id(db: &D1Database, invite_id: &str) -> Result<Option<Invit
                 .and_then(|x| x.as_str())
                 .unwrap_or("member")
                 .to_owned(),
-            is_valid: true,
         })
     }))
 }

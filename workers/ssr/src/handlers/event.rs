@@ -109,7 +109,6 @@ pub async fn get_event_detail(
         let empty_counts = attendance_db::DayCountRow {
             going: 0,
             not_going: 0,
-            attended: 0,
             no_answer: member_count,
         };
         let counts = day_counts.get(&day.id).unwrap_or(&empty_counts);

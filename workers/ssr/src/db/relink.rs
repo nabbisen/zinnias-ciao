@@ -11,7 +11,6 @@ pub struct RelinkTargetRow {
     pub id: String,
     pub community_id: String,
     pub membership_id: String,
-    pub created_by_membership_id: String,
     pub user_id: String,
 }
 
@@ -31,7 +30,7 @@ pub async fn find_valid_by_hmac(
     let now = now_utc();
     let row = db
         .prepare(
-            "SELECT r.id, r.community_id, r.membership_id, r.created_by_membership_id, m.user_id \
+            "SELECT r.id, r.community_id, r.membership_id, m.user_id \
              FROM membership_relink_codes r \
              JOIN community_memberships m ON m.id = r.membership_id \
              WHERE r.code_hmac = ?1 \
@@ -51,7 +50,6 @@ pub async fn find_valid_by_hmac(
             id: v.get("id")?.as_str()?.to_owned(),
             community_id: v.get("community_id")?.as_str()?.to_owned(),
             membership_id: v.get("membership_id")?.as_str()?.to_owned(),
-            created_by_membership_id: v.get("created_by_membership_id")?.as_str()?.to_owned(),
             user_id: v.get("user_id")?.as_str()?.to_owned(),
         })
     }))

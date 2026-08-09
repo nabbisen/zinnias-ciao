@@ -44,7 +44,6 @@ fn query_escape_encodes_spaces_and_japanese() {
 fn event_row(repeat_rule: &str, repeat_count: Option<u32>) -> event_db::EventRow {
     event_db::EventRow {
         id: "evt".to_string(),
-        community_id: "com".to_string(),
         title: "Title".to_string(),
         description: Some("Description".to_string()),
         location: Some("Room".to_string()),
@@ -66,7 +65,6 @@ fn cancelled_event_row() -> event_db::EventRow {
 fn day(seq: u32, date: &str) -> event_db::EventDayRow {
     event_db::EventDayRow {
         id: format!("day-{seq}"),
-        event_id: "evt".to_string(),
         seq,
         day_date: date.to_string(),
         starts_at_utc: format!("{date}T01:00:00.000Z"),

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! D1 data-access layer.
 
 pub mod attendance;
@@ -13,9 +12,6 @@ pub mod invite;
 pub mod membership;
 pub mod relink;
 pub mod session;
-
-use worker::D1Database;
-pub type Db<'a> = &'a D1Database;
 
 pub fn now_utc() -> String {
     let ms = worker::Date::now().as_millis();

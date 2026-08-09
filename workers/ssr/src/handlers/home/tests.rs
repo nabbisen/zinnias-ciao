@@ -18,9 +18,6 @@ fn event_row(
         starts_at_utc: "2026-07-05T00:00:00Z".to_string(),
         ends_at_utc: "2026-07-05T01:00:00Z".to_string(),
         occurrence_status: occurrence_status.to_string(),
-        series_id: None,
-        seq: 1,
-        total_days: 1,
     }
 }
 

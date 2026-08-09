@@ -958,3 +958,86 @@ removes a way to pick the wrong function name, not just unused code.
       full this time (unlike the audit) since this package deletes code
       from the session, invite, relink, membership, and calendar paths.
       *(evidence `.git-exclude/tmp/handoff045-proofs/`)*
+
+## Unread row fields, and the last of the allows (Handoff 046)
+
+Not a numbered RFC — the closing move on `#![allow(dead_code)]`, driven by
+what Handoff 045 left behind. Unlike 045, **this package changes queries**:
+a field nothing reads corresponds to a column a `SELECT` still fetches,
+deserialised into a struct nobody looks at. The point isn't byte savings —
+it's restoring the property that the query fetches what the code reads, so
+a future unread-field warning means something again.
+
+- [x] **24 fields removed, grouped by the 12 `SELECT`s that fetched them**
+      (`db/attendance.rs`'s `AttendanceRow`/`DayCountRow`, `db/calendar.rs`'s
+      `CalendarTokenRow`/`IcsEventRow`, `db/community.rs`'s `CommunityRow`,
+      `db/event.rs`'s `EventRow`/`EventDayRow`/`HomeEventRow`,
+      `db/event_note.rs`'s `NoteRow`, `db/event_template.rs`'s
+      `EventTemplateRow`, `db/membership.rs`'s `MembershipRow`). Every
+      struct's full constructor list was found first, not assumed single —
+      `HomeEventRow` alone has two (`calendar_month_for_community_limited`,
+      `home_upcoming_for_communities`); both moved together, in the same
+      commit, so no query was left fetching a column its struct no longer
+      declares.
+- [x] **`invite.rs::is_valid` and the three `membership.rs::is_active`
+      items turned out to be Rust-side literal `true`, not `SELECT`
+      columns** — set unconditionally at every construction site, redundant
+      with the row's existence (each query's own `WHERE` already guarantees
+      "used_at IS NULL"/"removed_at IS NULL" before the row is ever built).
+      Neither carries authorisation meaning; removing them touched no query
+      and no guard. Called out separately from the `SELECT`-column grouping
+      above, since there was no projection to edit.
+- [x] **A fallout ring the audit's own coordinates didn't reach**: four
+      files beyond `db/` and the five allow-holders also constructed these
+      structs directly — one in production
+      (`handlers/event.rs`'s `DayCountRow` zero-fallback), three in test
+      helpers (`handlers/communities/matrix/tests.rs`,
+      `handlers/communities/tests.rs`, `handlers/home/tests.rs`,
+      `handlers/admin/events/tests.rs`). All four updated in the same
+      commits as their structs; `cargo test -p zinnias-ciao-ssr --lib
+      --no-run` after each file's edit is what surfaced them — compile
+      errors, not warnings, so nothing could be missed silently.
+- [x] `db.rs::Db` (orphaned type alias) deleted — zero references anywhere,
+      confirmed before and after.
+- [x] `workers/ssr/src/errors.rs` deleted along with its `mod errors;` at
+      `lib.rs:10` — after Handoff 045 the file was a doc comment describing
+      helpers that no longer existed, the same defect this sequence already
+      corrected in the digest comment and the Handoff 040 record.
+      `render.rs`'s own unrelated `mod errors;` (→ `render/errors.rs`) is
+      untouched — confirmed by name, not by proximity.
+- [x] **The three surviving `#![allow(dead_code)]` directives, reduced to
+      their smallest honest form**:
+      - **`db.rs` — removed entirely.** With the 24 fields resolved and
+        `Db` gone, its inner attribute (covering the whole `db/` tree)
+        suppressed zero remaining items, confirmed by re-measurement before
+        deleting it.
+      - **`authz.rs` — replaced with an item-level `#[allow(dead_code)]`**
+        on the `user_id` field alone, carrying the audit's reason in a
+        comment. Its file-header comment had grouped `community_id` with
+        `user_id` as both "populated for completeness, not read" — false
+        for `community_id`, which `handlers/me.rs` reads twice; corrected
+        while converting the allow, since only `user_id` is actually dead.
+      - **`abuse_limiter.rs` — `#![cfg_attr(not(target_arch = "wasm32"),
+        allow(dead_code))]`.** Tried and confirmed working: zero dead-code
+        warnings from the file on *either* target afterward, where a
+        blanket allow would have kept claiming the module has dead code
+        even on wasm32, where it does not.
+      - **`db/session.rs::touch`**, the `deliberate` item `db.rs`'s allow
+        used to cover incidentally, now carries its own item-level
+        `#[allow(dead_code)]` with the RFC-038 citation.
+- [x] **Dead-code counts, both targets, JSON method**: native **24 → 0**,
+      `wasm32-unknown-unknown` **19 → 0**. Every remaining item from the
+      five original allow-holders is now individually explained by an
+      item-level allow or the `cfg_attr` form — nothing is suppressed by a
+      module-wide statement that overclaims.
+- [x] Full suite green: `cargo test --workspace` **512 passed** — unchanged
+      from Handoff 045 (only existing test-constructor call sites were
+      edited; no test added or removed). Clippy (`-D warnings`, clean, no
+      fallout to delete beyond the four constructor sites already accounted
+      for above), fmt, wasm check, `mdbook build docs` all pass clean;
+      `git diff --check` reports no whitespace errors; `bun run build`
+      succeeds at 28.4kb. The digest gate passes **without** a re-pin. All
+      ten smokes pass, with **no rendered-output change** on any of
+      them — the guard against a column reaching a page by a route the
+      compiler couldn't see. *(evidence
+      `.git-exclude/tmp/handoff046-proofs/`)*

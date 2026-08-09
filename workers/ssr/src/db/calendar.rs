@@ -11,7 +11,6 @@ use crate::audit::{self, AuditAction, AuditMetadata};
 /// Metadata returned to callers — never includes the HMAC.
 pub struct CalendarTokenRow {
     pub id: String,
-    pub created_at: String,
 }
 
 /// Look up an active (unrevoked) token by its HMAC.
@@ -53,7 +52,7 @@ pub async fn find_active_for_membership(
 ) -> Result<Option<CalendarTokenRow>> {
     let rows = db
         .prepare(
-            "SELECT id, created_at \
+            "SELECT id \
              FROM calendar_tokens \
              WHERE membership_id = ?1 AND community_id = ?2 \
                AND revoked_at IS NULL \
@@ -68,7 +67,6 @@ pub async fn find_active_for_membership(
     Ok(rows.into_iter().next().and_then(|v| {
         Some(CalendarTokenRow {
             id: v.get("id")?.as_str()?.to_owned(),
-            created_at: v.get("created_at")?.as_str()?.to_owned(),
         })
     }))
 }
@@ -157,7 +155,6 @@ pub async fn revoke_required(
 /// Events for the ICS feed: title, times, location, status.
 /// Only events for the given community_id — enforced in query.
 pub struct IcsEventRow {
-    pub event_id: String,
     pub title: String,
     pub location: Option<String>,
     pub status: String, // "scheduled" | "cancelled"
@@ -172,7 +169,6 @@ pub async fn events_for_feed(db: &D1Database, community_id: &str) -> Result<Vec<
     let rows = db
         .prepare(
             "SELECT ed.id AS day_id, \
-                    e.id AS event_id, \
                     e.title, \
                     e.location, \
                     e.status, \
@@ -193,7 +189,6 @@ pub async fn events_for_feed(db: &D1Database, community_id: &str) -> Result<Vec<
         .filter_map(|v| {
             Some(IcsEventRow {
                 day_id: v.get("day_id")?.as_str()?.to_owned(),
-                event_id: v.get("event_id")?.as_str()?.to_owned(),
                 title: v.get("title")?.as_str()?.to_owned(),
                 location: v
                     .get("location")

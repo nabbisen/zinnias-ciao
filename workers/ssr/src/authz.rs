@@ -1,9 +1,3 @@
-// `community_id` and `user_id` are populated for completeness (RFC-004 context object)
-// but most handlers address the community via the validated URL parameter directly.
-// `membership_id`, `role`, and `display_name` are the fields actually read.
-#![allow(dead_code)]
-
-//!
 //! Every community-scoped route calls `require_membership` before acting.
 //! A missing or removed membership returns the same generic not-found response
 //! as a nonexistent resource, so private resource existence is never revealed.
@@ -17,6 +11,10 @@ use zinnias_ciao_contracts::Locale;
 pub struct MembershipContext {
     pub membership_id: String,
     pub community_id: String,
+    /// Populated for completeness (RFC-004 context object), but not read —
+    /// most handlers address the community via the validated URL parameter
+    /// directly. Handoff 044 audit verdict: `deliberate`.
+    #[allow(dead_code)]
     pub user_id: String,
     pub role: String,
     pub display_name: String,

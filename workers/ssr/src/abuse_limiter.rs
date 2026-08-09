@@ -1,4 +1,11 @@
-#![allow(dead_code)]
+// Handoff 046 §7.4: dead only on the native target — the `#[cfg(target_arch
+// = "wasm32")]`-gated Durable Object glue below is this module's only
+// caller of the pure policy/transition logic, and that glue does not
+// compile natively. A blanket `#![allow(dead_code)]` would say "this module
+// has dead code," which is false for the artifact that ships; this form
+// keeps wasm32 honest, so a genuinely dead item here is still caught on the
+// target that matters.
+#![cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
 //! `AbuseLimiter` Durable Object — RFC-078.
 //!
 //! One SQLite-backed Durable Object per HMAC-derived subject/scope,
