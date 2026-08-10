@@ -2,6 +2,18 @@
 -- ciao.zinnias / RFC-002
 -- Event -> EventDay -> Attendance grain (confirmed).
 -- All secrets stored as HMAC-SHA256(pepper, value) — never plaintext (AD-3).
+--
+-- Corrected at source 2026-08-10, under the one-time pre-deployment
+-- exception recorded in ROADMAP.md ("Migration immutability begins at
+-- first deployment") and RFC-081 §1.2a: removed the table-level
+-- UNIQUE(community_id, user_id) on community_memberships (replaced by the
+-- partial unique index below, RFC-081 §1.2) and users.idp_subject
+-- (rejected by RFC-080 §3.4; user_identities, migration 0013, replaces
+-- it). Both changes were originally attempted as a forward migration
+-- (Handoff 051); that rebuild is impossible under D1 for a table with
+-- live foreign-key dependents, so the initial schema was corrected here
+-- instead, once, while no database outside a developer's machine had
+-- ever applied it. This exception does not recur after first deployment.
 
 CREATE TABLE IF NOT EXISTS communities (
     id         TEXT PRIMARY KEY,
@@ -13,8 +25,6 @@ CREATE TABLE IF NOT EXISTS communities (
 
 CREATE TABLE IF NOT EXISTS users (
     id          TEXT PRIMARY KEY,
-    -- Reserved for deferred OIDC (AD-2). NULL for invite-only members.
-    idp_subject TEXT UNIQUE,
     created_at  TEXT NOT NULL
 );
 
@@ -25,8 +35,7 @@ CREATE TABLE IF NOT EXISTS community_memberships (
     role         TEXT NOT NULL CHECK(role IN ('admin','member')),
     display_name TEXT NOT NULL,
     joined_at    TEXT NOT NULL,
-    removed_at   TEXT,
-    UNIQUE(community_id, user_id)
+    removed_at   TEXT
 );
 
 CREATE TABLE IF NOT EXISTS invite_codes (
@@ -146,6 +155,13 @@ CREATE INDEX IF NOT EXISTS idx_memberships_user
 
 CREATE INDEX IF NOT EXISTS idx_memberships_community_active
     ON community_memberships(community_id, removed_at);
+
+-- RFC-081 §1.2: at most one non-removed membership per (community, user);
+-- any number of removed historical rows for the same pair is permitted.
+-- A suspended row (RFC-082) is not removed, so it still occupies the pair.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_one_active_per_user
+    ON community_memberships(community_id, user_id)
+    WHERE removed_at IS NULL;
 
 -- Home window query: bounded date scan for one community (RFC-002 §6).
 CREATE INDEX IF NOT EXISTS idx_event_days_community_time

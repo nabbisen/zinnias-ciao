@@ -1274,3 +1274,64 @@ authorization boundary (Slices 0–1) is untouched by this package.
       produces different digests. `cargo test --workspace`: **525 → 526**.
       Clippy, fmt, wasm check, `mdbook build docs`, `git diff --check`,
       `bun run build` re-confirmed clean; digest gate without a re-pin.
+
+## Schema re-baseline: membership continuity, at source (Handoff 052, replaces Handoff 051)
+
+Handoff 051 (rebuilding `community_memberships`/`users` via a forward
+migration 0014) escalated as a stop condition: under D1, a table with live
+foreign-key dependents cannot be dropped, by any of five mechanisms tested
+(`PRAGMA foreign_keys = OFF`, in-file and as a separate call;
+`PRAGMA defer_foreign_keys = ON`; renaming the old table out of the way;
+explicit `BEGIN`/`COMMIT`). RFC-081 §1.2a records the finding. **Owner
+decision, 2026-08-10**: because no database outside a developer's machine
+has ever applied these migrations, `migrations/0001_initial.sql` is
+corrected at source instead, under a one-time exception recorded in
+`ROADMAP.md` ("Migration immutability begins at first deployment") that
+expires at first deployment and must not be cited afterward.
+
+- [x] **Three edits to `0001_initial.sql`, nothing else.** Removed the
+      table-level `UNIQUE(community_id, user_id)` on `community_memberships`;
+      added `idx_memberships_one_active_per_user` (partial unique index,
+      `WHERE removed_at IS NULL`) beside the two pre-existing indexes;
+      removed `users.idp_subject` and its comment. A dated header comment
+      records the exception and points at RFC-081 §1.2a and `ROADMAP.md`.
+      No new migration — `0013_identity_namespaces.sql` remains the head;
+      the `rfc079_package7_…` migration-filename-list gate needed no
+      update, confirmed by re-running it. No migration other than `0001`
+      touched — confirmed by `git status`/`git diff --stat`.
+- [x] **Every verification run against a genuinely fresh database**
+      (`bun run reset:dev`, which deletes `.wrangler/state/v3/d1` outright
+      before reapplying every migration — not a database that had
+      previously applied the old `0001`). Confirmed by direct query, not
+      by reading the SQL: the only autoindex on `community_memberships` is
+      `sqlite_autoindex_community_memberships_1`, and
+      `pragma_index_info` shows it covers `id` alone (`origin: "pk"`) —
+      not `(community_id, user_id)`; `idx_memberships_one_active_per_user`
+      confirmed `unique=1, partial=1` via `pragma_index_list`; both
+      pre-existing indexes present; `users` has exactly `id`, `created_at`
+      via `pragma_table_info`; migrations 0001–0013 all applied; 0013's
+      `idns_local_fake` namespace present.
+- [x] **All three invariant cases demonstrated** against the same fresh
+      database, using the dev-seeded community: two `removed_at IS NULL`
+      rows for the same `(community_id, user_id)` — **rejected**
+      (`SQLITE_CONSTRAINT_UNIQUE`); one removed plus one new active row for
+      the same pair — **accepted** (the case the old constraint made
+      impossible, and the entire reason for the change); two removed rows
+      for the same pair — **accepted**. Probe rows cleaned up afterward,
+      confirmed by row count back to the seed baseline before the smoke run.
+- [x] `docs/src/developer/architecture.md`'s AD-2 summary corrected:
+      `users.idp_subject` no longer described as nullable/reserved: it was
+      rejected by RFC-080 §3.4 and removed; `user_identities` (migration
+      0013) is the replacement, keyed on
+      `(identity_namespace_id, subject_lookup)`. The frozen v1 historical
+      record (`docs/src/shared/ref/roadmap-and-rfcs-v1/ARCHITECTURE-DECISIONS.md`)
+      left untouched — it is accurate to what was decided then.
+- [x] `cargo test --workspace`: **526, unchanged** — this package adds no
+      Rust. Clippy (`-D warnings`), fmt, wasm check, `mdbook build docs`,
+      `git diff --check`, `bun run build` (28.4kb, unchanged) all pass
+      clean. Digest gate passes without a re-pin.
+- [x] **All eleven smokes green from a fresh database** — each smoke seeds
+      its own fixtures against the corrected schema end to end, which is
+      the strongest evidence the re-baseline is faithful to what the
+      application actually needs. Zero failed checks, zero CSP violations.
+      *(evidence `.git-exclude/tmp/handoff052-proofs/`)*

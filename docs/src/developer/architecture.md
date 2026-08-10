@@ -86,10 +86,13 @@ Summary:
 - **AD-1** SSR + progressive enhancement. Forms are `<form method="post">` + 303 redirect.
   State changes never depend on client-side JavaScript. No browser WASM bundle.
   Service worker caches GET responses only; POSTs go to the network.
-- **AD-2** Invite-code + cookie session now; OIDC deferred. `users.idp_subject` is nullable,
-  preserving a migration path. Lost-session recovery is admin-mediated: active
-  members can use RFC-024 help-signin codes, while removed members return
-  through a new invite under RFC-063.
+- **AD-2** Invite-code + cookie session now; OIDC deferred. The originally reserved
+  `users.idp_subject` (singleton, namespace-free) was rejected by RFC-080 §3.4 and
+  removed; external identity's migration path is `user_identities` (migration
+  0013), keyed on `(identity_namespace_id, subject_lookup)` so a subject is never
+  assumed to mean the same person across two namespaces. Lost-session recovery is
+  admin-mediated: active members can use RFC-024 help-signin codes, while removed
+  members return through a new invite under RFC-063.
 - **AD-3** Design to Workers Free (10 ms CPU). HMAC-SHA256 instead of slow KDFs.
   D1 queries and `fetch` are I/O (not CPU budget). No heavy crypto in hot paths.
 - **AD-4** One server-issued form token per render = CSRF protection + idempotency.
