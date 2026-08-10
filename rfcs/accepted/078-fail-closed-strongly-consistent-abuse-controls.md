@@ -1,7 +1,19 @@
 # RFC 078 — Fail-Closed Strongly Consistent Abuse Controls
 
 **Status.** Accepted — architecture-approved and owner-accepted 2026-07-23;
-implementation is authorized but has not started  
+**implemented and committed at `c991b82` on 2026-07-28**, including the required
+I-B1 concurrency-burst evidence. RFC-050 exact-candidate hosted evidence remains
+pending, so **B3 and all staging/public/production holds remain open** and this
+RFC stays in `accepted/` rather than moving to `done/`.
+
+*Corrected 2026-08-09.* This line previously read "implementation is authorized
+but has not started," which was false from 2026-07-28 onward. `rfcs/README.md`
+recorded the implementation correctly throughout; only this header was stale.
+Found during the Handoff 044 dead-code audit, which traced live enforcement on
+three request paths (`join.rs`, `relink.rs`, `community_create.rs`) through the
+`ABUSE_LIMITER` Durable Object binding — a security RFC reading "not started"
+while its controls were live is the kind of record that misleads exactly when it
+matters.  
 **Priority.** Architect-review remediation; blocks controlled hosted staging unless
 risk-accepted and blocks any public or production pilot  
 **Source finding.** 2026-07-14 architecture preparation review B3  

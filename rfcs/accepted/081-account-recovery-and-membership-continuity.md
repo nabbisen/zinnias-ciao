@@ -122,6 +122,36 @@ one small group would hold effective access to unrelated groups.
 
 This is the finding that most justifies Stage 2 existing.
 
+### 2.1a Correction, 2026-08-09 — this is live today, not only after RFC-080
+
+The paragraph above was drafted on the assumption that multi-community
+membership under one `users.id` arrives with RFC-080. **That is wrong, and the
+gap is already reachable.**
+
+- `workers/ssr/src/handlers/community_create.rs:195` passes **`&auth.user_id`** to
+  `create_with_first_admin`. A signed-in member who creates a community gains a
+  second membership under the **same** `users.id`.
+- `workers/ssr/src/authz.rs:40` resolves authorization as
+  `find_active(&auth.user_id, community_id)`. A session is scoped to a *user*,
+  never to a community, so it authorizes **every** active membership that user
+  holds.
+- Invite redemption does not produce this, because
+  `workers/ssr/src/handlers/join.rs:202` mints a fresh `user_id` per redemption.
+  Community creation is the path that does.
+
+**Preconditions for exploitation**, stated so severity is not overstated: a
+victim holds active memberships in two communities under one `users.id` (reached
+by creating a community while signed in to another); the attacker is an admin of
+one of those communities but not the other (reached via RFC-062 promotion); the
+attacker generates a relink or help-signin code and redeems it themselves rather
+than delivering it. The result is a session that reaches the community the
+attacker does not administer.
+
+It is not anonymously exploitable and it needs a specific sequence, but it needs
+no new code and no RFC-080. **§2.2's community binding is therefore a fix, not a
+precaution**, and it is sequenced first in the implementation slice plan for that
+reason.
+
 ### 2.2 The fix — capability, not just provenance
 
 RFC-080 adds session provenance. Provenance alone records *how* a session was
