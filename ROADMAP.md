@@ -314,6 +314,36 @@ RFC is.
    recovery, session, and lockout semantics before drafting an implementation
    RFC. This roadmap entry does not authorize an RFC or implementation.
 
+   **Hold-lift recorded — owner decision, 2026-08-09.** The gating sentence
+   above predates the 2026-07-29 amendment and contradicts this section's own
+   header: the freeze over this list was lifted, but this entry still told the
+   reader to wait for that same lift. It was written when the whole list was
+   frozen and was never reconciled. **The 2026-07-29 lift covers this track like
+   the rest of the list**, and this entry is selected as the active theme.
+
+   What that does **not** change. The consultation's own staging is unaffected:
+   Stage 0 (user research and provider due diligence) → Stage 1 (identity
+   foundation RFC, which chooses no provider) → Stage 2 (recovery and
+   membership-continuity policy) → Stage 3 (first provider rollout). Stages 1
+   and 2 must both be accepted before any provider rollout begins.
+
+   Still not authorized by this entry: an RFC number, any implementation, any
+   provider registration, secret provisioning, hosted callback, or external data
+   collection. B1, B3, B4, and B5 remain open; production, public-pilot, and
+   first-real-community deployment remain **No-Go**. Nothing here closes a
+   finding.
+
+   **Why now rather than after a pilot.** Adding external identity later would
+   require a first-link ceremony for every existing member, and the consultation
+   forbids treating an existing 30-day cookie as sufficient step-up for a
+   permanent external link — so it would mean a bounded migration ceremony for
+   legacy sessions with no provenance, on live data. Settling the foundation
+   before any real community joins avoids that entirely. That window closes when
+   the first one does.
+
+   Governing record:
+   `.git-exclude/reviewed/zinnias-ciao-main-2026-07-17-external-identity-pre-rfc-architect-consultation.md`
+
 2. **RFC-054: Japanese UX Copy Review**
    Recent releases added sensitive recovery and member-management flows. Copy
    quality is part of usability and safety, but the full native-speaker copy
