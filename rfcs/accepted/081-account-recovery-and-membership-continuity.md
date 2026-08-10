@@ -1,0 +1,333 @@
+# RFC 081 - Account Recovery and Membership Continuity
+
+**Status.** Accepted — owner-accepted 2026-08-09. Stage 2 of the external-identity
+track; companion and **prerequisite** to RFC-080. Both stages are now accepted,
+which is the precondition for a provider-independent implementation handoff.
+Provider rollout remains Stage 3 and still requires user research that does not
+exist. **Acceptance confers no implementation authority by itself** — see §12.
+
+**This RFC chooses no provider.** It does assume more than one will eventually
+exist, because the owner's recorded expectation is **Google Account and LINE, at
+least**, which makes linking a day-one concern rather than a later one.
+
+**Target release.** None. Design only.
+
+**Tracks.** Account recovery authority, session capability, membership
+continuity, schema. Amends **RFC-024** (admin-mediated relink), **RFC-063**
+(removal and re-add), and AD-2. Depends on RFC-080's identity and provenance
+model.
+
+**Touches.** `community_memberships` uniqueness, `sessions` capability scope,
+relink and help-signin authorization, a recovery-credential table, the audit
+inventory, member-facing recovery copy.
+
+---
+
+## Summary
+
+RFC-080 gives the application a stable principal. **This RFC makes that principal
+safe to have.**
+
+A stable `users.id` that spans communities breaks three things that are correct
+today only because identity is disposable: a community admin can mint a session
+that reaches every community the person belongs to; a removed member cannot come
+back as the same principal; and losing your only credential means losing the
+account with no path back that does not run through an admin.
+
+Each is a consequence of the same change, and none can be deferred past
+implementation.
+
+## Background — why today is fine and tomorrow is not
+
+**Today identity is disposable.** `workers/ssr/src/handlers/join.rs:202` mints a
+fresh `user_id` from `crypto::random_token()` on **every** invite redemption. The
+same human redeeming two invites becomes two principals with no relationship.
+
+That single fact is why the current design is coherent:
+
+- `UNIQUE(community_id, user_id)` at `migrations/0001_initial.sql:29` is never
+  violated by a removed-then-returning member, because the returning member is a
+  new `user_id`.
+- A relink session minted by a community admin authorizes "every membership of
+  this user" — which today is, in practice, one.
+- Losing a credential loses one community's membership, not an account.
+
+**RFC-080 removes that fact.** Once a returning person resolves to the *same*
+`users.id`, all three become live problems simultaneously. This RFC settles them
+before, not after.
+
+RFC-024 anticipated this in its own text: *"Any future multi-community identity
+or OIDC RFC must revisit this recovery flow before a single `user_id`…"* — this
+is that revisit.
+
+## 1. Membership continuity — amending RFC-063
+
+### 1.1 The constraint
+
+RFC-063's accepted direction is **Option A: removal only; re-add creates a new
+membership.** With a stable principal, `UNIQUE(community_id, user_id)` makes that
+impossible: the removed row still occupies the pair.
+
+The three ways out, and why two are rejected:
+
+| Option | Verdict |
+|---|---|
+| Reactivate the removed membership | **Rejected.** Restores history and role silently; RFC-063 explicitly excluded reactivation, and removal must mean removal. |
+| Give the returning person a new `user_id` | **Rejected.** Defeats RFC-080 entirely and splits one human's identity per removal. |
+| Allow historical rows; require at most one *active* membership per pair | **Accepted.** |
+
+### 1.2 The replacement
+
+Drop the table constraint; add a partial unique index:
+
+```sql
+CREATE UNIQUE INDEX idx_memberships_one_active_per_user
+    ON community_memberships(community_id, user_id)
+    WHERE removed_at IS NULL;
+```
+
+The invariant becomes **at most one active membership per (community, user)**,
+with any number of removed historical rows. SQLite enforces partial unique
+indexes natively, so this is an index swap, not application-level checking.
+
+### 1.3 The policy that goes with it
+
+- A returning recognized person receives a **new membership row under the same
+  `users.id`**.
+- The removed membership stays removed and **keeps its historical attendance and
+  notes**. Nothing is merged, reassigned, or recomputed.
+- No removed membership is reactivated. Re-entry requires a **valid invite**,
+  exactly as it does today — recognition is not admission.
+- Attendance and note history stays attached to the membership that produced it,
+  so a member who left and returned sees a fresh history in that community.
+
+**Owner decision (1).** Does a returning member see their prior history in that
+community? This RFC says **no** — history belongs to the membership, and a
+removal was a real boundary. The alternative is a display-layer join across a
+user's memberships, which is a product decision with privacy consequences: an
+admin who removed someone would see the prior history reattach itself.
+
+## 2. Community-admin authority — the load-bearing correction
+
+### 2.1 What is wrong once identity is stable
+
+`membership_relink_codes` (`migrations/0008`) is community-scoped: it carries
+`community_id`, `membership_id`, and `created_by_membership_id`. But the session
+it mints is **account-wide** — `sessions.user_id` is the only scope a session
+has.
+
+So with a stable principal, **any single community admin could mint a session
+that authorizes every community that person belongs to.** A volunteer admin of
+one small group would hold effective access to unrelated groups.
+
+This is the finding that most justifies Stage 2 existing.
+
+### 2.2 The fix — capability, not just provenance
+
+RFC-080 adds session provenance. Provenance alone records *how* a session was
+made; it does not constrain what the session may reach. This RFC adds the
+constraint.
+
+**A relink- or help-signin-derived session is bound to the granting community.**
+It carries that `community_id`, and authorization refuses any membership outside
+it. Concretely such a session may not:
+
+- reach any community other than the granting one;
+- link, unlink, or replace an external identity;
+- add, remove, or view recovery credentials; or
+- elevate itself by any means short of a fresh first-class authentication.
+
+An admin-mediated recovery therefore restores **access to that admin's
+community** and nothing else — which is the authority a community admin actually
+has, expressed in the session model rather than assumed by absence.
+
+**Owner decision (2).** Two ways to express this: bind the session to the
+community (recommended, and the smaller change given provenance already exists),
+or split sessions into account-level and community-level kinds. The second is
+cleaner in the abstract and a much larger change to shipped code. This RFC
+proposes the first.
+
+## 3. Provider-independent recovery
+
+AD-2 requires no external-account hard wall, so a provider-independent path must
+exist and must remain usable — **"recovery-only" must not mean "hidden until an
+emergency and then unusable."**
+
+### 3.1 The baseline: a member-held recovery credential
+
+At first identity link, the member is issued a **single-use account recovery
+code**, shown once, stored as an HMAC exactly like invite and relink codes
+(AD-3). It authenticates the principal at account level, independent of any
+provider.
+
+Properties: single-use; regenerable from an authenticated first-class session;
+its existence visible in account settings so the member knows it exists; and
+never recoverable by an admin, since that would reintroduce §2's problem.
+
+### 3.2 The natural second method
+
+Once a member has linked **two** providers — the expected Google Account and LINE
+case — each is a recovery path for the other, and directive 10's "at least one
+other verified usable method" is satisfied without the member holding anything.
+
+This is why linking is a day-one concern: with two expected providers, the good
+recovery story is available immediately, but only if linking is designed now.
+
+### 3.3 Final-credential unlink is prohibited
+
+Unlink requires recent step-up, explicit confirmation, **at least one other
+verified usable authentication or recovery method**, a required audit, and
+revocation or rotation of affected sessions. A member may not remove their last
+way in.
+
+**Owner decision (3).** Is a one-time code shown once acceptable for this
+audience? For low-technology-familiarity members it is a known failure point —
+people lose it. The alternatives are worse for this product (email needs an
+address we deliberately do not collect; admin-held recovery reintroduces §2), but
+the copy and the moment of issuance need care, and it is a genuine product risk
+rather than a technical one.
+
+## 4. Linking, with two providers expected from the start
+
+A verified identity that resolves to no `user_id` is **never** auto-attached to
+an existing principal — not by email, name, avatar, phone, or provider group
+(RFC-080 §7). So a member with both a Google Account and LINE becomes two
+principals unless linking is explicit.
+
+The flow: from an authenticated first-class session, in account settings, the
+member starts a `link` transaction (RFC-080 §5); a fresh provider
+authentication in a fresh OIDC transaction; a purpose-bound, user-bound,
+single-use link token; uniqueness rejection if that identity is already attached
+elsewhere; a required audit; session rotation and revocation of others.
+
+A collision — the identity already belongs to another principal — **fails closed
+with generic copy** that does not disclose account existence. No merge. A member
+who has genuinely created two accounts needs a future merge RFC, which remains
+out of scope.
+
+## 5. Legacy sessions at cutover
+
+Every session existing at implementation time predates provenance. RFC-080
+forbids treating a 30-day cookie as sufficient step-up for a permanent link.
+
+The ceremony: sessions without provenance are treated as **lowest assurance**;
+they may continue ordinary community use, but any account-level operation —
+first link, recovery-credential issuance, unlink — requires a fresh first-class
+authentication. Since the only first-class authentication before providers exist
+is invite redemption, in practice a member links from a session created after
+cutover, or through a bounded, audited admin-assisted path that §2 already
+constrains to one community.
+
+**Owner decision (4).** Whether to expire all pre-cutover sessions at
+implementation instead. That is cleaner and forces every member through one
+re-authentication — a real cost for a volunteer community, and only worth it if a
+pilot has begun. If no real community has used the service by then, this decision
+is free, which is another argument for doing the identity track before a pilot.
+
+## 6. Account with no active memberships
+
+A recognized principal with no active membership reaches a **minimal account
+surface only**: view and manage linked identities, manage recovery credentials,
+delete the account. No community data, no member lists, no event data, no
+disclosure of which communities exist or once existed.
+
+## 7. Provider loss or compromise
+
+- **Provider outage:** existing application sessions survive; new sign-ins and
+  links fail closed (RFC-080 §5.2).
+- **Verified provider compromise, account disable, or invalid Apple transfer
+  state:** revoke all local sessions for the affected principal.
+- **Provider logout alone** does not revoke local sessions unless a
+  provider-specific contract requires it.
+- **A member losing access to their provider account** uses the §3 recovery
+  credential or a second linked identity. There is no admin path to account-level
+  recovery — by design, per §2.
+
+## 8. Audit
+
+Extending RFC-080's additions, all Class A: recovery credential issued,
+regenerated, or consumed; identity link rejected for collision; admin-derived
+session refused an account-level operation.
+
+The last one is deliberately audited on *refusal*. A community admin attempting an
+account-level operation is the exact misuse §2 exists to prevent, and it should be
+visible rather than merely blocked.
+
+Standard prohibitions carry over: no raw subject, issuer, email, token, code,
+`nonce`, `state`, PKCE material, or session ID in metadata.
+
+## 9. Member-facing copy
+
+Recovery, collision, and cancellation copy is plain Japanese and must not
+disclose account existence, which provider is linked, invite validity, or any
+internal identifier. It must not present the provider-independent path as
+second-class — no dark pattern favouring provider adoption (consultation §UX
+direction).
+
+Copy quality here overlaps RFC-054's scope; the two should be reviewed together
+if RFC-054 runs first.
+
+## 10. Acceptance criteria
+
+1. `UNIQUE(community_id, user_id)` replaced by a partial unique index on
+   `removed_at IS NULL`; historical removed rows permitted.
+2. A returning recognized person gets a new membership under the same `users.id`;
+   no reactivation; prior history stays on the removed membership; a valid invite
+   is still required.
+3. Relink- and help-signin-derived sessions are bound to the granting community
+   and refused every account-level operation, enforced and tested.
+4. A provider-independent recovery credential exists, is member-held, is visible
+   in account settings, and is never admin-recoverable.
+5. Final-credential unlink is impossible; unlink requires step-up, another usable
+   method, audit, and revocation.
+6. Linking is explicit, step-up-gated, collision-safe, and never automatic.
+7. Legacy sessions are lowest-assurance and cannot perform account-level
+   operations.
+8. A principal with no active membership reaches only the minimal account
+   surface.
+9. Audit inventory extended, including the refusal case; `AuditAction::ALL`
+   updated.
+10. All routes work with no application JavaScript.
+
+## 11. Owner decisions carried in this RFC
+
+**Resolved by acceptance, 2026-08-09** — each was drafted with a stated position,
+and acceptance adopts it:
+
+1. **§1.3** — returning members do **not** see prior community history; history
+   stays attached to the removed membership.
+2. **§2.2** — relink- and help-signin-derived sessions are **bound to the
+   granting community**, rather than sessions being split into account-level and
+   community-level kinds.
+3. **§3.3** — a **one-time member-held recovery code** is the provider-independent
+   baseline. Recorded as carrying real product risk for
+   low-technology-familiarity members: people lose one-time codes. The
+   alternatives were rejected as worse for this product, not as risk-free.
+
+**Still open — no default was drafted:**
+
+4. **§5 — whether to expire all pre-cutover sessions at implementation.** This is
+   deliberately deferred to implementation time, because its answer depends on a
+   fact not yet known: **whether any real community has used the service by
+   then.**
+
+   The decision trigger, for whoever writes the implementation handoff:
+
+   - **No real community has used the service** → expire all pre-cutover
+     sessions. The cost is zero and it removes the legacy-assurance class
+     entirely, so §5's ceremony never has to run.
+   - **A real community has used the service** → keep §5's ceremony; forcing every
+     member of a volunteer community through re-authentication is a real cost that
+     needs owner sign-off at that moment.
+
+   This must be answered explicitly in the implementation handoff, not assumed.
+
+## 12. What acceptance does not authorize
+
+No implementation, provider selection, registration, secret provisioning, hosted
+callback, or deployment. B1, B3, B4, and B5 remain open; production,
+public-pilot, and first-real-community deployment remain **No-Go**.
+
+Acceptance of **both** this RFC and RFC-080 is the precondition for an
+implementation handoff — and even then, provider rollout is Stage 3 and requires
+the user research that does not yet exist.

@@ -341,13 +341,30 @@ RFC is.
    before any real community joins avoids that entirely. That window closes when
    the first one does.
 
-   **Stage 1 accepted 2026-08-09** — RFC-080 *External Identity Foundation*, in
-   `rfcs/accepted/`. It chooses no provider and confers no implementation
-   authority. Stage 2 (recovery and membership continuity) is next and must be
-   accepted before implementation begins. Owner expectation for eventual
-   providers, recorded 2026-08-09: **Google Account and LINE, at least** — which
-   makes account linking a day-one concern rather than a later one, since one
-   person may hold both and auto-linking by email or name is prohibited.
+   **Stages 1 and 2 accepted 2026-08-09** — RFC-080 *External Identity
+   Foundation* and RFC-081 *Account Recovery and Membership Continuity*, both in
+   `rfcs/accepted/`. Neither chooses a provider. Together they meet the
+   precondition for a **provider-independent** implementation handoff, testable
+   against a local fake issuer with no provider account, no secrets, and no
+   network. **Stage 3 (first provider rollout) still requires the Stage 0 user
+   research, which does not exist.**
+
+   RFC-081 amends two shipped RFCs: **RFC-024** (relink and help-signin sessions
+   become bound to the granting community, because a stable `users.id` would
+   otherwise let one community admin mint a session reaching every community that
+   person belongs to) and **RFC-063** (`UNIQUE(community_id, user_id)` becomes a
+   partial unique index on `removed_at IS NULL`, so a removed member can return as
+   the same principal without reactivating the old membership).
+
+   Owner expectation for eventual providers, recorded 2026-08-09: **Google Account
+   and LINE, at least** — which makes account linking a day-one concern rather
+   than a later one, since one person may hold both and auto-linking by email or
+   name is prohibited.
+
+   **One open owner decision**, deliberately deferred: whether to expire all
+   pre-cutover sessions at implementation (RFC-081 §11.4). Its answer depends on
+   whether a real community has used the service by then — free if not, a real
+   cost if so. To be answered in the implementation handoff, not assumed.
 
    Governing records:
    `.git-exclude/reviewed/zinnias-ciao-main-2026-07-17-external-identity-pre-rfc-architect-consultation.md`,
