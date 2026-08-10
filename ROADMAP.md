@@ -341,8 +341,17 @@ RFC is.
    before any real community joins avoids that entirely. That window closes when
    the first one does.
 
-   Governing record:
-   `.git-exclude/reviewed/zinnias-ciao-main-2026-07-17-external-identity-pre-rfc-architect-consultation.md`
+   **Stage 1 accepted 2026-08-09** — RFC-080 *External Identity Foundation*, in
+   `rfcs/accepted/`. It chooses no provider and confers no implementation
+   authority. Stage 2 (recovery and membership continuity) is next and must be
+   accepted before implementation begins. Owner expectation for eventual
+   providers, recorded 2026-08-09: **Google Account and LINE, at least** — which
+   makes account linking a day-one concern rather than a later one, since one
+   person may hold both and auto-linking by email or name is prohibited.
+
+   Governing records:
+   `.git-exclude/reviewed/zinnias-ciao-main-2026-07-17-external-identity-pre-rfc-architect-consultation.md`,
+   `.git-exclude/research/2026-08-09-stage0-provider-due-diligence.md`
 
 2. **RFC-054: Japanese UX Copy Review**
    Recent releases added sensitive recovery and member-management flows. Copy
