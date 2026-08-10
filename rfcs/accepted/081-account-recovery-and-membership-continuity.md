@@ -90,6 +90,52 @@ The invariant becomes **at most one active membership per (community, user)**,
 with any number of removed historical rows. SQLite enforces partial unique
 indexes natively, so this is an index swap, not application-level checking.
 
+### 1.2a Correction, 2026-08-10 — "an index swap" was wrong; the method changed
+
+**The invariant above is unchanged and remains the accepted design.** How it is
+reached changed, because the stated method turned out to be impossible under D1.
+
+`UNIQUE(community_id, user_id)` is a **table-level constraint**
+(`migrations/0001_initial.sql:29`), not a droppable index, so replacing it
+requires rebuilding `community_memberships` — which has **8 dependent tables
+across 11 foreign-key columns**. Under D1 that rebuild cannot be performed.
+Handoff 051 escalated it as a stop condition, and the following were each tested
+and ruled out rather than assumed:
+
+| Mechanism | Result |
+|---|---|
+| `PRAGMA foreign_keys = OFF` | D1 runs every statement in an implicit transaction; the pragma is a documented no-op there and does not persist across calls |
+| `PRAGMA defer_foreign_keys = ON` | Cloudflare's documented substitute. Fails at commit — **reproduced in plain SQLite 3.53**, so this is SQLite semantics, not a D1 quirk: dropping the parent leaves a deferred violation that re-creating the name does not clear |
+| `PRAGMA legacy_alter_table = ON` | Verified set (`=1`); SQLite 3.53 still rewrites dependants' FK text on rename, so the old table cannot be orphaned |
+| `DROP INDEX sqlite_autoindex_…` | *"index associated with UNIQUE or PRIMARY KEY constraint cannot be dropped"* |
+| Explicit `BEGIN`/`COMMIT` | D1 refuses raw SQL transaction control outright |
+
+The conclusion is general: **under D1, a table with dependent rows cannot be
+dropped.** This equally blocks RFC-080 §3.4's `users.idp_subject` drop, since
+`users` has three dependants with rows.
+
+**Accepted method, owner decision 2026-08-10: re-baseline the initial schema.**
+Because the service has never been deployed — no database outside a developer's
+machine has ever applied these migrations, confirmed by the owner — the initial
+migration is corrected at source rather than migrated forward:
+`community_memberships` is created without the table-level `UNIQUE` and with the
+partial index; `users` is created without `idp_subject`. Developers reset their
+local database. No `0014` exists.
+
+**This is a one-time exception with a hard boundary**, recorded in `ROADMAP.md`:
+**migration immutability begins at first deployment.** It must not be cited as
+precedent afterwards, when the same edit would silently diverge every deployed
+database from the migration history.
+
+Two options were rejected. **Reactivation** — making `removed_at` reversible —
+was rejected as permanently lossy: once a row has been un-removed, nothing can
+reconstruct which stint an attendance belonged to, or whether someone was a
+member on a given date. **Rebuilding the dependent graph** was rejected as
+disproportionate: the recursion reaches most of the schema with the authorization
+table at its centre. The reversibility that made reactivation tempting is
+supplied instead by RFC-082's suspension state, which is additive and needs none
+of this.
+
 ### 1.3 The policy that goes with it
 
 - A returning recognized person receives a **new membership row under the same

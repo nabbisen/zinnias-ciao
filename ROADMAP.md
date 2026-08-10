@@ -64,6 +64,26 @@ candidate of that day — which will be later than today's tree. The tooling is
 committed and gated, so drift is detectable, but the campaign is not
 transferable evidence from an earlier commit.
 
+### Migration immutability begins at first deployment — owner decision 2026-08-10
+
+Migrations are normally append-only, because a committed migration has already
+run somewhere you cannot reach. **That premise does not hold yet.** The service
+has never been deployed; no database outside a developer's machine has ever
+applied any migration in this repository.
+
+So, once and only once: **the initial schema may be corrected at source rather
+than migrated forward.** This was decided to reach RFC-081 §1's membership
+invariant, which is unreachable under D1 by migration — see RFC-081 §1.2a for
+the five mechanisms tested and rejected. The cost is that every developer resets
+their local database (`bun run reset:dev`).
+
+**The exception expires at first deployment and must not be cited afterwards.**
+From that moment a committed migration has run somewhere unreachable, editing one
+silently diverges every deployed database from its history, and the only correct
+move is a forward migration — however inconvenient.
+
+Anyone reading this after a deployment has happened: the answer is no.
+
 ### Tagging is not deploying — clarified 2026-07-30
 
 The hold amendment separated **source remediation** from **hosted evidence** for
