@@ -1192,3 +1192,85 @@ handoff's own §9 was never possible.
       zero CSP violations, across all eleven. Digest gate passes without a
       re-pin (bundle unchanged at 28.4kb). *(evidence
       `.git-exclude/tmp/handoff049-proofs/`)*
+
+## Identity schema and namespaces (Handoff 050, external-identity Slice 2)
+
+Purely additive: two new tables nothing reads yet, and a digest helper with
+no caller yet. No route, handler, or `authz.rs` change — RFC-081 §2's
+authorization boundary (Slices 0–1) is untouched by this package.
+
+- [x] Migration `0013_identity_namespaces.sql`: **no `ALTER TABLE` on any
+      existing table.** Creates `identity_namespaces` (RFC-080 §3.2 — an
+      immutable record of a reviewed provider registration: provider kind,
+      issuer, audience, subject scope, environment, created-at) and
+      `user_identities` (RFC-080 §3.3, `UNIQUE(identity_namespace_id,
+      subject_lookup)` — not the subject alone, not email). Seeds exactly
+      one row: the `local_fake` namespace. No production or staging
+      namespace exists.
+- [x] `users.idp_subject` untouched — not populated, not referenced, not
+      commented on. Per Handoff 050 §3, dropping it moves to Slice 3: SQLite
+      refuses `DROP COLUMN` on a `UNIQUE` column, so removing it requires a
+      full table rebuild with FK handling for `community_memberships` and
+      `sessions` — the same table-rebuild shape Slice 3 already needs for
+      `community_memberships`' `UNIQUE(community_id, user_id)`, so both
+      rebuilds land in one reviewed package instead of two.
+- [x] `crypto::subject_lookup` — a keyed digest (`hmac_hex` with the
+      existing pepper, AD-3/RFC-077; no second hashing path). The subject
+      is treated as opaque and case-sensitive: no normalisation, no
+      lowercasing. Four unit tests: deterministic for the same input;
+      different pepper gives a different digest; a case difference gives a
+      **different** digest (proves no normalisation); the raw subject
+      never appears in the 64-hex-char output.
+- [x] `db/identity.rs`: one row type, one lookup by
+      `(identity_namespace_id, subject_lookup)` — nothing beyond what
+      Slice 4's authentication callback will immediately use. Both it and
+      `crypto::subject_lookup` carry an **item-level**
+      `#[allow(dead_code)]` naming Slice 4 as the arriving caller. No
+      module-wide `#![allow(dead_code)]` added anywhere in the crate —
+      confirmed by grep, zero real occurrences (the only three matches are
+      comments referencing the *absence* of one, from Handoffs 044–046).
+- [x] **§5.4 decided: `list_active_for_user` given the same required
+      `scope_community_id` parameter** `list_communities_for_user` gained
+      in Handoff 049, not left as a documented exception. It was a second
+      enumeration of the same fact, safe only because `home.rs` happened to
+      branch around its one scope-sensitive consumer — a future caller
+      would have had no such protection. Both of `home.rs`'s call sites
+      updated; neither needed behavioural change (`redirect_to_home` and
+      `get_home`'s `is_first_run` count both already avoided calling it at
+      all for a bound session, which remains the cheaper choice over
+      calling the now-scoped version).
+- [x] New gate, `rfc080_identity_namespaces_are_never_created_outside_a_migration`:
+      unlike the two session-minting gates, this one has **no exceptions
+      table** — every `INSERT INTO identity_namespaces` under
+      `workers/ssr/src` is unconditionally wrong, since RFC-080 §3.2
+      requires namespaces to come from a migration or reviewed
+      configuration only. Proven firing: a temporary insert added to
+      `db/identity.rs` failed the gate as expected, removed and
+      `cmp`-verified byte-identical. Both prior gates
+      (`rfc081_session_minting_sites_are_enumerated_and_set_a_provenance`,
+      `handoff049_smoke_session_fixtures_all_set_a_provenance`)
+      re-confirmed still passing, untouched by this package.
+- [x] `cargo test --workspace`: **520 → 525** — one new gate test, four new
+      digest unit tests, both accounted for. Clippy (`-D warnings`, no new
+      module-wide allow), fmt, wasm check, `mdbook build docs`,
+      `git diff --check`, `bun run build` all pass clean. Migration proven
+      both ways: applied to a fresh dev database, and applied to one
+      already at 0012.
+- [x] **All eleven smokes green, unchanged** — the expected result for a
+      purely additive package: nothing reads the new tables yet, so nothing
+      should have moved. Digest gate passes without a re-pin. *(evidence
+      `.git-exclude/tmp/handoff050-proofs/`)*
+- [x] **Review correction**: `crypto::subject_lookup` now mixes
+      `identity_namespace_id` into the digest input (with a `\u{1f}`
+      unit-separator against concatenation collisions), not `subject`
+      alone. RFC-080 §3.1 requires that two different namespaces never be
+      inferable as the same person; without the namespace in the input,
+      the same subject linked under two namespaces (an *expected* state —
+      §7 forbids auto-linking, §12 puts merge out of scope) would have
+      produced an identical digest. Since the raw subject is never stored,
+      this had to be correct before the first `user_identities` row is
+      ever linked — the table is still empty, so the fix was free. Fifth
+      unit test added: the same subject under two different namespaces
+      produces different digests. `cargo test --workspace`: **525 → 526**.
+      Clippy, fmt, wasm check, `mdbook build docs`, `git diff --check`,
+      `bun run build` re-confirmed clean; digest gate without a re-pin.

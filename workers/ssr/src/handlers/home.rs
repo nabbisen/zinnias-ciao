@@ -20,7 +20,12 @@ pub async fn redirect_to_home(req: Request, env: &Env, _rid: &str) -> Result<Res
         scope
     } else {
         let db = env.d1("DB")?;
-        let memberships = membership_db::list_active_for_user(&db, &auth.user_id).await?;
+        let memberships = membership_db::list_active_for_user(
+            &db,
+            &auth.user_id,
+            auth.scope_community_id.as_deref(),
+        )
+        .await?;
         if memberships.is_empty() {
             return render::session_expired();
         }
@@ -48,13 +53,11 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
     // unconditional call already returns just the granting community for a
     // bound session — the hand-built single-element summary from Handoff
     // 048 is gone. `list_active_for_user` (used only for the `is_first_run`
-    // count below) has no scope parameter — that is out of this slice's
-    // §4.2, which named `list_communities_for_user` specifically — so
-    // calling it unfiltered would leak cross-community membership *count*
-    // through the first-run-vs-no-events wording choice. It is still
-    // called only for unscoped sessions; a bound session's count is
-    // definitionally 1 (`require_membership` above already proved exactly
-    // this one community), so no query is needed for that case at all.
+    // count below) gained the same required scope parameter in Handoff 050
+    // §5.4. A bound session's count is still hardcoded to `1` here rather
+    // than calling the now-scoped function — `require_membership` above
+    // already proved exactly this one community, so a query would be
+    // redundant, not merely safe.
     let community_summaries = membership_db::list_communities_for_user(
         &db,
         &auth.user_id,
@@ -64,7 +67,7 @@ pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) ->
     let membership_count = if auth.scope_community_id.is_some() {
         1
     } else {
-        membership_db::list_active_for_user(&db, &auth.user_id)
+        membership_db::list_active_for_user(&db, &auth.user_id, auth.scope_community_id.as_deref())
             .await?
             .len()
     };

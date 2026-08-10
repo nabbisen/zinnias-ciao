@@ -97,6 +97,39 @@ pub fn hmac_hex(pepper: &str, value: &str) -> String {
     hex::encode(mac.finalize().into_bytes())
 }
 
+/// The `user_identities.subject_lookup` keyed digest (RFC-080 §3.3, Handoff
+/// 050 §5.2, corrected per the Slice 2 review's required fix). A D1 export
+/// must not become a cross-system correlation list keyed on provider
+/// identifiers — an unkeyed hash would not prevent that (a plain SHA-256 of
+/// a subject is trivially reversible by anyone holding the same subject),
+/// so this exists only to route through the existing pepper rather than
+/// introduce a second hashing path. `subject` is opaque and case-sensitive:
+/// no normalisation, no lowercasing, no trimming. "Helpfully" normalising
+/// an OIDC subject would merge two distinct people.
+///
+/// `identity_namespace_id` is mixed into the digest input, not just
+/// `subject`: RFC-080 §3.1 says two different namespaces must never be
+/// inferred to identify the same person, but without the namespace in the
+/// input, the same provider subject linked under two namespaces (a
+/// production/staging pair for the same client, or two client
+/// registrations where the subject is stable across both — an expected
+/// state, since §7 forbids auto-linking and §12 puts merge out of scope)
+/// would produce the identical digest, making that inference free to
+/// anyone holding a database export. The raw subject is never stored, so
+/// this must be right before the first row is ever linked — there is
+/// nothing to recompute a different digest from afterward. The `\u{1f}`
+/// (ASCII unit separator, never a legal character in an OIDC namespace id
+/// or subject) prevents `("ns1", "abc")` and `("ns1a", "bc")` from
+/// colliding.
+///
+/// No caller yet (Handoff 050 §5.3): Slice 4's authentication callback is
+/// the first caller, computing this digest from a verified provider
+/// subject before passing it to `db::identity::find_by_subject_lookup`.
+#[allow(dead_code)] // Slice 4: the authentication callback (RFC-080 §5).
+pub fn subject_lookup(pepper: &str, identity_namespace_id: &str, subject: &str) -> String {
+    hmac_hex(pepper, &format!("{identity_namespace_id}\u{1f}{subject}"))
+}
+
 /// Constant-time comparison of equal-length strings.
 pub fn constant_time_eq(a: &str, b: &str) -> bool {
     if a.len() != b.len() {

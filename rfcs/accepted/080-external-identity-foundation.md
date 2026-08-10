@@ -196,10 +196,41 @@ Uniqueness is `(identity_namespace_id, subject_lookup)` — **not** email, not a
 provider label, not the subject alone. Two different namespaces never identify
 the same person, and the implementation must not infer that they do.
 
-**`subject_lookup` is a keyed digest** of the provider subject, using the existing
-HMAC pepper discipline (AD-3, RFC-077). Rationale: a D1 export must not become a
-cross-system correlation list keyed on provider identifiers. Treat the subject as
-opaque and case-sensitive before digesting.
+**`subject_lookup` is a keyed digest** of the **identity namespace and** the
+provider subject together, using the existing HMAC pepper discipline (AD-3,
+RFC-077). Rationale: a D1 export must not become a cross-system correlation list
+keyed on provider identifiers. Treat the subject as opaque and case-sensitive
+before digesting, and separate the namespace from the subject with an
+unambiguous delimiter so that `("ns1", "abc")` and `("ns1a", "bc")` cannot
+collide.
+
+**Corrected 2026-08-09 → owner-accepted 2026-08-10.** This paragraph previously
+read "a keyed digest **of the provider subject**," with no namespace input.
+Handoff 050 implemented that faithfully, and the Slice 2 review found the
+consequence: the same provider subject appearing in two namespaces would produce
+**identical** digests, which contradicts §3.1's own rule that the implementation
+must not infer that two namespaces identify the same person. With identical
+digests that inference is not merely available — it is free to anyone holding an
+export.
+
+The case that matters is narrow and worth stating precisely. Where both rows
+belong to the same `users.id`, the `user_id` column already reveals the linkage
+and the digest adds nothing. The case the correction addresses is **the same
+subject under two different `users.id`** — an *expected* state, because §7
+forbids auto-linking and §12 puts merge out of scope. Two accounts for one person
+is a state this design deliberately permits; identical digests would turn it into
+a visible fact.
+
+**Why this was corrected before implementation rather than after.** The raw
+subject is deliberately never stored, so once `user_identities` holds a single
+row there is nothing left to recompute a different digest from. The derivation
+freezes permanently at the first link. The correction was free while the table
+was empty and would have been impossible afterwards.
+
+**Severity, recorded honestly:** this is privacy hardening, not a vulnerability.
+The pepper already prevents *cross-system* correlation, which is this paragraph's
+primary stated goal and held under either derivation. The namespace input adds
+prevention of *intra-export* linkage across namespaces.
 
 If a future provider lifecycle operation genuinely requires the raw subject —
 Apple's `transfer_sub` exchange is the known candidate — the **provider RFC** must

@@ -4942,6 +4942,7 @@ fn rfc079_package7_removal_and_documentation_boundary_are_pinned() {
         "0010_audit_integrity.sql",
         "0011_membership_ui_language.sql",
         "0012_session_provenance.sql",
+        "0013_identity_namespaces.sql",
     ];
     assert_eq!(
         migration_filenames, expected_migration_filenames,
@@ -5560,5 +5561,45 @@ fn handoff049_smoke_session_fixtures_all_set_a_provenance() {
          provenance = 'invite_redemption' on the fixture (these all simulate a member who \
          joined by redeeming an invite):\n{}",
         missing.join("\n")
+    );
+}
+
+/// RFC-080 §3.2 (Handoff 050 §6): namespaces are created by migration or
+/// reviewed configuration, **never at runtime from a token** — that is the
+/// whole point of a namespace being a reviewed provider registration
+/// rather than something a callback can mint on the fly. Unlike the two
+/// session-minting gates above, there is no legitimate application-code
+/// site to name: every occurrence of `INSERT INTO identity_namespaces`
+/// under `workers/ssr/src` is unconditionally wrong. Default-fail with no
+/// exceptions table.
+#[test]
+fn rfc080_identity_namespaces_are_never_created_outside_a_migration() {
+    let mut files = Vec::new();
+    walk_rs_files(&workers_ssr_src_dir(), &mut files);
+    let src_dir = workers_ssr_src_dir();
+    let mut offenders: Vec<String> = Vec::new();
+
+    for path in &files {
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        if content.contains("INSERT INTO identity_namespaces") {
+            let rel = path
+                .strip_prefix(&src_dir)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .replace('\\', "/");
+            offenders.push(rel);
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "found `INSERT INTO identity_namespaces` under workers/ssr/src in: {} — RFC-080 §3.2 \
+         requires every namespace to come from a migration or reviewed configuration, never \
+         from application code at request time. A namespace minted from a token would let a \
+         request forge the reviewed-registration guarantee this table exists to provide. If \
+         this is genuinely needed, that is a stop condition (Handoff 050 §14), not something \
+         to except here.",
+        offenders.join(", ")
     );
 }

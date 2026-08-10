@@ -142,10 +142,34 @@ pub async fn find_active_by_id(
     }))
 }
 
-/// All active memberships for a user (for the communities list / session boot).
-pub async fn list_active_for_user(db: &D1Database, user_id: &str) -> Result<Vec<MembershipRow>> {
-    let rows = db
-        .prepare(
+/// All active memberships for a user (for the communities list / session
+/// boot).
+///
+/// RFC-081 §2 (Handoff 050 §5.4, carried from the Slice 1 review):
+/// `scope_community_id` is required, not optional with a default, for the
+/// same reason `list_communities_for_user` gained one in Handoff 049 — a
+/// second enumeration of the same fact must not become a side door a
+/// future caller can reach without thinking about session scope. `Some(id)`
+/// restricts the result to that one community; `None` (a first-class,
+/// unscoped session) returns every active membership, as before.
+pub async fn list_active_for_user(
+    db: &D1Database,
+    user_id: &str,
+    scope_community_id: Option<&str>,
+) -> Result<Vec<MembershipRow>> {
+    let rows = if let Some(scope) = scope_community_id {
+        db.prepare(
+            "SELECT id, community_id, role \
+             FROM community_memberships \
+             WHERE user_id = ?1 AND removed_at IS NULL AND community_id = ?2 \
+             ORDER BY joined_at ASC",
+        )
+        .bind(&[user_id.into(), scope.into()])?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?
+    } else {
+        db.prepare(
             "SELECT id, community_id, role \
              FROM community_memberships \
              WHERE user_id = ?1 AND removed_at IS NULL \
@@ -154,7 +178,8 @@ pub async fn list_active_for_user(db: &D1Database, user_id: &str) -> Result<Vec<
         .bind(&[user_id.into()])?
         .all()
         .await?
-        .results::<serde_json::Value>()?;
+        .results::<serde_json::Value>()?
+    };
 
     Ok(rows
         .into_iter()

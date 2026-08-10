@@ -8,6 +8,7 @@ pub mod event_note;
 pub mod event_series;
 pub mod event_template;
 pub mod event_write;
+pub mod identity;
 pub mod invite;
 pub mod membership;
 pub mod relink;
