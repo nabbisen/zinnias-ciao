@@ -1041,3 +1041,154 @@ a future unread-field warning means something again.
       them — the guard against a column reaching a page by a route the
       compiler couldn't see. *(evidence
       `.git-exclude/tmp/handoff046-proofs/`)*
+
+## Session provenance and community binding (Handoff 048, RFC-081 §2/§2.1a — external-identity Slice 1)
+
+Closes a live gap, not preparation for future work: `authz.rs` previously
+resolved authorization from `(auth.user_id, community_id)` alone, so a
+relink- or help-signin-derived session — grantable by a single community's
+admin — authorized *every* community that `user_id` belonged to, not just
+the granting one. `handlers/community_create.rs` reusing `auth.user_id` for
+a signed-in member's second community is what puts one `user_id` in more
+than one community and makes the gap reachable. Invite redemption always
+mints a fresh `user_id`, so joining never produced this gap.
+
+- [x] **§3 re-enumerated before starting**: exactly two session-minting
+      sites (`db/invite.rs` invite redemption, `db/relink.rs` relink
+      redemption) and exactly two relink-issuing paths
+      (`handlers/admin/help_signin.rs`, `handlers/operator.rs`, RFC-069),
+      both landing in the same redemption. No third site found.
+- [x] **Migration `0012_session_provenance.sql`**: adds `provenance TEXT`
+      (nullable in schema — a `NOT NULL DEFAULT` would stamp legacy rows
+      with a provenance they never had) and `scope_community_id TEXT
+      REFERENCES communities(id)` to `sessions`, then revokes every
+      pre-existing session row outright. Per RFC-081 §11.4: as of this
+      migration no real community has used the service (deployment remains
+      No-Go), so there is no legacy-assurance session class to preserve —
+      the cheap answer applies.
+- [x] The two minting sites now set `provenance`: `'invite_redemption'`
+      (first-class, `scope_community_id` left `NULL`) and `'relink'`
+      (`scope_community_id` set from the redeemed code's own
+      `community_id`). A new release gate
+      (`rfc081_session_minting_sites_are_enumerated_and_set_a_provenance`)
+      pins this to exactly these two sites, default-fail on any new
+      unguarded `INSERT INTO sessions`.
+- [x] **`authz.rs` fail-closed refusals**: `NULL` provenance is refused
+      unconditionally (an assertion in behaviour, since the migration's
+      revoke means no session should reach this state — a refusal, not an
+      `unwrap`). A present `scope_community_id` that does not match the
+      requested community is refused. Both refusals are indistinguishable
+      from "no such membership" — no signal that a membership exists
+      elsewhere, that the session is scoped, or which community scoped it.
+      The operator-issued relink path (RFC-069) gets the identical
+      restriction as the admin-issued one.
+- [x] **Deliberately deferred, not omitted**: `authenticated_at` (RFC-080
+      §6 also wants authentication time recorded; today `created_at` *is*
+      the authentication time at both minting sites, so nothing is lost
+      until session rotation arrives in Slice 5, which is the named point
+      this should be picked back up).
+- [x] **Every caller of `list_active_for_user` and `find_first_admin_for_user`
+      decided explicitly** (RFC-081 §7.4 — the side-door risk named as
+      "most likely to be missed"): `handlers/home.rs::get_home` and
+      `redirect_to_home` rebuilt to construct single-community view data
+      from data `require_membership` already resolved, instead of calling
+      the enumerating queries, for any bound session.
+      `handlers/me.rs::can_create_community`'s link visibility now also
+      requires an unscoped session. Every other caller in the tree
+      (`admin/role_transfer.rs`, `admin/help_signin.rs`,
+      `admin/events/create.rs`, `admin/events/attendance.rs`,
+      `admin/events/cancel.rs`, `admin/events/edit.rs`,
+      `admin/events/recreate.rs`, `admin/events/notes.rs`,
+      `admin/events/copy.rs`, `admin/member_remove.rs`,
+      `admin/members.rs`, `export.rs`, `templates.rs`, `event.rs`) calls
+      `list_communities_for_user` only *after* an `authz::require_membership`
+      or `require_admin` check has already gated the same `community_id`,
+      to populate the community-switcher dropdown's link list — a
+      display-only enumeration leak (a bound session's switcher can list
+      communities it cannot reach), left unfixed as a named out-of-scope
+      finding rather than expanded into this slice.
+- [x] A refused out-of-scope access attempt is now audited
+      (`AuditAction::SessionScopeRefused`, Class C/best-effort, no session
+      ID or raw identifiers in metadata) — deliberate, since a
+      community-bound session reaching for another community is the exact
+      misuse this package exists to make visible.
+- [x] Six new `authz.rs` unit tests against the pure `decide_membership_scope`
+      / `decide_unscoped_admin_access` functions, plus one new release-gate
+      test — `cargo test --workspace` moved **512 → 519**, both new tests
+      accounted for. Clippy (`-D warnings`), fmt, wasm check, `mdbook build
+      docs`, `git diff --check`, and `bun run build` all pass clean.
+      Migration proven both ways: applied to a fresh DB, and applied with a
+      pre-existing unrevoked session present (confirmed revoked, with
+      `provenance`/`scope_community_id` both `NULL`, after migration).
+- [ ] **Full ten-smoke regression is not clean.** Seven of the ten
+      pre-existing required smokes currently fail against this branch: the
+      cause is upstream of this slice's own logic (raw fixture SQL that
+      predates the new column), not a defect in the scope check itself.
+      Left unresolved pending owner/architect direction — see the Handoff
+      048 review request for the full diagnosis, the two routes discovered
+      to bypass `authz.rs` entirely, and the smoke-by-smoke breakdown.
+      *(evidence `.git-exclude/tmp/handoff048-proofs/`)*
+
+## Slice 1 correction: scope coverage and fixtures (Handoff 049)
+
+Both open items above are corrections to Handoff 048's own review
+(`.git-exclude/reviewed/zinnias-ciao-main-2026-08-10-session-provenance-and-community-binding-review.md`),
+not new work — the mechanism from Handoff 048 was already correct; two
+routes never called into it, and a smoke-fixture assumption in that
+handoff's own §9 was never possible.
+
+- [x] `handlers/communities.rs::get_communities` (the calendar/matrix view,
+      `/c/{id}/communities`) no longer hand-rolls its membership check —
+      it calls `authz::require_membership` like every other page-level
+      route, which removed the separate `membership_db::find_active` call
+      it used to make (same query resolved once instead of twice).
+- [x] `db/membership.rs::list_communities_for_user` takes a **required**
+      `scope_community_id: Option<&str>` parameter — every one of its 21
+      call sites updated to pass `auth.scope_community_id.as_deref()`, so a
+      third caller cannot omit it the way these two did. This also closes
+      the community-switcher-dropdown leak named (but left unfixed) in
+      Handoff 048's own record above: a bound session's switcher no longer
+      lists communities it cannot reach.
+- [x] `handlers/community.rs::get_switch` (`/switch?community=`) refuses a
+      `NULL`-provenance session explicitly (`authz::has_provenance`, the
+      same branch `decide_membership_scope` uses, not a second copy of the
+      check) and can no longer pivot a bound session out of scope — its
+      membership list is now the same scope-filtered result, so the
+      non-member-target fallback (`memberships.first()`) lands on the
+      bound community rather than an assumed-safe guess.
+- [x] `handlers/home.rs::get_home`'s Handoff 048 bound-session branch
+      partially simplified: `community_summaries` now always comes from
+      the (now scope-filtered) `list_communities_for_user`, removing the
+      hand-built single-element summary and its extra `find_active` call.
+      The `list_active_for_user`-derived membership *count* still branches
+      explicitly, since that function has no scope parameter (out of this
+      package's §4.2) and calling it unfiltered for a bound session would
+      leak a second membership's existence through the first-run/no-events
+      wording choice.
+- [x] All 19 `scripts/smoke/*.mjs` fixtures that seed a session now set
+      `provenance = 'invite_redemption'` — not just the seven that were
+      red, all nineteen, since the other twelve were latent failures
+      waiting for whichever assertion first crossed a gated route.
+- [x] A new release gate (`handoff049_smoke_session_fixtures_all_set_a_provenance`)
+      walks `scripts/smoke/*.mjs` directly (not a curated filename list —
+      a curated list is exactly the shape that let 18 of 19 fixtures go
+      stale silently) and fails if any `INSERT INTO sessions` omits
+      `provenance`. Proven firing: a temporary provenance-less insert
+      added to a fixture failed the gate as expected, then was removed and
+      `cmp`-verified byte-identical.
+      `rfc081_session_minting_sites_are_enumerated_and_set_a_provenance`
+      (Handoff 048's gate, over `workers/ssr/src`) re-confirmed still
+      passing — untouched by this package.
+      `cargo test --workspace`: **519 → 520**, the one new gate test.
+- [x] `smoke:session-scope` extended with four checks proving the
+      previously-uncovered routes are fixed: a bound session cannot load
+      the other community's calendar/matrix view, cannot pivot to it via
+      `/switch`, does not see it listed in its own switcher, and — the
+      check that keeps the fix honest — a first-class session with the
+      identical two memberships still reaches both communities via both
+      routes.
+- [x] **All ten pre-existing required smokes green**, plus the extended
+      eleventh — the headline result of this package. Zero failed checks,
+      zero CSP violations, across all eleven. Digest gate passes without a
+      re-pin (bundle unchanged at 28.4kb). *(evidence
+      `.git-exclude/tmp/handoff049-proofs/`)*

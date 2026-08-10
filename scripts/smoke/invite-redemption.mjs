@@ -110,7 +110,7 @@ function seed() {
     `INSERT OR IGNORE INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${adminMembershipId}', '${communityId}', '${adminUserId}', 'admin', 'Invite Smoke Admin', '${now}')`,
     `UPDATE community_memberships SET role='admin', display_name='Invite Smoke Admin', removed_at=NULL WHERE id='${adminMembershipId}'`,
     `DELETE FROM sessions WHERE id = 'sess_smoke_invite_admin' OR session_hmac = '${adminSessionHmac}'`,
-    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_smoke_invite_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
+    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('sess_smoke_invite_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`,
     `DELETE FROM invite_codes WHERE community_id = '${communityId}'`,
     `DELETE FROM form_tokens WHERE user_id = '' OR user_id = '${adminUserId}'`,
   ];

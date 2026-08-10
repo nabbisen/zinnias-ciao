@@ -48,11 +48,18 @@ pub(crate) enum AuditAction {
     CommunityExportAuthorized,
     CalendarMatrixCsvExportRequested,
     SessionLogout,
+    /// RFC-081 §8 / Handoff 048: a community-bound (relink- or
+    /// help-signin-derived) session tried to reach a community other than
+    /// the one that granted it, or tried a non-community-scoped flow
+    /// (`require_active_admin_somewhere`) that a bound session may never
+    /// use. The refusal itself is unconditional and fail-closed; this
+    /// action records it as visible, deliberate misuse-shaped evidence.
+    SessionScopeRefused,
 }
 
 impl AuditAction {
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 26] = [
+    pub(crate) const ALL: [Self; 27] = [
         Self::CommunityCreated,
         Self::MembershipCreatedFirstAdmin,
         Self::MembershipDisplayNameUpdated,
@@ -79,6 +86,7 @@ impl AuditAction {
         Self::CommunityExportAuthorized,
         Self::CalendarMatrixCsvExportRequested,
         Self::SessionLogout,
+        Self::SessionScopeRefused,
     ];
 
     pub(crate) const fn canonical(self) -> &'static str {
@@ -109,6 +117,7 @@ impl AuditAction {
             Self::CommunityExportAuthorized => "community.export_authorized",
             Self::CalendarMatrixCsvExportRequested => "calendar_matrix_csv.export_requested",
             Self::SessionLogout => "session.logout",
+            Self::SessionScopeRefused => "session.scope_refused",
         }
     }
 
@@ -162,7 +171,7 @@ impl AuditAction {
             Self::CalendarFeedTokenGenerated | Self::CalendarFeedTokenRevoked => "calendar_feed",
             Self::EventTemplateCreated | Self::EventTemplateDeleted => "event_template",
             Self::CalendarMatrixCsvExportRequested => "calendar_matrix_csv",
-            Self::SessionLogout => "session",
+            Self::SessionLogout | Self::SessionScopeRefused => "session",
         }
     }
 
@@ -237,6 +246,14 @@ pub(crate) enum AuditMetadata {
     MatrixExportRequested {
         month: String,
     },
+    SessionScopeRefused {
+        /// The community that granted the refused session.
+        granting_community_id: String,
+        /// The community the session tried to reach, if the refusal names
+        /// one — `None` for `require_active_admin_somewhere`, which has no
+        /// single target community to name.
+        attempted_community_id: Option<String>,
+    },
 }
 
 impl AuditMetadata {
@@ -273,6 +290,13 @@ impl AuditMetadata {
                 target_membership_id,
             } => json!({ "target_membership_id": target_membership_id }),
             Self::MatrixExportRequested { month } => json!({ "month": month }),
+            Self::SessionScopeRefused {
+                granting_community_id,
+                attempted_community_id,
+            } => json!({
+                "granting_community_id": granting_community_id,
+                "attempted_community_id": attempted_community_id,
+            }),
         }
     }
 }
@@ -963,9 +987,10 @@ pub(crate) async fn write_pre_disclosure(
     Ok(())
 }
 
-/// Logout is the sole Class C safety-first exception. This helper deliberately
-/// accepts no subject or session identifier and owns its bounded failure
-/// incident so the caller can always continue to cookie clearing.
+/// A Class C safety-first exception (Handoff 048 added a second — see
+/// `write_session_scope_refused` below). This helper deliberately accepts
+/// no subject or session identifier and owns its bounded failure incident
+/// so the caller can always continue to cookie clearing.
 pub(crate) async fn write_logout_secondary(db: &D1Database, request_id: &str) {
     let action = AuditAction::SessionLogout;
     let mut sink = console_failure_sink;
@@ -976,6 +1001,63 @@ pub(crate) async fn write_logout_secondary(db: &D1Database, request_id: &str) {
         None,
         action,
         AuditMetadata::None,
+        AuditFailureEvent::SecondaryWrite,
+        &mut sink,
+    ) {
+        Ok(record) => record,
+        Err(_) => return,
+    };
+    let statement = match record.statement(db) {
+        Ok(statement) => statement,
+        Err(_) => {
+            log_failure(
+                request_id,
+                action,
+                AuditFailureEvent::SecondaryWrite,
+                AuditFailureCategory::Construction,
+            );
+            return;
+        }
+    };
+    if statement.run().await.is_err() {
+        log_failure(
+            request_id,
+            action,
+            AuditFailureEvent::SecondaryWrite,
+            AuditFailureCategory::Storage,
+        );
+        return;
+    }
+    record.log_success();
+}
+
+/// RFC-081 §8 / Handoff 048: a community-bound session was refused —
+/// either it tried a community other than `granting_community_id`
+/// (`attempted_community_id = Some(..)`), or it tried a
+/// non-community-scoped flow that a bound session may never use
+/// (`attempted_community_id = None`). Class C: the refusal itself is
+/// unconditional and already decided by the caller before this is called;
+/// a storage or construction failure here must not change that outcome,
+/// only be logged.
+pub(crate) async fn write_session_scope_refused(
+    db: &D1Database,
+    request_id: &str,
+    granting_community_id: &str,
+    attempted_community_id: Option<&str>,
+) {
+    let action = AuditAction::SessionScopeRefused;
+    let metadata = AuditMetadata::SessionScopeRefused {
+        granting_community_id: granting_community_id.to_owned(),
+        attempted_community_id: attempted_community_id.map(str::to_owned),
+    };
+    let mut sink = console_failure_sink;
+    let record = match owned_record_with_sink(
+        request_id,
+        None,
+        None,
+        None,
+        action,
+        metadata,
         AuditFailureEvent::SecondaryWrite,
         &mut sink,
     ) {
@@ -1052,6 +1134,10 @@ fn validate_pairing(
                 AuditAction::CalendarMatrixCsvExportRequested,
                 AuditMetadata::MatrixExportRequested { .. }
             )
+            | (
+                AuditAction::SessionScopeRefused,
+                AuditMetadata::SessionScopeRefused { .. }
+            )
     ) || matches!(metadata, AuditMetadata::None)
         && matches!(
             action,
@@ -1086,7 +1172,7 @@ fn validate_context(
     target_id: Option<&str>,
 ) -> std::result::Result<(), AuditBuildError> {
     let valid = match action {
-        AuditAction::SessionLogout => {
+        AuditAction::SessionLogout | AuditAction::SessionScopeRefused => {
             community_id.is_none() && actor_membership_id.is_none() && target_id.is_none()
         }
         AuditAction::CalendarFeedTokenGenerated | AuditAction::CalendarFeedTokenRevoked => {
@@ -1141,6 +1227,16 @@ fn validate_metadata_fields(metadata: &AuditMetadata) -> std::result::Result<(),
             target_membership_id,
         } => validate_identifier(target_membership_id),
         AuditMetadata::MatrixExportRequested { month } => validate_month(month),
+        AuditMetadata::SessionScopeRefused {
+            granting_community_id,
+            attempted_community_id,
+        } => {
+            validate_identifier(granting_community_id)?;
+            if let Some(id) = attempted_community_id {
+                validate_identifier(id)?;
+            }
+            Ok(())
+        }
         AuditMetadata::None
         | AuditMetadata::DisplayNameChanged
         | AuditMetadata::EventEdited { .. } => Ok(()),
@@ -1462,7 +1558,7 @@ mod tests {
         metadata: AuditMetadata,
     ) -> Result<AuditRecord, AuditBuildError> {
         let (community_id, actor_membership_id, target_id) = match action {
-            AuditAction::SessionLogout => (None, None, None),
+            AuditAction::SessionLogout | AuditAction::SessionScopeRefused => (None, None, None),
             AuditAction::CalendarFeedTokenGenerated | AuditAction::CalendarFeedTokenRevoked => {
                 (Some("community_1"), Some("membership_1"), None)
             }
@@ -1486,7 +1582,7 @@ mod tests {
             .into_iter()
             .map(AuditAction::canonical)
             .collect();
-        assert_eq!(values.len(), 26);
+        assert_eq!(values.len(), 27);
         assert!(values.iter().all(|value| value.contains('.')));
         for value in values {
             assert_eq!(

@@ -15,9 +15,9 @@ use zinnias_ciao_domain::{DisplayNameError, validate_display_name};
 const DISPLAY_NAME_UPDATED_REF: &str = "display_name_updated";
 const DISPLAY_NAME_UNCHANGED_REF: &str = "display_name_unchanged";
 
-pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> Result<Response> {
+pub async fn get_me(req: Request, env: &Env, rid: &str, community_id: &str) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let locale = membership.locale;
     let db = env.d1("DB")?;
     let url = req.url()?;
@@ -39,9 +39,13 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
 
     let community = db::community::find_active(&db, community_id).await?;
     let community_name = community.as_ref().map(|c| c.name.as_str()).unwrap_or("");
-    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await
-        .unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
     let _community_pairs: Vec<(String, String)> = _communities_for_switcher
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
@@ -54,7 +58,13 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
             i18n::ROLE_MEMBER
         },
     );
-    let can_create_community = crate::handlers::community_create::community_creation_enabled(env)
+    // RFC-081 §2.1a / Handoff 048 §7.4: a community-bound session must not
+    // even be shown this link — `require_active_admin_somewhere` (the
+    // route this points to) refuses it unconditionally, and rendering a
+    // link that always 404s would itself leak "this account is an admin
+    // somewhere else" through a session scoped to just this community.
+    let can_create_community = auth.scope_community_id.is_none()
+        && crate::handlers::community_create::community_creation_enabled(env)
         && membership_db::find_first_admin_for_user(&db, &auth.user_id)
             .await?
             .is_some();
@@ -169,11 +179,11 @@ pub async fn get_me(req: Request, env: &Env, _rid: &str, community_id: &str) -> 
 pub async fn get_display_name(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let token = crate::codlet::issue_token(
         env,
         &auth.user_id,
@@ -191,7 +201,7 @@ pub async fn post_display_name(
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
 
     let form = req.form_data().await?;
     let raw_token = form.get_field("_token").unwrap_or_default();
@@ -420,11 +430,11 @@ const UI_LANGUAGE_UNCHANGED_REF: &str = "ui_language_unchanged";
 pub async fn get_language(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let url = req.url()?;
     let flash_code = url
         .query_pairs()
@@ -445,11 +455,11 @@ pub async fn get_language(
 pub async fn post_language(
     mut req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
 
     let form = req.form_data().await?;
     let raw_token = form.get_field("_token").unwrap_or_default();

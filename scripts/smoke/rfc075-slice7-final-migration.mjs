@@ -112,7 +112,7 @@ function seed() {
     `INSERT INTO communities (id, name, timezone, is_active, created_at) VALUES ('${communityId}', 'RFC075 Slice 7 Primary', 'Asia/Tokyo', 1, '${now}')`,
     `INSERT INTO users (id, created_at) VALUES ('${adminUserId}', '${now}')`,
     `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${adminMembershipId}', '${communityId}', '${adminUserId}', 'admin', '${esc('RFC075 Slice 7 Admin')}', '${now}')`,
-    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc075s7_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
+    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('sess_rfc075s7_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`,
     // Three same-day events so a single cell exercises the breakdown state
     // (more than one event on a day), plus single-status cells from the
     // other two, and an empty column from every other day in the month.

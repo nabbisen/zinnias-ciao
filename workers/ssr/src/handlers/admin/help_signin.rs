@@ -15,8 +15,12 @@ fn redirect(url: &str) -> Result<Response> {
     Ok(r.with_status(303))
 }
 
-async fn community_pairs_for_user(db: &worker::D1Database, user_id: &str) -> Vec<(String, String)> {
-    membership_db::list_communities_for_user(db, user_id)
+async fn community_pairs_for_user(
+    db: &worker::D1Database,
+    user_id: &str,
+    scope_community_id: Option<&str>,
+) -> Vec<(String, String)> {
+    membership_db::list_communities_for_user(db, user_id, scope_community_id)
         .await
         .unwrap_or_default()
         .iter()
@@ -29,12 +33,12 @@ async fn community_pairs_for_user(db: &worker::D1Database, user_id: &str) -> Vec
 pub async fn get_help_signin(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
     let target =
         match membership_db::find_active_summary(&db, target_membership_id, community_id).await? {
@@ -48,7 +52,8 @@ pub async fn get_help_signin(
         Some(target_membership_id),
     )
     .await?;
-    let community_pairs = community_pairs_for_user(&db, &auth.user_id).await;
+    let community_pairs =
+        community_pairs_for_user(&db, &auth.user_id, auth.scope_community_id.as_deref()).await;
     let nav = render::bottom_nav(community_id, "home");
 
     let body = format!(
@@ -98,7 +103,7 @@ pub async fn post_help_signin(
     target_membership_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let target =
@@ -168,7 +173,7 @@ pub async fn post_help_signin(
         header = render::header_with_switcher_next(
             i18n::JA_ADMIN_HELP_SIGNIN_TITLE,
             community_id,
-            &community_pairs_for_user(&db, &auth.user_id).await,
+            &community_pairs_for_user(&db, &auth.user_id, auth.scope_community_id.as_deref()).await,
             "admin_members"
         ),
         title = i18n::JA_ADMIN_HELP_SIGNIN_TITLE,

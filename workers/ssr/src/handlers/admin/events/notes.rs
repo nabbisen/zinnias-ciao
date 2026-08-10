@@ -11,13 +11,13 @@ use super::support::redirect;
 pub async fn get_admin_hide_note_confirm(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
     event_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let token = crate::codlet::issue_token(
@@ -35,9 +35,13 @@ pub async fn get_admin_hide_note_confirm(
         .map(|m| m.display_name.as_str())
         .unwrap_or("this member");
 
-    let communities = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await
-        .unwrap_or_default();
+    let communities = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
     let pairs: Vec<(String, String)> = communities
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
@@ -85,7 +89,7 @@ pub async fn post_admin_hide_note(
     target_membership_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;

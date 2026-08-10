@@ -42,14 +42,14 @@ fn note_flash_message(
 pub async fn get_event_detail(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
     event_id: &str,
     flash: Option<&str>,
     err: Option<&str>,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let locale = membership.locale;
     let db = env.d1("DB")?;
 
@@ -285,9 +285,13 @@ pub async fn get_event_detail(
         .as_ref()
         .map(|c| c.timezone.as_str())
         .unwrap_or("UTC");
-    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await
-        .unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
     let _community_pairs: Vec<(String, String)> = _communities_for_switcher
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
@@ -398,7 +402,7 @@ pub async fn post_my_status(
     day_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -496,12 +500,12 @@ pub async fn post_my_status(
 pub async fn post_my_note(
     mut req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -543,12 +547,12 @@ pub async fn post_my_note(
 pub async fn get_delete_note_confirm(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let locale = membership.locale;
     let db = env.d1("DB")?;
 
@@ -568,9 +572,13 @@ pub async fn get_delete_note_confirm(
         return redirect(&format!("/c/{community_id}/events/{event_id}"));
     }
 
-    let communities = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await
-        .unwrap_or_default();
+    let communities = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
     let pairs: Vec<(String, String)> = communities
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
@@ -611,12 +619,12 @@ pub async fn get_delete_note_confirm(
 pub async fn delete_my_note(
     mut req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;

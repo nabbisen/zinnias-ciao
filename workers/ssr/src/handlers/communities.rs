@@ -18,21 +18,19 @@ use zinnias_ciao_domain::{
 pub async fn get_communities(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
+    let active_membership = crate::authz::require_membership(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
-    let summaries = membership_db::list_communities_for_user(&db, &auth.user_id).await?;
-    if !summaries.iter().any(|s| s.community_id == community_id) {
-        return render::not_found();
-    }
-    let Some(active_membership) =
-        membership_db::find_active(&db, &auth.user_id, community_id).await?
-    else {
-        return render::not_found();
-    };
+    let summaries = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await?;
     let can_create_event = active_membership.role == "admin";
     let locale = active_membership.locale;
 
@@ -242,7 +240,7 @@ pub async fn post_matrix_export_audit(
     // succeeded — so there is nothing to resolve a locale from. Deployment
     // default (Japanese), matching render/errors.rs's rationale.
     let auth = crate::require_auth_or!(&req, env, json_error(401, i18n::JA_SESSION_EXPIRED));
-    let membership = crate::authz::require_admin(env, &auth, community_id).await?;
+    let membership = crate::authz::require_admin(env, &auth, community_id, rid).await?;
     let locale = membership.locale;
     let db = env.d1("DB")?;
     let form = req.form_data().await?;

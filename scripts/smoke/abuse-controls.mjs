@@ -259,7 +259,7 @@ async function communityCreationWindowBoundary() {
         "INSERT INTO communities (id,name,timezone,is_active,created_at) VALUES ('com_seed','Seed','Asia/Tokyo',1,'2026-07-28T00:00:00.000Z')",
         "INSERT INTO users (id,created_at) VALUES ('usr_seed','2026-07-28T00:00:00.000Z')",
         "INSERT INTO community_memberships (id,community_id,user_id,role,display_name,joined_at) VALUES ('mem_seed','com_seed','usr_seed','admin','Seed Admin','2026-07-28T00:00:00.000Z')",
-        `INSERT INTO sessions (id,user_id,session_hmac,created_at,expires_at,last_seen_at) VALUES ('sess_seed','usr_seed','${sessionHmac}','2026-07-28T00:00:00.000Z','2099-12-31T23:59:59.000Z','2026-07-28T00:00:00.000Z')`,
+        `INSERT INTO sessions (id,user_id,session_hmac,created_at,expires_at,last_seen_at, provenance) VALUES ('sess_seed','usr_seed','${sessionHmac}','2026-07-28T00:00:00.000Z','2099-12-31T23:59:59.000Z','2026-07-28T00:00:00.000Z', 'invite_redemption')`,
       ].join(';'),
     );
     running = await start(fixture);
@@ -389,7 +389,7 @@ async function communityCreationConcurrencyBurst() {
         "INSERT INTO communities (id,name,timezone,is_active,created_at) VALUES ('com_burst_seed','Seed','Asia/Tokyo',1,'2026-07-28T00:00:00.000Z')",
         "INSERT INTO users (id,created_at) VALUES ('usr_burst','2026-07-28T00:00:00.000Z')",
         "INSERT INTO community_memberships (id,community_id,user_id,role,display_name,joined_at) VALUES ('mem_burst','com_burst_seed','usr_burst','admin','Burst Admin','2026-07-28T00:00:00.000Z')",
-        `INSERT INTO sessions (id,user_id,session_hmac,created_at,expires_at,last_seen_at) VALUES ('sess_burst','usr_burst','${sessionHmac}','2026-07-28T00:00:00.000Z','2099-12-31T23:59:59.000Z','2026-07-28T00:00:00.000Z')`,
+        `INSERT INTO sessions (id,user_id,session_hmac,created_at,expires_at,last_seen_at, provenance) VALUES ('sess_burst','usr_burst','${sessionHmac}','2026-07-28T00:00:00.000Z','2099-12-31T23:59:59.000Z','2026-07-28T00:00:00.000Z', 'invite_redemption')`,
       ].join(';'),
     );
     running = await start(fixture);

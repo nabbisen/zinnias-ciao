@@ -48,7 +48,8 @@
     "smoke:admin-event-forms": "node scripts/smoke/rfc075-slice4-admin-event-forms.mjs",
     "smoke:admin-member-management": "node scripts/smoke/rfc075-slice5-admin-member-management.mjs",
     "smoke:admin-tools-onboarding": "node scripts/smoke/rfc075-slice6-admin-tools-and-onboarding.mjs",
-    "smoke:final-migration": "node scripts/smoke/rfc075-slice7-final-migration.mjs"
+    "smoke:final-migration": "node scripts/smoke/rfc075-slice7-final-migration.mjs",
+    "smoke:session-scope": "node scripts/smoke/session-provenance-and-community-binding.mjs"
   },
   "devDependencies": {
     "wrangler": "4.113.0"

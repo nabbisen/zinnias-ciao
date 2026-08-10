@@ -19,12 +19,12 @@ fn redirect(url: &str) -> Result<Response> {
 pub async fn get_remove_member(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
     target_membership_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
 
     // Cannot remove yourself.
     if target_membership_id == membership.membership_id {
@@ -48,9 +48,13 @@ pub async fn get_remove_member(
 
     let community = db::community::find_active(&db, community_id).await?;
     let _community_name = community.map(|c| c.name).unwrap_or_default();
-    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await
-        .unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
     let _community_pairs: Vec<(String, String)> = _communities_for_switcher
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
@@ -105,7 +109,7 @@ pub async fn post_remove_member(
     target_membership_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
 
     if target_membership_id == membership.membership_id {
         return render::not_found();

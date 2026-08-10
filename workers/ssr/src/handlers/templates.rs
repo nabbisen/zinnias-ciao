@@ -37,11 +37,11 @@ fn templates_flash_message(code: Option<&str>) -> Option<&'static str> {
 pub async fn get_templates(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let create_token = crate::codlet::issue_token(
@@ -55,9 +55,13 @@ pub async fn get_templates(
     let templates = tmpl_db::list_active(&db, community_id)
         .await
         .unwrap_or_default();
-    let communities = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await
-        .unwrap_or_default();
+    let communities = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
     let community_pairs: Vec<(String, String)> = communities
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
@@ -210,7 +214,7 @@ pub async fn post_create_template(
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -280,7 +284,7 @@ pub async fn post_delete_template(
     template_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;

@@ -125,7 +125,7 @@ function membershipInsert(id, communityId, role, displayName) {
 }
 
 function sessionInsert(id, sessHmac) {
-  return `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('${id}', '${userId}', '${sessHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`;
+  return `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('${id}', '${userId}', '${sessHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`;
 }
 
 function eventInsert(id, communityId, createdByMembershipId, title, status) {

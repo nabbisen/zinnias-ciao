@@ -95,7 +95,7 @@ function seed() {
     `INSERT INTO communities (id, name, timezone, is_active, created_at) VALUES ('${communityId}', 'RFC075 Primary', 'Asia/Tokyo', 1, '${now}')`,
     `INSERT INTO users (id, created_at) VALUES ('${memberUserId}', '${now}')`,
     `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${memberMembershipId}', '${communityId}', '${memberUserId}', 'admin', '${esc('RFC075 Admin')}', '${now}')`,
-    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc075_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
+    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('sess_rfc075_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`,
     `INSERT INTO events (id, community_id, created_by_membership_id, title, location, description, status, repeat_rule, repeat_count, created_at, updated_at) VALUES ('${eventId}', '${communityId}', '${memberMembershipId}', 'RFC075 Visible Event', 'RFC075 Room', '', 'scheduled', 'none', NULL, '${now}', '${now}')`,
     // 2026-08-03T00:00:00Z is 09:00 JST on Monday, 3 Aug 2026 — same fixture
     // date used by the RFC-072 native tests and smoke:language.

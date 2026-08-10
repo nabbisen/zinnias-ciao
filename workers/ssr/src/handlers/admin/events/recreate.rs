@@ -12,12 +12,12 @@ use super::policy::event_can_seed_recreate;
 pub async fn get_recreate_event(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
     event_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let source_event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -27,9 +27,13 @@ pub async fn get_recreate_event(
     let token =
         crate::codlet::issue_token(env, &auth.user_id, token_purpose::CREATE_EVENT, None).await?;
 
-    let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await
-        .unwrap_or_default();
+    let communities_for_switcher = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
     let community_pairs: Vec<(String, String)> = communities_for_switcher
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))

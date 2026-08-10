@@ -14,6 +14,10 @@ use crate::db::session as session_db;
 pub struct AuthContext {
     pub session_id: String,
     pub user_id: String,
+    /// RFC-081 §2 / Handoff 048 — see `db::session::SessionRow` for what
+    /// these mean and why `provenance` is optional in the type.
+    pub provenance: Option<String>,
+    pub scope_community_id: Option<String>,
 }
 
 /// Authentication failure keeps configuration unavailability distinct from
@@ -78,6 +82,8 @@ pub async fn require_auth(req: &Request, env: &Env) -> std::result::Result<AuthC
     Ok(AuthContext {
         session_id: session.id,
         user_id: session.user_id,
+        provenance: session.provenance,
+        scope_community_id: session.scope_community_id,
     })
 }
 

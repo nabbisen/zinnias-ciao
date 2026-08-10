@@ -81,11 +81,16 @@ pub async fn redeem_required(
             target.membership_id.as_str().into(),
             target.user_id.as_str().into(),
         ])?;
+    // Handoff 048 (RFC-081 §2.1a): community-bound session — provenance
+    // 'relink', scope_community_id set from the redeemed code's own
+    // community_id (already validated by `claim`'s guard above; the same
+    // value, not re-derived). Authorization refuses any other community.
     let session = db
         .prepare(
             "INSERT INTO sessions \
-             (id, user_id, session_hmac, created_at, expires_at, last_seen_at) \
-             SELECT ?1, ?2, ?3, ?4, ?5, ?4 \
+             (id, user_id, session_hmac, created_at, expires_at, last_seen_at, \
+              provenance, scope_community_id) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4, 'relink', ?7 \
              WHERE EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?6 AND m.community_id=?7 \
                              AND m.user_id=?2 AND m.removed_at IS NULL)",

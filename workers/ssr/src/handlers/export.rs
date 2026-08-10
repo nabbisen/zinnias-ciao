@@ -21,11 +21,11 @@ use zinnias_ciao_contracts::i18n;
 pub async fn get_export_page(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     // Issue a one-time download token bound to this admin.
@@ -37,9 +37,13 @@ pub async fn get_export_page(
     )
     .await?;
 
-    let communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await
-        .unwrap_or_default();
+    let communities_for_switcher = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
     let community_pairs: Vec<(String, String)> = communities_for_switcher
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
@@ -116,7 +120,7 @@ pub async fn get_export_json(
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     // Validate the one-time download token from the query string.

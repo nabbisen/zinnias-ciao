@@ -127,7 +127,7 @@ function seed() {
     `INSERT INTO users (id, created_at) VALUES ('${otherUserId}', '${now}')`,
     `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${memberMembershipId}', '${communityId}', '${memberUserId}', 'member', '${esc(originalDisplayName)}', '${now}')`,
     `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${otherMembershipId}', '${otherCommunityId}', '${otherUserId}', 'admin', 'RFC070 Other Admin', '${now}')`,
-    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc070_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
+    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('sess_rfc070_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`,
     `INSERT INTO events (id, community_id, created_by_membership_id, title, location, description, status, repeat_rule, repeat_count, created_at, updated_at) VALUES ('${eventId}', '${communityId}', '${memberMembershipId}', 'RFC070 Visible Event', 'RFC070 Room', '', 'scheduled', 'none', NULL, '${now}', '${now}')`,
     `INSERT INTO event_days (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at, occurrence_status) VALUES ('${eventDayId}', '${eventId}', '${communityId}', 1, '2026-07-20', '2026-07-20T01:00:00.000Z', '2026-07-20T02:00:00.000Z', '${now}', 'scheduled')`,
     `INSERT INTO attendances (id, event_day_id, membership_id, status, updated_at) VALUES ('${attendanceId}', '${eventDayId}', '${memberMembershipId}', 'going', '${now}')`,

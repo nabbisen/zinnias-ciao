@@ -20,11 +20,11 @@ use crate::render;
 pub async fn get_me_calendar(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let locale = membership.locale;
     let db = env.d1("DB")?;
     let pp = crate::crypto::pepper(env)?;
@@ -40,10 +40,13 @@ pub async fn get_me_calendar(
         .await
         .unwrap_or(None);
 
-    let communities_for_switcher =
-        crate::db::membership::list_communities_for_user(&db, &auth.user_id)
-            .await
-            .unwrap_or_default();
+    let communities_for_switcher = crate::db::membership::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
     let community_pairs: Vec<(String, String)> = communities_for_switcher
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
@@ -172,7 +175,7 @@ pub async fn post_regenerate_calendar(
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
     let pp = crate::crypto::pepper(env)?;
 
@@ -217,7 +220,7 @@ pub async fn post_revoke_calendar(
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;

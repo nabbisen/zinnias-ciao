@@ -190,7 +190,7 @@ function seed() {
     // switch and §7.2's locale resolution are both membership-scoped, not
     // user-scoped (see 'otherMembershipUnaffectedThroughout' below).
     `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${otherMembershipId}', '${otherCommunityId}', '${memberUserId}', 'member', 'RFC072 Member Other', '${now}')`,
-    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc072_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
+    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('sess_rfc072_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`,
     `INSERT INTO events (id, community_id, created_by_membership_id, title, location, description, status, repeat_rule, repeat_count, created_at, updated_at) VALUES ('${eventId}', '${communityId}', '${memberMembershipId}', 'RFC072 Visible Event', 'RFC072 Room', '', 'scheduled', 'none', NULL, '${now}', '${now}')`,
     // Handoff 042 §7.1: seeded relative to this run (see the derivation
     // above `now`), not a fixed calendar instant — this fixture cannot

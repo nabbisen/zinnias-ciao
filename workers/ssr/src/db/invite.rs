@@ -169,11 +169,13 @@ pub async fn redeem_required(
             now.as_str().into(),
             user_id.into(),
         ])?;
+    // Handoff 048 (RFC-081 §2): first-class session — provenance
+    // 'invite_redemption', scope_community_id left NULL. Not community-bound.
     let session = db
         .prepare(
             "INSERT INTO sessions \
-             (id, user_id, session_hmac, created_at, expires_at, last_seen_at) \
-             SELECT ?1, ?2, ?3, ?4, ?5, ?4 \
+             (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4, 'invite_redemption' \
              WHERE EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?6 AND m.community_id=?7 \
                              AND m.user_id=?2 AND m.removed_at IS NULL)",

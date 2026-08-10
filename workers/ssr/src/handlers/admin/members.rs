@@ -132,7 +132,7 @@ fn legacy_query_redirect(location: &str) -> Result<Response> {
 pub async fn get_invites(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let url = req.url()?;
@@ -142,7 +142,7 @@ pub async fn get_invites(
             .find(|(key, _)| key == "flash")
             .map(|(_, value)| value.into_owned());
         let flash = invites_flash_message(flash_code.as_deref());
-        get_invites_authenticated(req, env, community_id, flash)
+        get_invites_authenticated(req, env, rid, community_id, flash)
     }) {
         ControlFlow::Break(location) => legacy_query_redirect(&location),
         ControlFlow::Continue(response) => response.await,
@@ -152,18 +152,28 @@ pub async fn get_invites(
 async fn get_invites_authenticated(
     req: Request,
     env: &Env,
+    rid: &str,
     community_id: &str,
     flash: Option<&'static str>,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id).await?;
-    render_invites_page(env, community_id, &auth.user_id, flash, None).await
+    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    render_invites_page(
+        env,
+        community_id,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+        flash,
+        None,
+    )
+    .await
 }
 
 async fn render_invites_page(
     env: &Env,
     community_id: &str,
     user_id: &str,
+    scope_community_id: Option<&str>,
     flash: Option<&'static str>,
     reveal: Option<&InviteCodeReveal>,
 ) -> Result<Response> {
@@ -171,9 +181,10 @@ async fn render_invites_page(
     let gen_token =
         crate::codlet::issue_token(env, user_id, token_purpose::GENERATE_INVITE, None).await?;
 
-    let communities_for_switcher = membership_db::list_communities_for_user(&db, user_id)
-        .await
-        .unwrap_or_default();
+    let communities_for_switcher =
+        membership_db::list_communities_for_user(&db, user_id, scope_community_id)
+            .await
+            .unwrap_or_default();
     let community_pairs: Vec<(String, String)> = communities_for_switcher
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
@@ -296,7 +307,7 @@ pub async fn post_generate_invite(
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
     let pp = crate::crypto::pepper(env)?;
 
@@ -351,11 +362,19 @@ pub async fn post_generate_invite(
         return render::not_found();
     }
     let reveal = InviteCodeReveal::new(code);
-    let mut response =
-        match render_invites_page(env, community_id, &auth.user_id, None, Some(&reveal)).await {
-            Ok(response) => response,
-            Err(_) => return render::service_unavailable(),
-        };
+    let mut response = match render_invites_page(
+        env,
+        community_id,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+        None,
+        Some(&reveal),
+    )
+    .await
+    {
+        Ok(response) => response,
+        Err(_) => return render::service_unavailable(),
+    };
     response
         .headers_mut()
         .set("Cache-Control", "no-store, private")?;
@@ -375,7 +394,7 @@ pub async fn post_revoke_invite(
     invite_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -405,17 +424,21 @@ pub async fn post_revoke_invite(
 pub async fn get_members(
     req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
     let community = db::community::find_active(&db, community_id).await?;
     let _community_name = community.map(|c| c.name).unwrap_or_default();
-    let _communities_for_switcher = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await
-        .unwrap_or_default();
+    let _communities_for_switcher = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
     let _community_pairs: Vec<(String, String)> = _communities_for_switcher
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))

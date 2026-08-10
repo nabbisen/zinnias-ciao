@@ -99,8 +99,8 @@ function seed() {
     `UPDATE community_memberships SET role='admin', display_name='RFC062 Second Admin', removed_at=NULL WHERE id='${secondAdminMembershipId}'`,
     `UPDATE community_memberships SET role='member', display_name='RFC062 Admin As Member', removed_at=NULL WHERE id='${adminMemberOnlyMembershipId}'`,
     `DELETE FROM sessions WHERE id IN ('sess_rfc062_admin', 'sess_rfc062_member') OR session_hmac IN ('${adminSessionHmac}', '${memberSessionHmac}')`,
-    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc062_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
-    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc062_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
+    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('sess_rfc062_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`,
+    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('sess_rfc062_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`,
   ];
   for (const statement of statements) sql(statement);
 }

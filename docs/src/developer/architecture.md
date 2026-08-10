@@ -66,6 +66,7 @@ migrations/
   0009_recurrence_v2.sql
   0010_audit_integrity.sql   closed audit schema, legacy metadata reset, assertion table (RFC-079)
   0011_membership_ui_language.sql  nullable ui_language on community_memberships (RFC-072 Slice A)
+  0012_session_provenance.sql  provenance + scope_community_id on sessions; revokes pre-existing rows (RFC-081 §2, Handoff 048)
 scripts/
   setup.mjs                  Dev bootstrap: D1 migrations + seed data
 docs/src/                    mdbook documentation (SUMMARY.md is the index)

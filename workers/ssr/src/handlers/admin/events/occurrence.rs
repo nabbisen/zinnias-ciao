@@ -10,13 +10,13 @@ use super::support::redirect;
 pub async fn get_cancel_occurrence(
     _req: Request,
     env: &Env,
-    _rid: &str,
+    rid: &str,
     community_id: &str,
     event_id: &str,
     day_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&_req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id).await?;
+    let _membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
         Some(e) if e.status != "cancelled" => e,
@@ -68,7 +68,7 @@ pub async fn post_cancel_occurrence(
     day_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_admin(env, &auth, community_id).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
     let db = env.d1("DB")?;
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();

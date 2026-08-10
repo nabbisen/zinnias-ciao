@@ -111,7 +111,7 @@ function seed() {
     // "last admin" block — not screenshotted, but seeded for completeness.
     `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${secondAdminMembershipId}', '${communityId}', '${secondAdminUserId}', 'admin', '${esc('RFC075 Slice 5 Second Admin')}', '${now}')`,
     `INSERT INTO community_memberships (id, community_id, user_id, role, display_name, joined_at) VALUES ('${memberMembershipId}', '${communityId}', '${memberUserId}', 'member', '${esc(longMemberDisplayName)}', '${now}')`,
-    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at) VALUES ('sess_rfc075s5_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}')`,
+    `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('sess_rfc075s5_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`,
   ];
   for (const statement of statements) sql(statement);
 }

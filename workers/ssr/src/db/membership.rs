@@ -474,12 +474,32 @@ pub struct CommunitySummary {
 
 /// All communities a user is an active member of, with display metadata,
 /// ordered by joined_at. Used for navigation and multi-community summaries.
+///
+/// RFC-081 §2 (Handoff 049): `scope_community_id` is required, not optional
+/// with a default, so a caller cannot forget it the way `get_communities`
+/// and `get_switch` did in Handoff 048 — pass `auth.scope_community_id`.
+/// `Some(id)` restricts the result to that one community (a community-bound
+/// session must never see or reach any other); `None` (a first-class,
+/// unscoped session) returns every community, as before.
 pub async fn list_communities_for_user(
     db: &D1Database,
     user_id: &str,
+    scope_community_id: Option<&str>,
 ) -> Result<Vec<CommunitySummary>> {
-    let rows = db
-        .prepare(
+    let rows = if let Some(scope) = scope_community_id {
+        db.prepare(
+            "SELECT m.community_id, c.name AS community_name, c.timezone, m.role \
+             FROM community_memberships m \
+             JOIN communities c ON c.id = m.community_id \
+             WHERE m.user_id = ?1 AND m.removed_at IS NULL AND m.community_id = ?2 \
+             ORDER BY m.joined_at ASC",
+        )
+        .bind(&[user_id.into(), scope.into()])?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?
+    } else {
+        db.prepare(
             "SELECT m.community_id, c.name AS community_name, c.timezone, m.role \
              FROM community_memberships m \
              JOIN communities c ON c.id = m.community_id \
@@ -489,7 +509,8 @@ pub async fn list_communities_for_user(
         .bind(&[user_id.into()])?
         .all()
         .await?
-        .results::<serde_json::Value>()?;
+        .results::<serde_json::Value>()?
+    };
 
     Ok(rows
         .into_iter()

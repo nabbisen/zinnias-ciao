@@ -2385,8 +2385,8 @@ fn rfc070_self_display_name_editing_routes_are_member_scoped() {
         "RFC-070 must expose GET/POST /c/:cid/me/display-name through the community router"
     );
     assert!(
-        ME_HANDLER_SRC.contains("require_membership(env, &auth, community_id)")
-            && !ME_HANDLER_SRC.contains("require_admin(env, &auth, community_id)"),
+        ME_HANDLER_SRC.contains("require_membership(env, &auth, community_id, rid)")
+            && !ME_HANDLER_SRC.contains("require_admin(env, &auth, community_id, rid)"),
         "RFC-070 display-name editing must require active membership, not admin role"
     );
     assert!(
@@ -3465,7 +3465,12 @@ fn rfc068_calendar_matrix_csv_export_contract_is_guarded() {
 #[test]
 fn rfc059_calendar_create_from_day_is_route_backed() {
     assert!(
-        COMMUNITIES_SRC.contains("membership_db::find_active")
+        // Handoff 049 §4.1: get_communities now gates through
+        // authz::require_membership (which itself resolves find_active)
+        // instead of calling membership_db::find_active directly — the
+        // property this checks (admin status derived from an active
+        // membership) is unchanged, only the call site moved.
+        COMMUNITIES_SRC.contains("authz::require_membership")
             && COMMUNITIES_SRC.contains("membership.role == \"admin\"")
             && COMMUNITIES_SRC.contains("can_create_event"),
         "Calendar create-from-day action must be rendered only for active admins"
@@ -3697,7 +3702,7 @@ fn rfc076_one_time_invite_response_isolation_is_pinned() {
         get.contains("leturl=req.url()?")
             && get.contains("run_invite_get_preflight(invite_get_preflight(")
             && get.contains("ControlFlow::Break(location)=>legacy_query_redirect(&location)")
-            && get.contains("get_invites_authenticated(req,env,community_id,flash)")
+            && get.contains("get_invites_authenticated(req,env,rid,community_id,flash)")
             && !get.contains("require_auth")
             && !get.contains("require_admin")
             && !get.contains("env.d1")
@@ -4936,6 +4941,7 @@ fn rfc079_package7_removal_and_documentation_boundary_are_pinned() {
         "0009_recurrence_v2.sql",
         "0010_audit_integrity.sql",
         "0011_membership_ui_language.sql",
+        "0012_session_provenance.sql",
     ];
     assert_eq!(
         migration_filenames, expected_migration_filenames,
@@ -5383,5 +5389,176 @@ fn hardcoded_hex_color_count_never_increases() {
          {HARDCODED_HEX_RATCHET}. This count may only go down. If you added a new hex value in \
          Rust, reach for a --cz-* token in app.css instead; if you migrated more of the tree and \
          lowered the real count, lower HARDCODED_HEX_RATCHET to match — never raise it."
+    );
+}
+
+/// Handoff 048 §8 (RFC-081 §2/§2.1a): the whole session-provenance design
+/// rests on there being exactly two session-minting sites (§3's
+/// enumeration). Default-fail, same shape as `ADMIN_CLASS_LEAK_EXCEPTIONS`:
+/// every `INSERT INTO sessions` anywhere under `workers/ssr/src` must be
+/// named here with a written reason, or the walk fails — an unguarded
+/// third minting site added later would otherwise silently reintroduce a
+/// NULL-provenance session with nothing to catch it before authorization's
+/// fail-closed refusal (§7.3) does, at request time, in production.
+struct SessionMintingSite {
+    file: &'static str,
+    reason: &'static str,
+}
+
+const KNOWN_SESSION_MINTING_SITES: &[SessionMintingSite] = &[
+    SessionMintingSite {
+        file: "db/invite.rs",
+        reason: "invite redemption — first-class session, provenance 'invite_redemption', no scope",
+    },
+    SessionMintingSite {
+        file: "db/relink.rs",
+        reason: "relink redemption — community-bound session, provenance 'relink', scope from the redeemed code's community_id",
+    },
+];
+
+/// The SQL string literal for one `db.prepare("...")` call, from `start`
+/// (the byte offset of `INSERT INTO sessions` within it) up to the next
+/// `.bind(` — this codebase's own convention is that every `db.prepare`
+/// call is immediately followed by `.bind(`, so this reliably captures
+/// just the one statement's column list without over- or under-matching.
+fn sql_statement_text(content: &str, start: usize) -> &str {
+    let after = &content[start..];
+    let end = after.find(".bind(").unwrap_or(after.len());
+    &after[..end]
+}
+
+#[test]
+fn rfc081_session_minting_sites_are_enumerated_and_set_a_provenance() {
+    let mut files = Vec::new();
+    walk_rs_files(&workers_ssr_src_dir(), &mut files);
+    let src_dir = workers_ssr_src_dir();
+    let mut seen_files = std::collections::HashSet::new();
+    let mut unexpected: Vec<String> = Vec::new();
+
+    for path in &files {
+        let rel = path
+            .strip_prefix(&src_dir)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let mut search_from = 0;
+        while let Some(rel_idx) = content[search_from..].find("INSERT INTO sessions") {
+            let start = search_from + rel_idx;
+            match KNOWN_SESSION_MINTING_SITES.iter().find(|s| s.file == rel) {
+                Some(site) => {
+                    seen_files.insert(site.file);
+                    let statement = sql_statement_text(&content, start);
+                    assert!(
+                        statement.contains("provenance"),
+                        "{rel}'s INSERT INTO sessions does not set provenance — every session \
+                         must have one after migration 0012 (Handoff 048 §7.1); a session \
+                         minted without it is refused by authorization (§7.3), fail-closed, but \
+                         that is a production-time symptom of a bug this gate exists to catch \
+                         at build time instead."
+                    );
+                }
+                None => unexpected.push(rel.clone()),
+            }
+            search_from = start + "INSERT INTO sessions".len();
+        }
+    }
+
+    assert!(
+        unexpected.is_empty(),
+        "an INSERT INTO sessions occurs in a file not named in KNOWN_SESSION_MINTING_SITES: \
+         {}\n\
+         RFC-081 §2.1a's whole community-binding design assumes exactly two minting sites \
+         (Handoff 048 §3). If this is a genuine third one, that is a Handoff 048 §17 stop \
+         condition — it needs its own provenance/scope decision, not a silent pass. If it is a \
+         false positive (e.g. a comment or test fixture containing the literal text), narrow \
+         this gate's search rather than adding an exception for something that never mints a \
+         session.",
+        unexpected.join("\n")
+    );
+
+    for site in KNOWN_SESSION_MINTING_SITES {
+        assert!(
+            seen_files.contains(site.file),
+            "KNOWN_SESSION_MINTING_SITES names {} ({}) but the walk never found an INSERT INTO \
+             sessions there — stale table entry?",
+            site.file,
+            site.reason
+        );
+    }
+}
+
+fn scripts_smoke_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/smoke")
+}
+
+/// The JS template-literal string for one `INSERT INTO sessions` statement,
+/// from `start` up to the closing backtick — every fixture in
+/// `scripts/smoke/*.mjs` writes its statement as a single template literal,
+/// so this reliably captures just that one statement (the `.bind(` analogue
+/// used by `sql_statement_text` above doesn't apply here — these are raw D1
+/// `execute` calls, not `db.prepare`/`.bind` pairs).
+fn mjs_statement_text(content: &str, start: usize) -> &str {
+    let after = &content[start..];
+    let end = after.find('`').unwrap_or(after.len());
+    &after[..end]
+}
+
+/// Handoff 049 §4.5: the smoke-fixture counterpart to
+/// `rfc081_session_minting_sites_are_enumerated_and_set_a_provenance`
+/// above. That gate pins the two *application* minting sites; this one
+/// pins every *fixture* one. Deliberately a directory walk, not a curated
+/// list of filenames — a curated list is exactly the shape that let 18 of
+/// 19 fixtures go stale when migration 0012 landed (Handoff 048 §7, review
+/// §7): nobody had to update a list, so nobody did. A future "fixture
+/// twenty" is caught automatically because every `.mjs` file under
+/// `scripts/smoke/` is walked, not just the ones named here.
+#[test]
+fn handoff049_smoke_session_fixtures_all_set_a_provenance() {
+    let dir = scripts_smoke_dir();
+    let entries = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("failed to read directory {}: {e}", dir.display()));
+    let mut checked = 0usize;
+    let mut missing: Vec<String> = Vec::new();
+
+    for entry in entries {
+        let path = entry
+            .unwrap_or_else(|e| panic!("failed to read directory entry: {e}"))
+            .path();
+        if path.is_dir() || !path.extension().is_some_and(|ext| ext == "mjs") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let mut search_from = 0;
+        while let Some(rel_idx) = content[search_from..].find("INSERT INTO sessions") {
+            let start = search_from + rel_idx;
+            checked += 1;
+            let statement = mjs_statement_text(&content, start);
+            if !statement.contains("provenance") {
+                missing.push(format!("{name} (byte offset {start})"));
+            }
+            search_from = start + "INSERT INTO sessions".len();
+        }
+    }
+
+    assert!(
+        checked > 0,
+        "found zero `INSERT INTO sessions` occurrences under scripts/smoke/ — has the directory \
+         moved, or did every smoke fixture stop seeding sessions directly? This gate expects at \
+         least the existing fixtures to still be there; an empty result likely means the gate \
+         itself is broken, not that there is nothing left to check."
+    );
+    assert!(
+        missing.is_empty(),
+        "these smoke fixtures INSERT a session without setting provenance — after migration \
+         0012 (Handoff 048 §7.1) every session must have one, or authorization's fail-closed \
+         refusal (Handoff 048 §7.3 / Handoff 049 §4.2) rejects it at the first scope-checked \
+         route it touches, silently, at smoke-run time rather than here. Set \
+         provenance = 'invite_redemption' on the fixture (these all simulate a member who \
+         joined by redeeming an invite):\n{}",
+        missing.join("\n")
     );
 }

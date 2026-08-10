@@ -9,30 +9,65 @@ use zinnias_ciao_contracts::i18n;
 
 pub async fn redirect_to_home(req: Request, env: &Env, _rid: &str) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, crate::render::session_expired());
-    let db = env.d1("DB")?;
-    let memberships = membership_db::list_active_for_user(&db, &auth.user_id).await?;
-    if memberships.is_empty() {
-        return render::session_expired();
-    }
-    // Use the first community as default; M3+ will add a selected-community cookie.
-    let cid = &memberships[0].community_id;
+
+    // RFC-081 §2.1a / Handoff 048 §7.4: a community-bound session redirects
+    // straight to its own granting community — never enumerates every
+    // membership. Enumerating and picking `[0]` could redirect to a
+    // *different* community than the one that granted the session, and the
+    // resulting URL (even if the next request refuses it) would still name
+    // a community this session has no business revealing.
+    let cid = if let Some(scope) = auth.scope_community_id.clone() {
+        scope
+    } else {
+        let db = env.d1("DB")?;
+        let memberships = membership_db::list_active_for_user(&db, &auth.user_id).await?;
+        if memberships.is_empty() {
+            return render::session_expired();
+        }
+        // Use the first community as default; M3+ will add a selected-community cookie.
+        memberships[0].community_id.clone()
+    };
     let mut resp = Response::empty()?;
     resp.headers_mut()
         .set("Location", &format!("/c/{cid}/home"))?;
     Ok(resp.with_status(303))
 }
 
-pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -> Result<Response> {
+pub async fn get_home(req: Request, env: &Env, rid: &str, community_id: &str) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let membership = require_membership(env, &auth, community_id).await?;
+    let membership = require_membership(env, &auth, community_id, rid).await?;
     let locale = membership.locale;
     let db = env.d1("DB")?;
 
     // Home window: today through 30 days ahead
     let from_utc = db::now_utc();
     let to_utc = db::utc_days_ahead(30);
-    let memberships = membership_db::list_active_for_user(&db, &auth.user_id).await?;
-    let community_summaries = membership_db::list_communities_for_user(&db, &auth.user_id).await?;
+
+    // RFC-081 §2.1a / Handoff 049: `list_communities_for_user` is now
+    // scope-filtered at the source (Handoff 049 §4.2), so a single
+    // unconditional call already returns just the granting community for a
+    // bound session — the hand-built single-element summary from Handoff
+    // 048 is gone. `list_active_for_user` (used only for the `is_first_run`
+    // count below) has no scope parameter — that is out of this slice's
+    // §4.2, which named `list_communities_for_user` specifically — so
+    // calling it unfiltered would leak cross-community membership *count*
+    // through the first-run-vs-no-events wording choice. It is still
+    // called only for unscoped sessions; a bound session's count is
+    // definitionally 1 (`require_membership` above already proved exactly
+    // this one community), so no query is needed for that case at all.
+    let community_summaries = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await?;
+    let membership_count = if auth.scope_community_id.is_some() {
+        1
+    } else {
+        membership_db::list_active_for_user(&db, &auth.user_id)
+            .await?
+            .len()
+    };
     let community_ids: Vec<&str> = community_summaries
         .iter()
         .map(|c| c.community_id.as_str())
@@ -47,7 +82,7 @@ pub async fn get_home(req: Request, env: &Env, _rid: &str, community_id: &str) -
     // instead of a plain text paragraph. Detect first-run by member count.
     let is_first_run = rows.is_empty()
         && membership.is_admin()
-        && memberships.len() == 1
+        && membership_count == 1
         && community_summaries.len() == 1;
     let (empty_html, admin_shortcuts): (String, String) =
         if rows.is_empty() && membership.is_admin() {

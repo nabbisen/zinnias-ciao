@@ -12,6 +12,15 @@ use crate::db::now_utc;
 pub struct SessionRow {
     pub id: String,
     pub user_id: String,
+    /// RFC-081 §2 / Handoff 048: how this session was minted
+    /// (`invite_redemption` or `relink`). Every session created after
+    /// migration 0012 has one; authorization refuses NULL (§7.3 — a
+    /// pre-cutover session, all of which migration 0012 revoked outright).
+    pub provenance: Option<String>,
+    /// RFC-081 §2.1a: the community that granted this session, for
+    /// relink-derived sessions only. NULL for first-class
+    /// (invite-redemption) sessions, which are not community-bound.
+    pub scope_community_id: Option<String>,
 }
 
 /// Look up a session by its HMAC.
@@ -20,7 +29,7 @@ pub async fn find_active(db: &D1Database, session_hmac: &str) -> Result<Option<S
     let now = now_utc();
     let row = db
         .prepare(
-            "SELECT id, user_id \
+            "SELECT id, user_id, provenance, scope_community_id \
              FROM sessions \
              WHERE session_hmac = ?1 \
                AND revoked_at IS NULL \
@@ -35,6 +44,14 @@ pub async fn find_active(db: &D1Database, session_hmac: &str) -> Result<Option<S
         Some(SessionRow {
             id: v.get("id")?.as_str()?.to_owned(),
             user_id: v.get("user_id")?.as_str()?.to_owned(),
+            provenance: v
+                .get("provenance")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_owned()),
+            scope_community_id: v
+                .get("scope_community_id")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_owned()),
         })
     }))
 }

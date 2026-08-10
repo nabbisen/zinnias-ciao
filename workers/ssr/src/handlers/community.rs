@@ -8,8 +8,18 @@ use worker::{Env, Request, Response, Result};
 /// Validates that the authenticated user is an active member of the target
 /// community before redirecting (prevents open-redirect / cross-community
 /// access). Falls back to the member home on any mismatch.
+///
+/// RFC-081 §2 (Handoff 049): `memberships` is resolved scope-filtered
+/// (`auth.scope_community_id`), so a community-bound session's `target`
+/// match and its `memberships.first()` fallback both already see only the
+/// granting community — there is no separate scope check to add here.
+/// What scope-filtering does *not* cover is a `NULL`-provenance session, so
+/// that is checked explicitly, first.
 pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
+    if !crate::authz::has_provenance(&auth) {
+        return render::not_found();
+    }
 
     let url = req.url()?;
     let target: Option<String> = url
@@ -22,9 +32,13 @@ pub async fn get_switch(req: Request, env: &Env, _rid: &str) -> Result<Response>
         .map(|(_, v)| v.to_string());
 
     let db = env.d1("DB")?;
-    let memberships = membership_db::list_communities_for_user(&db, &auth.user_id)
-        .await
-        .unwrap_or_default();
+    let memberships = membership_db::list_communities_for_user(
+        &db,
+        &auth.user_id,
+        auth.scope_community_id.as_deref(),
+    )
+    .await
+    .unwrap_or_default();
 
     // Only redirect to a community the user actually belongs to.
     let dest = match target {

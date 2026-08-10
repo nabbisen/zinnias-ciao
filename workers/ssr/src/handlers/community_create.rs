@@ -27,9 +27,9 @@ pub(crate) fn community_creation_enabled(env: &Env) -> bool {
         .unwrap_or(false)
 }
 
-pub async fn get_new_community(req: Request, env: &Env, _rid: &str) -> Result<Response> {
+pub async fn get_new_community(req: Request, env: &Env, rid: &str) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let admin = require_active_admin_somewhere(env, &auth).await?;
+    let admin = require_active_admin_somewhere(env, &auth, rid).await?;
 
     if !community_creation_enabled(env) {
         return render_disabled(&admin);
@@ -61,7 +61,7 @@ pub async fn post_new_community(mut req: Request, env: &Env, rid: &str) -> Resul
     };
 
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let admin = require_active_admin_somewhere(env, &auth).await?;
+    let admin = require_active_admin_somewhere(env, &auth, rid).await?;
 
     if !community_creation_enabled(env) {
         return render_disabled(&admin);
