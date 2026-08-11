@@ -1,6 +1,7 @@
 //! D1 data-access layer.
 
 pub mod attendance;
+pub mod auth_transaction;
 pub mod calendar;
 pub mod community;
 pub mod event;
@@ -37,7 +38,7 @@ pub fn utc_days_ahead(days: u64) -> String {
     format!("{y:04}-{mo:02}-{d:02}T00:00:00.000Z")
 }
 
-fn epoch_to_ymd_hms(epoch_secs: u64) -> (u32, u32, u32, u32, u32, u32) {
+pub(crate) fn epoch_to_ymd_hms(epoch_secs: u64) -> (u32, u32, u32, u32, u32, u32) {
     let s = (epoch_secs % 60) as u32;
     let mi = ((epoch_secs / 60) % 60) as u32;
     let h = ((epoch_secs / 3600) % 24) as u32;

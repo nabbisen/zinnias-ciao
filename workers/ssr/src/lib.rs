@@ -8,6 +8,7 @@ mod codlet;
 mod crypto;
 mod db;
 mod form_token;
+mod identity;
 mod render;
 mod session;
 

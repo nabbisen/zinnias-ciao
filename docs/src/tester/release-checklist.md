@@ -1335,3 +1335,56 @@ expires at first deployment and must not be cited afterward.
       the strongest evidence the re-baseline is faithful to what the
       application actually needs. Zero failed checks, zero CSP violations.
       *(evidence `.git-exclude/tmp/handoff052-proofs/`)*
+
+## The authentication transaction and the fake issuer (Handoff 053, external-identity Slice 4a)
+
+Pure mechanism: a table, a verification path, a test-only issuer. No route
+reaches any of it, no network call exists anywhere in it — confirmed both
+by a dedicated gate and by the build itself staying at 28.4kb.
+
+- [x] Migration `0014_auth_transactions.sql`, additive only. Follows AD-3's
+      digest-at-rest discipline: `lookup_key_hmac` (the OIDC `state`
+      value's HMAC — finding the row by it *is* the state check, so there
+      is no separate stored "expected state" to drift from it) and
+      `nonce_hmac` are digests; the raw values are never stored.
+      `pkce_verifier` is stored raw, deliberately — it must be recoverable
+      for the token exchange, and alone it is not a bearer credential
+      (the also-required, single-use, provider-issued authorization code
+      is never stored at all).
+- [x] **JWT handling is hand-rolled, not library-based** — `jsonwebtoken`
+      (even restricted to its `rust_crypto` feature) failed to compile to
+      `wasm32-unknown-unknown` via a transitive `getrandom` conflict, and
+      pulled in RSA/PKCS machinery this package never needs. Built instead
+      on the same RustCrypto primitives (`hmac`, `sha2`) already used by
+      `crypto::hmac_hex`, plus a new minimal `base64` dependency (confirmed
+      wasm32-clean). This makes the algorithm-pinning guarantee airtight
+      by construction: there is no library default to research or trust,
+      because the caller (never the token) supplies the expected algorithm
+      and key source.
+- [x] **Algorithm pinning proven with the full negative matrix**: correct
+      algorithm accepted; every other algorithm rejected, including one
+      the token's own header claims is correct; `alg: none` rejected
+      unconditionally; unknown key id rejected; malformed signature
+      rejected — each its own distinct rejection reason, its own test, 28
+      tests total across the module.
+- [x] **§5.6 decided**: a revoked identity authenticates nobody and is
+      indistinguishable to the caller from one never linked —
+      `identity::identity_lookup_is_authenticatable`, tested, is the one
+      place that decision is made; `db::identity::find_by_subject_lookup`
+      still returns revoked rows unfiltered, on purpose, so the decision
+      stays in the layer that can reason about it.
+- [x] Both required gates (no network call anywhere under `identity/`; the
+      fake issuer structurally absent from non-test builds via
+      `#[cfg(test)] mod fake_issuer;`) proven firing, `cmp`-verified
+      restores.
+- [x] `cargo test --workspace`: **526 → 556** — 28 identity-module tests
+      plus the 2 new gate tests, exactly accounted for. Clippy, fmt, wasm
+      check, `mdbook build docs`, `git diff --check`, `bun run build`
+      (28.4kb, unchanged) all clean. Digest gate passes without a re-pin.
+      Migration proven both ways: fresh database, and one already at 0013
+      with a pre-existing row confirmed to survive. Transaction table's
+      single-use/expiry/replay guarantees proven directly against a real
+      local D1 (no route exists yet to exercise them through).
+- [x] **All eleven smokes green, unchanged** — expected for a package that
+      adds no reachable surface. *(evidence
+      `.git-exclude/tmp/handoff053-proofs/`)*

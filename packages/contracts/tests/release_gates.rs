@@ -4943,6 +4943,7 @@ fn rfc079_package7_removal_and_documentation_boundary_are_pinned() {
         "0011_membership_ui_language.sql",
         "0012_session_provenance.sql",
         "0013_identity_namespaces.sql",
+        "0014_auth_transactions.sql",
     ];
     assert_eq!(
         migration_filenames, expected_migration_filenames,
@@ -5601,5 +5602,83 @@ fn rfc080_identity_namespaces_are_never_created_outside_a_migration() {
          this is genuinely needed, that is a stop condition (Handoff 050 §14), not something \
          to except here.",
         offenders.join(", ")
+    );
+}
+
+fn identity_module_dir() -> std::path::PathBuf {
+    workers_ssr_src_dir().join("identity")
+}
+
+/// Handoff 053 §6.1: 4a performs no HTTP of any kind — a stray `fetch` is
+/// the difference between a testable, no-network boundary and one that
+/// silently needs a live provider. Default-fail: every file under
+/// `workers/ssr/src/identity/` is scanned for the substring `fetch`
+/// (case-insensitive, so a `Fetch`-typed network call can't slip in under
+/// a differently-cased spelling either), and none may contain it.
+#[test]
+fn identity_module_makes_no_network_call() {
+    let mut files = Vec::new();
+    walk_rs_files(&identity_module_dir(), &mut files);
+    assert!(
+        !files.is_empty(),
+        "found zero .rs files under workers/ssr/src/identity/ — has the module moved? This \
+         gate expects the module this handoff added to still be there."
+    );
+
+    let mut offenders: Vec<String> = Vec::new();
+    for path in &files {
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        if content.to_ascii_lowercase().contains("fetch") {
+            offenders.push(
+                path.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+            );
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "found the substring `fetch` (case-insensitive) in: {} — Handoff 053 §2/§6.1 requires \
+         the identity module to make no network call of any kind. If a real provider adapter \
+         genuinely needs one, that is Slice 4b's job in a route-reachable file, not this \
+         module's.",
+        offenders.join(", ")
+    );
+}
+
+/// Handoff 053 §6.2: the fake issuer (RFC-080 §10) is a required
+/// deliverable, but only as a test-only mechanism — it must not be
+/// reachable from a non-test build. The guarantee is structural, not a
+/// convention to remember: `identity/mod.rs` declares the module behind
+/// `#[cfg(test)]`, so `fake_issuer.rs` is entirely absent from a release
+/// build's compiled output, not merely unreferenced by it. This gate
+/// checks that declaration is actually there, in the specific two-line
+/// shape that makes it true.
+#[test]
+fn identity_fake_issuer_is_test_only() {
+    let mod_rs = identity_module_dir().join("mod.rs");
+    let content = std::fs::read_to_string(&mod_rs)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", mod_rs.display()));
+
+    assert!(
+        content.contains("fake_issuer.rs") || identity_module_dir().join("fake_issuer.rs").exists(),
+        "workers/ssr/src/identity/fake_issuer.rs is missing — has the fake issuer (RFC-080 §10, \
+         a required deliverable) been removed?"
+    );
+
+    let guarded = content
+        .lines()
+        .collect::<Vec<_>>()
+        .windows(2)
+        .any(|pair| pair[0].trim() == "#[cfg(test)]" && pair[1].trim() == "mod fake_issuer;");
+
+    assert!(
+        guarded,
+        "identity/mod.rs must declare `mod fake_issuer;` immediately behind its own \
+         `#[cfg(test)]` line — found the declaration, but not in that exact guarded shape. A \
+         fake_issuer reachable from a non-test build is the difference between a test-only \
+         mechanism and a live one; do not weaken this to a doc comment or a runtime check."
     );
 }

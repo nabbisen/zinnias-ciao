@@ -68,6 +68,7 @@ migrations/
   0011_membership_ui_language.sql  nullable ui_language on community_memberships (RFC-072 Slice A)
   0012_session_provenance.sql  provenance + scope_community_id on sessions; revokes pre-existing rows (RFC-081 §2, Handoff 048)
   0013_identity_namespaces.sql  identity_namespaces + user_identities tables, additive only, seeds the local-fake namespace (RFC-080 §3, Handoff 050)
+  0014_auth_transactions.sql   auth_transactions table (server-side OIDC transaction), additive only, no callers yet (RFC-080 §5, Handoff 053)
 scripts/
   setup.mjs                  Dev bootstrap: D1 migrations + seed data
 docs/src/                    mdbook documentation (SUMMARY.md is the index)

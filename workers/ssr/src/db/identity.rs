@@ -15,6 +15,15 @@ use worker::{D1Database, Result};
 /// `'revoked'` row should be treated as unlinked or surfaced distinctly
 /// is a collision-handling decision that belongs to Slice 4, not to this
 /// accessor.
+///
+/// **Decided in Handoff 053 (Slice 4a):** a revoked identity authenticates
+/// nobody and is indistinguishable to the caller from one that was never
+/// linked — see `identity::identity_lookup_is_authenticatable`, which is
+/// where that decision is actually enforced. This accessor still returns
+/// the row unfiltered, on purpose: the decision belongs one layer up, not
+/// baked into the query, so a future caller with a genuinely different
+/// need (e.g. showing an admin that an identity exists but is revoked)
+/// is not blocked by this function's own choice.
 #[allow(dead_code)] // Slice 4: read by the authentication callback (RFC-080 §5).
 pub struct UserIdentityRow {
     pub id: String,
