@@ -3089,6 +3089,12 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
         reason: "admin-only surface, RFC-072 Slice D",
     },
     LocalizationException {
+        path: "handlers/identity/mod.rs",
+        ja_count: 6,
+        calls_bare_page: true,
+        reason: "anonymous route, no membership/session yet, RFC-072 Slice D — matches handlers/join.rs's own convention (Handoff 054)",
+    },
+    LocalizationException {
         path: "handlers/join.rs",
         ja_count: 18,
         calls_bare_page: true,
@@ -4335,7 +4341,10 @@ fn rfc079_package0a_current_audit_inventory_is_pinned() {
         ("MembershipDisplayNameUpdated", &["handlers/me.rs"][..]),
         ("InviteCodeGenerated", &["db/invite.rs"][..]),
         ("InviteCodeRevoked", &["db/invite.rs"][..]),
-        ("InviteCodeRedeemed", &["db/invite.rs"][..]),
+        (
+            "InviteCodeRedeemed",
+            &["db/auth_transaction.rs", "db/invite.rs"][..],
+        ),
         ("MembershipRelinkCodeCreated", &["db/relink.rs"][..]),
         ("MembershipRelinkRedeemed", &["db/relink.rs"][..]),
         ("OperatorRecoveryAdminRelinkCreated", &["db/relink.rs"][..]),
@@ -5410,11 +5419,15 @@ struct SessionMintingSite {
 const KNOWN_SESSION_MINTING_SITES: &[SessionMintingSite] = &[
     SessionMintingSite {
         file: "db/invite.rs",
-        reason: "invite redemption — first-class session, provenance 'invite_redemption', no scope",
+        reason: "invite redemption — first-class session, provenance InviteRedemption, no scope",
     },
     SessionMintingSite {
         file: "db/relink.rs",
-        reason: "relink redemption — community-bound session, provenance 'relink', scope from the redeemed code's community_id",
+        reason: "relink redemption — community-bound session, provenance Relink, scope from the redeemed code's community_id",
+    },
+    SessionMintingSite {
+        file: "db/auth_transaction.rs",
+        reason: "external identity sign-in/join (Handoff 054) — provenance ExternalIdentity, two INSERT INTO sessions occurrences in this one file (issue_sign_in_required, issue_join_required)",
     },
 ];
 
@@ -5427,6 +5440,28 @@ fn sql_statement_text(content: &str, start: usize) -> &str {
     let after = &content[start..];
     let end = after.find(".bind(").unwrap_or(after.len());
     &after[..end]
+}
+
+/// From `start` (the byte offset of `INSERT INTO sessions`) through the
+/// end of the immediately following `.bind(&[ ... ])?;` call — a fixed,
+/// generous window rather than exact bracket-matching, since every real
+/// call site's full `prepare(...).bind(...)` is well under this many
+/// characters and a generous window only risks a false negative (missing
+/// a `SessionProvenance::` reference that is genuinely there), never a
+/// false positive.
+fn rust_call_site_text(content: &str, start: usize) -> &str {
+    let after = &content[start..];
+    let end = after.len().min(2_000);
+    let mut boundary = end;
+    // Prefer to cut at the `.bind(...)?;` call's own closing `;` if it
+    // falls inside the window, so the captured text does not spill into
+    // unrelated code that happens to follow.
+    if let Some(bind_start) = after[..end].find(".bind(")
+        && let Some(close) = after[bind_start..end].find("])?;")
+    {
+        boundary = bind_start + close + "])?;".len();
+    }
+    &after[..boundary]
 }
 
 #[test]
@@ -5459,6 +5494,28 @@ fn rfc081_session_minting_sites_are_enumerated_and_set_a_provenance() {
                          minted without it is refused by authorization (§7.3), fail-closed, but \
                          that is a production-time symptom of a bug this gate exists to catch \
                          at build time instead."
+                    );
+                    // Handoff 054 §5.4: provenance must be written through
+                    // `SessionProvenance`, never a bare SQL string literal
+                    // — a typo'd literal is still a non-null string, which
+                    // passes `decide_membership_scope`'s null check and is
+                    // silently treated as an unscoped, first-class session.
+                    for literal in ["'invite_redemption'", "'relink'", "'external_identity'"] {
+                        assert!(
+                            !statement.contains(literal),
+                            "{rel}'s INSERT INTO sessions sets provenance with the SQL literal \
+                             {literal} instead of a SessionProvenance value bound as a \
+                             parameter — this is exactly the typo hazard Handoff 054 §5.4 \
+                             introduced the type to close at compile time."
+                        );
+                    }
+                    let call_site = rust_call_site_text(&content, start);
+                    assert!(
+                        call_site.contains("SessionProvenance::"),
+                        "{rel}'s INSERT INTO sessions / .bind(...) call does not reference \
+                         `SessionProvenance::` anywhere — provenance must be written through \
+                         the type (Handoff 054 §5.4), not assembled from an untyped string \
+                         built elsewhere."
                     );
                 }
                 None => unexpected.push(rel.clone()),

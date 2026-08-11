@@ -9,6 +9,32 @@ use worker::{D1Database, Result};
 
 use crate::db::now_utc;
 
+/// RFC-081 §2 / Handoff 054 §5.4: `sessions.provenance` has no `CHECK`
+/// constraint — the one-time pre-deployment schema exception (RFC-081
+/// §1.2a) is spent, so one cannot be added now. Without this type, a
+/// typo'd literal at a minting site is a non-null string, which passes
+/// `authz::decide_membership_scope`'s null check and carries no
+/// `scope_community_id` — silently treated as an unscoped, first-class
+/// session. This type makes the typo a compile error instead of a
+/// runtime fact: every minting site writes through `as_str()`, so the
+/// database can only ever receive one of these three exact strings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SessionProvenance {
+    InviteRedemption,
+    Relink,
+    ExternalIdentity,
+}
+
+impl SessionProvenance {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::InviteRedemption => "invite_redemption",
+            Self::Relink => "relink",
+            Self::ExternalIdentity => "external_identity",
+        }
+    }
+}
+
 pub struct SessionRow {
     pub id: String,
     pub user_id: String,

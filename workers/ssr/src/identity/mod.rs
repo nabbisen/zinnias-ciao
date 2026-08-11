@@ -1,11 +1,15 @@
 //! The verified-identity boundary — RFC-080 §4/§4.1 (Handoff 053, external-
-//! identity Slice 4a). No route reaches this module; no network call
-//! exists in it. Slice 4b wires a real callback to it.
+//! identity Slice 4a). This module itself makes no network call and
+//! reaches no route directly; `handlers::identity` (Handoff 054) is what
+//! wires a real callback to it.
 
 mod jwt;
 
 #[cfg(test)]
 mod fake_issuer;
+
+#[cfg(feature = "dev_fake_issuer")]
+pub(crate) mod dev_fake_issuer;
 
 use jwt::{JwtError, decode_and_verify};
 
@@ -47,6 +51,34 @@ pub(crate) struct NamespaceVerification {
     /// there is exactly one key — the common shared-secret-namespace
     /// case; a token naming a `kid` must match one exactly.
     pub keys: Vec<(String, Vec<u8>)>,
+}
+
+/// Resolve verification requirements for a namespace — from code, never
+/// from the token. Handoff 054 §3: `idns_local_fake` is recognised only
+/// under the `dev_fake_issuer` feature; without it, this returns `None`
+/// for every namespace unconditionally, which is what makes a production
+/// build structurally incapable of verifying a token against it — there
+/// is no configuration flag that re-enables this at runtime, only a
+/// cargo feature that changes what got compiled.
+#[cfg(feature = "dev_fake_issuer")]
+pub(crate) fn resolve_namespace_verification(namespace_id: &str) -> Option<NamespaceVerification> {
+    if namespace_id != "idns_local_fake" {
+        return None;
+    }
+    Some(NamespaceVerification {
+        expected_alg: jwt::ALG_HS256,
+        expected_issuer: dev_fake_issuer::ISSUER.to_owned(),
+        expected_audience: dev_fake_issuer::AUDIENCE.to_owned(),
+        keys: vec![(
+            dev_fake_issuer::KID.to_owned(),
+            dev_fake_issuer::shared_key(),
+        )],
+    })
+}
+
+#[cfg(not(feature = "dev_fake_issuer"))]
+pub(crate) fn resolve_namespace_verification(_namespace_id: &str) -> Option<NamespaceVerification> {
+    None
 }
 
 impl NamespaceVerification {

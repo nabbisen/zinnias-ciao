@@ -171,11 +171,12 @@ pub async fn redeem_required(
         ])?;
     // Handoff 048 (RFC-081 §2): first-class session — provenance
     // 'invite_redemption', scope_community_id left NULL. Not community-bound.
+    // Handoff 054 §5.4: written through SessionProvenance, not a literal.
     let session = db
         .prepare(
             "INSERT INTO sessions \
              (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) \
-             SELECT ?1, ?2, ?3, ?4, ?5, ?4, 'invite_redemption' \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?8 \
              WHERE EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?6 AND m.community_id=?7 \
                              AND m.user_id=?2 AND m.removed_at IS NULL)",
@@ -188,6 +189,9 @@ pub async fn redeem_required(
             session_expires_at.as_str().into(),
             membership_id.into(),
             community_id.into(),
+            crate::db::session::SessionProvenance::InviteRedemption
+                .as_str()
+                .into(),
         ])?;
     let record = audit::required_record(
         request_id,

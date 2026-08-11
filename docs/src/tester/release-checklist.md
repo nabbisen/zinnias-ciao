@@ -1388,3 +1388,104 @@ by a dedicated gate and by the build itself staying at 28.4kb.
 - [x] **All eleven smokes green, unchanged** — expected for a package that
       adds no reachable surface. *(evidence
       `.git-exclude/tmp/handoff053-proofs/`)*
+
+## The authentication callback route (Handoff 054, external-identity Slice 4b)
+
+4a built a verification path nothing could reach; this package makes it
+reachable — the point and the risk of the same package, since every
+mistake here is a live authentication path.
+
+- [x] **`dev_fake_issuer` Cargo feature (default off) is the structural
+      guarantee §3 requires.** Gates both the fake issuer's HTTP routes
+      (`identity::dev_fake_issuer`, entirely absent as a module without
+      it) and the namespace-verification-requirements resolver's only
+      Some-returning branch — the feature-off variant of
+      `resolve_namespace_verification` returns `None` unconditionally, no
+      configuration can re-enable it at runtime. Established first,
+      empirically, that `wrangler dev` and `bun run build` invoke the
+      identical root `[build]` command with no built-in per-environment
+      differentiation, and that `scripts/lib/isolated-worker-test.mjs`
+      copies the pre-built shared artifact rather than rebuilding — so the
+      new smoke builds its own isolated, feature-on artifact into a
+      scratch directory and overwrites only its own already-isolated copy,
+      never the shared `workers/ssr/build/` the other eleven smokes depend
+      on.
+- [x] **Both required gates proven firing on every failure branch**, each
+      `cmp`-verified byte-identical after restore:
+      `identity_dev_fake_issuer_absent_from_production_build`
+      (`test:dev-fake-issuer-absent`) — builds both a feature-off and a
+      feature-on artifact into scratch directories, asserts four markers
+      unique to the gated route paths/issuer constants are absent from the
+      former and present in the latter (proving the search itself isn't
+      vacuous); fired by flipping the feature to default-on in
+      `Cargo.toml`. `rfc081_session_minting_sites_are_enumerated_and_set_a_provenance`,
+      strengthened with two new checks (no SQL string literal at any
+      minting site; every site's Rust call-site text references
+      `SessionProvenance::`) — fired independently on both branches
+      (reintroducing a literal; inlining an untyped string past the type).
+- [x] **`SessionProvenance` closes the RFC-080 §6 / Handoff 054 §5.4 typo hazard** — a
+      compile-time enum with a single serialisation point, converted at
+      all three minting sites (`db/invite.rs`, `db/relink.rs`, the new
+      `db/auth_transaction.rs`), gate-enforced.
+- [x] **Nine-step callback contract (RFC-080 §5.1)**: transaction
+      consumed/reserved before the code exchange, not after; only
+      `VerifiedExternalIdentity` crosses into identity logic. Safe-return
+      allowlist is server-side, resolved from the transaction row, never a
+      request parameter — `//evil.example` (the protocol-relative trap)
+      and backslash variants explicitly rejected, both by unit test and by
+      the smoke seeding a malicious `return_to` directly into the row (the
+      only way it could ever arrive there) and confirming the callback
+      still redirects to the safe default.
+- [x] **One real bug found and fixed by the smoke, not by inspection**:
+      `db::auth_transaction::insert_required`'s three `Option<&str>`
+      columns were bound via bare `.into()`, which produces a JS
+      `undefined` for `None` rather than `null` — D1 rejects `undefined`
+      binds outright (`D1_TYPE_ERROR`), so every `/identity/start` call
+      failed closed with a generic 500 before this fix. Corrected to the
+      same `.map(JsValue::from_str).unwrap_or(JsValue::NULL)` pattern
+      already established in `db/event_template.rs`/`db/event_write.rs`.
+      Native `cargo test` could not have caught this — it is a D1-runtime
+      binding behaviour, not a compile-time type error — which is exactly
+      why this slice's own §6 called for an end-to-end proof.
+- [x] **Review-054 fix: `mint_malformed_signature` did not reliably
+      malform.** It mutated the base64url signature's *last* character —
+      but a 32-byte HMAC encodes to 43 characters carrying 258 bits, so
+      the last character holds only 4 significant bits (2 are padding);
+      4 of the 64 alphabet characters decode to the identical byte there.
+      The mutation was a silent no-op on exactly one of those (`'A'`),
+      making `malformed_signature_is_rejected` fail (`unwrap_err()`
+      panicking on an unexpectedly-valid signature) about 1 run in 16 —
+      measured at 3/31 by the reviewer. Fixed to mutate the signature's
+      *first* character instead, which always carries a full 6
+      significant bits with no padding ambiguity, making the mutation
+      unconditional. Re-run 50 times as separate process invocations
+      (each with a freshly random HMAC key): 0 failures. Full workspace
+      suite, clippy (both feature states), and both wasm checks re-run
+      clean after the fix; test count unchanged (566 — a logic fix, not a
+      new test).
+- [x] **The new identity smoke, all six required scenarios green**:
+      successful sign-in issuing a session with provenance
+      `external_identity`; a replayed callback rejected; a tampered
+      `state` rejected; a wrong `nonce` (tampered before reaching the
+      provider) rejected; an out-of-allowlist `return_to` refused; the
+      whole flow succeeding end-to-end with a real headless browser,
+      application JavaScript fully disabled
+      (`Emulation.setScriptExecutionDisabled`), zero CSP violations.
+- [x] No CSP change (top-level navigation only, `form-action 'self'`
+      unaffected — confirmed by `git diff` on `attach_security_headers`
+      showing no touch). No account surface, no `authenticated_at`, no
+      version bump.
+- [x] `cargo test --workspace`: **556 → 566** — exactly the 10 new tests in
+      `handlers/identity/tests.rs` (allowlist rejections, provenance
+      exhaustiveness, invite-reference extraction, urlencode); the
+      strengthened `release_gates` assertion added no new test. Clippy
+      (native and `--features dev_fake_issuer`), fmt, wasm check (both
+      feature states), `mdbook build docs`, `git diff --check` all clean.
+      `bun run build`: 28.4kb → 28.6kb — expected, not suspicious: this
+      slice adds a real reachable route/handler path even with the
+      feature off, unlike 4a. Digest/cache-version gate passes without a
+      re-pin (no version bump, no cached asset touched).
+- [x] **All twelve smokes green** — the eleven pre-existing unmodified,
+      plus the new `smoke:identity-callback`. Zero CSP violations, zero
+      stray processes left running. *(evidence
+      `.git-exclude/evidence/handoff054/`)*

@@ -117,5 +117,29 @@ pub(crate) fn decode_and_verify(
     Ok(DecodedJwt { claims })
 }
 
+/// Encode and sign a compact JWT with HS256. Used by Handoff 054's
+/// `dev_fake_issuer` module to mint tokens for the local fake issuer's
+/// `/token` endpoint — gated the same way that module is
+/// (`#[cfg(feature = "dev_fake_issuer")]`), so a production build has no
+/// code that can sign a token at all, not just no code that verifies
+/// `idns_local_fake`. (4a's test-only fake issuer, `fake_issuer.rs`, has
+/// its own independent signing helpers under `#[cfg(test)]` — reviewed and
+/// left as-is rather than refactored onto this one, which did not exist
+/// when it was written.)
+#[cfg(feature = "dev_fake_issuer")]
+pub(crate) fn encode_hs256(
+    header: &serde_json::Value,
+    claims: &serde_json::Value,
+    key: &[u8],
+) -> String {
+    let header_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_vec(header).expect("header serializes"));
+    let payload_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_vec(claims).expect("claims serialize"));
+    let signing_input = format!("{header_b64}.{payload_b64}");
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC accepts any key length");
+    mac.update(signing_input.as_bytes());
+    let sig_b64 = URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes());
+    format!("{signing_input}.{sig_b64}")
+}
+
 #[cfg(test)]
 mod tests;

@@ -29,6 +29,7 @@
     "test:bootstrap-safety": "node scripts/test-bootstrap-cloudflare.mjs",
     "test:hmac-pepper-configuration": "node scripts/test-hmac-pepper-configuration.mjs",
     "test:form-token-replay-rejected": "node scripts/test-form-token-replay-rejected.mjs",
+    "test:dev-fake-issuer-absent": "node scripts/test-dev-fake-issuer-absent-from-production-build.mjs",
     "test:abuse-controls": "node scripts/smoke/abuse-controls.mjs",
     "test:evidence-manifest": "node scripts/test-evidence-manifest.mjs",
     "test:release-candidate-attestation-gates": "node scripts/test-release-candidate-attestation-gates.mjs",
@@ -49,7 +50,8 @@
     "smoke:admin-member-management": "node scripts/smoke/rfc075-slice5-admin-member-management.mjs",
     "smoke:admin-tools-onboarding": "node scripts/smoke/rfc075-slice6-admin-tools-and-onboarding.mjs",
     "smoke:final-migration": "node scripts/smoke/rfc075-slice7-final-migration.mjs",
-    "smoke:session-scope": "node scripts/smoke/session-provenance-and-community-binding.mjs"
+    "smoke:session-scope": "node scripts/smoke/session-provenance-and-community-binding.mjs",
+    "smoke:identity-callback": "node scripts/smoke/external-identity-callback.mjs"
   },
   "devDependencies": {
     "wrangler": "4.113.0"

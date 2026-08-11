@@ -6,6 +6,18 @@ license.workspace       = true
 authors.workspace       = true
 repository.workspace    = true
 
+# RFC-080 §10 / Handoff 054 §3: the local fake issuer (its HTTP routes, and
+# the namespace-verification-requirements resolver's branch for
+# `idns_local_fake`) exists only when this feature is enabled. Off by
+# default — `bun run build` (production, staging, and every one of the ten
+# pre-existing smokes) never passes it, so a production artifact is
+# structurally incapable of authenticating against the fake issuer: the
+# code and its string literals are absent from the compiled wasm, not
+# merely unreachable at runtime. Only the new identity smoke's own,
+# separately-built artifact enables it.
+[features]
+dev_fake_issuer = []
+
 # Workers target is wasm32-unknown-unknown; wrangler/worker-build drives this.
 [lib]
 crate-type              = ["cdylib"]

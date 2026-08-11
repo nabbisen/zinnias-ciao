@@ -43,3 +43,21 @@ pub const EN_JOIN_PROFILE_PAGE_TITLE: &str = "Your name";
 
 pub const JA_JOIN_PAGE_TITLE: &str = "参加";
 pub const JA_JOIN_PROFILE_PAGE_TITLE: &str = "お名前";
+
+// ── External identity sign-in (RFC-080, Handoff 054) ─────────────────────
+// One generic outcome for every distinct rejection reason in the callback
+// contract (RFC-080 §5.2): sign-in failure text must never confirm account
+// existence, a linked provider, invite validity, or any internal detail.
+pub const EN_IDENTITY_SIGN_IN_LINK: &str = "Sign in with an external account";
+pub const EN_IDENTITY_SIGN_IN_FAILED_TITLE: &str = "Sign-in could not be completed";
+pub const EN_IDENTITY_SIGN_IN_FAILED_BODY: &str =
+    "Sign-in could not be completed. You can try again, or cancel and return.";
+pub const EN_IDENTITY_SIGN_IN_RETRY: &str = "Try again";
+pub const EN_IDENTITY_SIGN_IN_CANCEL: &str = "Cancel";
+
+pub const JA_IDENTITY_SIGN_IN_LINK: &str = "外部アカウントでサインイン";
+pub const JA_IDENTITY_SIGN_IN_FAILED_TITLE: &str = "サインインを完了できませんでした";
+pub const JA_IDENTITY_SIGN_IN_FAILED_BODY: &str =
+    "サインインを完了できませんでした。もう一度お試しいただくか、キャンセルしてお戻りください。";
+pub const JA_IDENTITY_SIGN_IN_RETRY: &str = "もう一度試す";
+pub const JA_IDENTITY_SIGN_IN_CANCEL: &str = "キャンセル";

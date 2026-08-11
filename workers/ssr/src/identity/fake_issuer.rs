@@ -93,14 +93,24 @@ impl FakeIssuer {
     /// has been corrupted after signing — decodes fine, verifies against
     /// nothing.
     pub(super) fn mint_malformed_signature(&self, claims: &Claims) -> String {
-        let mut token = self.mint(claims);
-        let last = token.pop().expect("signed token is non-empty");
-        // Any distinct valid base64url character changes the decoded
-        // signature bytes without changing the token's length or making
-        // it fail to base64-decode.
-        let replacement = if last == 'A' { 'B' } else { 'A' };
-        token.push(replacement);
-        token
+        let token = self.mint(claims);
+        let dot = token.rfind('.').expect("signed token has three parts");
+        let sig_start = dot + 1;
+        let mut bytes = token.into_bytes();
+        // Mutate the signature's *first* base64url character, not its
+        // last. A 32-byte HMAC encodes to 43 base64url characters holding
+        // 258 bits, so the last character carries only 4 significant bits
+        // (the other 2 are padding) — 4 of the 64 alphabet characters
+        // decode to the identical final byte there, making a last-char
+        // mutation a silent no-op about 1 run in 16 (review-054 measured
+        // 3/31, consistent with 1/16). The first character always carries
+        // a full 6 significant bits of the first signature byte, with no
+        // padding ambiguity at the start of any base64 stream — so
+        // changing it to a different valid character unconditionally
+        // changes the decoded bytes.
+        let first = bytes[sig_start];
+        bytes[sig_start] = if first == b'A' { b'B' } else { b'A' };
+        String::from_utf8(bytes).expect("base64url alphabet is ASCII")
     }
 
     /// Full control over both header and payload JSON, for cases the

@@ -117,6 +117,27 @@ async fn dispatch_request(
         (Method::Get, "/relink") => handlers::relink::get_relink(req, env, request_id).await,
         (Method::Post, "/relink") => handlers::relink::post_relink(req, env, request_id).await,
 
+        // ── External identity (RFC-080 §5, Handoff 054) ───────────────────
+        (Method::Get, "/identity/start") => {
+            handlers::identity::get_start(req, env, request_id).await
+        }
+        (Method::Get, "/identity/callback") => {
+            handlers::identity::get_callback(req, env, request_id).await
+        }
+
+        // ── The local fake issuer — dev/smoke builds only (Handoff 054 §3).
+        // Absent entirely from a production build; see
+        // `identity_dev_fake_issuer_absent_from_production_build` in
+        // release_gates.rs for the artifact-level proof.
+        #[cfg(feature = "dev_fake_issuer")]
+        (Method::Get, "/dev/identity/fake-issuer/authorize") => {
+            identity::dev_fake_issuer::get_authorize(req, env, request_id).await
+        }
+        #[cfg(feature = "dev_fake_issuer")]
+        (Method::Post, "/dev/identity/fake-issuer/token") => {
+            identity::dev_fake_issuer::post_token(req, env, request_id).await
+        }
+
         // ── Member area ───────────────────────────────────────────────────
         (Method::Get, "/") | (Method::Get, "/c") => {
             handlers::home::redirect_to_home(req, env, request_id).await

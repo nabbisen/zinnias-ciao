@@ -55,11 +55,20 @@ pub(crate) enum AuditAction {
     /// use. The refusal itself is unconditional and fail-closed; this
     /// action records it as visible, deliberate misuse-shaped evidence.
     SessionScopeRefused,
+    /// RFC-080 §8 / Handoff 054: a session was issued after a verified
+    /// external identity resolved to an already-linked user (`sign_in`).
+    /// No community is involved — user-level, same shape as
+    /// `SessionLogout`. The `join` outcome (a new identity claiming an
+    /// invite) reuses `InviteCodeRedeemed` instead, since structurally it
+    /// is the same event the ordinary invite-code `/join` flow already
+    /// records; `sessions.provenance` is what distinguishes how the
+    /// session was authenticated, not a second audit action.
+    ExternalSessionIssued,
 }
 
 impl AuditAction {
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 27] = [
+    pub(crate) const ALL: [Self; 28] = [
         Self::CommunityCreated,
         Self::MembershipCreatedFirstAdmin,
         Self::MembershipDisplayNameUpdated,
@@ -87,6 +96,7 @@ impl AuditAction {
         Self::CalendarMatrixCsvExportRequested,
         Self::SessionLogout,
         Self::SessionScopeRefused,
+        Self::ExternalSessionIssued,
     ];
 
     pub(crate) const fn canonical(self) -> &'static str {
@@ -118,6 +128,7 @@ impl AuditAction {
             Self::CalendarMatrixCsvExportRequested => "calendar_matrix_csv.export_requested",
             Self::SessionLogout => "session.logout",
             Self::SessionScopeRefused => "session.scope_refused",
+            Self::ExternalSessionIssued => "session.external_issued",
         }
     }
 
@@ -147,6 +158,7 @@ impl AuditAction {
                 | Self::CalendarFeedTokenRevoked
                 | Self::EventTemplateCreated
                 | Self::EventTemplateDeleted
+                | Self::ExternalSessionIssued
         )
     }
 
@@ -171,7 +183,9 @@ impl AuditAction {
             Self::CalendarFeedTokenGenerated | Self::CalendarFeedTokenRevoked => "calendar_feed",
             Self::EventTemplateCreated | Self::EventTemplateDeleted => "event_template",
             Self::CalendarMatrixCsvExportRequested => "calendar_matrix_csv",
-            Self::SessionLogout | Self::SessionScopeRefused => "session",
+            Self::SessionLogout | Self::SessionScopeRefused | Self::ExternalSessionIssued => {
+                "session"
+            }
         }
     }
 
@@ -1157,6 +1171,7 @@ fn validate_pairing(
                 | AuditAction::EventTemplateDeleted
                 | AuditAction::CommunityExportAuthorized
                 | AuditAction::SessionLogout
+                | AuditAction::ExternalSessionIssued
         );
     if valid {
         Ok(())
@@ -1172,7 +1187,9 @@ fn validate_context(
     target_id: Option<&str>,
 ) -> std::result::Result<(), AuditBuildError> {
     let valid = match action {
-        AuditAction::SessionLogout | AuditAction::SessionScopeRefused => {
+        AuditAction::SessionLogout
+        | AuditAction::SessionScopeRefused
+        | AuditAction::ExternalSessionIssued => {
             community_id.is_none() && actor_membership_id.is_none() && target_id.is_none()
         }
         AuditAction::CalendarFeedTokenGenerated | AuditAction::CalendarFeedTokenRevoked => {
@@ -1582,7 +1599,7 @@ mod tests {
             .into_iter()
             .map(AuditAction::canonical)
             .collect();
-        assert_eq!(values.len(), 27);
+        assert_eq!(values.len(), 28);
         assert!(values.iter().all(|value| value.contains('.')));
         for value in values {
             assert_eq!(
@@ -1597,15 +1614,16 @@ mod tests {
     }
 
     #[test]
-    fn class_a_action_inventory_is_closed_at_twenty_three() {
+    fn class_a_action_inventory_is_closed_at_twenty_four() {
         let class_a: Vec<_> = AuditAction::ALL
             .into_iter()
             .filter(|action| action.is_class_a())
             .collect();
-        assert_eq!(class_a.len(), 23);
+        assert_eq!(class_a.len(), 24);
         assert!(!AuditAction::CommunityExportAuthorized.is_class_a());
         assert!(!AuditAction::CalendarMatrixCsvExportRequested.is_class_a());
         assert!(!AuditAction::SessionLogout.is_class_a());
+        assert!(AuditAction::ExternalSessionIssued.is_class_a());
     }
 
     #[test]

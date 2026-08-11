@@ -8,6 +8,7 @@ pub mod event;
 pub mod export;
 pub mod health;
 pub mod home;
+pub mod identity;
 pub mod join;
 pub mod me;
 pub mod operator;
