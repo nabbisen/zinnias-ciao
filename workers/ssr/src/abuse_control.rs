@@ -30,6 +30,13 @@ pub enum Scope {
     CommunityUser,
     CommunitySession,
     CommunityNetwork,
+    /// RFC-081 §3.3 / Handoff 057 §5.2: the anonymous recovery-credential
+    /// consumption route. A distinct scope, not `Relink` reused — the two
+    /// flows must not share a rate-limit budget (one could starve the
+    /// other), and this route authenticates an entire account rather than
+    /// one community membership, which is exactly why Handoff 057 calls
+    /// the limiter a stop condition for it, not a nice-to-have.
+    Recovery,
 }
 
 impl Scope {
@@ -40,16 +47,19 @@ impl Scope {
             Scope::CommunityUser => "community-user",
             Scope::CommunitySession => "community-session",
             Scope::CommunityNetwork => "community-network",
+            Scope::Recovery => "recovery",
         }
     }
 
     /// The policy identifier sent to the coordinator. The three community
-    /// dimensions share one policy; invite and relink each have their own.
+    /// dimensions share one policy; invite, relink, and recovery each have
+    /// their own.
     const fn policy(self) -> &'static str {
         match self {
             Scope::Invite => "invite",
             Scope::Relink => "relink",
             Scope::CommunityUser | Scope::CommunitySession | Scope::CommunityNetwork => "community",
+            Scope::Recovery => "recovery",
         }
     }
 
@@ -58,7 +68,7 @@ impl Scope {
     /// defensive ceiling only.
     const fn max_window_seconds(self) -> u32 {
         match self {
-            Scope::Invite | Scope::Relink => 300,
+            Scope::Invite | Scope::Relink | Scope::Recovery => 300,
             Scope::CommunityUser | Scope::CommunitySession | Scope::CommunityNetwork => 86_400,
         }
     }

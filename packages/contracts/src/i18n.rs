@@ -17,6 +17,7 @@ mod general;
 mod home;
 mod me;
 mod notes;
+mod recovery;
 mod templates;
 
 pub use access::*;
@@ -30,6 +31,7 @@ pub use general::*;
 pub use home::*;
 pub use me::*;
 pub use notes::*;
+pub use recovery::*;
 pub use templates::*;
 
 use crate::locale::Locale;

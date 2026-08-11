@@ -13,6 +13,7 @@ pub mod identity;
 pub mod join;
 pub mod me;
 pub mod operator;
+pub mod recovery;
 pub mod relink;
 pub mod static_files;
 pub mod templates;

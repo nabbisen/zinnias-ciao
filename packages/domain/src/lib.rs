@@ -7,6 +7,7 @@ pub mod event_admin;
 pub mod invite;
 pub mod membership;
 pub mod note;
+pub mod recovery;
 pub mod session;
 pub mod status;
 
@@ -24,6 +25,9 @@ pub use event_admin::{
 pub use invite::{INVITE_CODE_LEN, InviteValidationError, validate_invite_input};
 pub use membership::{Membership, Role};
 pub use note::{NOTE_MAX_CHARS, NoteError, validate_note};
+pub use recovery::{
+    ACCOUNT_RECOVERY_CODE_LEN, RecoveryCodeValidationError, validate_recovery_code_input,
+};
 pub use session::SessionState;
 pub use status::{
     AttendanceStatus, DayTimeState, StatusTransitionError, validate_status_transition,

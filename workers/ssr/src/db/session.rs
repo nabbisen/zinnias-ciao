@@ -23,6 +23,13 @@ pub(crate) enum SessionProvenance {
     InviteRedemption,
     Relink,
     ExternalIdentity,
+    /// RFC-081 §3 / Handoff 057 §5.2: minted by the anonymous recovery-
+    /// credential consumption route. Unscoped, account-tier by
+    /// construction — `authz::is_account_tier_session` excludes only
+    /// `Relink`, so this provenance is eligible the same way
+    /// `ExternalIdentity` already is; pinned by a test rather than
+    /// assumed (Handoff 057 §5.2's own instruction).
+    AccountRecovery,
 }
 
 impl SessionProvenance {
@@ -31,6 +38,7 @@ impl SessionProvenance {
             Self::InviteRedemption => "invite_redemption",
             Self::Relink => "relink",
             Self::ExternalIdentity => "external_identity",
+            Self::AccountRecovery => "account_recovery",
         }
     }
 }

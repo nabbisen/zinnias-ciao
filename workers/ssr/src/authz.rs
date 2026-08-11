@@ -540,6 +540,22 @@ mod tests {
     }
 
     #[test]
+    fn account_recovery_provenance_is_account_tier_and_eligible_when_fresh() {
+        // Handoff 057 §5.2: pinned rather than assumed — the session a
+        // recovery-credential consumption mints must be account-tier and
+        // fresh by construction (`is_account_tier_session` excludes only
+        // `Relink`), not merely by omission of a check somewhere else.
+        assert!(is_fresh_for_account_operations(
+            &auth_with_freshness(Some("account_recovery"), None, Some(WITHIN_WINDOW)),
+            WINDOW_START,
+        ));
+        assert_eq!(
+            decide_account_surface_access(&auth(Some("account_recovery"), None)),
+            AccountSurfaceDecision::Allowed
+        );
+    }
+
+    #[test]
     fn scoped_session_is_refused_even_with_eligible_provenance_and_fresh_authentication() {
         assert!(!is_fresh_for_account_operations(
             &auth_with_freshness(
@@ -611,11 +627,12 @@ mod tests {
         // A brute-force cross-product, independent of the targeted tests
         // above: only (eligible provenance, unscoped, authenticated_at
         // within the window) may pass.
-        let provenances: [Option<&str>; 4] = [
+        let provenances: [Option<&str>; 5] = [
             None,
             Some("invite_redemption"),
             Some("relink"),
             Some("external_identity"),
+            Some("account_recovery"),
         ];
         let scopes: [Option<&str>; 2] = [None, Some("com_a")];
         let freshness: [Option<&str>; 3] = [None, Some(BEFORE_WINDOW), Some(WITHIN_WINDOW)];

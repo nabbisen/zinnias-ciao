@@ -382,29 +382,27 @@ pub async fn get_callback(req: Request, env: &Env, rid: &str) -> Result<Response
     // session, and audit — one outcome per `action`, RFC-080 §7 (no
     // orphan users, no auto-link).
     let outcome = match transaction.action.as_str() {
-        "sign_in" => {
-            sign_in_outcome(
-                &db,
-                rid,
-                pepper.as_str(),
-                &namespace,
-                &subject_lookup,
-                &req,
-                env,
-            )
-            .await?
-        }
-        "join" => {
-            join_outcome(
-                &db,
-                rid,
-                pepper.as_str(),
-                &namespace,
-                &subject_lookup,
-                transaction.invite_reference.as_deref(),
-            )
-            .await?
-        }
+        "sign_in" => sign_in_outcome(
+            &db,
+            rid,
+            pepper.as_str(),
+            &namespace,
+            &subject_lookup,
+            &req,
+            env,
+        )
+        .await?
+        .map(CallbackOutcome::Redirect),
+        "join" => join_outcome(
+            &db,
+            rid,
+            pepper.as_str(),
+            &namespace,
+            &subject_lookup,
+            transaction.invite_reference.as_deref(),
+        )
+        .await?
+        .map(CallbackOutcome::Redirect),
         "link" => match transaction.initiating_user_id.as_deref() {
             Some(initiating_user_id) => {
                 link_outcome(
@@ -427,25 +425,64 @@ pub async fn get_callback(req: Request, env: &Env, rid: &str) -> Result<Response
         _ => None,
     };
 
-    let Some(session_secret) = outcome else {
+    let Some(outcome) = outcome else {
         return sign_in_failed_page();
     };
 
-    // Step 9: redirect to a fixed clean local route — provider response
-    // parameters (`code`, `state`) never appear in this response's own
-    // URL, so they drop out of subsequent history/referrer propagation.
-    let destination = resolve_safe_return(transaction.return_to.as_deref());
     let cookie_domain = env
         .var("SESSION_COOKIE_DOMAIN")
         .ok()
         .map(|s| s.to_string())
         .filter(|s| !s.is_empty());
-    let session_cookie =
-        crate::session::build_session_cookie(&session_secret, cookie_domain.as_deref());
-    let mut resp = redirect(destination)?;
-    resp.headers_mut().set("Set-Cookie", &session_cookie)?;
-    resp.headers_mut().set("Referrer-Policy", "no-referrer")?;
-    Ok(resp)
+
+    match outcome {
+        // Step 9: redirect to a fixed clean local route — provider
+        // response parameters (`code`, `state`) never appear in this
+        // response's own URL, so they drop out of subsequent
+        // history/referrer propagation.
+        CallbackOutcome::Redirect(session_secret) => {
+            let destination = resolve_safe_return(transaction.return_to.as_deref());
+            let session_cookie =
+                crate::session::build_session_cookie(&session_secret, cookie_domain.as_deref());
+            let mut resp = redirect(destination)?;
+            resp.headers_mut().set("Set-Cookie", &session_cookie)?;
+            resp.headers_mut().set("Referrer-Policy", "no-referrer")?;
+            Ok(resp)
+        }
+        // RFC-081 §3.1 / Handoff 057 §5.1: the member's very first link
+        // just issued their recovery credential — shown exactly once, in
+        // this response, rather than a redirect that would need to carry
+        // the plaintext code somewhere (a query string, a KV entry) this
+        // package's own "never redisplay" discipline forbids.
+        CallbackOutcome::RevealAccountPage {
+            session_secret,
+            user_id,
+            code,
+        } => {
+            let session_cookie =
+                crate::session::build_session_cookie(&session_secret, cookie_domain.as_deref());
+            let mut resp =
+                crate::handlers::account::render_account_page(env, &user_id, true, Some(&code))
+                    .await?;
+            resp.headers_mut().set("Set-Cookie", &session_cookie)?;
+            resp.headers_mut().set("Referrer-Policy", "no-referrer")?;
+            Ok(resp)
+        }
+    }
+}
+
+/// The `get_callback` success shape: an ordinary redirect (every action
+/// today except a first link), or a direct 200 rendering the account page
+/// with a just-issued recovery credential revealed once — see
+/// `CallbackOutcome::RevealAccountPage`'s call site for why a redirect
+/// cannot carry that plaintext.
+enum CallbackOutcome {
+    Redirect(String),
+    RevealAccountPage {
+        session_secret: String,
+        user_id: String,
+        code: String,
+    },
 }
 
 async fn sign_in_outcome(
@@ -525,7 +562,7 @@ async fn link_outcome(
     pepper: &str,
     subject_lookup: &str,
     initiating_user_id: &str,
-) -> Result<Option<String>> {
+) -> Result<Option<CallbackOutcome>> {
     if db::identity::find_by_subject_lookup(db, "idns_local_fake", subject_lookup)
         .await?
         .is_some()
@@ -557,7 +594,34 @@ async fn link_outcome(
         &session_hmac,
     )
     .await?;
-    Ok(Some(session_secret))
+
+    // RFC-081 §3.1 / Handoff 057 §5.1: issued the first time this
+    // principal ever holds a usable method — not bundled into the same
+    // batch as the identity write above; see
+    // `db::recovery::issue_at_first_link_required`'s own doc comment for
+    // why that tradeoff was made deliberately.
+    let code = crate::handlers::account::recovery::generate_code()?;
+    let normalized = crate::crypto::normalize_invite_code(&code);
+    let code_hmac = crate::crypto::hmac_hex(pepper, &normalized);
+    let credential_id = format!("rec_{}", &crate::crypto::random_token()[..24]);
+    let issued = db::recovery::issue_at_first_link_required(
+        db,
+        rid,
+        initiating_user_id,
+        &credential_id,
+        &code_hmac,
+    )
+    .await?;
+
+    if issued {
+        Ok(Some(CallbackOutcome::RevealAccountPage {
+            session_secret,
+            user_id: initiating_user_id.to_owned(),
+            code,
+        }))
+    } else {
+        Ok(Some(CallbackOutcome::Redirect(session_secret)))
+    }
 }
 
 async fn join_outcome(

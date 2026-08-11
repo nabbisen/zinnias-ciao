@@ -240,8 +240,25 @@ fn en_ja_parity() {
         "ACCOUNT_LINK_BODY",
         "ACCOUNT_LINK_SUBMIT",
         "ACCOUNT_LINK_CANCEL",
+        // Recovery credential and unlink (RFC-081 §3, Handoff 057)
+        "ACCOUNT_RECOVERY_CREDENTIAL_EXISTS",
+        "ACCOUNT_RECOVERY_REGENERATE_LABEL",
+        "ACCOUNT_RECOVERY_REVEAL_WARNING",
+        "ACCOUNT_RECOVERY_REVEAL_HINT",
+        "ACCOUNT_RECOVERY_CONTINUE",
+        "ACCOUNT_UNLINK_LABEL",
+        "ACCOUNT_UNLINK_TITLE",
+        "ACCOUNT_UNLINK_BODY",
+        "ACCOUNT_UNLINK_SUBMIT",
+        "ACCOUNT_UNLINK_CANCEL",
+        "ACCOUNT_UNLINK_REFUSED",
+        "RECOVERY_TITLE",
+        "RECOVERY_BODY",
+        "RECOVERY_CODE_LABEL",
+        "RECOVERY_SUBMIT",
+        "RECOVERY_INVALID",
     ];
-    assert_eq!(en_keys.len(), 214, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 230, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

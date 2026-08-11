@@ -69,6 +69,12 @@ fn policy_limits(policy: &str) -> Option<(i64, i64)> {
     match policy {
         "invite" | "relink" => Some((10, 300_000)),
         "community" => Some((3, 86_400_000)),
+        // RFC-081 §3.3 / Handoff 057 §5.2: tighter than invite/relink —
+        // this route authenticates an entire account, not one community
+        // membership, and the credential it guards carries no expiry, so
+        // the per-window throttle is a standing defense over an unbounded
+        // lifetime rather than a short one.
+        "recovery" => Some((5, 300_000)),
         _ => None,
     }
 }

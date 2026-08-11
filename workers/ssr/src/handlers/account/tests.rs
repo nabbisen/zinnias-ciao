@@ -4,6 +4,7 @@ use crate::db::membership::CommunitySummary;
 
 fn identity(namespace: &str, linked_at: &str) -> LinkedIdentitySummary {
     LinkedIdentitySummary {
+        id: "idty_test".to_owned(),
         identity_namespace_id: namespace.to_owned(),
         linked_at: linked_at.to_owned(),
     }
@@ -100,14 +101,43 @@ fn stale_session_shows_the_sign_in_again_message_and_link() {
     assert!(!html.contains(i18n::JA_ACCOUNT_FRESH_CAN_MANAGE));
 }
 
-// ── The full body: recovery credential always "none yet" in 5a ───────────
+// ── The full body: recovery credential existence (Handoff 057 §5.1) ──────
 
 #[test]
-fn recovery_credential_section_always_shows_none_yet() {
-    // 5a creates no recovery credential (Slice 5b's job) — the account
-    // page must not claim one might exist.
-    let html = render_body(&[], &[], true);
+fn recovery_credential_section_shows_none_yet_when_absent() {
+    let html = render_body(&[], &[], true, false, "tok", None);
     assert!(html.contains(i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_NONE));
+    assert!(!html.contains(i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS));
+}
+
+#[test]
+fn recovery_credential_section_shows_exists_when_present() {
+    let html = render_body(&[], &[], true, true, "tok", None);
+    assert!(html.contains(i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS));
+    assert!(!html.contains(i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_NONE));
+}
+
+#[test]
+fn recovery_regenerate_form_always_present_and_carries_the_token() {
+    // Reachable whether or not a credential already exists — for a
+    // pre-057 linked member with no credential yet, this doubles as
+    // "generate for the first time."
+    for has_credential in [false, true] {
+        let html = render_body(&[], &[], true, has_credential, "regen-token-value", None);
+        assert!(html.contains("action=\"/account/recovery/regenerate\""));
+        assert!(html.contains("regen-token-value"));
+    }
+}
+
+#[test]
+fn reveal_renders_the_code_and_warning_only_when_present() {
+    let without = render_body(&[], &[], true, true, "tok", None);
+    assert!(!without.contains("id=\"recovery-code-reveal\""));
+
+    let with = render_body(&[], &[], true, true, "tok", Some("ABCD-EFGH-JKMN"));
+    assert!(with.contains("id=\"recovery-code-reveal\""));
+    assert!(with.contains("ABCD-EFGH-JKMN"));
+    assert!(with.contains(i18n::JA_ACCOUNT_RECOVERY_REVEAL_WARNING));
 }
 
 #[test]
@@ -119,6 +149,9 @@ fn full_body_never_mentions_subject_digest_or_issuer() {
         &[identity("idns_local_fake", "2026-08-11T00:00:00.000Z")],
         &[community("Test Community")],
         false,
+        true,
+        "tok",
+        None,
     );
     for forbidden in ["subject", "digest", "issuer", "sub=", "https://fake-issuer"] {
         assert!(
@@ -130,8 +163,15 @@ fn full_body_never_mentions_subject_digest_or_issuer() {
 
 #[test]
 fn full_body_includes_every_section_heading() {
-    let html = render_body(&[], &[], true);
+    let html = render_body(&[], &[], true, false, "tok", None);
     assert!(html.contains(i18n::JA_ACCOUNT_LINKED_IDENTITIES_HEADING));
     assert!(html.contains(i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_HEADING));
     assert!(html.contains(i18n::JA_ACCOUNT_COMMUNITIES_HEADING));
+}
+
+#[test]
+fn each_linked_identity_carries_its_own_unlink_link() {
+    let html = render_identities(&[identity("idns_local_fake", "2026-08-11T00:00:00.000Z")]);
+    assert!(html.contains("/account/unlink/idty_test"));
+    assert!(html.contains(i18n::JA_ACCOUNT_UNLINK_LABEL));
 }

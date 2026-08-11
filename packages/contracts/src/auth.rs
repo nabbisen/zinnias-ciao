@@ -49,6 +49,9 @@ pub mod token_purpose {
     pub const CHANGE_DISPLAY_NAME: &str = "change_display_name";
     pub const CHANGE_UI_LANGUAGE: &str = "change_ui_language";
     pub const LINK_IDENTITY: &str = "link_identity";
+    pub const REDEEM_RECOVERY: &str = "redeem_recovery";
+    pub const REGENERATE_RECOVERY: &str = "regenerate_recovery";
+    pub const UNLINK_IDENTITY: &str = "unlink_identity";
 }
 
 /// Outcome of attempting to consume a single-use form token.

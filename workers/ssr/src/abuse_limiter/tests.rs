@@ -32,6 +32,22 @@ fn known_policies_have_fixed_limits() {
     assert_eq!(policy_limits("invite"), Some((10, 300_000)));
     assert_eq!(policy_limits("relink"), Some((10, 300_000)));
     assert_eq!(policy_limits("community"), Some((3, 86_400_000)));
+    assert_eq!(policy_limits("recovery"), Some((5, 300_000)));
+}
+
+#[test]
+fn recovery_policy_is_distinct_from_and_stricter_than_relink() {
+    let (recovery_limit, recovery_window) = policy_limits("recovery").unwrap();
+    let (relink_limit, relink_window) = policy_limits("relink").unwrap();
+    assert!(
+        recovery_limit < relink_limit,
+        "recovery authenticates an entire account and its credential never expires — it must \
+         not share relink's more permissive budget"
+    );
+    assert_eq!(
+        recovery_window, relink_window,
+        "same window shape, tighter count only"
+    );
 }
 
 #[test]

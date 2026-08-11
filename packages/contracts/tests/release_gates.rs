@@ -579,6 +579,34 @@ fn i18n_en_ja_parity_count() {
         (EN_ACCOUNT_LINK_BODY, JA_ACCOUNT_LINK_BODY),
         (EN_ACCOUNT_LINK_SUBMIT, JA_ACCOUNT_LINK_SUBMIT),
         (EN_ACCOUNT_LINK_CANCEL, JA_ACCOUNT_LINK_CANCEL),
+        (
+            EN_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS,
+            JA_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS,
+        ),
+        (
+            EN_ACCOUNT_RECOVERY_REGENERATE_LABEL,
+            JA_ACCOUNT_RECOVERY_REGENERATE_LABEL,
+        ),
+        (
+            EN_ACCOUNT_RECOVERY_REVEAL_WARNING,
+            JA_ACCOUNT_RECOVERY_REVEAL_WARNING,
+        ),
+        (
+            EN_ACCOUNT_RECOVERY_REVEAL_HINT,
+            JA_ACCOUNT_RECOVERY_REVEAL_HINT,
+        ),
+        (EN_ACCOUNT_RECOVERY_CONTINUE, JA_ACCOUNT_RECOVERY_CONTINUE),
+        (EN_ACCOUNT_UNLINK_LABEL, JA_ACCOUNT_UNLINK_LABEL),
+        (EN_ACCOUNT_UNLINK_TITLE, JA_ACCOUNT_UNLINK_TITLE),
+        (EN_ACCOUNT_UNLINK_BODY, JA_ACCOUNT_UNLINK_BODY),
+        (EN_ACCOUNT_UNLINK_SUBMIT, JA_ACCOUNT_UNLINK_SUBMIT),
+        (EN_ACCOUNT_UNLINK_CANCEL, JA_ACCOUNT_UNLINK_CANCEL),
+        (EN_ACCOUNT_UNLINK_REFUSED, JA_ACCOUNT_UNLINK_REFUSED),
+        (EN_RECOVERY_TITLE, JA_RECOVERY_TITLE),
+        (EN_RECOVERY_BODY, JA_RECOVERY_BODY),
+        (EN_RECOVERY_CODE_LABEL, JA_RECOVERY_CODE_LABEL),
+        (EN_RECOVERY_SUBMIT, JA_RECOVERY_SUBMIT),
+        (EN_RECOVERY_INVALID, JA_RECOVERY_INVALID),
     ];
     // Strings that are intentionally identical across languages (product name,
     // numeric units, etc.) are exempted from the identity check.
@@ -736,6 +764,8 @@ const GITIGNORE_SRC: &str = include_str!("../../../.gitignore");
 const MIGRATION_0009_SRC: &str = include_str!("../../../migrations/0009_recurrence_v2.sql");
 const MIGRATION_0011_SRC: &str =
     include_str!("../../../migrations/0011_membership_ui_language.sql");
+const MIGRATION_0017_SRC: &str =
+    include_str!("../../../migrations/0017_account_recovery_credentials.sql");
 const EVENT_SERIES_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/event_series.rs");
 const EVENT_ADMIN_DOMAIN_SRC: &str = include_str!("../../../packages/domain/src/event_admin.rs");
 const CRYPTO_SRC: &str = include_str!("../../../workers/ssr/src/crypto.rs");
@@ -1569,9 +1599,12 @@ const MEMBER_REMOVE_HANDLER_SRC: &str =
 const HELP_SIGNIN_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/admin/help_signin.rs");
 const RELINK_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/relink.rs");
+const RECOVERY_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/recovery.rs");
 const OPERATOR_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/operator.rs");
 const MEMBERSHIP_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/membership.rs");
 const RELINK_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/relink.rs");
+const RECOVERY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/recovery.rs");
+const IDENTITY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/identity.rs");
 const RECOVER_COMMUNITY_ACCESS_SCRIPT_SRC: &str =
     include_str!("../../../scripts/recover-community-access.mjs");
 const APP_JS_SRC: &str = include_str!("../../../workers/ssr/static/app.js");
@@ -2192,6 +2225,153 @@ fn rfc024_redemption_rechecks_active_membership_and_community() {
             && JOIN_HANDLER_SRC.contains("let membership_id = crate::crypto::random_token();")
             && INVITE_DB_SRC.contains("INSERT INTO community_memberships"),
         "RFC-024 invite-era help-signin relies on join minting a fresh user_id and membership per invite redemption"
+    );
+}
+
+/// Handoff 057 §6 gate 2: the anonymous recovery-credential consumption
+/// route is abuse-limited, and reserved *before* any credential lookup —
+/// a stop condition per §5.2 / §10, since this route authenticates an
+/// entire account and the credential it guards carries no expiry.
+/// Default-fail: asserts the reserve call's own source position precedes
+/// the credential lookup's, not merely that both strings appear somewhere
+/// in the file — presence alone would pass even if the lookup ran first
+/// and the limiter were reserved only afterward as an afterthought.
+#[test]
+fn rfc081_recovery_route_is_abuse_limited_before_any_credential_lookup() {
+    // Comments stripped first — this file's own module doc comment
+    // mentions `abuse_control::reserve` in prose near the top, which
+    // would otherwise make the position check pass regardless of where
+    // the *real* call sits (discovered while proving this gate fires:
+    // reordering the real call after the lookup still passed, because
+    // the doc-comment mention is always earliest in the file).
+    let production = strip_line_comments(RECOVERY_HANDLER_SRC);
+    let reserve_pos = production
+        .find("abuse_control::reserve")
+        .expect("post_recovery must call abuse_control::reserve");
+    let lookup_pos = production
+        .find("recovery_db::find_valid_by_hmac")
+        .expect("post_recovery must look up the credential by its HMAC");
+    assert!(
+        reserve_pos < lookup_pos,
+        "abuse_control::reserve must be called before the first credential lookup, not after — \
+         found the reserve call at byte {reserve_pos} and the lookup at byte {lookup_pos}"
+    );
+    assert!(
+        RECOVERY_HANDLER_SRC.contains("Scope::Recovery"),
+        "the recovery route must use its own Scope::Recovery, never a scope shared with /relink"
+    );
+    assert!(
+        !RECOVERY_HANDLER_SRC.contains("Scope::Relink"),
+        "the recovery route must not reuse /relink's Scope — sharing a budget lets one flow \
+         starve the other (Handoff 057 §5.2)"
+    );
+    assert!(
+        RECOVERY_HANDLER_SRC.contains("JA_RECOVERY_INVALID")
+            && !RECOVERY_HANDLER_SRC.contains("already used")
+            && !RECOVERY_HANDLER_SRC.contains("revoked")
+            && !RECOVERY_HANDLER_SRC.contains("expired"),
+        "recovery consumption failures must use one generic error, never a distinct message for \
+         unknown/consumed/revoked/expired"
+    );
+}
+
+/// Handoff 057 §5.1 / §7: the recovery credential's own required-test
+/// list — HMAC at rest (never a raw code column), single-use consumption,
+/// and regeneration revoking whatever was previously active in the same
+/// batch as the new insert. Same shape as
+/// `rfc024_relink_codes_are_membership_scoped_hmacs`.
+#[test]
+fn rfc081_recovery_credentials_are_hmac_only_and_regeneration_revokes_previous() {
+    assert!(
+        RECOVERY_DB_SRC.contains("account_recovery_credentials")
+            && RECOVERY_DB_SRC.contains("code_hmac"),
+        "recovery credential table access must reference the HMAC-shaped code_hmac column"
+    );
+    assert!(
+        MIGRATION_0017_SRC.contains("account_recovery_credentials")
+            && MIGRATION_0017_SRC.contains("code_hmac")
+            && !MIGRATION_0017_SRC.contains("code TEXT"),
+        "migration 0017 must define code_hmac only — no separate raw/plaintext code column"
+    );
+    assert!(
+        RECOVERY_HANDLER_SRC.contains("hmac_hex(pepper.as_str()")
+            || RECOVERY_HANDLER_SRC.contains("hmac_hex(pepper"),
+        "the anonymous consumption route must hash the submitted code before any lookup"
+    );
+    // Deliberately the *raw* source here, not `compact_brace_block`'s
+    // output — that helper collapses all whitespace (joining tokens with
+    // nothing between them), which would turn `"revoked_at = ?1"` into an
+    // unmatchable `"revoked_at=?1"` (the exact trap Handoff 056's own
+    // gate work hit and documented).
+    let regenerate_start = RECOVERY_DB_SRC
+        .find("pub async fn regenerate_required")
+        .expect("db/recovery.rs must define regenerate_required");
+    let regenerate = &RECOVERY_DB_SRC[regenerate_start..];
+    assert!(
+        regenerate.contains("revoked_at = ?1")
+            && regenerate.contains("consumed_at IS NULL AND revoked_at IS NULL")
+            && regenerate.contains("execute_required_tail"),
+        "regenerate_required must revoke whatever credential was previously active in the same \
+         batch as the new insert, so a member can never hold two"
+    );
+    assert!(
+        RECOVERY_DB_SRC.contains("pub async fn consume_required")
+            && RECOVERY_DB_SRC.contains("consumed_at IS NULL AND revoked_at IS NULL")
+            && RECOVERY_HANDLER_SRC.contains("recovery_db::consume_required"),
+        "consumption must mark the credential consumed with a conditional single-use update"
+    );
+}
+
+/// Handoff 057 §5.1 / §7 / §9: "No admin-facing recovery operation of any
+/// kind" — RFC-081 §2's community-admin-authority boundary applies to
+/// every account-level credential operation this package adds, the same
+/// way it already applies to linking. Default-fail: scans every `.rs`
+/// file under `handlers/admin/` for any reference to the recovery or
+/// unlink machinery.
+#[test]
+fn rfc081_no_admin_surface_reaches_any_recovery_operation() {
+    let admin_dir = workers_ssr_src_dir().join("handlers/admin");
+    let mut files = Vec::new();
+    walk_rs_files(&admin_dir, &mut files);
+    assert!(
+        files.len() > 3,
+        "expected several .rs files under handlers/admin/, found only {} — directory walk is \
+         probably broken, not the codebase actually shrinking",
+        files.len()
+    );
+
+    let forbidden = [
+        "db::recovery",
+        "recovery_db",
+        "unlink_required",
+        "REGENERATE_RECOVERY",
+        "REDEEM_RECOVERY",
+        "UNLINK_IDENTITY",
+        "account_recovery_credentials",
+    ];
+    let mut offenders: Vec<String> = Vec::new();
+    let src_dir = workers_ssr_src_dir();
+    for path in &files {
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let rel = path
+            .strip_prefix(&src_dir)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        for pattern in forbidden {
+            if content.contains(pattern) {
+                offenders.push(format!("{rel}: {pattern}"));
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "an admin-surface file references recovery/unlink machinery: {} — RFC-081 §2 / Handoff \
+         057 §5.1 forbids any admin path to an account-level credential operation, the same \
+         boundary linking already respects",
+        offenders.join(", ")
     );
 }
 
@@ -3123,15 +3303,27 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     },
     LocalizationException {
         path: "handlers/account/mod.rs",
-        ja_count: 14,
+        ja_count: 20,
         calls_bare_page: true,
-        reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 055; +1 in Handoff 056 for the link entry-point label)",
+        reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 055; +1 in Handoff 056 for the link entry-point label; +5 in Handoff 057 for recovery-credential status/regenerate and per-identity unlink labels)",
     },
     LocalizationException {
         path: "handlers/account/link.rs",
         ja_count: 5,
         calls_bare_page: true,
         reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 056)",
+    },
+    LocalizationException {
+        path: "handlers/account/unlink.rs",
+        ja_count: 6,
+        calls_bare_page: true,
+        reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 057)",
+    },
+    LocalizationException {
+        path: "handlers/recovery.rs",
+        ja_count: 10,
+        calls_bare_page: true,
+        reason: "anonymous route, no membership/session yet, RFC-072 Slice D — matches handlers/relink.rs's own convention (Handoff 057)",
     },
     LocalizationException {
         path: "handlers/identity/mod.rs",
@@ -5001,6 +5193,7 @@ fn rfc079_package7_removal_and_documentation_boundary_are_pinned() {
         "0014_auth_transactions.sql",
         "0015_session_authenticated_at.sql",
         "0016_auth_transaction_initiating_user.sql",
+        "0017_account_recovery_credentials.sql",
     ];
     assert_eq!(
         migration_filenames, expected_migration_filenames,
@@ -5481,6 +5674,10 @@ const KNOWN_SESSION_MINTING_SITES: &[SessionMintingSite] = &[
         file: "db/identity.rs",
         reason: "external identity linking (Handoff 056 §5.1) — provenance ExternalIdentity, one INSERT INTO sessions occurrence (link_required), atomic with the user_identities insert and the revoke-others rotation",
     },
+    SessionMintingSite {
+        file: "db/recovery.rs",
+        reason: "recovery-credential consumption (Handoff 057 §5.2) — provenance AccountRecovery, unscoped, account-tier and fresh by construction (pinned by authz::account_recovery_provenance_is_account_tier_and_eligible_when_fresh)",
+    },
 ];
 
 /// The SQL string literal for one `db.prepare("...")` call, from `start`
@@ -5808,27 +6005,35 @@ fn identity_fake_issuer_is_test_only() {
     );
 }
 
-/// Handoff 056 §6 gate 1: linking must be additive by construction — no
-/// route or handler anywhere in this codebase may ever revoke,
-/// deactivate, or delete a `user_identities` row. Default-fail: scans
-/// every `.rs` file under `workers/ssr/src` for the two SQL shapes that
-/// could ever remove a member's ability to authenticate via a linked
-/// identity (`DELETE FROM user_identities` and
-/// `UPDATE user_identities SET status`, the column that carries
-/// `'active'`/`'revoked'`) — both forbidden unconditionally. Deliberately
-/// does not forbid `UPDATE user_identities SET last_authenticated_at`
-/// (the existing touch step in `issue_sign_in_required`/
-/// `reauthenticate_required`), a different column with no bearing on
-/// whether the identity is usable.
+/// Handoff 056 §6 gate 1, **relaxed (not deleted) by Handoff 057 §6 gate
+/// 1**: linking must be additive by construction everywhere except the one
+/// legitimate unlink path Handoff 057 adds. Default-fail, same
+/// exceptions-table shape as `KNOWN_SESSION_MINTING_SITES` /
+/// `ADMIN_CLASS_LEAK_EXCEPTIONS`: every `UPDATE user_identities SET status`
+/// anywhere under `workers/ssr/src` must be named here with a written
+/// reason, or the walk fails — a second, un-reviewed unlink path appearing
+/// later is exactly what this exists to catch. `DELETE FROM
+/// user_identities` stays unconditionally forbidden with **no** exception
+/// ever granted — a hard delete is never legitimate, matching this
+/// schema's established revoke-not-delete discipline everywhere else.
+struct UnlinkExceptionSite {
+    file: &'static str,
+    reason: &'static str,
+}
+
+const USER_IDENTITIES_UNLINK_EXCEPTIONS: &[UnlinkExceptionSite] = &[UnlinkExceptionSite {
+    file: "db/identity.rs",
+    reason: "the one legitimate unlink path (RFC-081 §3.3, Handoff 057 §5.3) — \
+             unlink_required's claim is a single, EXISTS-guarded UPDATE that can only ever \
+             affect a row when at least one other verified usable method remains",
+}];
+
 #[test]
 fn no_unlink_path_exists_for_user_identities() {
     let mut files = Vec::new();
     walk_rs_files(&workers_ssr_src_dir(), &mut files);
     let src_dir = workers_ssr_src_dir();
-    let forbidden = [
-        "DELETE FROM user_identities",
-        "UPDATE user_identities SET status",
-    ];
+    let mut seen_files = std::collections::HashSet::new();
     let mut offenders: Vec<String> = Vec::new();
 
     for path in &files {
@@ -5839,20 +6044,66 @@ fn no_unlink_path_exists_for_user_identities() {
             .unwrap_or(path)
             .to_string_lossy()
             .replace('\\', "/");
-        for pattern in forbidden {
-            if content.contains(pattern) {
-                offenders.push(format!("{rel}: {pattern}"));
+        if content.contains("DELETE FROM user_identities") {
+            offenders.push(format!(
+                "{rel}: DELETE FROM user_identities (never permitted — no exception exists for \
+                 a hard delete)"
+            ));
+        }
+        if content.contains("UPDATE user_identities SET status") {
+            match USER_IDENTITIES_UNLINK_EXCEPTIONS
+                .iter()
+                .find(|s| s.file == rel)
+            {
+                Some(site) => {
+                    seen_files.insert(site.file);
+                }
+                None => offenders.push(format!("{rel}: UPDATE user_identities SET status")),
             }
         }
     }
 
     assert!(
         offenders.is_empty(),
-        "found an unlink-capable SQL statement against user_identities: {} — RFC-081 §4 / \
-         Handoff 056 §5.2 requires linking to be additive by construction; if a genuine unlink \
-         path is being added, that is Slice 5c's job, reviewed on its own, not something to \
-         except here.",
+        "found an unlink-capable SQL statement against user_identities not named in \
+         USER_IDENTITIES_UNLINK_EXCEPTIONS: {} — RFC-081 §4 / §3.3 requires linking to stay \
+         additive by construction everywhere except the one reviewed unlink path; a genuine \
+         second unlink path needs its own review and a table entry with a written reason, not a \
+         silent pass.",
         offenders.join(", ")
+    );
+
+    for site in USER_IDENTITIES_UNLINK_EXCEPTIONS {
+        assert!(
+            seen_files.contains(site.file),
+            "USER_IDENTITIES_UNLINK_EXCEPTIONS names {} ({}) but the walk never found an UPDATE \
+             user_identities SET status there — stale table entry?",
+            site.file,
+            site.reason
+        );
+    }
+
+    // Defence in depth, matching `rfc081_session_minting_sites_are_enumerated_and_set_a_provenance`'s
+    // own per-site assertions: the named exception's own statement must
+    // actually be guarded, not merely present. A regression here (the
+    // `EXISTS` guard silently dropped) would still pass the exceptions-
+    // table check above, since that check only looks for the statement's
+    // fixed prefix — this is what catches the guard itself disappearing.
+    let unlink_statement_start = IDENTITY_DB_SRC
+        .find("UPDATE user_identities SET status = 'revoked'")
+        .expect("db/identity.rs must still contain the named unlink statement");
+    let unlink_statement = rust_call_site_text(IDENTITY_DB_SRC, unlink_statement_start);
+    assert!(
+        unlink_statement.contains("status = 'active'")
+            && unlink_statement.contains("usable_method_exists_sql("),
+        "db/identity.rs's unlink UPDATE must stay guarded by both the current-status check and \
+         a call to usable_method_exists_sql — an unguarded version of this exact statement is \
+         the final-credential-lockout bug RFC-081 §3.3 exists to prevent"
+    );
+    assert!(
+        RECOVERY_DB_SRC.contains("account_recovery_credentials")
+            && RECOVERY_DB_SRC.contains("user_identities"),
+        "usable_method_exists_sql must still check both halves of the usable-method definition"
     );
 }
 

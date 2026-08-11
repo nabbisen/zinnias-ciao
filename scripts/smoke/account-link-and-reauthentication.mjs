@@ -303,6 +303,12 @@ try {
   const linkAuthorizeUrl = postLinkA.headers.get('location');
   const linkAuthorize = await driveAuthorize(linkAuthorizeUrl ?? '');
   const linkCallbackRes = await fetch(linkAuthorize.callbackUrl, { redirect: 'manual' });
+  // Handoff 057 §5.1: this is principal A's first-ever link, so the
+  // callback now renders the account page directly (200, not a 303
+  // redirect) with the newly-issued recovery credential revealed once —
+  // never write the revealed code itself into evidence, only whether the
+  // reveal markup is present.
+  const linkCallbackBody = await linkCallbackRes.text();
   // The raw session secret from A's rotated cookie — reused below to drive
   // the re-authentication scenario against this same principal.
   const linkSessionSecret = /ciao_sid=([^;]+)/.exec(linkCallbackRes.headers.get('set-cookie') ?? '')?.[1];
@@ -313,6 +319,9 @@ try {
     `SELECT user_id FROM user_identities WHERE identity_namespace_id='${namespaceId}' AND subject_lookup='${fakeSubjectLookup}'`,
   );
   const originalSessionARow = query(`SELECT revoked_at FROM sessions WHERE session_hmac = '${sessionAHmac}'`);
+  const recoveryCredentialRows = query(
+    `SELECT consumed_at, revoked_at FROM account_recovery_credentials WHERE user_id = '${userAId}'`,
+  );
   results.push({
     name: 'link_succeeds_rotates_and_writes_identity',
     observed: {
@@ -324,15 +333,21 @@ try {
       linkSessionRows: withoutSessionId(linkSessionRows),
       linkedIdentityRows,
       originalSessionARow,
+      recoveryCredentialRowCount: recoveryCredentialRows.length,
     },
     checks: {
       confirmationTokenPresent: Boolean(tokenA),
       postLinkRedirectsToProvider: postLinkA.status === 303 && (linkAuthorizeUrl ?? '').includes('/dev/identity/fake-issuer/authorize'),
-      callbackRedirectsToAccount: linkCallbackRes.status === 303 && linkCallbackRes.headers.get('location') === '/account',
+      // Handoff 057 §5.1: the very first link reveals a just-issued
+      // recovery credential directly (200), rather than redirecting —
+      // there is nowhere else to carry the one-time plaintext code.
+      callbackRevealsAccountPageWithNewCredential:
+        linkCallbackRes.status === 200 && linkCallbackBody.includes('id="recovery-code-reveal"'),
       newSessionIssuedForUserA: linkSessionRows.length === 1 && linkSessionRows[0]?.user_id === userAId,
       newSessionProvenanceIsExternalIdentity: linkSessionRows[0]?.provenance === 'external_identity',
       identityLinkedToUserA: linkedIdentityRows.length === 1 && linkedIdentityRows[0]?.user_id === userAId,
       originalSessionRevokedByRotation: originalSessionARow[0]?.revoked_at != null,
+      recoveryCredentialIssuedExactlyOnce: recoveryCredentialRows.length === 1,
     },
   });
 

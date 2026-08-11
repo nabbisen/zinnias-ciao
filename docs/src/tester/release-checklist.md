@@ -1684,3 +1684,124 @@ can remove a credential (5b's job).
       page it necessarily reaches on this pass, navigating correctly with
       application JavaScript fully disabled in a real browser). Zero CSP
       violations, zero stray processes left running.
+
+## Handoff 057 — Slice 5c: the recovery credential and unlink
+
+- [x] **The recovery credential**: issued automatically the first time a
+      member ever links an identity (`db::recovery::issue_at_first_link_required`,
+      called by `handlers/identity/mod.rs::link_outcome` immediately after
+      a successful link — a deliberately separate call, not bundled into
+      the same batch, so the result doesn't need to be extracted from
+      `execute_asserted_required`'s generic batch index). HMAC at rest
+      (migration 0017, `code_hmac` only — no raw/plaintext column exists).
+      `expires_at` is nullable and this package never sets it: unlike a
+      relink code, a recovery credential is meant to remain usable
+      indefinitely, not redeemed within minutes. Shown exactly once, in
+      the same response that generated or regenerated it — never a
+      redirect, since a redirect has nowhere safe to carry a one-time
+      plaintext value. Regenerating revokes whatever was previously active
+      in the same batch as the new insert
+      (`execute_required_tail(vec![revoke_previous, issue_new], ...)`), so
+      a member can never hold two.
+- [x] **The anonymous consumption route (`/recovery`)** mints an
+      account-tier, unscoped, fresh session via a fourth
+      `SessionProvenance::AccountRecovery` variant — pinned by a dedicated
+      test, not assumed, per the handoff's own instruction. All four
+      consumption-failure causes (unknown, consumed, revoked, expired)
+      collapse into one generic, identical response: no early
+      classification branch exists to leak which cause fired, the same
+      "define the invalid state once" discipline `db/relink.rs` already
+      uses. Abuse-limited under its own `Scope::Recovery` (`(5, 300_000)`
+      — stricter than invite/relink's `(10, 300_000)`, since this route
+      authenticates an entire account with a credential that never
+      expires), reserved before any credential lookup — a gate proves
+      this by source position, not merely presence, after discovering
+      (while proving the gate fires) that this file's own module doc
+      comment mentioning `abuse_control::reserve` in prose would
+      otherwise satisfy a naive presence check regardless of where the
+      real call sat; the gate now strips comments first.
+- [x] **Unlink — the one legitimate exception to "additive by
+      construction."** `db/identity.rs::unlink_required`'s claim is a
+      single `UPDATE user_identities SET status='revoked' WHERE id=?1 AND
+      user_id=?2 AND status='active' AND {usable-method-check}` — the
+      "usable method" definition
+      (`db::recovery::usable_method_exists_sql`) is centralized in one
+      function and embedded, with independent placeholder numbering, into
+      both this claim and the same-batch revoke-others statement, so the
+      two can never disagree within one unlink attempt. This — not a
+      `SELECT` beforehand — is what makes the required concurrency
+      guarantee hold: two requests racing to unlink different identities
+      on a two-identity account are serialized by D1's single-writer
+      model, and whichever runs second evaluates the usable-method check
+      *after* the first has already committed, correctly seeing zero
+      remaining methods and declining. `claim` is the batch's tail (not
+      `revoke_others`), so the required audit gates on **its** row count;
+      `revoke_others` carries the identical guard for a second reason —
+      without it, a refused unlink could still silently revoke the
+      member's other sessions as a side effect merely because it ran
+      earlier in the same batch. Requires a fresh account-tier session
+      (redirects to re-authenticate when stale, rather than a dead end);
+      refuses generically on decline, row untouched.
+- [x] **The unlink gate relaxed, not deleted**: `no_unlink_path_exists_for_user_identities`
+      became an exceptions-table (`USER_IDENTITIES_UNLINK_EXCEPTIONS`),
+      the same shape as `KNOWN_SESSION_MINTING_SITES` — one named site
+      (`db/identity.rs`) with a written reason. `DELETE FROM
+      user_identities` stays unconditionally forbidden, no exception ever
+      possible. A defence-in-depth assertion on top confirms the named
+      site's own statement still references both the `status = 'active'`
+      guard and the shared `usable_method_exists_sql` call, catching a
+      regression that quietly dropped the guard while leaving the
+      forbidden-pattern match intact. Both halves proven firing (a second,
+      unnamed file; and a weakened guard on the named site), with
+      `cmp`-verified restores.
+- [x] **No admin surface reaches any recovery operation** — a default-fail
+      gate scans every file under `handlers/admin/` for any reference to
+      the recovery/unlink machinery, matching RFC-081 §2's existing
+      community-admin-authority boundary.
+- [x] `cargo test --workspace`: **600 → 622** (+22: +3 in the new
+      `release_gates.rs` gates, +6 in `packages/domain`'s recovery-code
+      validation, +13 in the `ssr` crate — `db/recovery.rs`,
+      `handlers/account/recovery.rs`'s code-generation tests, the new
+      `authz`/`abuse_control`/`abuse_limiter` pinning tests, and the
+      account-page rendering tests) — plus `--features dev_fake_issuer`:
+      **270 → 283** (same +13 `ssr`-crate delta, the fake-issuer-gated
+      tests unaffected). Both deltas reconciled against the diff's new
+      `#[test]` functions, including ones in brand-new (therefore
+      untracked-at-`git diff`-time) files. Clippy (native and
+      `--features dev_fake_issuer`), fmt, wasm check (both feature
+      states), `mdbook build docs`, `git diff --check` all clean. `bun run
+      build`: `index.js` unchanged at 28.6kb, `index_bg.wasm` 1,537,003 →
+      1,574,577 bytes (+~36.7KB) — the new migration/handler/db/audit
+      code. Digest/cache-version gate passes without a re-pin. No version
+      bump.
+- [x] **Fifteen smokes green**, including the new
+      `smoke:account-recovery-unlink` (nine scenarios: unlink refused with
+      no other usable method, row untouched; unlink succeeding with a
+      second identity or a recovery credential as the fallback; the
+      concurrency race against real D1 leaving exactly one identity
+      active; unlink refused for a `Relink`-provenance session and
+      redirected-to-reauthenticate for a stale one; consumption of a
+      valid code minting an account-tier fresh session; all four
+      consumption failure causes generic and identical apart from their
+      own per-render CSRF token; and the refused → generate → succeeds →
+      consume sequence navigating correctly with application JavaScript
+      fully disabled). Zero CSP violations, zero stray processes left
+      running.
+- [x] **A smoke-fixture bug found and fixed, not a product bug**: the
+      first draft of this smoke's five fetch-based `/recovery` consumption
+      attempts plus its no-JS scenario's own final attempt — six total —
+      all shared the same local `127.0.0.1` client address, silently
+      exhausting `Scope::Recovery`'s own five-per-five-minute abuse-limiter
+      budget before the sixth (legitimate) attempt ran, producing a false
+      failure that read exactly like a product bug. Root-caused by
+      reproducing the same sequence in isolation outside the failing
+      smoke until a minimal repro appeared, then confirming the fix (a
+      distinct synthetic `CF-Connecting-IP` per scenario, TEST-NET-3
+      addresses) empirically before trusting it.
+- [x] **A pre-existing smoke updated for new, correct behaviour**:
+      `smoke:account-link-reauth`'s "link succeeds" scenario previously
+      asserted a 303 redirect to `/account`; a first-ever link now
+      correctly reveals the newly-issued recovery credential directly
+      (200) instead, since a redirect has nowhere to carry the plaintext
+      code. Updated to assert the reveal markup is present, plus a new
+      check that the credential was issued exactly once.

@@ -137,13 +137,14 @@ fn same_64_prefix_yields_the_same_canonical_subject() {
 // ── HMAC domain separation ──────────────────────────────────────────────────
 
 #[test]
-fn subject_digest_differs_across_all_five_scopes() {
+fn subject_digest_differs_across_all_six_scopes() {
     let scopes = [
         Scope::Invite,
         Scope::Relink,
         Scope::CommunityUser,
         Scope::CommunitySession,
         Scope::CommunityNetwork,
+        Scope::Recovery,
     ];
     let mut digests = Vec::new();
     for scope in scopes {
@@ -350,4 +351,14 @@ fn invite_and_relink_have_independent_policies() {
     assert_eq!(Scope::Invite.policy(), "invite");
     assert_eq!(Scope::Relink.policy(), "relink");
     assert_ne!(Scope::Invite.policy(), Scope::Relink.policy());
+}
+
+#[test]
+fn recovery_has_its_own_policy_distinct_from_relink() {
+    // Handoff 057 §5.2: must not share a budget with `/relink` — a
+    // distinct policy identifier is what keeps the coordinator from
+    // pooling the two flows' capacity together.
+    assert_eq!(Scope::Recovery.policy(), "recovery");
+    assert_ne!(Scope::Recovery.policy(), Scope::Relink.policy());
+    assert_ne!(Scope::Recovery.label(), Scope::Relink.label());
 }

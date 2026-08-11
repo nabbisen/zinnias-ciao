@@ -12,6 +12,7 @@ use worker::{D1Database, Result};
 use zinnias_ciao_contracts::SESSION_TTL_SECONDS;
 
 use crate::audit::{self, AuditAction, AuditMetadata};
+use crate::db::recovery::usable_method_exists_sql;
 use crate::db::session::SessionProvenance;
 use crate::db::{add_seconds_to_now, now_utc, session};
 
@@ -82,7 +83,14 @@ pub async fn find_by_subject_lookup(
 /// there is no digest for a rendering bug to ever leak, structurally
 /// rather than by caller discipline. Same reasoning as
 /// `db/invite.rs::InviteMetaRow` ("Code HMACs are never returned").
+///
+/// `id` was added in Handoff 057 to give the unlink route something to
+/// address a specific identity by — it is an opaque, internally-generated
+/// identifier (the same `idty_`-shaped class as this app's `com_`/`usr_`/
+/// `mem_` route parameters elsewhere), never the subject, digest, or
+/// issuer §10 forbids rendering.
 pub struct LinkedIdentitySummary {
+    pub id: String,
     pub identity_namespace_id: String,
     pub linked_at: String,
 }
@@ -97,7 +105,7 @@ pub async fn list_active_for_user(
 ) -> Result<Vec<LinkedIdentitySummary>> {
     let rows = db
         .prepare(
-            "SELECT identity_namespace_id, linked_at \
+            "SELECT id, identity_namespace_id, linked_at \
              FROM user_identities \
              WHERE user_id = ?1 AND status = 'active' \
              ORDER BY linked_at ASC",
@@ -111,6 +119,7 @@ pub async fn list_active_for_user(
         .into_iter()
         .filter_map(|v| {
             Some(LinkedIdentitySummary {
+                id: v.get("id")?.as_str()?.to_owned(),
                 identity_namespace_id: v.get("identity_namespace_id")?.as_str()?.to_owned(),
                 linked_at: v.get("linked_at")?.as_str()?.to_owned(),
             })
@@ -198,4 +207,71 @@ pub async fn link_required(
     )
     .await?;
     Ok(())
+}
+
+/// RFC-081 §3.3 / Handoff 057 §5.3: the one legitimate unlink path in this
+/// codebase — named in `release_gates.rs`'s
+/// `no_unlink_path_exists_for_user_identities` exceptions table rather
+/// than defeating that gate, per Handoff 057 §6 gate 1's explicit
+/// instruction to relax it, not delete it.
+///
+/// The "at least one other usable method" check
+/// ([`usable_method_exists_sql`]) is embedded in **both** statements below
+/// with the identical definition, so the two can never disagree within
+/// one unlink attempt — this, not a `SELECT` beforehand, is what makes
+/// the concurrent-unlink race impossible: two requests racing to unlink
+/// different identities on a two-identity account are serialized by D1's
+/// single-writer model, and whichever runs second evaluates the usable-
+/// method check *after* the first has already committed, correctly
+/// seeing zero remaining methods and declining.
+///
+/// `claim` is the batch's tail (last statement) rather than
+/// `revoke_others`, specifically so the required audit gates on **its**
+/// row count, not on however many other sessions happened to exist — a
+/// refused unlink (claim affects 0 rows) must never audit, and must never
+/// revoke anything else either. `revoke_others` carries the identical
+/// usable-method guard for exactly that second reason: without it, a
+/// refused unlink attempt could still silently log the member out of
+/// their other sessions as a side effect, purely because it ran earlier
+/// in the same batch — a decline must have no side effects at all, not
+/// just no audited one.
+pub async fn unlink_required(
+    db: &D1Database,
+    request_id: &str,
+    user_id: &str,
+    identity_id: &str,
+    except_session_id: &str,
+) -> Result<bool> {
+    let now = now_utc();
+    let claim = db
+        .prepare(format!(
+            "UPDATE user_identities SET status = 'revoked' \
+             WHERE id = ?1 AND user_id = ?2 AND status = 'active' \
+               AND {usable}",
+            usable = usable_method_exists_sql("?1", "?2", "?3"),
+        ))
+        .bind(&[identity_id.into(), user_id.into(), now.as_str().into()])?;
+    let revoke_others = db
+        .prepare(format!(
+            "UPDATE sessions SET revoked_at = ?1 \
+             WHERE user_id = ?2 AND id != ?3 \
+               AND revoked_at IS NULL AND expires_at > ?1 \
+               AND {usable}",
+            usable = usable_method_exists_sql("?4", "?2", "?1"),
+        ))
+        .bind(&[
+            now.as_str().into(),
+            user_id.into(),
+            except_session_id.into(),
+            identity_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        None,
+        None,
+        None,
+        AuditAction::ExternalIdentityUnlinked,
+        AuditMetadata::None,
+    )?;
+    audit::execute_required_tail(db, vec![revoke_others, claim], &record).await
 }

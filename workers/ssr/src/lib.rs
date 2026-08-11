@@ -117,6 +117,12 @@ async fn dispatch_request(
         (Method::Get, "/relink") => handlers::relink::get_relink(req, env, request_id).await,
         (Method::Post, "/relink") => handlers::relink::post_relink(req, env, request_id).await,
 
+        // ── Account recovery credential consumption (RFC-081 §3, Handoff 057)
+        (Method::Get, "/recovery") => handlers::recovery::get_recovery(req, env, request_id).await,
+        (Method::Post, "/recovery") => {
+            handlers::recovery::post_recovery(req, env, request_id).await
+        }
+
         // ── External identity (RFC-080 §5, Handoff 054) ───────────────────
         (Method::Get, "/identity/start") => {
             handlers::identity::get_start(req, env, request_id).await
@@ -149,6 +155,19 @@ async fn dispatch_request(
         }
         (Method::Post, "/account/link") => {
             handlers::account::link::post_link(req, env, request_id).await
+        }
+
+        // ── Recovery credential regeneration and unlink (RFC-081 §3, Handoff 057)
+        (Method::Post, "/account/recovery/regenerate") => {
+            handlers::account::recovery::post_regenerate(req, env, request_id).await
+        }
+        (Method::Get, p) if p.starts_with("/account/unlink/") => {
+            let identity_id = p.trim_start_matches("/account/unlink/");
+            handlers::account::unlink::get_unlink(req, env, request_id, identity_id).await
+        }
+        (Method::Post, p) if p.starts_with("/account/unlink/") => {
+            let identity_id = p.trim_start_matches("/account/unlink/");
+            handlers::account::unlink::post_unlink(req, env, request_id, identity_id).await
         }
 
         // ── Member area ───────────────────────────────────────────────────

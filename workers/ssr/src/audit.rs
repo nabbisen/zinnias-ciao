@@ -83,11 +83,29 @@ pub(crate) enum AuditAction {
     /// (an ordinary sign-in, no prior session to revoke) because rotation
     /// is a materially different event — it destroys other live sessions.
     ExternalSessionReauthenticated,
+    /// RFC-081 §3.1 / §8 / Handoff 057 §5.1: a member's account recovery
+    /// credential was issued — always at their first identity link, never
+    /// on a second or later one (`db::recovery::issue_at_first_link_required`'s
+    /// own guard is what makes "first" true, not this action's presence).
+    RecoveryCredentialIssued,
+    /// RFC-081 §3.1 / §8 / Handoff 057 §5.1: a member regenerated their
+    /// recovery credential, revoking whatever was previously active in
+    /// the same batch.
+    RecoveryCredentialRegenerated,
+    /// RFC-081 §3 / §8 / Handoff 057 §5.2: a recovery credential was
+    /// consumed via the anonymous route, minting an account-tier, fresh
+    /// session for its owning principal.
+    RecoveryCredentialConsumed,
+    /// RFC-081 §3.3 / Handoff 057 §5.3: a member unlinked an external
+    /// identity — the one legitimate exception to §5.2's "additive by
+    /// construction" invariant, reachable only with at least one other
+    /// verified usable method remaining.
+    ExternalIdentityUnlinked,
 }
 
 impl AuditAction {
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 31] = [
+    pub(crate) const ALL: [Self; 35] = [
         Self::CommunityCreated,
         Self::MembershipCreatedFirstAdmin,
         Self::MembershipDisplayNameUpdated,
@@ -119,6 +137,10 @@ impl AuditAction {
         Self::ExternalIdentityLinked,
         Self::ExternalIdentityLinkRejected,
         Self::ExternalSessionReauthenticated,
+        Self::RecoveryCredentialIssued,
+        Self::RecoveryCredentialRegenerated,
+        Self::RecoveryCredentialConsumed,
+        Self::ExternalIdentityUnlinked,
     ];
 
     pub(crate) const fn canonical(self) -> &'static str {
@@ -154,6 +176,10 @@ impl AuditAction {
             Self::ExternalIdentityLinked => "external_identity.linked",
             Self::ExternalIdentityLinkRejected => "external_identity.link_rejected",
             Self::ExternalSessionReauthenticated => "session.external_reauthenticated",
+            Self::RecoveryCredentialIssued => "recovery_credential.issued",
+            Self::RecoveryCredentialRegenerated => "recovery_credential.regenerated",
+            Self::RecoveryCredentialConsumed => "recovery_credential.consumed",
+            Self::ExternalIdentityUnlinked => "external_identity.unlinked",
         }
     }
 
@@ -187,6 +213,10 @@ impl AuditAction {
                 | Self::ExternalIdentityLinked
                 | Self::ExternalIdentityLinkRejected
                 | Self::ExternalSessionReauthenticated
+                | Self::RecoveryCredentialIssued
+                | Self::RecoveryCredentialRegenerated
+                | Self::RecoveryCredentialConsumed
+                | Self::ExternalIdentityUnlinked
         )
     }
 
@@ -215,9 +245,12 @@ impl AuditAction {
             | Self::SessionScopeRefused
             | Self::ExternalSessionIssued
             | Self::ExternalSessionReauthenticated => "session",
-            Self::ExternalIdentityLinked | Self::ExternalIdentityLinkRejected => {
-                "external_identity"
-            }
+            Self::ExternalIdentityLinked
+            | Self::ExternalIdentityLinkRejected
+            | Self::ExternalIdentityUnlinked => "external_identity",
+            Self::RecoveryCredentialIssued
+            | Self::RecoveryCredentialRegenerated
+            | Self::RecoveryCredentialConsumed => "recovery_credential",
         }
     }
 
@@ -1253,6 +1286,10 @@ fn validate_pairing(
                 | AuditAction::ExternalIdentityLinked
                 | AuditAction::ExternalIdentityLinkRejected
                 | AuditAction::ExternalSessionReauthenticated
+                | AuditAction::RecoveryCredentialIssued
+                | AuditAction::RecoveryCredentialRegenerated
+                | AuditAction::RecoveryCredentialConsumed
+                | AuditAction::ExternalIdentityUnlinked
         );
     if valid {
         Ok(())
@@ -1273,7 +1310,11 @@ fn validate_context(
         | AuditAction::ExternalSessionIssued
         | AuditAction::ExternalIdentityLinked
         | AuditAction::ExternalIdentityLinkRejected
-        | AuditAction::ExternalSessionReauthenticated => {
+        | AuditAction::ExternalSessionReauthenticated
+        | AuditAction::RecoveryCredentialIssued
+        | AuditAction::RecoveryCredentialRegenerated
+        | AuditAction::RecoveryCredentialConsumed
+        | AuditAction::ExternalIdentityUnlinked => {
             community_id.is_none() && actor_membership_id.is_none() && target_id.is_none()
         }
         AuditAction::CalendarFeedTokenGenerated | AuditAction::CalendarFeedTokenRevoked => {
@@ -1683,7 +1724,7 @@ mod tests {
             .into_iter()
             .map(AuditAction::canonical)
             .collect();
-        assert_eq!(values.len(), 31);
+        assert_eq!(values.len(), 35);
         assert!(values.iter().all(|value| value.contains('.')));
         for value in values {
             assert_eq!(
@@ -1698,12 +1739,12 @@ mod tests {
     }
 
     #[test]
-    fn class_a_action_inventory_is_closed_at_twenty_seven() {
+    fn class_a_action_inventory_is_closed_at_thirty_one() {
         let class_a: Vec<_> = AuditAction::ALL
             .into_iter()
             .filter(|action| action.is_class_a())
             .collect();
-        assert_eq!(class_a.len(), 27);
+        assert_eq!(class_a.len(), 31);
         assert!(!AuditAction::CommunityExportAuthorized.is_class_a());
         assert!(!AuditAction::CalendarMatrixCsvExportRequested.is_class_a());
         assert!(!AuditAction::SessionLogout.is_class_a());
@@ -1711,6 +1752,10 @@ mod tests {
         assert!(AuditAction::ExternalIdentityLinked.is_class_a());
         assert!(AuditAction::ExternalIdentityLinkRejected.is_class_a());
         assert!(AuditAction::ExternalSessionReauthenticated.is_class_a());
+        assert!(AuditAction::RecoveryCredentialIssued.is_class_a());
+        assert!(AuditAction::RecoveryCredentialRegenerated.is_class_a());
+        assert!(AuditAction::RecoveryCredentialConsumed.is_class_a());
+        assert!(AuditAction::ExternalIdentityUnlinked.is_class_a());
     }
 
     #[test]
