@@ -223,8 +223,19 @@ fn en_ja_parity() {
         // Join page (RFC-003)
         "JOIN_PAGE_TITLE",
         "JOIN_PROFILE_PAGE_TITLE",
+        // Account surface (RFC-080 §6 / RFC-081 §6, Handoff 055)
+        "ACCOUNT_PAGE_TITLE",
+        "ACCOUNT_LINKED_IDENTITIES_HEADING",
+        "ACCOUNT_NO_LINKED_IDENTITIES",
+        "ACCOUNT_LINKED_AT_PREFIX",
+        "ACCOUNT_RECOVERY_CREDENTIAL_HEADING",
+        "ACCOUNT_RECOVERY_CREDENTIAL_NONE",
+        "ACCOUNT_COMMUNITIES_HEADING",
+        "ACCOUNT_NO_COMMUNITIES",
+        "ACCOUNT_FRESH_CAN_MANAGE",
+        "ACCOUNT_STALE_SIGN_IN_AGAIN",
     ];
-    assert_eq!(en_keys.len(), 199, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 209, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

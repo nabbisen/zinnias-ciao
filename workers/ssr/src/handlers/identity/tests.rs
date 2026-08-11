@@ -8,6 +8,15 @@ fn allowlisted_destination_is_accepted() {
 }
 
 #[test]
+fn account_destination_is_accepted_handoff_055() {
+    // Handoff 055 §5.4: the allowlist's first growth since §5.2 — no live
+    // call site produces this value yet (see the module doc comment on
+    // `ALLOWED_RETURN_DESTINATIONS`), but the function's own behavior for
+    // it is proven here regardless of what currently reaches it.
+    assert_eq!(resolve_safe_return(Some("/account")), "/account");
+}
+
+#[test]
 fn missing_stored_value_falls_back_to_the_safe_default() {
     assert_eq!(resolve_safe_return(None), "/");
 }

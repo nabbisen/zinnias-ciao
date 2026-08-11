@@ -138,6 +138,11 @@ async fn dispatch_request(
             identity::dev_fake_issuer::post_token(req, env, request_id).await
         }
 
+        // ── Account surface (RFC-080 §6 / RFC-081 §6, Handoff 055) ─────────
+        // The first non-community-scoped member route — reachable by any
+        // account-tier session, including one with zero active memberships.
+        (Method::Get, "/account") => handlers::account::get_account(req, env, request_id).await,
+
         // ── Member area ───────────────────────────────────────────────────
         (Method::Get, "/") | (Method::Get, "/c") => {
             handlers::home::redirect_to_home(req, env, request_id).await

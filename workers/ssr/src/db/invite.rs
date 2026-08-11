@@ -172,11 +172,13 @@ pub async fn redeem_required(
     // Handoff 048 (RFC-081 §2): first-class session — provenance
     // 'invite_redemption', scope_community_id left NULL. Not community-bound.
     // Handoff 054 §5.4: written through SessionProvenance, not a literal.
+    // Handoff 055 §5.1: authenticated_at set equal to created_at (?4) at
+    // creation — they diverge only once session rotation (Slice 5b) exists.
     let session = db
         .prepare(
             "INSERT INTO sessions \
-             (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) \
-             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?8 \
+             (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance, authenticated_at) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?8, ?4 \
              WHERE EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?6 AND m.community_id=?7 \
                              AND m.user_id=?2 AND m.removed_at IS NULL)",

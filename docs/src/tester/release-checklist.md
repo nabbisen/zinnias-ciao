@@ -1489,3 +1489,90 @@ mistake here is a live authentication path.
       plus the new `smoke:identity-callback`. Zero CSP violations, zero
       stray processes left running. *(evidence
       `.git-exclude/evidence/handoff054/`)*
+
+## Session freshness and the account surface (Handoff 055, external-identity Slice 5a)
+
+The first non-community-scoped member route tier — read-only, nothing here
+can remove a credential (5b's job).
+
+- [x] **§5.5 investigated before building anything**: a no-membership
+      session hitting `/` today gets `render::session_expired()` (401,
+      generic Japanese text, no distinct "no communities" disclosure);
+      `/switch` redirects to `/join`; `/c/:cid/*` 404s generically;
+      `/communities/new` 404s (a separate, pre-existing admin-somewhere
+      gate). No leak, no uncaught error — confirmed by seeding a real
+      no-membership session against a running local instance and reading
+      the actual responses, not by inspection alone.
+- [x] Migration `0015_session_authenticated_at.sql`, additive/nullable,
+      matching `provenance`'s own precedent — no default, existing rows
+      get `NULL`, treated as not-fresh fail-closed. Applied both ways:
+      fresh (0001→0015) and onto a database already at 0014, with a
+      pre-existing session row confirmed to survive with `authenticated_at
+      = NULL`.
+- [x] **Every minting site sets `authenticated_at = created_at`** at
+      creation (`db/invite.rs`, `db/relink.rs`, both `db/auth_transaction.rs`
+      sites) — the existing provenance minting-site gate extended, not
+      duplicated, with the same class of check. Proven firing: removed the
+      column from one site, confirmed the gate failed naming it, restored,
+      `cmp`-verified byte-identical.
+- [x] **The step-up predicate** (`authz::is_fresh_for_account_operations`)
+      is pure — no D1, no wall-clock read, `freshness_window_start`
+      supplied by the caller as an ISO8601 string in `db::now_utc`'s own
+      fixed shape, compared lexicographically (no date parsing needed).
+      Factored the shared "is this an account-tier session at all"
+      condition (provenance present and not `Relink`, unscoped) out into
+      `is_account_tier_session`, reused by both the freshness predicate
+      and the new `decide_account_surface_access` — one assertion, not two
+      that could drift. Exhaustive tests: every provenance × scope ×
+      freshness combination via a brute-force cross-product, plus the
+      boundary itself pinned both ways (`>=`, inclusive — exactly-900-
+      seconds-old is still fresh; one millisecond earlier is not).
+- [x] **§5.3's decision recorded, not yet exercised**: first link will not
+      require freshness (the fresh OIDC transaction *is* the step-up, and
+      an invite-only member has no other way to ever become fresh before
+      linking); unlink and recovery-credential changes will. Carried
+      forward to Slice 5b's handoff, not overturned here.
+- [x] **`/account`**: read-only, no application JavaScript, Japanese-only
+      (RFC-072 Slice D — no single community-scoped `ui_language` to
+      resolve from an account-tier session, same reasoning as
+      `handlers/identity/mod.rs`). Displays linked identities (namespace +
+      `linked_at` only — `db::identity::LinkedIdentitySummary` cannot
+      structurally carry a subject or digest, since the query never
+      selects those columns), the communities the principal belongs to,
+      "no recovery credential yet" (always, in 5a), and whether the
+      session is fresh enough to manage settings. A `Relink`-provenance
+      session is refused the surface entirely
+      (`authz::require_account_surface`, audited the same way
+      `require_active_admin_somewhere`'s bound-session refusal already
+      is). A no-membership principal reaches the page and nothing else —
+      RFC-081 §6.
+- [x] **`ALLOWED_RETURN_DESTINATIONS` grows for the first time**: `/account`
+      added alongside `/`. No live call site produces this value yet — a
+      working "re-authenticate, land back on /account" flow needs
+      `handlers/identity/mod.rs::get_start`'s existing already-
+      authenticated short-circuit to change first (it currently bounces
+      *any* valid session straight to `/`, stale or not, before a fresh
+      re-auth could ever run), which is session-rotation-adjacent territory
+      left to Slice 5b rather than decided here. `resolve_safe_return`
+      keeps its `&'static str` return type; the growth is exercised by its
+      own unit test, not left dead.
+- [x] `cargo test --workspace`: **566 → 594** (+28: 15 in `authz.rs` — the
+      account-surface-access decision and the freshness predicate, both
+      exhaustive; 1 in `handlers/identity/tests.rs` — the allowlist
+      growth; 12 in the new `handlers/account/tests.rs`), exactly
+      accounted for. Clippy (native and `--features dev_fake_issuer`),
+      fmt, wasm check (both feature states), `mdbook build docs`,
+      `git diff --check` all clean. `bun run build`: `index.js` unchanged
+      at 28.6kb, `index_bg.wasm` 1,512,220 → 1,521,140 bytes (+~8.7KB) —
+      the new authz/handler code, JS glue untouched since no new route
+      shape changed at that layer. Digest/cache-version gate passes
+      without a re-pin.
+- [x] **All thirteen smokes green**, including the new
+      `smoke:account-surface` (fresh session's full display exercised
+      with JavaScript disabled in a real browser, a stale session's "sign
+      in again" display, the RFC-081 §6 no-membership state, and a
+      Relink-provenance session refused entirely). Zero CSP violations,
+      zero stray processes left running. One transient, unrelated
+      `smoke:display-name` network flake reproduced once and passed clean
+      on immediate retry — not a regression, noted rather than hidden.
+      *(evidence `.git-exclude/evidence/handoff055/`)*

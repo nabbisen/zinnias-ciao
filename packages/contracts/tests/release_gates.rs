@@ -546,6 +546,34 @@ fn i18n_en_ja_parity_count() {
         (EN_ME_LANGUAGE_SUBMIT, JA_ME_LANGUAGE_SUBMIT),
         (EN_ME_LANGUAGE_UPDATED, JA_ME_LANGUAGE_UPDATED),
         (EN_ME_LANGUAGE_CANCEL, JA_ME_LANGUAGE_CANCEL),
+        (EN_ACCOUNT_PAGE_TITLE, JA_ACCOUNT_PAGE_TITLE),
+        (
+            EN_ACCOUNT_LINKED_IDENTITIES_HEADING,
+            JA_ACCOUNT_LINKED_IDENTITIES_HEADING,
+        ),
+        (
+            EN_ACCOUNT_NO_LINKED_IDENTITIES,
+            JA_ACCOUNT_NO_LINKED_IDENTITIES,
+        ),
+        (EN_ACCOUNT_LINKED_AT_PREFIX, JA_ACCOUNT_LINKED_AT_PREFIX),
+        (
+            EN_ACCOUNT_RECOVERY_CREDENTIAL_HEADING,
+            JA_ACCOUNT_RECOVERY_CREDENTIAL_HEADING,
+        ),
+        (
+            EN_ACCOUNT_RECOVERY_CREDENTIAL_NONE,
+            JA_ACCOUNT_RECOVERY_CREDENTIAL_NONE,
+        ),
+        (
+            EN_ACCOUNT_COMMUNITIES_HEADING,
+            JA_ACCOUNT_COMMUNITIES_HEADING,
+        ),
+        (EN_ACCOUNT_NO_COMMUNITIES, JA_ACCOUNT_NO_COMMUNITIES),
+        (EN_ACCOUNT_FRESH_CAN_MANAGE, JA_ACCOUNT_FRESH_CAN_MANAGE),
+        (
+            EN_ACCOUNT_STALE_SIGN_IN_AGAIN,
+            JA_ACCOUNT_STALE_SIGN_IN_AGAIN,
+        ),
     ];
     // Strings that are intentionally identical across languages (product name,
     // numeric units, etc.) are exempted from the identity check.
@@ -3089,6 +3117,12 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
         reason: "admin-only surface, RFC-072 Slice D",
     },
     LocalizationException {
+        path: "handlers/account/mod.rs",
+        ja_count: 13,
+        calls_bare_page: true,
+        reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 055)",
+    },
+    LocalizationException {
         path: "handlers/identity/mod.rs",
         ja_count: 6,
         calls_bare_page: true,
@@ -4953,6 +4987,7 @@ fn rfc079_package7_removal_and_documentation_boundary_are_pinned() {
         "0012_session_provenance.sql",
         "0013_identity_namespaces.sql",
         "0014_auth_transactions.sql",
+        "0015_session_authenticated_at.sql",
     ];
     assert_eq!(
         migration_filenames, expected_migration_filenames,
@@ -5494,6 +5529,22 @@ fn rfc081_session_minting_sites_are_enumerated_and_set_a_provenance() {
                          minted without it is refused by authorization (§7.3), fail-closed, but \
                          that is a production-time symptom of a bug this gate exists to catch \
                          at build time instead."
+                    );
+                    // Handoff 055 §7: extends this same gate rather than
+                    // adding a second one — the same class of omission as
+                    // a missing provenance, now for authenticated_at
+                    // (migration 0015). A session minted without it is
+                    // refused by the step-up predicate (fail-closed, NULL
+                    // is never fresh), but that is a production-time
+                    // symptom this gate exists to catch at build time.
+                    assert!(
+                        statement.contains("authenticated_at"),
+                        "{rel}'s INSERT INTO sessions does not set authenticated_at — every \
+                         session must have one after migration 0015 (Handoff 055 §5.1); a \
+                         session minted without it is refused fresh by \
+                         authz::is_fresh_for_account_operations (fail-closed), but that is a \
+                         production-time symptom of a bug this gate exists to catch at build \
+                         time instead."
                     );
                     // Handoff 054 §5.4: provenance must be written through
                     // `SessionProvenance`, never a bare SQL string literal

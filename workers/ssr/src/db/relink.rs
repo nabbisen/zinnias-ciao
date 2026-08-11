@@ -86,12 +86,13 @@ pub async fn redeem_required(
     // community_id (already validated by `claim`'s guard above; the same
     // value, not re-derived). Authorization refuses any other community.
     // Handoff 054 §5.4: written through SessionProvenance, not a literal.
+    // Handoff 055 §5.1: authenticated_at set equal to created_at (?4).
     let session = db
         .prepare(
             "INSERT INTO sessions \
              (id, user_id, session_hmac, created_at, expires_at, last_seen_at, \
-              provenance, scope_community_id) \
-             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?8, ?7 \
+              provenance, scope_community_id, authenticated_at) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?8, ?7, ?4 \
              WHERE EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?6 AND m.community_id=?7 \
                              AND m.user_id=?2 AND m.removed_at IS NULL)",

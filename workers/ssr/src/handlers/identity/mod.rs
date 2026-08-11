@@ -31,7 +31,18 @@ const CLIENT_ID: &str = "zinnias-ciao-dev-fake-client";
 /// trusted as a redirect target without its own check (defence in depth
 /// against a future caller of `db::auth_transaction::insert_required`
 /// passing something unsafe).
-const ALLOWED_RETURN_DESTINATIONS: &[&str] = &["/"];
+///
+/// `/account` (Handoff 055 §5.4) is the first growth of this list since
+/// its introduction: no live call site sets `return_to` to it yet — every
+/// `insert_required` call in this file still passes `Some("/")` — a
+/// working "re-authenticate, land back on /account" path needs
+/// `get_start`'s own already-authenticated short-circuit (below) to change
+/// first, which is session-rotation-adjacent territory this package
+/// deliberately leaves to Slice 5b (see the review request for the full
+/// reasoning). Added now, and exercised by its own test, so 5b extends an
+/// already-reviewed allowlist rather than growing it and wiring a live
+/// producer in the same, more sensitive package.
+const ALLOWED_RETURN_DESTINATIONS: &[&str] = &["/", "/account"];
 
 fn resolve_safe_return(stored: Option<&str>) -> &'static str {
     match stored.and_then(|value| {

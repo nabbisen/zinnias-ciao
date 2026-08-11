@@ -7,6 +7,7 @@
 //! Naming: `<LANG>_<CONTEXT>_<KEY>` in SCREAMING_SNAKE_CASE.
 
 mod access;
+mod account;
 mod admin;
 mod calendar;
 mod community;
@@ -19,6 +20,7 @@ mod notes;
 mod templates;
 
 pub use access::*;
+pub use account::*;
 pub use admin::*;
 pub use calendar::*;
 pub use community::*;

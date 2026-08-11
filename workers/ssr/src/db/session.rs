@@ -47,6 +47,13 @@ pub struct SessionRow {
     /// relink-derived sessions only. NULL for first-class
     /// (invite-redemption) sessions, which are not community-bound.
     pub scope_community_id: Option<String>,
+    /// RFC-080 §6 / Handoff 055: when this session last actually
+    /// authenticated — distinct from `created_at`, which a future
+    /// rotation (Slice 5b) will leave behind. NULL for every session
+    /// minted before migration 0015; the step-up predicate
+    /// (`authz::is_fresh_for_account_operations`) treats NULL as not
+    /// fresh, the same fail-closed treatment NULL `provenance` gets.
+    pub authenticated_at: Option<String>,
 }
 
 /// Look up a session by its HMAC.
@@ -55,7 +62,7 @@ pub async fn find_active(db: &D1Database, session_hmac: &str) -> Result<Option<S
     let now = now_utc();
     let row = db
         .prepare(
-            "SELECT id, user_id, provenance, scope_community_id \
+            "SELECT id, user_id, provenance, scope_community_id, authenticated_at \
              FROM sessions \
              WHERE session_hmac = ?1 \
                AND revoked_at IS NULL \
@@ -76,6 +83,10 @@ pub async fn find_active(db: &D1Database, session_hmac: &str) -> Result<Option<S
                 .map(|s| s.to_owned()),
             scope_community_id: v
                 .get("scope_community_id")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_owned()),
+            authenticated_at: v
+                .get("authenticated_at")
                 .and_then(|x| x.as_str())
                 .map(|s| s.to_owned()),
         })

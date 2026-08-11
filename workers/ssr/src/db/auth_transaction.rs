@@ -182,8 +182,8 @@ pub async fn issue_sign_in_required(
     let session = db
         .prepare(
             "INSERT INTO sessions \
-             (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) \
-             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?6 \
+             (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance, authenticated_at) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?6, ?4 \
              WHERE EXISTS (SELECT 1 FROM user_identities \
                            WHERE id = ?7 AND user_id = ?2 AND status = 'active')",
         )
@@ -306,8 +306,8 @@ pub async fn issue_join_required(
     let session = db
         .prepare(
             "INSERT INTO sessions \
-             (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) \
-             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?6 \
+             (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance, authenticated_at) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?6, ?4 \
              WHERE EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?7 AND m.community_id=?8 \
                              AND m.user_id=?2 AND m.removed_at IS NULL)",

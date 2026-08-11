@@ -18,6 +18,9 @@ pub struct AuthContext {
     /// these mean and why `provenance` is optional in the type.
     pub provenance: Option<String>,
     pub scope_community_id: Option<String>,
+    /// RFC-080 §6 / Handoff 055 — see `db::session::SessionRow` for the
+    /// fail-closed NULL treatment.
+    pub authenticated_at: Option<String>,
 }
 
 /// Authentication failure keeps configuration unavailability distinct from
@@ -84,6 +87,7 @@ pub async fn require_auth(req: &Request, env: &Env) -> std::result::Result<AuthC
         user_id: session.user_id,
         provenance: session.provenance,
         scope_community_id: session.scope_community_id,
+        authenticated_at: session.authenticated_at,
     })
 }
 

@@ -51,7 +51,8 @@
     "smoke:admin-tools-onboarding": "node scripts/smoke/rfc075-slice6-admin-tools-and-onboarding.mjs",
     "smoke:final-migration": "node scripts/smoke/rfc075-slice7-final-migration.mjs",
     "smoke:session-scope": "node scripts/smoke/session-provenance-and-community-binding.mjs",
-    "smoke:identity-callback": "node scripts/smoke/external-identity-callback.mjs"
+    "smoke:identity-callback": "node scripts/smoke/external-identity-callback.mjs",
+    "smoke:account-surface": "node scripts/smoke/account-surface.mjs"
   },
   "devDependencies": {
     "wrangler": "4.113.0"

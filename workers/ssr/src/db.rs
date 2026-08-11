@@ -31,6 +31,23 @@ pub fn add_seconds_to_now(seconds: u64) -> String {
     format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}.{millis:03}Z")
 }
 
+/// RFC-080 §6 / Handoff 055: mirrors `add_seconds_to_now`, subtracting
+/// instead of adding — used by callers that need a freshness-window
+/// threshold (e.g. `authz::is_fresh_for_account_operations`'s
+/// `freshness_window_start` argument) as a string in the same fixed
+/// `YYYY-MM-DDTHH:MM:SS.mmmZ` shape `authenticated_at` is stored in, so
+/// the comparison at the call site is a plain string comparison, not a
+/// second date-parsing path.
+pub fn subtract_seconds_from_now(seconds: u64) -> String {
+    let ms = worker::Date::now()
+        .as_millis()
+        .saturating_sub(seconds * 1000);
+    let secs = ms / 1000;
+    let millis = ms % 1000;
+    let (y, mo, d, h, mi, s) = epoch_to_ymd_hms(secs);
+    format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}.{millis:03}Z")
+}
+
 pub fn utc_days_ahead(days: u64) -> String {
     let ms = worker::Date::now().as_millis() + days * 86_400 * 1_000;
     let secs = ms / 1000;

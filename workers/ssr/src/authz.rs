@@ -5,8 +5,15 @@
 use worker::{Env, Result};
 
 use crate::db::membership as membership_db;
+use crate::db::session::SessionProvenance;
 use crate::session::AuthContext;
 use zinnias_ciao_contracts::Locale;
+
+/// RFC-080 §6 / Handoff 055 §5.2: account-level operations are rare and
+/// deliberate — a member performing one has just decided to. Fifteen
+/// minutes is long enough for a form to be filled and short enough that a
+/// stolen cookie found later is not sufficient on its own.
+pub(crate) const ACCOUNT_OPERATION_FRESHNESS_SECONDS: u64 = 900;
 
 pub struct MembershipContext {
     pub membership_id: String,
@@ -211,16 +218,147 @@ pub async fn require_active_admin_somewhere(
     })
 }
 
+/// RFC-080 §6 / Handoff 055 §5.4: is this session an **account-tier**
+/// session at all, independent of freshness? Shared by
+/// [`decide_account_surface_access`] (viewing `/account` needs this alone)
+/// and [`is_fresh_for_account_operations`] (acting on it needs this *and*
+/// freshness) — factored out so the two refusal conditions below are
+/// asserted once, not duplicated into two call sites that could drift.
+///
+/// Both of the following must hold:
+/// - provenance is present and is not `Relink` (RFC-081 §2 already refuses
+///   a community-admin-derived session at the community tier; this is
+///   where that refusal extends to the account tier);
+/// - `scope_community_id` is `None` — a community-bound session is not an
+///   account session. In this codebase every `Relink` session is also
+///   scoped, so this alone already covers it in practice; the explicit
+///   provenance check above is defence in depth against a hypothetical
+///   future unscoped `Relink` session, not dead code.
+fn is_account_tier_session(auth: &AuthContext) -> bool {
+    match auth.provenance.as_deref() {
+        None => return false,
+        Some(provenance) if provenance == SessionProvenance::Relink.as_str() => return false,
+        Some(_) => {}
+    }
+    auth.scope_community_id.is_none()
+}
+
+/// RFC-080 §6 / Handoff 055 §5.2: the account-tier step-up predicate — this
+/// is where "may this session act on the account itself" gets decided,
+/// strictly more powerful than "may this session reach this community."
+/// Pure, in `decide_membership_scope`'s own shape: no D1, no wall-clock
+/// read, natively unit-testable. `freshness_window_start` is `db::now_utc`
+/// minus [`ACCOUNT_OPERATION_FRESHNESS_SECONDS`], computed by the caller
+/// (e.g. `db::subtract_seconds_from_now(ACCOUNT_OPERATION_FRESHNESS_SECONDS)`)
+/// — not "now" itself, so this function does no date arithmetic of its
+/// own: `authenticated_at` and `freshness_window_start` are both
+/// `db::now_utc`'s fixed `YYYY-MM-DDTHH:MM:SS.mmmZ` shape, which sorts
+/// lexicographically in the same order it sorts chronologically, so
+/// freshness is a plain string comparison.
+///
+/// All of the following must hold: [`is_account_tier_session`], and
+/// `authenticated_at` is present and no earlier than
+/// `freshness_window_start` — `None` is refused the same fail-closed way
+/// `None` provenance already is, not treated as fresh.
+pub(crate) fn is_fresh_for_account_operations(
+    auth: &AuthContext,
+    freshness_window_start: &str,
+) -> bool {
+    if !is_account_tier_session(auth) {
+        return false;
+    }
+    match auth.authenticated_at.as_deref() {
+        Some(authenticated_at) => authenticated_at >= freshness_window_start,
+        None => false,
+    }
+}
+
+/// RFC-081 §6 / Handoff 055 §5.4: the pure fail-closed decision behind
+/// `require_account_surface` — same extraction reasoning as
+/// `decide_membership_scope`. `/account` is reachable by any account-tier
+/// session regardless of freshness or membership count (RFC-081 §6: a
+/// principal with no active membership still reaches the account
+/// surface); freshness only changes what the page *offers*, decided by
+/// [`is_fresh_for_account_operations`] separately.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AccountSurfaceDecision<'a> {
+    Allowed,
+    RefusedNullProvenance,
+    /// Covers both the `Relink`-provenance refusal and the
+    /// out-of-tier-scope refusal — in this codebase's current shape they
+    /// are the same live case (every `Relink` session is scoped), so one
+    /// audited reason serves both. `granting_community_id` is `None` only
+    /// for the hypothetical unscoped-`Relink` case, which has no
+    /// community to name — not audited, matching
+    /// `RefusedNullProvenance`'s own "no producer to catch in the act"
+    /// reasoning.
+    RefusedIneligible {
+        granting_community_id: Option<&'a str>,
+    },
+}
+
+pub(crate) fn decide_account_surface_access(auth: &AuthContext) -> AccountSurfaceDecision<'_> {
+    match auth.provenance.as_deref() {
+        None => return AccountSurfaceDecision::RefusedNullProvenance,
+        Some(provenance) if provenance == SessionProvenance::Relink.as_str() => {
+            return AccountSurfaceDecision::RefusedIneligible {
+                granting_community_id: auth.scope_community_id.as_deref(),
+            };
+        }
+        Some(_) => {}
+    }
+    if let Some(scope) = auth.scope_community_id.as_deref() {
+        return AccountSurfaceDecision::RefusedIneligible {
+            granting_community_id: Some(scope),
+        };
+    }
+    AccountSurfaceDecision::Allowed
+}
+
+/// Verify the authenticated session may reach the account surface at all
+/// (RFC-081 §6, Handoff 055 §5.4). Returns `Err(not_found)` (generic,
+/// RFC-004 shape) if refused — indistinguishable from any other not-found
+/// response, same discipline as `require_membership`.
+pub async fn require_account_surface(
+    env: &Env,
+    auth: &AuthContext,
+    request_id: &str,
+) -> Result<()> {
+    match decide_account_surface_access(auth) {
+        AccountSurfaceDecision::Allowed => Ok(()),
+        AccountSurfaceDecision::RefusedNullProvenance => Err(not_found()),
+        AccountSurfaceDecision::RefusedIneligible {
+            granting_community_id: None,
+        } => Err(not_found()),
+        AccountSurfaceDecision::RefusedIneligible {
+            granting_community_id: Some(scope),
+        } => {
+            let db = env.d1("DB")?;
+            crate::audit::write_session_scope_refused(&db, request_id, scope, None).await;
+            Err(not_found())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn auth(provenance: Option<&str>, scope_community_id: Option<&str>) -> AuthContext {
+        auth_with_freshness(provenance, scope_community_id, None)
+    }
+
+    fn auth_with_freshness(
+        provenance: Option<&str>,
+        scope_community_id: Option<&str>,
+        authenticated_at: Option<&str>,
+    ) -> AuthContext {
         AuthContext {
             session_id: "sess_test".to_owned(),
             user_id: "usr_test".to_owned(),
             provenance: provenance.map(str::to_owned),
             scope_community_id: scope_community_id.map(str::to_owned),
+            authenticated_at: authenticated_at.map(str::to_owned),
         }
     }
 
@@ -298,5 +436,206 @@ mod tests {
             "RFC-081 §2.1a: /communities/new must not let a relink-bound session \
              mint a brand-new community it then admins"
         );
+    }
+
+    // ── decide_account_surface_access (§5.4) ─────────────────────────────
+
+    #[test]
+    fn account_surface_null_provenance_is_refused() {
+        assert_eq!(
+            decide_account_surface_access(&auth(None, None)),
+            AccountSurfaceDecision::RefusedNullProvenance
+        );
+    }
+
+    #[test]
+    fn account_surface_allows_unscoped_first_class_and_external_identity_sessions() {
+        for provenance in ["invite_redemption", "external_identity"] {
+            assert_eq!(
+                decide_account_surface_access(&auth(Some(provenance), None)),
+                AccountSurfaceDecision::Allowed,
+                "provenance={provenance}"
+            );
+        }
+    }
+
+    #[test]
+    fn account_surface_allows_a_principal_with_zero_memberships() {
+        // RFC-081 §6: the account surface's whole point is to remain
+        // reachable with no active membership — this decision has no
+        // knowledge of membership count at all, which is exactly what
+        // makes that true; membership count is irrelevant input here.
+        assert_eq!(
+            decide_account_surface_access(&auth(Some("invite_redemption"), None)),
+            AccountSurfaceDecision::Allowed
+        );
+    }
+
+    #[test]
+    fn account_surface_refuses_relink_provenance_with_the_granting_community_audited() {
+        assert_eq!(
+            decide_account_surface_access(&auth(Some("relink"), Some("com_a"))),
+            AccountSurfaceDecision::RefusedIneligible {
+                granting_community_id: Some("com_a")
+            },
+            "the account surface must be refused to Relink sessions entirely, \
+             carrying the granting community for the audit write"
+        );
+    }
+
+    #[test]
+    fn account_surface_refuses_any_scoped_session_even_with_eligible_provenance() {
+        // Defensive: today only Relink produces a scoped session, but the
+        // refusal is keyed on scope, not provenance name, so a
+        // hypothetical future scoped non-Relink provenance is refused too.
+        assert_eq!(
+            decide_account_surface_access(&auth(Some("invite_redemption"), Some("com_a"))),
+            AccountSurfaceDecision::RefusedIneligible {
+                granting_community_id: Some("com_a")
+            }
+        );
+    }
+
+    // ── is_fresh_for_account_operations (§5.2) — exhaustive ─────────────
+
+    const WINDOW_START: &str = "2026-08-11T00:00:00.000Z";
+    const WITHIN_WINDOW: &str = "2026-08-11T00:10:00.000Z"; // 10 min after start
+    const BEFORE_WINDOW: &str = "2026-08-10T23:50:00.000Z"; // 10 min before start
+
+    #[test]
+    fn null_provenance_is_refused_even_when_otherwise_fresh() {
+        assert!(!is_fresh_for_account_operations(
+            &auth_with_freshness(None, None, Some(WITHIN_WINDOW)),
+            WINDOW_START,
+        ));
+    }
+
+    #[test]
+    fn relink_provenance_is_refused_even_when_unscoped_and_fresh() {
+        // Relink sessions in this codebase are always scoped in practice,
+        // but the predicate must refuse Relink on its own, independent of
+        // scope — RFC-081 §2's community-admin-authority boundary applies
+        // to the account tier even in a hypothetical unscoped shape.
+        assert!(!is_fresh_for_account_operations(
+            &auth_with_freshness(Some("relink"), None, Some(WITHIN_WINDOW)),
+            WINDOW_START,
+        ));
+        assert!(!is_fresh_for_account_operations(
+            &auth_with_freshness(Some("relink"), Some("com_a"), Some(WITHIN_WINDOW)),
+            WINDOW_START,
+        ));
+    }
+
+    #[test]
+    fn invite_redemption_and_external_identity_are_both_eligible_provenances() {
+        for provenance in ["invite_redemption", "external_identity"] {
+            assert!(
+                is_fresh_for_account_operations(
+                    &auth_with_freshness(Some(provenance), None, Some(WITHIN_WINDOW)),
+                    WINDOW_START,
+                ),
+                "provenance={provenance} must be eligible when unscoped and fresh"
+            );
+        }
+    }
+
+    #[test]
+    fn scoped_session_is_refused_even_with_eligible_provenance_and_fresh_authentication() {
+        assert!(!is_fresh_for_account_operations(
+            &auth_with_freshness(
+                Some("invite_redemption"),
+                Some("com_a"),
+                Some(WITHIN_WINDOW)
+            ),
+            WINDOW_START,
+        ));
+        assert!(!is_fresh_for_account_operations(
+            &auth_with_freshness(
+                Some("external_identity"),
+                Some("com_a"),
+                Some(WITHIN_WINDOW)
+            ),
+            WINDOW_START,
+        ));
+    }
+
+    #[test]
+    fn null_authenticated_at_is_refused_not_treated_as_fresh() {
+        assert!(!is_fresh_for_account_operations(
+            &auth_with_freshness(Some("invite_redemption"), None, None),
+            WINDOW_START,
+        ));
+    }
+
+    #[test]
+    fn authenticated_at_within_the_window_is_fresh() {
+        assert!(is_fresh_for_account_operations(
+            &auth_with_freshness(Some("invite_redemption"), None, Some(WITHIN_WINDOW)),
+            WINDOW_START,
+        ));
+    }
+
+    #[test]
+    fn authenticated_at_before_the_window_is_stale() {
+        assert!(!is_fresh_for_account_operations(
+            &auth_with_freshness(Some("invite_redemption"), None, Some(BEFORE_WINDOW)),
+            WINDOW_START,
+        ));
+    }
+
+    #[test]
+    fn authenticated_at_exactly_at_the_window_boundary_is_fresh() {
+        // Inclusive boundary: a session authenticated exactly
+        // ACCOUNT_OPERATION_FRESHNESS_SECONDS ago is still fresh, not yet
+        // stale — `>=`, not `>`.
+        assert!(is_fresh_for_account_operations(
+            &auth_with_freshness(Some("invite_redemption"), None, Some(WINDOW_START)),
+            WINDOW_START,
+        ));
+    }
+
+    #[test]
+    fn authenticated_at_one_millisecond_before_the_boundary_is_stale() {
+        assert!(!is_fresh_for_account_operations(
+            &auth_with_freshness(
+                Some("invite_redemption"),
+                None,
+                Some("2026-08-10T23:59:59.999Z")
+            ),
+            WINDOW_START,
+        ));
+    }
+
+    #[test]
+    fn every_provenance_and_scope_and_freshness_combination_is_covered() {
+        // A brute-force cross-product, independent of the targeted tests
+        // above: only (eligible provenance, unscoped, authenticated_at
+        // within the window) may pass.
+        let provenances: [Option<&str>; 4] = [
+            None,
+            Some("invite_redemption"),
+            Some("relink"),
+            Some("external_identity"),
+        ];
+        let scopes: [Option<&str>; 2] = [None, Some("com_a")];
+        let freshness: [Option<&str>; 3] = [None, Some(BEFORE_WINDOW), Some(WITHIN_WINDOW)];
+
+        for provenance in provenances {
+            for scope in scopes {
+                for authenticated_at in freshness {
+                    let expected = provenance.is_some_and(|p| p != "relink")
+                        && scope.is_none()
+                        && authenticated_at == Some(WITHIN_WINDOW);
+                    assert_eq!(
+                        is_fresh_for_account_operations(
+                            &auth_with_freshness(provenance, scope, authenticated_at),
+                            WINDOW_START,
+                        ),
+                        expected,
+                        "provenance={provenance:?} scope={scope:?} authenticated_at={authenticated_at:?}"
+                    );
+                }
+            }
+        }
     }
 }

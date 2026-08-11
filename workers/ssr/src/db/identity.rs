@@ -70,3 +70,45 @@ pub async fn find_by_subject_lookup(
         })
     }))
 }
+
+/// The account surface's own row shape (RFC-080 §6 / RFC-081 §6, Handoff
+/// 055 §5.4) — deliberately narrower than [`UserIdentityRow`], not a
+/// filtered view of it: this query never `SELECT`s `subject_lookup`, so
+/// there is no digest for a rendering bug to ever leak, structurally
+/// rather than by caller discipline. Same reasoning as
+/// `db/invite.rs::InviteMetaRow` ("Code HMACs are never returned").
+pub struct LinkedIdentitySummary {
+    pub identity_namespace_id: String,
+    pub linked_at: String,
+}
+
+/// Every `active` identity linked to `user_id`, oldest first. `revoked`
+/// rows are excluded — matching `identity::identity_lookup_is_authenticatable`'s
+/// existing decision that a revoked identity is, to every caller, as good
+/// as never linked.
+pub async fn list_active_for_user(
+    db: &D1Database,
+    user_id: &str,
+) -> Result<Vec<LinkedIdentitySummary>> {
+    let rows = db
+        .prepare(
+            "SELECT identity_namespace_id, linked_at \
+             FROM user_identities \
+             WHERE user_id = ?1 AND status = 'active' \
+             ORDER BY linked_at ASC",
+        )
+        .bind(&[user_id.into()])?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(LinkedIdentitySummary {
+                identity_namespace_id: v.get("identity_namespace_id")?.as_str()?.to_owned(),
+                linked_at: v.get("linked_at")?.as_str()?.to_owned(),
+            })
+        })
+        .collect())
+}
