@@ -574,6 +574,11 @@ fn i18n_en_ja_parity_count() {
             EN_ACCOUNT_STALE_SIGN_IN_AGAIN,
             JA_ACCOUNT_STALE_SIGN_IN_AGAIN,
         ),
+        (EN_ACCOUNT_LINK_ENTRY_LABEL, JA_ACCOUNT_LINK_ENTRY_LABEL),
+        (EN_ACCOUNT_LINK_TITLE, JA_ACCOUNT_LINK_TITLE),
+        (EN_ACCOUNT_LINK_BODY, JA_ACCOUNT_LINK_BODY),
+        (EN_ACCOUNT_LINK_SUBMIT, JA_ACCOUNT_LINK_SUBMIT),
+        (EN_ACCOUNT_LINK_CANCEL, JA_ACCOUNT_LINK_CANCEL),
     ];
     // Strings that are intentionally identical across languages (product name,
     // numeric units, etc.) are exempted from the identity check.
@@ -3118,9 +3123,15 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     },
     LocalizationException {
         path: "handlers/account/mod.rs",
-        ja_count: 13,
+        ja_count: 14,
         calls_bare_page: true,
-        reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 055)",
+        reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 055; +1 in Handoff 056 for the link entry-point label)",
+    },
+    LocalizationException {
+        path: "handlers/account/link.rs",
+        ja_count: 5,
+        calls_bare_page: true,
+        reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 056)",
     },
     LocalizationException {
         path: "handlers/identity/mod.rs",
@@ -4119,6 +4130,7 @@ fn rfc079_class_a_failure_telemetry_is_centrally_and_exhaustively_owned() {
         "execute_required_batch(",
         "execute_required_tail(",
         "execute_asserted_required(",
+        "execute_required_standalone(",
     ];
     assert_eq!(
         production_core
@@ -4988,6 +5000,7 @@ fn rfc079_package7_removal_and_documentation_boundary_are_pinned() {
         "0013_identity_namespaces.sql",
         "0014_auth_transactions.sql",
         "0015_session_authenticated_at.sql",
+        "0016_auth_transaction_initiating_user.sql",
     ];
     assert_eq!(
         migration_filenames, expected_migration_filenames,
@@ -5462,7 +5475,11 @@ const KNOWN_SESSION_MINTING_SITES: &[SessionMintingSite] = &[
     },
     SessionMintingSite {
         file: "db/auth_transaction.rs",
-        reason: "external identity sign-in/join (Handoff 054) — provenance ExternalIdentity, two INSERT INTO sessions occurrences in this one file (issue_sign_in_required, issue_join_required)",
+        reason: "external identity sign-in/join/re-authentication (Handoff 054, Handoff 056 §3.2) — provenance ExternalIdentity, three INSERT INTO sessions occurrences in this one file (issue_sign_in_required, issue_join_required, reauthenticate_required)",
+    },
+    SessionMintingSite {
+        file: "db/identity.rs",
+        reason: "external identity linking (Handoff 056 §5.1) — provenance ExternalIdentity, one INSERT INTO sessions occurrence (link_required), atomic with the user_identities insert and the revoke-others rotation",
     },
 ];
 
@@ -5788,5 +5805,124 @@ fn identity_fake_issuer_is_test_only() {
          `#[cfg(test)]` line — found the declaration, but not in that exact guarded shape. A \
          fake_issuer reachable from a non-test build is the difference between a test-only \
          mechanism and a live one; do not weaken this to a doc comment or a runtime check."
+    );
+}
+
+/// Handoff 056 §6 gate 1: linking must be additive by construction — no
+/// route or handler anywhere in this codebase may ever revoke,
+/// deactivate, or delete a `user_identities` row. Default-fail: scans
+/// every `.rs` file under `workers/ssr/src` for the two SQL shapes that
+/// could ever remove a member's ability to authenticate via a linked
+/// identity (`DELETE FROM user_identities` and
+/// `UPDATE user_identities SET status`, the column that carries
+/// `'active'`/`'revoked'`) — both forbidden unconditionally. Deliberately
+/// does not forbid `UPDATE user_identities SET last_authenticated_at`
+/// (the existing touch step in `issue_sign_in_required`/
+/// `reauthenticate_required`), a different column with no bearing on
+/// whether the identity is usable.
+#[test]
+fn no_unlink_path_exists_for_user_identities() {
+    let mut files = Vec::new();
+    walk_rs_files(&workers_ssr_src_dir(), &mut files);
+    let src_dir = workers_ssr_src_dir();
+    let forbidden = [
+        "DELETE FROM user_identities",
+        "UPDATE user_identities SET status",
+    ];
+    let mut offenders: Vec<String> = Vec::new();
+
+    for path in &files {
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let rel = path
+            .strip_prefix(&src_dir)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        for pattern in forbidden {
+            if content.contains(pattern) {
+                offenders.push(format!("{rel}: {pattern}"));
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "found an unlink-capable SQL statement against user_identities: {} — RFC-081 §4 / \
+         Handoff 056 §5.2 requires linking to be additive by construction; if a genuine unlink \
+         path is being added, that is Slice 5c's job, reviewed on its own, not something to \
+         except here.",
+        offenders.join(", ")
+    );
+}
+
+/// Handoff 056 §6 gate 2: `prompt=login` must be sent for every `link` \
+/// authorization request and for a `sign_in` re-authentication — never a \
+/// hardcoded bypass of the one decision function that determines this \
+/// (`should_send_prompt_login`, exhaustively unit-tested in \
+/// `handlers/identity/tests.rs`). Checks both real call sites of \
+/// `start_oidc_transaction`: `get_start`'s own body must reference the \
+/// decision function directly (not a literal `true`/`false` in its place); \
+/// `handlers/account/link.rs::post_link`'s call must pass the literal \
+/// `true` its own function's unconditional `link` case computes to —
+/// proven equivalent to calling the decision function by
+/// `link_always_sends_prompt_login_regardless_of_session_state`, not
+/// merely assumed.
+#[test]
+fn prompt_login_is_sent_for_link_and_reauthentication() {
+    let identity_mod_path = workers_ssr_src_dir().join("handlers/identity/mod.rs");
+    let identity_mod = std::fs::read_to_string(&identity_mod_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", identity_mod_path.display()));
+    let get_start_body = compact_brace_block(&identity_mod, "pub async fn get_start");
+    assert!(
+        get_start_body.contains("should_send_prompt_login("),
+        "get_start must decide whether to send prompt=login through \
+         should_send_prompt_login, not a hardcoded bypass"
+    );
+
+    let start_oidc_transaction_body =
+        compact_brace_block(&identity_mod, "pub(crate) async fn start_oidc_transaction");
+    assert!(
+        start_oidc_transaction_body.contains("prompt=login")
+            && start_oidc_transaction_body.contains("send_prompt_login"),
+        "start_oidc_transaction must build the prompt=login query fragment conditionally on \
+         its own send_prompt_login parameter, not unconditionally"
+    );
+
+    let link_path = workers_ssr_src_dir().join("handlers/account/link.rs");
+    let link_source = std::fs::read_to_string(&link_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", link_path.display()));
+    // Deliberately the *raw* source, not `compact_brace_block`'s output —
+    // that helper collapses all whitespace (`split_whitespace().collect()`,
+    // built for exact-shape matching elsewhere in this file), which would
+    // destroy the argument-list structure this check needs to parse.
+    assert!(
+        link_source.contains("\"link\","),
+        "post_link must start a transaction with action \"link\""
+    );
+    // The call's own argument list, from `start_oidc_transaction(` through
+    // its matching close paren — bounded rather than exact-formatted, so
+    // this survives an ordinary `cargo fmt` reflow.
+    let call_start = link_source
+        .find("start_oidc_transaction(")
+        .expect("post_link must call start_oidc_transaction");
+    let call_site = &link_source[call_start..];
+    let call_end = call_site
+        .find(")\n")
+        .map(|offset| offset + 1)
+        .unwrap_or(call_site.len());
+    let arguments = &call_site[..call_end];
+    let last_argument = arguments
+        .trim_end_matches([')', '\n', ' '])
+        .rsplit(',')
+        .find(|segment| !segment.trim().is_empty())
+        .map(str::trim)
+        .unwrap_or("");
+    assert_eq!(
+        last_argument, "true",
+        "post_link's start_oidc_transaction call must pass true for send_prompt_login (found \
+         {last_argument:?}) — link's own case is unconditional (proven by \
+         link_always_sends_prompt_login_regardless_of_session_state), so a literal true here is \
+         the correct, equivalent value, not a bypass of a different decision"
     );
 }

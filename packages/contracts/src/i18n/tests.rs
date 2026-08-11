@@ -234,8 +234,14 @@ fn en_ja_parity() {
         "ACCOUNT_NO_COMMUNITIES",
         "ACCOUNT_FRESH_CAN_MANAGE",
         "ACCOUNT_STALE_SIGN_IN_AGAIN",
+        // Linking (RFC-081 §4, Handoff 056)
+        "ACCOUNT_LINK_ENTRY_LABEL",
+        "ACCOUNT_LINK_TITLE",
+        "ACCOUNT_LINK_BODY",
+        "ACCOUNT_LINK_SUBMIT",
+        "ACCOUNT_LINK_CANCEL",
     ];
-    assert_eq!(en_keys.len(), 209, "update parity list when adding strings");
+    assert_eq!(en_keys.len(), 214, "update parity list when adding strings");
     for key in en_keys {
         assert!(!key.is_empty(), "empty key: {key}");
     }

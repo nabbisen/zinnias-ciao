@@ -55,6 +55,30 @@ struct PendingCode {
     redirect_uri: String,
     code_challenge: String,
     nonce: String,
+    prompted_login: bool,
+}
+
+/// RFC-080 §6 / Handoff 056 §3.3: a completed OIDC round trip proves the
+/// member has an active provider session, not that they just
+/// authenticated — an SSO-backed provider can mint a token without
+/// prompting at all. `prompt=login` asks the provider to force a fresh
+/// prompt; this fake issuer has no real login form, so "re-prompted"
+/// means only "the caller asked" — but the resulting `auth_time` claim
+/// still needs to look observably different, so a test can tell the two
+/// cases apart (this is the "test that can distinguish" Handoff 056 §3.3
+/// requires). Not read or verified anywhere in the application
+/// (`identity::verify_id_token` does not check `auth_time` — see the
+/// review request for why that is deferred to a Stage 3 provider-
+/// selection criterion, not enforced here): this exists purely so the
+/// fake issuer's own behaviour is observably correct.
+const SSO_REUSE_SIMULATED_AGE_SECONDS: i64 = 3600;
+
+pub(crate) fn resolve_auth_time(prompted_login: bool, now: i64) -> i64 {
+    if prompted_login {
+        now
+    } else {
+        now - SSO_REUSE_SIMULATED_AGE_SECONDS
+    }
 }
 
 fn code_store() -> &'static Mutex<HashMap<String, PendingCode>> {
@@ -92,6 +116,7 @@ pub(crate) async fn get_authorize(req: Request, _env: &Env, _rid: &str) -> Resul
     if query_param(&url, "code_challenge_method").as_deref() != Some("S256") {
         return Response::error("unsupported code_challenge_method", 400);
     }
+    let prompted_login = query_param(&url, "prompt").as_deref() == Some("login");
 
     let mut code_bytes = [0u8; 32];
     getrandom::fill(&mut code_bytes).expect("getrandom failed");
@@ -103,6 +128,7 @@ pub(crate) async fn get_authorize(req: Request, _env: &Env, _rid: &str) -> Resul
             redirect_uri: redirect_uri.clone(),
             code_challenge,
             nonce,
+            prompted_login,
         },
     );
 
@@ -158,6 +184,7 @@ pub(crate) async fn post_token(mut req: Request, _env: &Env, _rid: &str) -> Resu
         "nonce": pending.nonce,
         "exp": now + 300,
         "iat": now,
+        "auth_time": resolve_auth_time(pending.prompted_login, now),
     });
     let id_token = encode_hs256(&header, &claims, &shared_key());
 
@@ -183,4 +210,34 @@ fn urlencode(value: &str) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Handoff 056 §3.3 / §8: the fake issuer must distinguish a
+    // prompted authentication from SSO reuse — this is that test.
+
+    #[test]
+    fn prompted_login_sets_auth_time_to_now() {
+        assert_eq!(resolve_auth_time(true, 1_700_000_000), 1_700_000_000);
+    }
+
+    #[test]
+    fn unprompted_reuse_sets_auth_time_visibly_in_the_past() {
+        let now = 1_700_000_000;
+        let auth_time = resolve_auth_time(false, now);
+        assert_eq!(auth_time, now - SSO_REUSE_SIMULATED_AGE_SECONDS);
+        assert!(
+            auth_time < now,
+            "SSO-reuse auth_time must be observably older than now, not equal to it"
+        );
+    }
+
+    #[test]
+    fn prompted_and_unprompted_are_always_distinguishable() {
+        let now = 1_700_000_000;
+        assert_ne!(resolve_auth_time(true, now), resolve_auth_time(false, now));
+    }
 }

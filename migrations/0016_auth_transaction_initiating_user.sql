@@ -1,0 +1,22 @@
+-- RFC-081 §4 / RFC-080 §5 (Handoff 056, external-identity Slice 5b):
+-- `link` transactions need the target user_id pinned at creation time —
+-- immutably, server-side, from an already-verified account-tier session —
+-- rather than re-derived from whatever session cookie happens to be
+-- active when the callback lands. Re-deriving it live would let a
+-- cross-session swap during the OIDC round trip (initiate as principal A,
+-- somehow complete as principal B) attach the verified identity to the
+-- wrong account; pinning it here at creation, from a session
+-- `authz::require_account_surface` already validated, closes that off
+-- structurally.
+--
+-- `sign_in` re-authentication needs no equivalent column: its target
+-- user_id always comes from the verified identity itself (never from the
+-- initiating session), so there is nothing to pin — see the Handoff 056
+-- review request for the full reasoning.
+--
+-- Nullable, additive: NULL for every `sign_in`/`join` transaction, and for
+-- every `link` transaction that predates this column (none exist yet —
+-- Handoff 053 §7.2's deferred `authenticated_at` precedent, not a live
+-- migration concern here).
+
+ALTER TABLE auth_transactions ADD COLUMN initiating_user_id TEXT;

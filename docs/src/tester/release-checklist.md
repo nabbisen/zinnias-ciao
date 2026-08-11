@@ -1576,3 +1576,111 @@ can remove a credential (5b's job).
       `smoke:display-name` network flake reproduced once and passed clean
       on immediate retry — not a regression, noted rather than hidden.
       *(evidence `.git-exclude/evidence/handoff055/`)*
+
+## Handoff 056 — Slice 5b: linking and re-authentication
+
+- [x] **`get_start`'s already-authenticated short-circuit now checks
+      freshness, `sign_in` only.** `action=join` is untouched — any valid
+      session (fresh or not) still bounces to `/`, since joining is
+      invite-driven and has no freshness question. For `sign_in`, a fresh
+      account-tier session still bounces to `/`; a valid-but-stale one now
+      proceeds through the same nine-step OIDC transaction machinery
+      instead of being turned away, with `return_to` set to `/account` and
+      `prompt=login` requested.
+- [x] **A completed OIDC round trip is not treated as proof of fresh
+      authentication.** `should_send_prompt_login(action, caller_has_valid_session)`
+      is a pure, exhaustively unit-tested decision (`link` always sends it;
+      `sign_in` sends it only when a valid session already exists; `join`
+      never does — all three actions crossed with both session states, six
+      cases, one test each plus a full cross-product test). The fake
+      issuer's `resolve_auth_time(prompted_login, now)` returns `now` when
+      prompted and `now - 3600` when not, so a test can tell "re-prompted"
+      apart from "SSO reuse" — this claim is not read or checked anywhere
+      in `identity::verify_id_token` (deliberately: whether a *real*
+      provider honours `prompt=login` is a Stage 3 provider-selection
+      criterion, not something this codebase can enforce against a
+      provider that lies).
+- [x] **Re-authentication rotates, it does not touch `authenticated_at` in
+      place.** `db::auth_transaction::reauthenticate_required` mints a new
+      session row, revokes the old one, and revokes every other active
+      session for that `user_id` (`db::session::revoke_others_statement`,
+      factored out of `db/relink.rs`'s existing proven shape and now
+      shared by both linking and re-authentication) — atomically with the
+      identity touch, in one `execute_asserted_required` batch. Proven via
+      a real round trip: same principal, same identity, new session id,
+      old session's `revoked_at` set, exactly one active session
+      remaining afterward.
+- [x] **Linking (RFC-081 §4)**: from an account-tier session only
+      (`Relink` and any community-scoped session refused, same boundary as
+      the account surface itself), gated by a purpose-bound, user-bound,
+      single-use token (`token_purpose::LINK_IDENTITY`, the same
+      `codlet`/`form_token` machinery `community_create.rs` already uses)
+      distinct from the OIDC transaction itself, with an explicit
+      confirmation step before the redirect and `prompt=login`
+      unconditionally. `initiating_user_id` (migration 0016, nullable,
+      link-only) is pinned onto the transaction row at *creation* time from
+      the already-verified session, not re-derived from a live session
+      cookie at callback time — closing a cross-session-swap window where
+      the session could otherwise change principal between initiation and
+      callback. Re-authentication needs no equivalent column: its target
+      user always comes from the verified identity itself, so a live-
+      session mismatch just falls back to an ordinary, non-rotating
+      sign-in rather than any cross-account risk.
+- [x] **Collision fails closed, generically, and is audited.** If the
+      verified identity already belongs to another principal, the caller
+      sees the same generic failure copy as any other rejection — no row
+      written, no disclosure that the identity is known elsewhere. Because
+      no business mutation happens in this case, the audit write needed a
+      new primitive: `audit::execute_required_standalone`, the first
+      Class-A-required write in this codebase with no paired mutation
+      (distinct from `write_session_scope_refused`'s best-effort Class
+      B/C pattern) — added to the Class A executor gate's own inventory.
+- [x] **§5.2's additive invariant, established two ways, not asserted.**
+      By construction: `link_required`'s only non-`INSERT` statement is
+      the revoke-others `UPDATE`, which touches `sessions`, never
+      `user_identities` — there is no code path in this function capable of
+      removing or deactivating an existing link. By a codebase-wide,
+      default-fail gate: `no_unlink_path_exists_for_user_identities` scans
+      every `.rs` file under `workers/ssr/src` and forbids
+      `"DELETE FROM user_identities"` and
+      `"UPDATE user_identities SET status"` unconditionally (deliberately
+      not forbidding `UPDATE user_identities SET last_authenticated_at`, a
+      different column with no bearing on usability) — any future
+      violation, anywhere in the codebase, fails this gate, not just a
+      review of this package's diff. Fired: added a matching `UPDATE`
+      statement to `db/identity.rs`, confirmed the gate failed naming the
+      file, restored (`cmp`-verified byte-identical), reconfirmed green.
+- [x] **`/account` is now a produced return destination**, resolving 5a's
+      flagged open question: both link's confirmation and `sign_in`
+      re-authentication set `return_to = "/account"`.
+      `ALLOWED_RETURN_DESTINATIONS` itself is unchanged from 5a (`/`,
+      `/account`) — only the producer existed to add.
+- [x] **Three new Class A audit actions** — `external_identity.linked`,
+      `external_identity.link_rejected`, `session.external_reauthenticated`
+      — `AuditAction::ALL` 28 → 31, the Class A inventory gate 24 → 27.
+- [x] `cargo test --workspace`: **594 → 600** (+6 under default features: 2
+      in the new release gates, 4 in `handlers/identity/tests.rs`'s
+      `prompt=login` decision coverage) — plus 3 more
+      (`identity/dev_fake_issuer.rs`'s `resolve_auth_time` coverage) that
+      only compile under the `dev_fake_issuer` feature (267 → 270 in the
+      `ssr` crate alone with that feature on), exactly accounted for.
+      Clippy (native and `--features dev_fake_issuer`), fmt, wasm check
+      (both feature states), `mdbook build docs`, `git diff --check` all
+      clean. `bun run build`: `index.js` unchanged at 28.6kb,
+      `index_bg.wasm` 1,521,140 → 1,537,003 bytes (+~15.5KB) — the new
+      migration/handler/db/audit code; JS glue untouched, no new route
+      shape at that layer. Digest/cache-version gate passes without a
+      re-pin. No version bump.
+- [x] **Fourteen smokes green**, including the new
+      `smoke:account-link-reauth` (six scenarios: `action=join` unchanged
+      for a signed-in session; a `Relink`-provenance session refused the
+      link entry point entirely; link succeeds with rotation, the new
+      identity row, and the old session revoked; a second principal's
+      link attempt against the same fake-issuer subject collides
+      generically with no row written; that same first principal's own
+      rotated session, staled by directly updating `authenticated_at`,
+      re-authenticates with a new session id and the old one revoked; and
+      the link confirmation flow, through to the generic collision-failure
+      page it necessarily reaches on this pass, navigating correctly with
+      application JavaScript fully disabled in a real browser). Zero CSP
+      violations, zero stray processes left running.

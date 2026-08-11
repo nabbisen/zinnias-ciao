@@ -24,6 +24,12 @@ pub struct AuthTransactionRow {
     pub invite_reference: Option<String>,
     pub callback_uri: String,
     pub return_to: Option<String>,
+    /// RFC-081 §4 / Handoff 056: `link` only — the account-tier user_id
+    /// this transaction was started from, pinned at creation time from an
+    /// already-verified session. `None` for `sign_in`/`join`. See
+    /// migration 0016's own comment for why this is pinned rather than
+    /// re-derived from a live session cookie at callback time.
+    pub initiating_user_id: Option<String>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -40,6 +46,7 @@ pub async fn insert_required(
     invite_reference: Option<&str>,
     callback_uri: &str,
     return_to: Option<&str>,
+    initiating_user_id: Option<&str>,
     created_at: &str,
     expires_at: &str,
 ) -> Result<()> {
@@ -56,12 +63,15 @@ pub async fn insert_required(
     let return_to_js = return_to
         .map(worker::wasm_bindgen::JsValue::from_str)
         .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
+    let initiating_user_id_js = initiating_user_id
+        .map(worker::wasm_bindgen::JsValue::from_str)
+        .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
     db.prepare(
         "INSERT INTO auth_transactions \
          (id, lookup_key_hmac, action, identity_namespace_id, nonce_hmac, \
           pkce_verifier, initiating_session_provenance, invite_reference, \
-          callback_uri, return_to, created_at, expires_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+          callback_uri, return_to, initiating_user_id, created_at, expires_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
     )
     .bind(&[
         id.into(),
@@ -74,6 +84,7 @@ pub async fn insert_required(
         invite_reference_js,
         callback_uri.into(),
         return_to_js,
+        initiating_user_id_js,
         created_at.into(),
         expires_at.into(),
     ])?
@@ -94,7 +105,8 @@ pub async fn find_active_by_lookup_key_hmac(
     let row = db
         .prepare(
             "SELECT id, action, identity_namespace_id, nonce_hmac, pkce_verifier, \
-                    initiating_session_provenance, invite_reference, callback_uri, return_to \
+                    initiating_session_provenance, invite_reference, callback_uri, return_to, \
+                    initiating_user_id \
              FROM auth_transactions \
              WHERE lookup_key_hmac = ?1 AND consumed_at IS NULL AND expires_at > ?2 \
              LIMIT 1",
@@ -121,6 +133,10 @@ pub async fn find_active_by_lookup_key_hmac(
             callback_uri: v.get("callback_uri")?.as_str()?.to_owned(),
             return_to: v
                 .get("return_to")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_owned()),
+            initiating_user_id: v
+                .get("initiating_user_id")
                 .and_then(|x| x.as_str())
                 .map(|s| s.to_owned()),
         })
@@ -205,6 +221,64 @@ pub async fn issue_sign_in_required(
         AuditMetadata::None,
     )?;
     audit::execute_asserted_required(db, touch, vec![session], vec![], &record).await?;
+    Ok(())
+}
+
+/// RFC-080 §6 / Handoff 056 §3.2: the re-authentication outcome — an
+/// already-signed-in principal completed a fresh OIDC round trip for
+/// `action=sign_in`. Same shape as [`issue_sign_in_required`] (touch,
+/// issue, audit) plus one addition: revoke every other active session for
+/// `user_id`, including the stale one that initiated this round trip —
+/// rotation, not an in-place `authenticated_at` update, so the session
+/// identifier itself changes (Handoff 056 §3.2's session-fixation
+/// reasoning). The caller decides whether this is a re-authentication at
+/// all by checking whether the *current* request's own session cookie
+/// already resolves to this same `user_id` — nothing here re-derives that
+/// decision from a stored transaction field.
+pub async fn reauthenticate_required(
+    db: &D1Database,
+    request_id: &str,
+    identity_id: &str,
+    user_id: &str,
+    session_id: &str,
+    session_hmac: &str,
+) -> Result<()> {
+    let now = now_utc();
+    let session_expires_at = add_seconds_to_now(SESSION_TTL_SECONDS);
+    let touch = db
+        .prepare(
+            "UPDATE user_identities SET last_authenticated_at = ?1 \
+             WHERE id = ?2 AND user_id = ?3 AND status = 'active'",
+        )
+        .bind(&[now.as_str().into(), identity_id.into(), user_id.into()])?;
+    let session = db
+        .prepare(
+            "INSERT INTO sessions \
+             (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance, authenticated_at) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?6, ?4 \
+             WHERE EXISTS (SELECT 1 FROM user_identities \
+                           WHERE id = ?7 AND user_id = ?2 AND status = 'active')",
+        )
+        .bind(&[
+            session_id.into(),
+            user_id.into(),
+            session_hmac.into(),
+            now.as_str().into(),
+            session_expires_at.as_str().into(),
+            SessionProvenance::ExternalIdentity.as_str().into(),
+            identity_id.into(),
+        ])?;
+    let revoke_others = crate::db::session::revoke_others_statement(db, user_id, session_id, &now)?;
+    let record = audit::required_record(
+        request_id,
+        None,
+        None,
+        None,
+        AuditAction::ExternalSessionReauthenticated,
+        AuditMetadata::None,
+    )?;
+    audit::execute_asserted_required(db, touch, vec![session], vec![revoke_others], &record)
+        .await?;
     Ok(())
 }
 

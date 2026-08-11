@@ -16,6 +16,14 @@ pub const EN_ACCOUNT_NO_COMMUNITIES: &str = "You do not belong to any community.
 pub const EN_ACCOUNT_FRESH_CAN_MANAGE: &str = "You can manage these settings now.";
 pub const EN_ACCOUNT_STALE_SIGN_IN_AGAIN: &str = "Sign in again to manage these settings.";
 
+// ── Linking (RFC-081 §4, Handoff 056) ─────────────────────────────────────
+pub const EN_ACCOUNT_LINK_ENTRY_LABEL: &str = "Link an external account";
+pub const EN_ACCOUNT_LINK_TITLE: &str = "Link an external account";
+pub const EN_ACCOUNT_LINK_BODY: &str = "You will be sent to sign in with the external account you want to link. \
+     No existing sign-in method is removed.";
+pub const EN_ACCOUNT_LINK_SUBMIT: &str = "Continue";
+pub const EN_ACCOUNT_LINK_CANCEL: &str = "Cancel";
+
 pub const JA_ACCOUNT_PAGE_TITLE: &str = "アカウント";
 pub const JA_ACCOUNT_LINKED_IDENTITIES_HEADING: &str = "連携している外部アカウント";
 pub const JA_ACCOUNT_NO_LINKED_IDENTITIES: &str = "連携している外部アカウントはありません。";
@@ -27,3 +35,9 @@ pub const JA_ACCOUNT_NO_COMMUNITIES: &str = "参加しているコミュニテ�
 pub const JA_ACCOUNT_FRESH_CAN_MANAGE: &str = "これらの設定は今すぐ管理できます。";
 pub const JA_ACCOUNT_STALE_SIGN_IN_AGAIN: &str =
     "これらの設定を管理するには、もう一度サインインしてください。";
+
+pub const JA_ACCOUNT_LINK_ENTRY_LABEL: &str = "外部アカウントを連携する";
+pub const JA_ACCOUNT_LINK_TITLE: &str = "外部アカウントを連携する";
+pub const JA_ACCOUNT_LINK_BODY: &str = "連携したい外部アカウントでサインインする画面に移動します。既存のサインイン方法が失われることはありません。";
+pub const JA_ACCOUNT_LINK_SUBMIT: &str = "続ける";
+pub const JA_ACCOUNT_LINK_CANCEL: &str = "キャンセル";

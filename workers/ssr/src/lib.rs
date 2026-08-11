@@ -143,6 +143,14 @@ async fn dispatch_request(
         // account-tier session, including one with zero active memberships.
         (Method::Get, "/account") => handlers::account::get_account(req, env, request_id).await,
 
+        // ── Linking (RFC-081 §4, Handoff 056) ───────────────────────────────
+        (Method::Get, "/account/link") => {
+            handlers::account::link::get_link(req, env, request_id).await
+        }
+        (Method::Post, "/account/link") => {
+            handlers::account::link::post_link(req, env, request_id).await
+        }
+
         // ── Member area ───────────────────────────────────────────────────
         (Method::Get, "/") | (Method::Get, "/c") => {
             handlers::home::redirect_to_home(req, env, request_id).await

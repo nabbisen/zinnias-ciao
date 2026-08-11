@@ -70,6 +70,7 @@ migrations/
   0013_identity_namespaces.sql  identity_namespaces + user_identities tables, additive only, seeds the local-fake namespace (RFC-080 §3, Handoff 050)
   0014_auth_transactions.sql   auth_transactions table (server-side OIDC transaction), additive only, no callers yet (RFC-080 §5, Handoff 053)
   0015_session_authenticated_at.sql  authenticated_at on sessions, additive/nullable, distinct from created_at ahead of session rotation (RFC-080 §6, Handoff 055)
+  0016_auth_transaction_initiating_user.sql  initiating_user_id on auth_transactions, additive/nullable, pins a link transaction's target account at creation (RFC-081 §4, Handoff 056)
 scripts/
   setup.mjs                  Dev bootstrap: D1 migrations + seed data
 docs/src/                    mdbook documentation (SUMMARY.md is the index)

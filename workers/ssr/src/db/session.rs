@@ -5,7 +5,7 @@
 //! `zinnias_ciao_contracts::SESSION_TTL_SECONDS` and is NEVER derived from an upstream
 //! token exp (regression note, RFC-003 §8).
 
-use worker::{D1Database, Result};
+use worker::{D1Database, D1PreparedStatement, Result};
 
 use crate::db::now_utc;
 
@@ -115,4 +115,31 @@ pub async fn touch(db: &D1Database, session_id: &str) -> Result<()> {
         .run()
         .await?;
     Ok(())
+}
+
+/// Build (not execute) the "revoke every other active session for this
+/// user_id" statement — RFC-080 §6 / Handoff 056 §3.2's rotation
+/// requirement. Reused by both linking (`db/identity.rs::link_required`)
+/// and re-authentication (`db/auth_transaction.rs::reauthenticate_required`)
+/// rather than duplicating `db/relink.rs::redeem_required`'s own
+/// established shape a third time. Guarded the same way that one is: the
+/// `WHERE EXISTS` re-confirms the caller's own new session (`except_session_id`)
+/// is itself active before revoking anything else, so a caller cannot
+/// revoke every session for a user_id by passing a session id that was
+/// never actually minted.
+pub(crate) fn revoke_others_statement(
+    db: &D1Database,
+    user_id: &str,
+    except_session_id: &str,
+    now: &str,
+) -> Result<D1PreparedStatement> {
+    db.prepare(
+        "UPDATE sessions SET revoked_at=?1 \
+         WHERE user_id=?2 AND id!=?3 \
+           AND revoked_at IS NULL AND expires_at>?1 \
+           AND EXISTS (SELECT 1 FROM sessions keep \
+                       WHERE keep.id=?3 AND keep.user_id=?2 \
+                         AND keep.revoked_at IS NULL AND keep.expires_at>?1)",
+    )
+    .bind(&[now.into(), user_id.into(), except_session_id.into()])
 }

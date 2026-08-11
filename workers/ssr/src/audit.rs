@@ -64,11 +64,30 @@ pub(crate) enum AuditAction {
     /// records; `sessions.provenance` is what distinguishes how the
     /// session was authenticated, not a second audit action.
     ExternalSessionIssued,
+    /// RFC-081 §4 / Handoff 056: a new `user_identities` row was written —
+    /// an account-tier session gained an external identity. Paired with
+    /// the identity insert, the rotated session, and the revoke-others
+    /// batch in `db/identity.rs::link_required`.
+    ExternalIdentityLinked,
+    /// RFC-081 §4 / Handoff 056 §5.4: a `link` attempt resolved to an
+    /// identity already linked to a `user_identities` row — the same
+    /// account or a different one, indistinguishable to the caller either
+    /// way. No row is ever written for this outcome; the audit row is the
+    /// only durable record, which is why auditing it matters (the same
+    /// reasoning `SessionScopeRefused` was introduced for in Slice 1).
+    ExternalIdentityLinkRejected,
+    /// RFC-080 §6 / Handoff 056 §3.2: an already-signed-in principal
+    /// completed a fresh OIDC round trip and was issued a **new** session,
+    /// with the initiating session (and every other active session for
+    /// that principal) revoked. Distinct from `ExternalSessionIssued`
+    /// (an ordinary sign-in, no prior session to revoke) because rotation
+    /// is a materially different event — it destroys other live sessions.
+    ExternalSessionReauthenticated,
 }
 
 impl AuditAction {
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 28] = [
+    pub(crate) const ALL: [Self; 31] = [
         Self::CommunityCreated,
         Self::MembershipCreatedFirstAdmin,
         Self::MembershipDisplayNameUpdated,
@@ -97,6 +116,9 @@ impl AuditAction {
         Self::SessionLogout,
         Self::SessionScopeRefused,
         Self::ExternalSessionIssued,
+        Self::ExternalIdentityLinked,
+        Self::ExternalIdentityLinkRejected,
+        Self::ExternalSessionReauthenticated,
     ];
 
     pub(crate) const fn canonical(self) -> &'static str {
@@ -129,6 +151,9 @@ impl AuditAction {
             Self::SessionLogout => "session.logout",
             Self::SessionScopeRefused => "session.scope_refused",
             Self::ExternalSessionIssued => "session.external_issued",
+            Self::ExternalIdentityLinked => "external_identity.linked",
+            Self::ExternalIdentityLinkRejected => "external_identity.link_rejected",
+            Self::ExternalSessionReauthenticated => "session.external_reauthenticated",
         }
     }
 
@@ -159,6 +184,9 @@ impl AuditAction {
                 | Self::EventTemplateCreated
                 | Self::EventTemplateDeleted
                 | Self::ExternalSessionIssued
+                | Self::ExternalIdentityLinked
+                | Self::ExternalIdentityLinkRejected
+                | Self::ExternalSessionReauthenticated
         )
     }
 
@@ -183,8 +211,12 @@ impl AuditAction {
             Self::CalendarFeedTokenGenerated | Self::CalendarFeedTokenRevoked => "calendar_feed",
             Self::EventTemplateCreated | Self::EventTemplateDeleted => "event_template",
             Self::CalendarMatrixCsvExportRequested => "calendar_matrix_csv",
-            Self::SessionLogout | Self::SessionScopeRefused | Self::ExternalSessionIssued => {
-                "session"
+            Self::SessionLogout
+            | Self::SessionScopeRefused
+            | Self::ExternalSessionIssued
+            | Self::ExternalSessionReauthenticated => "session",
+            Self::ExternalIdentityLinked | Self::ExternalIdentityLinkRejected => {
+                "external_identity"
             }
         }
     }
@@ -935,6 +967,52 @@ pub(crate) async fn execute_asserted_required(
     Ok(results)
 }
 
+/// Insert a required, Class A audit record with **no paired business
+/// mutation** — RFC-081 §4 / Handoff 056 §5.4's link-collision rejection is
+/// the first Class A event this codebase has needed to audit where the
+/// audit row itself is the entire durable record: no `user_identities` row
+/// is ever written for a collision, so there is nothing to pair with or
+/// gate on. Every other `execute_*` helper above ties the audit write to
+/// some adjacent mutation's `changes()`; this one has no mutation to tie
+/// to, so it simply requires the audit insert itself to succeed, with the
+/// same loud Class A failure handling as every other required write —
+/// never the best-effort, swallow-the-error shape `write_session_scope_refused`
+/// uses for its (Class B) refusal record.
+pub(crate) async fn execute_required_standalone(
+    db: &D1Database,
+    audit: &AuditRecord,
+) -> Result<()> {
+    if !audit.action.is_class_a() {
+        log_class_a_failure(audit, AuditFailureCategory::Construction);
+        return Err(worker::Error::RustError(
+            "standalone required audit action must be class A".to_owned(),
+        ));
+    }
+    let statement = match audit.statement(db) {
+        Ok(statement) => statement,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Construction);
+            return Err(error);
+        }
+    };
+    let results = match db.batch(vec![statement]).await {
+        Ok(results) => results,
+        Err(error) => {
+            log_class_a_failure(audit, AuditFailureCategory::Storage);
+            return Err(error);
+        }
+    };
+    let audit_changes = result_changes(&results, 0);
+    if audit_changes != 1 {
+        log_class_a_failure(audit, AuditFailureCategory::Storage);
+        return Err(worker::Error::RustError(format!(
+            "standalone required audit did not insert exactly one row: {audit_changes}"
+        )));
+    }
+    audit.log_success();
+    Ok(())
+}
+
 /// Persist Class B authorization evidence before any protected response is
 /// returned. Construction and storage failures emit only bounded operational
 /// fields; callers must translate the error into a disclosure-free 503.
@@ -1172,6 +1250,9 @@ fn validate_pairing(
                 | AuditAction::CommunityExportAuthorized
                 | AuditAction::SessionLogout
                 | AuditAction::ExternalSessionIssued
+                | AuditAction::ExternalIdentityLinked
+                | AuditAction::ExternalIdentityLinkRejected
+                | AuditAction::ExternalSessionReauthenticated
         );
     if valid {
         Ok(())
@@ -1189,7 +1270,10 @@ fn validate_context(
     let valid = match action {
         AuditAction::SessionLogout
         | AuditAction::SessionScopeRefused
-        | AuditAction::ExternalSessionIssued => {
+        | AuditAction::ExternalSessionIssued
+        | AuditAction::ExternalIdentityLinked
+        | AuditAction::ExternalIdentityLinkRejected
+        | AuditAction::ExternalSessionReauthenticated => {
             community_id.is_none() && actor_membership_id.is_none() && target_id.is_none()
         }
         AuditAction::CalendarFeedTokenGenerated | AuditAction::CalendarFeedTokenRevoked => {
@@ -1599,7 +1683,7 @@ mod tests {
             .into_iter()
             .map(AuditAction::canonical)
             .collect();
-        assert_eq!(values.len(), 28);
+        assert_eq!(values.len(), 31);
         assert!(values.iter().all(|value| value.contains('.')));
         for value in values {
             assert_eq!(
@@ -1614,16 +1698,19 @@ mod tests {
     }
 
     #[test]
-    fn class_a_action_inventory_is_closed_at_twenty_four() {
+    fn class_a_action_inventory_is_closed_at_twenty_seven() {
         let class_a: Vec<_> = AuditAction::ALL
             .into_iter()
             .filter(|action| action.is_class_a())
             .collect();
-        assert_eq!(class_a.len(), 24);
+        assert_eq!(class_a.len(), 27);
         assert!(!AuditAction::CommunityExportAuthorized.is_class_a());
         assert!(!AuditAction::CalendarMatrixCsvExportRequested.is_class_a());
         assert!(!AuditAction::SessionLogout.is_class_a());
         assert!(AuditAction::ExternalSessionIssued.is_class_a());
+        assert!(AuditAction::ExternalIdentityLinked.is_class_a());
+        assert!(AuditAction::ExternalIdentityLinkRejected.is_class_a());
+        assert!(AuditAction::ExternalSessionReauthenticated.is_class_a());
     }
 
     #[test]

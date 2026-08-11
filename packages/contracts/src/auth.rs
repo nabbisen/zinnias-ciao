@@ -48,6 +48,7 @@ pub mod token_purpose {
     pub const CREATE_COMMUNITY: &str = "create_community";
     pub const CHANGE_DISPLAY_NAME: &str = "change_display_name";
     pub const CHANGE_UI_LANGUAGE: &str = "change_ui_language";
+    pub const LINK_IDENTITY: &str = "link_identity";
 }
 
 /// Outcome of attempting to consume a single-use form token.

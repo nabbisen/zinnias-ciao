@@ -111,3 +111,42 @@ fn urlencode_escapes_everything_else() {
     assert_eq!(urlencode("a&b=c"), "a%26b%3Dc");
     assert_eq!(urlencode("https://x"), "https%3A%2F%2Fx");
 }
+
+// ── should_send_prompt_login (Handoff 056 §3.3) — exhaustive ────────────
+// The one place the "does this round trip need to prove freshness"
+// decision is made; every caller passes its result through, never a
+// hardcoded `true`/`false`.
+
+#[test]
+fn link_always_sends_prompt_login_regardless_of_session_state() {
+    assert!(should_send_prompt_login("link", true));
+    assert!(should_send_prompt_login("link", false));
+}
+
+#[test]
+fn sign_in_sends_prompt_login_only_when_a_valid_session_already_exists() {
+    assert!(should_send_prompt_login("sign_in", true));
+    assert!(!should_send_prompt_login("sign_in", false));
+}
+
+#[test]
+fn join_never_sends_prompt_login_regardless_of_session_state() {
+    // RFC-080 §5's own carve-out: joining is invite-driven and has no
+    // freshness question, unaffected by Handoff 056.
+    assert!(!should_send_prompt_login("join", true));
+    assert!(!should_send_prompt_login("join", false));
+}
+
+#[test]
+fn every_action_and_session_state_combination_is_covered() {
+    for action in ["sign_in", "join", "link"] {
+        for caller_has_valid_session in [true, false] {
+            let expected = action == "link" || (action == "sign_in" && caller_has_valid_session);
+            assert_eq!(
+                should_send_prompt_login(action, caller_has_valid_session),
+                expected,
+                "action={action} caller_has_valid_session={caller_has_valid_session}"
+            );
+        }
+    }
+}

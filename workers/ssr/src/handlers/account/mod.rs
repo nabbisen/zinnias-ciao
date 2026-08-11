@@ -24,6 +24,8 @@ use crate::authz;
 use crate::db;
 use crate::render::{self, escape_html};
 
+pub mod link;
+
 pub async fn get_account(req: Request, env: &Env, rid: &str) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     authz::require_account_surface(env, &auth, rid).await?;
@@ -115,6 +117,7 @@ fn render_body(
            <section class=\"cz-account-section\">\
              <h2 class=\"cz-account-section-heading\">{identities_heading}</h2>\
              {identities}\
+             <a href=\"/account/link\" class=\"cz-account-link-entry-link\">{link_entry}</a>\
            </section>\
            <section class=\"cz-account-section\">\
              <h2 class=\"cz-account-section-heading\">{recovery_heading}</h2>\
@@ -130,6 +133,7 @@ fn render_body(
         freshness = render_freshness(is_fresh),
         identities_heading = i18n::JA_ACCOUNT_LINKED_IDENTITIES_HEADING,
         identities = render_identities(identities),
+        link_entry = i18n::JA_ACCOUNT_LINK_ENTRY_LABEL,
         recovery_heading = i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_HEADING,
         recovery_none = i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_NONE,
         communities_heading = i18n::JA_ACCOUNT_COMMUNITIES_HEADING,

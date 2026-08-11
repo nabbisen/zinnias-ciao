@@ -9,6 +9,11 @@
 //! contains nothing beyond what that one lookup needs.
 
 use worker::{D1Database, Result};
+use zinnias_ciao_contracts::SESSION_TTL_SECONDS;
+
+use crate::audit::{self, AuditAction, AuditMetadata};
+use crate::db::session::SessionProvenance;
+use crate::db::{add_seconds_to_now, now_utc, session};
 
 /// One row of `user_identities` (RFC-080 §3.3). `status` is returned
 /// as-is, not filtered to `'active'` in the query below — whether a
@@ -111,4 +116,86 @@ pub async fn list_active_for_user(
             })
         })
         .collect())
+}
+
+/// RFC-081 §4 / Handoff 056 §5.1: link a verified external identity to an
+/// already-known `user_id`, atomically with session rotation. Callers must
+/// check `find_by_subject_lookup` first and treat `Some(_)` as a
+/// collision (Handoff 056 §5.4) — this function's own `claim` (the
+/// identity insert) is the second, authoritative check: its
+/// `WHERE NOT EXISTS` guard means a race loses zero rows here, never a
+/// `UNIQUE` constraint error, matching every other claim-then-create shape
+/// in this codebase (`db/invite.rs`, `db/relink.rs`). A claim that fails
+/// despite the caller's own earlier check is therefore a genuine race, not
+/// an expected outcome — `execute_asserted_required` correctly treats it
+/// as a Class A failure rather than a graceful collision, which is why
+/// the ordinary-collision path must never reach this function at all.
+///
+/// Additive by construction: the only statement here that is not an
+/// `INSERT` is the revoke-others `UPDATE`, which touches `sessions`, never
+/// `user_identities` — nothing in this function can ever remove or
+/// deactivate an existing identity link.
+#[allow(clippy::too_many_arguments)]
+pub async fn link_required(
+    db: &D1Database,
+    request_id: &str,
+    user_id: &str,
+    identity_id: &str,
+    identity_namespace_id: &str,
+    subject_lookup: &str,
+    session_id: &str,
+    session_hmac: &str,
+) -> Result<()> {
+    let now = now_utc();
+    let session_expires_at = add_seconds_to_now(SESSION_TTL_SECONDS);
+    let claim = db
+        .prepare(
+            "INSERT INTO user_identities \
+             (id, user_id, identity_namespace_id, subject_lookup, linked_at, status) \
+             SELECT ?1, ?2, ?3, ?4, ?5, 'active' \
+             WHERE NOT EXISTS (SELECT 1 FROM user_identities \
+                               WHERE identity_namespace_id=?3 AND subject_lookup=?4) \
+               AND EXISTS (SELECT 1 FROM users u WHERE u.id=?2)",
+        )
+        .bind(&[
+            identity_id.into(),
+            user_id.into(),
+            identity_namespace_id.into(),
+            subject_lookup.into(),
+            now.as_str().into(),
+        ])?;
+    let session_insert = db
+        .prepare(
+            "INSERT INTO sessions \
+             (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance, authenticated_at) \
+             SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?6, ?4 \
+             WHERE EXISTS (SELECT 1 FROM user_identities WHERE id=?7 AND user_id=?2)",
+        )
+        .bind(&[
+            session_id.into(),
+            user_id.into(),
+            session_hmac.into(),
+            now.as_str().into(),
+            session_expires_at.as_str().into(),
+            SessionProvenance::ExternalIdentity.as_str().into(),
+            identity_id.into(),
+        ])?;
+    let revoke_others = session::revoke_others_statement(db, user_id, session_id, &now)?;
+    let record = audit::required_record(
+        request_id,
+        None,
+        None,
+        None,
+        AuditAction::ExternalIdentityLinked,
+        AuditMetadata::None,
+    )?;
+    audit::execute_asserted_required(
+        db,
+        claim,
+        vec![session_insert],
+        vec![revoke_others],
+        &record,
+    )
+    .await?;
+    Ok(())
 }
