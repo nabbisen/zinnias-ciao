@@ -262,4 +262,8 @@ recommendation, and acceptance adopts it:
    dangerous of the two to review while distracted, because its failure mode is
    a silent fail-open across 52 call sites.
 
-   To be decided when Slice 4's handoff is written, not assumed before then.
+   **Decided 2026-08-10: after.** The external-identity track finishes first
+   (Slices 4 and 5), then suspension gets undivided review attention. Nothing
+   here is urgent — RFC-063's gap has been open since v0.50.0, and the
+   reversibility pressure that made it sharp came from a decision now resolved
+   (RFC-081 §1.2a).
