@@ -6,6 +6,7 @@ use zinnias_ciao_contracts::auth::token_purpose;
 use crate::audit::{self, AuditAction, AuditMetadata};
 use crate::authz::require_membership;
 use crate::crypto::hmac_hex;
+use crate::db::membership::MEMBERSHIP_ACTIVE;
 use crate::db::{self, membership as membership_db};
 use crate::form_token::ConsumeResult;
 use crate::render;
@@ -361,15 +362,15 @@ async fn update_display_name_with_audit_and_result(
     )?;
 
     let update_stmt = db
-        .prepare(
+        .prepare(format!(
             "UPDATE community_memberships \
              SET display_name = ?1 \
              WHERE id = ?2 \
                AND community_id = ?3 \
                AND user_id = ?4 \
-               AND removed_at IS NULL \
-               AND display_name != ?1",
-        )
+               AND {MEMBERSHIP_ACTIVE} \
+               AND display_name != ?1"
+        ))
         .bind(&[
             display_name.into(),
             membership_id.into(),
@@ -380,7 +381,7 @@ async fn update_display_name_with_audit_and_result(
     let audit_stmt = audit.statement_after_one_change(db)?;
 
     let result_stmt = db
-        .prepare(
+        .prepare(format!(
             "UPDATE form_tokens \
              SET result_ref = ?1 \
              WHERE token_hmac = ?2 \
@@ -390,9 +391,9 @@ async fn update_display_name_with_audit_and_result(
                AND EXISTS ( \
                  SELECT 1 FROM community_memberships \
                  WHERE id = ?5 AND community_id = ?6 AND user_id = ?3 \
-                   AND removed_at IS NULL AND display_name = ?7 \
-               )",
-        )
+                   AND {MEMBERSHIP_ACTIVE} AND display_name = ?7 \
+               )"
+        ))
         .bind(&[
             DISPLAY_NAME_UPDATED_REF.into(),
             token_hmac.as_str().into(),
@@ -637,14 +638,14 @@ async fn update_ui_language_with_result(
     let token_hmac = hmac_hex(pepper, raw_token);
 
     let update_stmt = db
-        .prepare(
+        .prepare(format!(
             "UPDATE community_memberships \
              SET ui_language = ?1 \
              WHERE id = ?2 \
                AND community_id = ?3 \
                AND user_id = ?4 \
-               AND removed_at IS NULL",
-        )
+               AND {MEMBERSHIP_ACTIVE}"
+        ))
         .bind(&[
             locale.code().into(),
             membership_id.into(),
@@ -653,7 +654,7 @@ async fn update_ui_language_with_result(
         ])?;
 
     let result_stmt = db
-        .prepare(
+        .prepare(format!(
             "UPDATE form_tokens \
              SET result_ref = ?1 \
              WHERE token_hmac = ?2 \
@@ -663,9 +664,9 @@ async fn update_ui_language_with_result(
                AND EXISTS ( \
                  SELECT 1 FROM community_memberships \
                  WHERE id = ?5 AND community_id = ?6 AND user_id = ?3 \
-                   AND removed_at IS NULL AND ui_language = ?7 \
-               )",
-        )
+                   AND {MEMBERSHIP_ACTIVE} AND ui_language = ?7 \
+               )"
+        ))
         .bind(&[
             UI_LANGUAGE_UPDATED_REF.into(),
             token_hmac.as_str().into(),

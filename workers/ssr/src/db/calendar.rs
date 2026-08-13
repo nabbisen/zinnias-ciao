@@ -7,6 +7,7 @@ use worker::Result;
 use worker::d1::D1Database;
 
 use crate::audit::{self, AuditAction, AuditMetadata};
+use crate::db::membership::MEMBERSHIP_ACTIVE;
 
 /// Metadata returned to callers — never includes the HMAC.
 pub struct CalendarTokenRow {
@@ -82,22 +83,22 @@ pub async fn rotate_required(
     now: &str,
 ) -> Result<bool> {
     let revoke = db
-        .prepare(
+        .prepare(format!(
             "UPDATE calendar_tokens SET revoked_at = ?1 \
              WHERE membership_id = ?2 AND community_id = ?3 \
                AND revoked_at IS NULL \
                AND EXISTS (SELECT 1 FROM community_memberships m \
-                   WHERE m.id = ?2 AND m.community_id = ?3 AND m.removed_at IS NULL)",
-        )
+                   WHERE m.id = ?2 AND m.community_id = ?3 AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[now.into(), membership_id.into(), community_id.into()])?;
     let insert = db
-        .prepare(
+        .prepare(format!(
             "INSERT INTO calendar_tokens \
              (id, community_id, membership_id, token_hmac, created_at) \
              SELECT ?1, ?2, ?3, ?4, ?5 \
              WHERE EXISTS (SELECT 1 FROM community_memberships m \
-                 WHERE m.id = ?3 AND m.community_id = ?2 AND m.removed_at IS NULL)",
-        )
+                 WHERE m.id = ?3 AND m.community_id = ?2 AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             id.into(),
             community_id.into(),
@@ -125,16 +126,16 @@ pub async fn revoke_required(
 ) -> Result<usize> {
     const ACTIVE_TOKEN_CAP: u32 = 10_000;
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "UPDATE calendar_tokens SET revoked_at = ?1 \
              WHERE membership_id = ?2 AND community_id = ?3 \
                AND revoked_at IS NULL \
                AND EXISTS (SELECT 1 FROM community_memberships m \
-                   WHERE m.id = ?2 AND m.community_id = ?3 AND m.removed_at IS NULL) \
+                   WHERE m.id = ?2 AND m.community_id = ?3 AND {MEMBERSHIP_ACTIVE}) \
                AND (SELECT COUNT(*) FROM calendar_tokens c \
                     WHERE c.membership_id = ?2 AND c.community_id = ?3 \
-                      AND c.revoked_at IS NULL) <= ?4",
-        )
+                      AND c.revoked_at IS NULL) <= ?4"
+        ))
         .bind(&[
             now.into(),
             membership_id.into(),

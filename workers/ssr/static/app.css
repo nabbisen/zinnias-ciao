@@ -1752,6 +1752,12 @@ button, a, [role="button"] { min-height: var(--cz-touch-min); }
 .cz-admin-member-row-action--danger {
   color: var(--cz-color-danger);
 }
+/* RFC-082: suspended is reversible, so its badge uses --cz-color-warning,
+ * not --cz-color-danger — visually distinct from removal. */
+.cz-admin-member-suspended-badge {
+  color: var(--cz-color-warning);
+  font-weight: 600;
+}
 .cz-admin-invite-link {
   display: block;
   margin-top: var(--cz-space-5);

@@ -3,6 +3,7 @@
 //! Status is per (event_day, membership). NULL = No answer — never fabricated.
 
 use crate::audit::{self, AuditAction, AuditMetadata};
+use crate::db::membership::MEMBERSHIP_ACTIVE;
 use crate::db::now_utc;
 use worker::{D1Database, Result};
 
@@ -192,7 +193,7 @@ pub async fn admin_override_matrix(
     }
     let now = now_utc();
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "WITH submitted AS ( \
                SELECT json_extract(value, '$.day_id') AS day_id, \
                       json_extract(value, '$.membership_id') AS membership_id, \
@@ -208,7 +209,7 @@ pub async fn admin_override_matrix(
                  AND d.community_id = ?4 AND e.community_id = ?4 \
                  AND d.occurrence_status = 'scheduled' \
                  AND e.status = 'scheduled' \
-                 AND target.community_id = ?4 AND target.removed_at IS NULL \
+                 AND target.community_id = ?4 AND {MEMBERSHIP_ACTIVE} \
                  AND (s.status IS NULL OR s.status IN ('going','not_going','attended')) \
              ) \
              INSERT INTO attendances \
@@ -225,14 +226,14 @@ pub async fn admin_override_matrix(
                AND EXISTS ( \
                     SELECT 1 FROM community_memberships actor \
                     WHERE actor.id = ?5 AND actor.community_id = ?4 \
-                      AND actor.role = 'admin' AND actor.removed_at IS NULL \
+                      AND actor.role = 'admin' AND {MEMBERSHIP_ACTIVE} \
                ) \
              ON CONFLICT(event_day_id, membership_id) DO UPDATE SET \
                status = excluded.status, \
                status_updated_at = excluded.status_updated_at, \
                updated_at = excluded.updated_at \
-             WHERE attendances.status IS NOT excluded.status",
-        )
+             WHERE attendances.status IS NOT excluded.status"
+        ))
         .bind(&[
             submitted_json.into(),
             now.as_str().into(),
@@ -267,7 +268,7 @@ pub async fn set_admin_attended_required(
     let now = now_utc();
     let attendance_id = crate::crypto::random_token()[..16].to_owned();
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "INSERT INTO attendances \
              (id, event_day_id, membership_id, status, status_updated_at, updated_at) \
              SELECT ?1, ?2, ?3, 'attended', ?4, ?4 \
@@ -282,14 +283,14 @@ pub async fn set_admin_attended_required(
                  AND d.occurrence_status = 'scheduled' \
                  AND e.status = 'scheduled' \
                  AND m.community_id = ?6 AND m.role = 'admin' \
-                 AND m.removed_at IS NULL \
+                 AND {MEMBERSHIP_ACTIVE} \
              ) \
              ON CONFLICT(event_day_id, membership_id) DO UPDATE SET \
                status = excluded.status, \
                status_updated_at = excluded.status_updated_at, \
                updated_at = excluded.updated_at \
-             WHERE attendances.status IS NOT 'attended'",
-        )
+             WHERE attendances.status IS NOT 'attended'"
+        ))
         .bind(&[
             attendance_id.as_str().into(),
             event_day_id.into(),

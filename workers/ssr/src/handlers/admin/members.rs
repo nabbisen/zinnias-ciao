@@ -444,12 +444,15 @@ pub async fn get_members(
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
 
-    let members = membership_db::list_all_active(&db, community_id).await?;
+    // RFC-082 §5: present, not active — a suspended member must still
+    // appear here, marked suspended, with an unsuspend action.
+    let members = membership_db::list_present_for_admin(&db, community_id).await?;
     let member_rows: String = members
         .iter()
         .map(|m| {
             let is_self = m.id == membership.membership_id;
-            let role_action = if is_self {
+            let is_suspended = m.suspended_at.is_some();
+            let role_action = if is_self || is_suspended {
                 String::new()
             } else if m.role == "admin" {
                 format!(
@@ -468,13 +471,36 @@ pub async fn get_members(
                     label = i18n::JA_ADMIN_PROMOTE_ACTION,
                 )
             };
-            let help_action = format!(
-                "<a href=\"/c/{cid}/admin/members/{mid}/help-signin\" \
+            let help_action = if is_suspended {
+                String::new()
+            } else {
+                format!(
+                    "<a href=\"/c/{cid}/admin/members/{mid}/help-signin\" \
                  class=\"cz-admin-member-row-action\">{label}</a>",
-                cid = render::escape_html(community_id),
-                mid = render::escape_html(&m.id),
-                label = i18n::JA_ADMIN_HELP_SIGNIN_ACTION,
-            );
+                    cid = render::escape_html(community_id),
+                    mid = render::escape_html(&m.id),
+                    label = i18n::JA_ADMIN_HELP_SIGNIN_ACTION,
+                )
+            };
+            let suspend_action = if is_self {
+                String::new()
+            } else if is_suspended {
+                format!(
+                    "<a href=\"/c/{cid}/admin/members/{mid}/unsuspend\" \
+                 class=\"cz-admin-member-row-action\">{label}</a>",
+                    cid = render::escape_html(community_id),
+                    mid = render::escape_html(&m.id),
+                    label = i18n::JA_ADMIN_UNSUSPEND_ACTION,
+                )
+            } else {
+                format!(
+                    "<a href=\"/c/{cid}/admin/members/{mid}/suspend\" \
+                 class=\"cz-admin-member-row-action\">{label}</a>",
+                    cid = render::escape_html(community_id),
+                    mid = render::escape_html(&m.id),
+                    label = i18n::JA_ADMIN_SUSPEND_ACTION,
+                )
+            };
             let remove_action = if is_self {
                 String::new()
             } else {
@@ -496,19 +522,29 @@ pub async fn get_members(
             } else {
                 String::new()
             };
+            let suspended_label = if is_suspended {
+                format!(
+                    " · <span class=\"cz-admin-member-suspended-badge\">{}</span>",
+                    i18n::JA_ADMIN_SUSPENDED_BADGE
+                )
+            } else {
+                String::new()
+            };
             format!(
                 "<li class=\"cz-admin-member-row\">\
              <span class=\"cz-admin-member-info\">\
              <span class=\"cz-admin-member-name\">{name}</span>\
-             <span class=\"cz-admin-member-role-label\">{role}{self_label}</span>\
+             <span class=\"cz-admin-member-role-label\">{role}{self_label}{suspended_label}</span>\
              </span>\
-             <span class=\"cz-admin-member-actions\">{role_action}{help_action}{remove_action}</span>\
+             <span class=\"cz-admin-member-actions\">{role_action}{help_action}{suspend_action}{remove_action}</span>\
              </li>",
                 name = render::escape_html(&m.display_name),
                 role = role_label,
                 self_label = self_label,
+                suspended_label = suspended_label,
                 role_action = role_action,
                 help_action = help_action,
+                suspend_action = suspend_action,
                 remove_action = remove_action,
             )
         })

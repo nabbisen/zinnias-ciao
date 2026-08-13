@@ -6,6 +6,7 @@
 //!   - `admin/member_remove.rs`: member removal
 //!   - `admin/role_transfer.rs`: member promotion/demotion
 //!   - `admin/help_signin.rs`: active-member lost-session help
+//!   - `admin/suspension.rs`: member suspend/unsuspend (RFC-082)
 
 pub use events::{
     get_admin_hide_note_confirm, get_attendance, get_cancel_event, get_cancel_occurrence,
@@ -18,6 +19,9 @@ pub use members::{get_invites, get_members, post_generate_invite, post_revoke_in
 pub use role_transfer::{
     get_demote_member, get_promote_member, post_demote_member, post_promote_member,
 };
+pub use suspension::{
+    get_suspend_member, get_unsuspend_member, post_suspend_member, post_unsuspend_member,
+};
 
 #[path = "admin/events.rs"]
 mod events;
@@ -29,3 +33,5 @@ mod member_remove;
 mod members;
 #[path = "admin/role_transfer.rs"]
 mod role_transfer;
+#[path = "admin/suspension.rs"]
+mod suspension;

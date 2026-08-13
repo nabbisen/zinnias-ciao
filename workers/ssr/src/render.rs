@@ -11,6 +11,7 @@ mod time;
 
 pub use errors::{
     configuration_unavailable, internal_error, not_found, service_unavailable, session_expired,
+    suspended,
 };
 pub use event_card::CardDay;
 pub use nav::{

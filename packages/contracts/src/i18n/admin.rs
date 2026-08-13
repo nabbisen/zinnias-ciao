@@ -58,6 +58,17 @@ pub const EN_ADMIN_HELP_SIGNIN_RELINK_LINK: &str = "Open sign-in-again page";
 pub const EN_ADMIN_HELP_SIGNIN_COPY_CODE: &str = "Copy code";
 pub const EN_ADMIN_HELP_SIGNIN_COPY_DONE: &str = "Copied";
 pub const EN_ADMIN_HELP_SIGNIN_COPY_FAILED: &str = "Could not copy";
+// RFC-082 / Handoff 058: membership suspension — reversible, unlike removal.
+pub const EN_ADMIN_SUSPENDED_BADGE: &str = "Suspended";
+pub const EN_ADMIN_SUSPEND_ACTION: &str = "Suspend";
+pub const EN_ADMIN_UNSUSPEND_ACTION: &str = "Unsuspend";
+pub const EN_ADMIN_SUSPEND_TITLE: &str = "Suspend member?";
+pub const EN_ADMIN_SUSPEND_CONSEQUENCE: &str = "This member will lose access to this community until unsuspended. Their role, history, and other communities are unaffected. This is reversible.";
+pub const EN_ADMIN_UNSUSPEND_TITLE: &str = "Unsuspend member?";
+pub const EN_ADMIN_UNSUSPEND_CONSEQUENCE: &str =
+    "This member will regain access to this community with their prior role unchanged.";
+pub const EN_ADMIN_LAST_ADMIN_SUSPEND: &str =
+    "Cannot suspend the last admin. Transfer the admin role first.";
 
 pub const JA_ADMIN_MEMBERS_TITLE: &str = "メンバー";
 pub const JA_ADMIN_MEMBERS_GENERATE_INVITE: &str = "招待コードを生成";
@@ -88,3 +99,13 @@ pub const JA_ADMIN_HELP_SIGNIN_RELINK_LINK: &str = "サインインし直す画�
 pub const JA_ADMIN_HELP_SIGNIN_COPY_CODE: &str = "コードをコピー";
 pub const JA_ADMIN_HELP_SIGNIN_COPY_DONE: &str = "コピーしました";
 pub const JA_ADMIN_HELP_SIGNIN_COPY_FAILED: &str = "コピーできませんでした";
+pub const JA_ADMIN_SUSPENDED_BADGE: &str = "停止中";
+pub const JA_ADMIN_SUSPEND_ACTION: &str = "一時停止";
+pub const JA_ADMIN_UNSUSPEND_ACTION: &str = "再開";
+pub const JA_ADMIN_SUSPEND_TITLE: &str = "一時停止しますか？";
+pub const JA_ADMIN_SUSPEND_CONSEQUENCE: &str = "このメンバーは再開されるまでこのコミュニティにアクセスできなくなります。役割・履歴・他のコミュニティへの参加には影響しません。この操作は取り消せます。";
+pub const JA_ADMIN_UNSUSPEND_TITLE: &str = "再開しますか？";
+pub const JA_ADMIN_UNSUSPEND_CONSEQUENCE: &str =
+    "このメンバーは元の役割のまま、このコミュニティに再びアクセスできるようになります。";
+pub const JA_ADMIN_LAST_ADMIN_SUSPEND: &str =
+    "最後の管理者は一時停止できません。先に管理者権限を移譲してください。";

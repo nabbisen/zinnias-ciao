@@ -4,6 +4,7 @@
 //! They store title/location/description/duration as defaults for event creation.
 
 use crate::audit::{self, AuditAction, AuditMetadata};
+use crate::db::membership::MEMBERSHIP_ACTIVE;
 use crate::db::now_utc;
 use worker::Result;
 use worker::d1::D1Database;
@@ -106,7 +107,7 @@ pub async fn insert_required(
         .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
 
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "INSERT INTO event_templates \
          (id, community_id, created_by_membership_id, title, location, description, \
           duration_minutes, is_active, created_at, updated_at) \
@@ -114,9 +115,9 @@ pub async fn insert_required(
          WHERE EXISTS ( \
            SELECT 1 FROM community_memberships \
            WHERE id = ?3 AND community_id = ?2 \
-             AND role = 'admin' AND removed_at IS NULL \
-         )",
-        )
+             AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
+         )"
+        ))
         .bind(&[
             id.into(),
             community_id.into(),
@@ -148,15 +149,15 @@ pub async fn soft_delete_required(
 ) -> Result<bool> {
     let now = now_utc();
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "UPDATE event_templates SET is_active = 0, updated_at = ?1 \
          WHERE id = ?2 AND community_id = ?3 AND is_active = 1 \
            AND EXISTS ( \
              SELECT 1 FROM community_memberships \
              WHERE id = ?4 AND community_id = ?3 \
-               AND role = 'admin' AND removed_at IS NULL \
-           )",
-        )
+               AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
+           )"
+        ))
         .bind(&[
             now.as_str().into(),
             template_id.into(),

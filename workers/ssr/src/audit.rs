@@ -101,11 +101,18 @@ pub(crate) enum AuditAction {
     /// construction" invariant, reachable only with at least one other
     /// verified usable method remaining.
     ExternalIdentityUnlinked,
+    /// RFC-082 §6 / Handoff 058: a community admin suspended a member —
+    /// reversible, unlike `MembershipRemoved`. Records the acting admin;
+    /// no role change, no session revocation.
+    MembershipSuspended,
+    /// RFC-082 §6 / Handoff 058: a community admin reversed a suspension,
+    /// restoring the member's prior role unchanged.
+    MembershipUnsuspended,
 }
 
 impl AuditAction {
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 35] = [
+    pub(crate) const ALL: [Self; 37] = [
         Self::CommunityCreated,
         Self::MembershipCreatedFirstAdmin,
         Self::MembershipDisplayNameUpdated,
@@ -141,6 +148,8 @@ impl AuditAction {
         Self::RecoveryCredentialRegenerated,
         Self::RecoveryCredentialConsumed,
         Self::ExternalIdentityUnlinked,
+        Self::MembershipSuspended,
+        Self::MembershipUnsuspended,
     ];
 
     pub(crate) const fn canonical(self) -> &'static str {
@@ -180,6 +189,8 @@ impl AuditAction {
             Self::RecoveryCredentialRegenerated => "recovery_credential.regenerated",
             Self::RecoveryCredentialConsumed => "recovery_credential.consumed",
             Self::ExternalIdentityUnlinked => "external_identity.unlinked",
+            Self::MembershipSuspended => "membership.suspended",
+            Self::MembershipUnsuspended => "membership.unsuspended",
         }
     }
 
@@ -217,6 +228,8 @@ impl AuditAction {
                 | Self::RecoveryCredentialRegenerated
                 | Self::RecoveryCredentialConsumed
                 | Self::ExternalIdentityUnlinked
+                | Self::MembershipSuspended
+                | Self::MembershipUnsuspended
         )
     }
 
@@ -230,7 +243,9 @@ impl AuditAction {
             | Self::OperatorRecoveryAdminRelinkCreated
             | Self::MembershipRemoved
             | Self::MembershipPromotedToAdmin
-            | Self::MembershipDemotedToMember => "membership",
+            | Self::MembershipDemotedToMember
+            | Self::MembershipSuspended
+            | Self::MembershipUnsuspended => "membership",
             Self::InviteCodeGenerated | Self::InviteCodeRevoked | Self::InviteCodeRedeemed => {
                 "invite_code"
             }
@@ -1290,6 +1305,8 @@ fn validate_pairing(
                 | AuditAction::RecoveryCredentialRegenerated
                 | AuditAction::RecoveryCredentialConsumed
                 | AuditAction::ExternalIdentityUnlinked
+                | AuditAction::MembershipSuspended
+                | AuditAction::MembershipUnsuspended
         );
     if valid {
         Ok(())
@@ -1724,7 +1741,7 @@ mod tests {
             .into_iter()
             .map(AuditAction::canonical)
             .collect();
-        assert_eq!(values.len(), 35);
+        assert_eq!(values.len(), 37);
         assert!(values.iter().all(|value| value.contains('.')));
         for value in values {
             assert_eq!(
@@ -1739,12 +1756,12 @@ mod tests {
     }
 
     #[test]
-    fn class_a_action_inventory_is_closed_at_thirty_one() {
+    fn class_a_action_inventory_is_closed_at_thirty_three() {
         let class_a: Vec<_> = AuditAction::ALL
             .into_iter()
             .filter(|action| action.is_class_a())
             .collect();
-        assert_eq!(class_a.len(), 31);
+        assert_eq!(class_a.len(), 33);
         assert!(!AuditAction::CommunityExportAuthorized.is_class_a());
         assert!(!AuditAction::CalendarMatrixCsvExportRequested.is_class_a());
         assert!(!AuditAction::SessionLogout.is_class_a());
@@ -1756,6 +1773,8 @@ mod tests {
         assert!(AuditAction::RecoveryCredentialRegenerated.is_class_a());
         assert!(AuditAction::RecoveryCredentialConsumed.is_class_a());
         assert!(AuditAction::ExternalIdentityUnlinked.is_class_a());
+        assert!(AuditAction::MembershipSuspended.is_class_a());
+        assert!(AuditAction::MembershipUnsuspended.is_class_a());
     }
 
     #[test]
@@ -1777,6 +1796,8 @@ mod tests {
             AuditAction::EventTemplateDeleted,
             AuditAction::CommunityExportAuthorized,
             AuditAction::SessionLogout,
+            AuditAction::MembershipSuspended,
+            AuditAction::MembershipUnsuspended,
         ];
         for action in none_actions {
             assert!(record(action, AuditMetadata::None).is_ok());

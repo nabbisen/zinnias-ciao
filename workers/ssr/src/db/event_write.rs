@@ -2,6 +2,7 @@
 
 use crate::audit::{self, AuditAction, AuditMetadata, EventEditScope};
 use crate::crypto::random_token;
+use crate::db::membership::MEMBERSHIP_ACTIVE;
 use crate::db::now_utc;
 use worker::{D1Database, Result};
 use zinnias_ciao_domain::RECURRENCE_MATERIALIZATION_INSERT_CAP;
@@ -79,7 +80,7 @@ pub async fn create_event(
         .as_ref()
         .is_some_and(|source| source.must_be_cancelled);
     let mut statements = vec![
-        db.prepare(
+        db.prepare(format!(
             "INSERT INTO events \
          (id, community_id, created_by_membership_id, title, location, description, \
           status, repeat_rule, repeat_count, created_at, updated_at) \
@@ -88,11 +89,11 @@ pub async fn create_event(
                        WHERE c.id=?2 AND c.is_active=1) \
            AND EXISTS (SELECT 1 FROM community_memberships actor \
                        WHERE actor.id=?3 AND actor.community_id=?2 \
-                         AND actor.role='admin' AND actor.removed_at IS NULL) \
+                         AND actor.role='admin' AND {MEMBERSHIP_ACTIVE}) \
            AND (?10 IS NULL OR EXISTS (SELECT 1 FROM events source \
                        WHERE source.id=?10 AND source.community_id=?2 \
-                         AND (?11=0 OR source.status='cancelled')))",
-        )
+                         AND (?11=0 OR source.status='cancelled')))"
+        ))
         .bind(&[
             event_id.as_str().into(),
             community_id.into(),
@@ -122,7 +123,7 @@ pub async fn create_event(
             .map(worker::wasm_bindgen::JsValue::from_str)
             .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
         statements.push(
-            db.prepare(
+            db.prepare(format!(
                 "INSERT INTO event_series \
              (id, event_id, community_id, frequency, start_day_date, starts_at_local, \
               ends_at_local, timezone, end_mode, occurrence_count, until_day_date, \
@@ -134,8 +135,8 @@ pub async fn create_event(
                              AND e.status='scheduled') \
                AND EXISTS (SELECT 1 FROM community_memberships actor \
                            WHERE actor.id=?14 AND actor.community_id=?3 \
-                             AND actor.role='admin' AND actor.removed_at IS NULL)",
-            )
+                             AND actor.role='admin' AND {MEMBERSHIP_ACTIVE})"
+            ))
             .bind(&[
                 series.id.into(),
                 event_id.as_str().into(),
@@ -166,7 +167,7 @@ pub async fn create_event(
             .map(worker::wasm_bindgen::JsValue::from_str)
             .unwrap_or(worker::wasm_bindgen::JsValue::NULL);
         statements.push(
-            db.prepare(
+            db.prepare(format!(
                 "INSERT INTO event_days \
              (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at, \
               series_id, series_occurrence_date) \
@@ -177,8 +178,8 @@ pub async fn create_event(
                              AND e.status='scheduled') \
                AND EXISTS (SELECT 1 FROM community_memberships actor \
                            WHERE actor.id=?11 AND actor.community_id=?3 \
-                             AND actor.role='admin' AND actor.removed_at IS NULL)",
-            )
+                             AND actor.role='admin' AND {MEMBERSHIP_ACTIVE})"
+            ))
             .bind(&[
                 day_id.as_str().into(),
                 event_id.as_str().into(),
@@ -223,7 +224,7 @@ pub async fn cancel_occurrence(
 ) -> Result<()> {
     let now = now_utc();
     let cancel = db
-        .prepare(
+        .prepare(format!(
             "UPDATE event_days SET occurrence_status='cancelled' \
          WHERE id=?1 AND event_id=?2 AND community_id=?3 \
            AND series_id=?4 AND series_occurrence_date=?5 \
@@ -232,8 +233,8 @@ pub async fn cancel_occurrence(
                        AND e.community_id=?3 AND e.status='scheduled') \
            AND EXISTS (SELECT 1 FROM community_memberships actor \
                        WHERE actor.id=?6 AND actor.community_id=?3 \
-                         AND actor.role='admin' AND actor.removed_at IS NULL)",
-        )
+                         AND actor.role='admin' AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             event_day_id.into(),
             event_id.into(),
@@ -299,7 +300,7 @@ pub async fn edit_event(
     let now = now_utc();
     let mut statements = Vec::new();
     if let Some((day_date, starts_utc, ends_utc)) = day {
-        statements.push(db.prepare(
+        statements.push(db.prepare(format!(
             "UPDATE event_days SET day_date=?1, starts_at_utc=?2, ends_at_utc=?3 \
              WHERE event_id=?4 AND community_id=?5 AND seq=1 \
                AND occurrence_status='scheduled' \
@@ -313,7 +314,7 @@ pub async fn edit_event(
                            AND e.community_id=?5 AND e.status='scheduled') \
                AND EXISTS (SELECT 1 FROM community_memberships actor \
                            WHERE actor.id=?10 AND actor.community_id=?5 \
-                             AND actor.role='admin' AND actor.removed_at IS NULL)")
+                             AND actor.role='admin' AND {MEMBERSHIP_ACTIVE})"))
             .bind(&[
                 day_date.into(), starts_utc.into(), ends_utc.into(), event_id.into(),
                 community_id.into(), title.into(), location.unwrap_or("").into(),
@@ -322,7 +323,7 @@ pub async fn edit_event(
     }
     if let Some((day_date, starts_utc, ends_utc)) = day {
         statements.push(
-            db.prepare(
+            db.prepare(format!(
                 "UPDATE events SET title=?1, location=?2, description=?3, updated_at=?4 \
                  WHERE id=?5 AND community_id=?6 AND status='scheduled' \
                    AND (title IS NOT ?1 OR location IS NOT ?2 OR description IS NOT ?3 \
@@ -336,8 +337,8 @@ pub async fn edit_event(
                                  AND d.starts_at_utc>?4) \
                    AND EXISTS (SELECT 1 FROM community_memberships actor \
                                WHERE actor.id=?7 AND actor.community_id=?6 \
-                                 AND actor.role='admin' AND actor.removed_at IS NULL)",
-            )
+                                 AND actor.role='admin' AND {MEMBERSHIP_ACTIVE})"
+            ))
             .bind(&[
                 title.into(),
                 location.unwrap_or("").into(),
@@ -353,7 +354,7 @@ pub async fn edit_event(
         );
     } else {
         statements.push(
-            db.prepare(
+            db.prepare(format!(
                 "UPDATE events SET title=?1, location=?2, description=?3, updated_at=?4 \
                  WHERE id=?5 AND community_id=?6 AND status='scheduled' \
                    AND (title IS NOT ?1 OR location IS NOT ?2 OR description IS NOT ?3) \
@@ -361,8 +362,8 @@ pub async fn edit_event(
                                    WHERE event_id=?5 AND starts_at_utc<=?4) \
                    AND EXISTS (SELECT 1 FROM community_memberships actor \
                                WHERE actor.id=?7 AND actor.community_id=?6 \
-                                 AND actor.role='admin' AND actor.removed_at IS NULL)",
-            )
+                                 AND actor.role='admin' AND {MEMBERSHIP_ACTIVE})"
+            ))
             .bind(&[
                 title.into(),
                 location.unwrap_or("").into(),
@@ -402,14 +403,14 @@ pub async fn cancel_event(
 ) -> Result<()> {
     let now = now_utc();
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "UPDATE events SET status='cancelled', cancelled_at=?1, \
          cancelled_by_membership_id=?2, updated_at=?1 \
          WHERE id=?3 AND community_id=?4 AND status='scheduled' \
            AND EXISTS (SELECT 1 FROM community_memberships actor \
                        WHERE actor.id=?2 AND actor.community_id=?4 \
-                         AND actor.role='admin' AND actor.removed_at IS NULL)",
-        )
+                         AND actor.role='admin' AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             now.as_str().into(),
             cancelled_by_membership_id.into(),

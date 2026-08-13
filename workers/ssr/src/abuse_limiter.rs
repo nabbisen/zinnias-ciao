@@ -200,10 +200,10 @@ impl DurableObject for AbuseLimiter {
         let sql = self.state.storage().sql();
         if let Ok(Some(row)) = read_row(&sql) {
             let now_ms = Date::now().as_millis() as i64;
-            if let Some((_, window_ms)) = policy_limits(&row.policy) {
-                if now_ms - row.window_started_ms >= window_ms {
-                    let _ = sql.exec("DELETE FROM limiter_state WHERE singleton = 1", None);
-                }
+            if let Some((_, window_ms)) = policy_limits(&row.policy)
+                && now_ms - row.window_started_ms >= window_ms
+            {
+                let _ = sql.exec("DELETE FROM limiter_state WHERE singleton = 1", None);
             }
         }
         Response::empty()

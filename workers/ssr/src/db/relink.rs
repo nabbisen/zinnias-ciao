@@ -5,6 +5,7 @@ use zinnias_ciao_contracts::RELINK_CODE_TTL_SECONDS;
 use zinnias_ciao_contracts::SESSION_TTL_SECONDS;
 
 use crate::audit::{self, AuditAction, AuditMetadata};
+use crate::db::membership::MEMBERSHIP_ACTIVE;
 use crate::db::{add_seconds_to_now, now_utc};
 
 pub struct RelinkTargetRow {
@@ -29,7 +30,7 @@ pub async fn find_valid_by_hmac(
 ) -> Result<Option<RelinkTargetRow>> {
     let now = now_utc();
     let row = db
-        .prepare(
+        .prepare(format!(
             "SELECT r.id, r.community_id, r.membership_id, m.user_id \
              FROM membership_relink_codes r \
              JOIN community_memberships m ON m.id = r.membership_id \
@@ -37,10 +38,10 @@ pub async fn find_valid_by_hmac(
                AND r.used_at IS NULL \
                AND r.revoked_at IS NULL \
                AND r.expires_at > ?2 \
-               AND m.removed_at IS NULL \
+               AND {MEMBERSHIP_ACTIVE} \
                AND m.community_id = r.community_id \
-             LIMIT 1",
-        )
+             LIMIT 1"
+        ))
         .bind(&[code_hmac.into(), now.as_str().into()])?
         .first::<serde_json::Value>(None)
         .await?;
@@ -66,14 +67,14 @@ pub async fn redeem_required(
     let now = now_utc();
     let session_expires_at = add_seconds_to_now(SESSION_TTL_SECONDS);
     let claim = db
-        .prepare(
+        .prepare(format!(
             "UPDATE membership_relink_codes SET used_at=?1 \
              WHERE id=?2 AND community_id=?3 AND membership_id=?4 \
                AND used_at IS NULL AND revoked_at IS NULL AND expires_at>?1 \
                AND EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?4 AND m.community_id=?3 \
-                             AND m.user_id=?5 AND m.removed_at IS NULL)",
-        )
+                             AND m.user_id=?5 AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             now.as_str().into(),
             target.id.as_str().into(),
@@ -88,15 +89,15 @@ pub async fn redeem_required(
     // Handoff 054 §5.4: written through SessionProvenance, not a literal.
     // Handoff 055 §5.1: authenticated_at set equal to created_at (?4).
     let session = db
-        .prepare(
+        .prepare(format!(
             "INSERT INTO sessions \
              (id, user_id, session_hmac, created_at, expires_at, last_seen_at, \
               provenance, scope_community_id, authenticated_at) \
              SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?8, ?7, ?4 \
              WHERE EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?6 AND m.community_id=?7 \
-                             AND m.user_id=?2 AND m.removed_at IS NULL)",
-        )
+                             AND m.user_id=?2 AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             session_id.into(),
             target.user_id.as_str().into(),
@@ -153,17 +154,17 @@ pub async fn issue_required(
     let now = now_utc();
     let operator_mode = operator_label.is_some();
     let revoke = db
-        .prepare(
+        .prepare(format!(
             "UPDATE membership_relink_codes SET revoked_at=?1 \
              WHERE membership_id=?2 AND community_id=?3 \
                AND used_at IS NULL AND revoked_at IS NULL AND expires_at>?1 \
                AND EXISTS (SELECT 1 FROM community_memberships target \
                            WHERE target.id=?2 AND target.community_id=?3 \
-                             AND target.removed_at IS NULL) \
+                             AND {MEMBERSHIP_ACTIVE}) \
                AND EXISTS (SELECT 1 FROM community_memberships actor \
                            WHERE actor.id=?4 AND actor.community_id=?3 \
-                             AND actor.role='admin' AND actor.removed_at IS NULL)",
-        )
+                             AND actor.role='admin' AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             now.as_str().into(),
             membership_id.into(),
@@ -171,18 +172,18 @@ pub async fn issue_required(
             actor_membership_id.into(),
         ])?;
     let insert = db
-        .prepare(
+        .prepare(format!(
             "INSERT INTO membership_relink_codes \
              (id, code_hmac, community_id, membership_id, created_by_membership_id, created_at, expires_at) \
              SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7 \
              WHERE EXISTS (SELECT 1 FROM community_memberships target \
                            WHERE target.id=?4 AND target.community_id=?3 \
-                             AND target.removed_at IS NULL \
+                             AND {MEMBERSHIP_ACTIVE} \
                              AND (?8=0 OR target.role='admin')) \
                AND EXISTS (SELECT 1 FROM community_memberships actor \
                            WHERE actor.id=?5 AND actor.community_id=?3 \
-                             AND actor.role='admin' AND actor.removed_at IS NULL)",
-        )
+                             AND actor.role='admin' AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             id.into(),
             code_hmac.into(),

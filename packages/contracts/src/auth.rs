@@ -38,6 +38,8 @@ pub mod token_purpose {
     pub const REMOVE_MEMBER: &str = "remove_member";
     pub const PROMOTE_MEMBER: &str = "promote_member";
     pub const DEMOTE_MEMBER: &str = "demote_member";
+    pub const SUSPEND_MEMBER: &str = "suspend_member";
+    pub const UNSUSPEND_MEMBER: &str = "unsuspend_member";
     pub const HELP_SIGNIN: &str = "help_signin";
     pub const REDEEM_RELINK: &str = "redeem_relink";
     pub const GENERATE_INVITE: &str = "generate_invite";

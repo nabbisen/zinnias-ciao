@@ -40,6 +40,15 @@ fn not_found() -> worker::Error {
     worker::Error::RustError("Not found.".to_string())
 }
 
+/// RFC-082 §4 / Handoff 058: the sentinel `require_membership` returns for
+/// a present-but-suspended membership, parallel to `not_found()`. Caught by
+/// `lib.rs::main`'s top-level dispatch and rendered as `render::suspended()`
+/// — this keeps `require_membership`'s signature and every one of its call
+/// sites (`let membership = require_membership(...).await?;`) unchanged.
+pub(crate) fn suspended() -> worker::Error {
+    worker::Error::RustError("Suspended.".to_string())
+}
+
 /// RFC-081 §2 / §2.1a (Handoff 048): the pure fail-closed decision behind
 /// `require_membership`, extracted so it is natively unit-testable —
 /// `require_membership` itself needs a real D1 handle and cannot run
@@ -119,9 +128,20 @@ pub async fn require_membership(
         }
     }
 
-    let row = membership_db::find_active(&db, &auth.user_id, community_id)
-        .await?
-        .ok_or_else(not_found)?; // generic: no resource existence leak
+    let row = match membership_db::find_active(&db, &auth.user_id, community_id).await? {
+        Some(row) => row,
+        None => {
+            // RFC-082 §4: a present-but-suspended membership gets the
+            // explicit paused page, not the generic not-found a genuinely
+            // absent or removed membership gets. `exists_present` is only
+            // ever `true` here for a suspended row — `find_active` already
+            // ruled out active.
+            if membership_db::exists_present(&db, &auth.user_id, community_id).await? {
+                return Err(suspended());
+            }
+            return Err(not_found()); // generic: no resource existence leak
+        }
+    };
 
     Ok(MembershipContext {
         membership_id: row.id,

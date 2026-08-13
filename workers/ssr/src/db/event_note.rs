@@ -3,6 +3,7 @@
 //! One note per (event, membership). Soft-deleted by note_deleted_at.
 
 use crate::audit::{self, AuditAction, AuditMetadata};
+use crate::db::membership::MEMBERSHIP_ACTIVE;
 use crate::db::now_utc;
 use worker::{D1Database, Result};
 
@@ -113,8 +114,12 @@ pub async fn admin_hide_required(
     target_membership_id: &str,
 ) -> Result<bool> {
     let now = now_utc();
+    // The target check (id = ?3) deliberately has no MEMBERSHIP_ACTIVE or
+    // MEMBERSHIP_PRESENT predicate at all — an admin may hide the note of a
+    // member who is removed or suspended, since this is moderation on the
+    // note's own content, not an action that grants the target anything.
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "UPDATE event_notes SET hidden_by_admin_at = ?1 \
          WHERE event_id = ?2 AND membership_id = ?3 \
            AND note_deleted_at IS NULL AND hidden_by_admin_at IS NULL \
@@ -129,9 +134,9 @@ pub async fn admin_hide_required(
            AND EXISTS ( \
              SELECT 1 FROM community_memberships \
              WHERE id = ?5 AND community_id = ?4 \
-               AND role = 'admin' AND removed_at IS NULL \
-           )",
-        )
+               AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
+           )"
+        ))
         .bind(&[
             now.as_str().into(),
             event_id.into(),

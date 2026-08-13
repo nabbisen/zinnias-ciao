@@ -10,6 +10,7 @@ use worker::{D1Database, Result};
 use zinnias_ciao_contracts::SESSION_TTL_SECONDS;
 
 use crate::audit::{self, AuditAction, AuditMetadata};
+use crate::db::membership::MEMBERSHIP_ACTIVE;
 use crate::db::session::SessionProvenance;
 use crate::db::{add_seconds_to_now, now_utc};
 
@@ -362,14 +363,14 @@ pub async fn issue_join_required(
             grants_role.into(),
         ])?;
     let link = db
-        .prepare(
+        .prepare(format!(
             "UPDATE invite_codes SET used_by_membership_id=?1 \
              WHERE id=?2 AND community_id=?3 AND used_at=?4 \
                AND used_by_membership_id IS NULL \
                AND EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?1 AND m.community_id=?3 \
-                             AND m.user_id=?5 AND m.removed_at IS NULL)",
-        )
+                             AND m.user_id=?5 AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             membership_id.into(),
             invite_id.into(),
@@ -378,14 +379,14 @@ pub async fn issue_join_required(
             user_id.into(),
         ])?;
     let session = db
-        .prepare(
+        .prepare(format!(
             "INSERT INTO sessions \
              (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance, authenticated_at) \
              SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?6, ?4 \
              WHERE EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?7 AND m.community_id=?8 \
-                             AND m.user_id=?2 AND m.removed_at IS NULL)",
-        )
+                             AND m.user_id=?2 AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             session_id.into(),
             user_id.into(),

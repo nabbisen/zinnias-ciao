@@ -310,6 +310,12 @@ pub async fn dispatch_get(req: Request, env: &Env, rid: &str, path: &str) -> Res
                         "help-signin" => {
                             super::admin::get_help_signin(req, env, rid, cid, mid).await
                         }
+                        "suspend" => {
+                            super::admin::get_suspend_member(req, env, rid, cid, mid).await
+                        }
+                        "unsuspend" => {
+                            super::admin::get_unsuspend_member(req, env, rid, cid, mid).await
+                        }
                         _ => render::not_found(),
                     }
                 }
@@ -404,6 +410,12 @@ pub async fn dispatch_post(req: Request, env: &Env, rid: &str, path: &str) -> Re
                         "demote" => super::admin::post_demote_member(req, env, rid, cid, mid).await,
                         "help-signin" => {
                             super::admin::post_help_signin(req, env, rid, cid, mid).await
+                        }
+                        "suspend" => {
+                            super::admin::post_suspend_member(req, env, rid, cid, mid).await
+                        }
+                        "unsuspend" => {
+                            super::admin::post_unsuspend_member(req, env, rid, cid, mid).await
                         }
                         _ => render::not_found(),
                     }

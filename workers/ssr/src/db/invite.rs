@@ -4,6 +4,7 @@
 //! All state changes (used, revoked) are soft — no hard deletes.
 
 use crate::audit::{self, AuditAction, AuditMetadata};
+use crate::db::membership::MEMBERSHIP_ACTIVE;
 use crate::db::now_utc;
 use worker::{D1Database, Result};
 use zinnias_ciao_contracts::SESSION_TTL_SECONDS;
@@ -154,14 +155,14 @@ pub async fn redeem_required(
             grants_role.into(),
         ])?;
     let link = db
-        .prepare(
+        .prepare(format!(
             "UPDATE invite_codes SET used_by_membership_id=?1 \
              WHERE id=?2 AND community_id=?3 AND used_at=?4 \
                AND used_by_membership_id IS NULL \
                AND EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?1 AND m.community_id=?3 \
-                             AND m.user_id=?5 AND m.removed_at IS NULL)",
-        )
+                             AND m.user_id=?5 AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             membership_id.into(),
             invite_id.into(),
@@ -175,14 +176,14 @@ pub async fn redeem_required(
     // Handoff 055 §5.1: authenticated_at set equal to created_at (?4) at
     // creation — they diverge only once session rotation (Slice 5b) exists.
     let session = db
-        .prepare(
+        .prepare(format!(
             "INSERT INTO sessions \
              (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance, authenticated_at) \
              SELECT ?1, ?2, ?3, ?4, ?5, ?4, ?8, ?4 \
              WHERE EXISTS (SELECT 1 FROM community_memberships m \
                            WHERE m.id=?6 AND m.community_id=?7 \
-                             AND m.user_id=?2 AND m.removed_at IS NULL)",
-        )
+                             AND m.user_id=?2 AND {MEMBERSHIP_ACTIVE})"
+        ))
         .bind(&[
             session_id.into(),
             user_id.into(),
@@ -224,7 +225,7 @@ pub async fn revoke_required(
 ) -> Result<bool> {
     let now = now_utc();
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "UPDATE invite_codes \
          SET revoked_at = ?1 \
          WHERE id = ?2 AND community_id = ?3 \
@@ -232,9 +233,9 @@ pub async fn revoke_required(
            AND EXISTS ( \
              SELECT 1 FROM community_memberships \
              WHERE id = ?4 AND community_id = ?3 \
-               AND role = 'admin' AND removed_at IS NULL \
-           )",
-        )
+               AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
+           )"
+        ))
         .bind(&[
             now.as_str().into(),
             invite_id.into(),
@@ -311,16 +312,16 @@ pub async fn insert_required(
     grants_role: &str,
 ) -> Result<bool> {
     let now = now_utc();
-    let mutation = db.prepare(
+    let mutation = db.prepare(format!(
         "INSERT INTO invite_codes \
          (id, community_id, code_hmac, created_by_membership_id, expires_at, grants_role, created_at) \
          SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7 \
          WHERE EXISTS ( \
            SELECT 1 FROM community_memberships \
            WHERE id = ?4 AND community_id = ?2 \
-             AND role = 'admin' AND removed_at IS NULL \
-         )",
-    )
+             AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
+         )"
+    ))
     .bind(&[
         id.into(),
         community_id.into(),

@@ -42,6 +42,12 @@ pub const CONFIGURATION_UNAVAILABLE: Localized = Localized {
 };
 pub const EN_NOT_FOUND: &str = "Not found.";
 pub const JA_NOT_FOUND: &str = "見つかりませんでした。";
+// RFC-082 §4 (owner decision): an explicit page for a suspended member, not
+// an indistinguishable not-found — suspension is not a secret from the
+// person suspended.
+pub const EN_MEMBERSHIP_SUSPENDED: &str =
+    "Your access to this community is paused. Contact your community administrator.";
+pub const JA_MEMBERSHIP_SUSPENDED: &str = "このコミュニティへのアクセスは一時停止されています。コミュニティの管理者にお問い合わせください。";
 pub const EN_INTERNAL_ERROR: &str = "Something went wrong. Please try again.";
 pub const JA_INTERNAL_ERROR: &str = "問題が発生しました。もう一度お試しください。";
 pub const EN_ADMIN_ATTEND_CANCELLED: &str = "Attendance cannot be corrected for a cancelled event.";

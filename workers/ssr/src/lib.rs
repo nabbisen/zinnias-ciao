@@ -61,6 +61,11 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
                 attach_security_headers(&mut resp, &request_id)?;
                 return Ok(resp);
             }
+            if is_suspended_error(&error) {
+                let mut resp = render::suspended()?;
+                attach_security_headers(&mut resp, &request_id)?;
+                return Ok(resp);
+            }
             console_error!(
                 "event=worker.request_failed request_id={} failure_category=unhandled route_class=request",
                 request_id
@@ -224,6 +229,13 @@ fn request_security_class(method: &Method, path: &str) -> RequestSecurityClass {
 
 fn is_not_found_error(e: &Error) -> bool {
     matches!(e, Error::RustError(message) if message == "Not found.")
+}
+
+/// RFC-082 §4 / Handoff 058: parallel to `is_not_found_error` — catches
+/// `authz::suspended()`'s sentinel and renders the explicit paused page
+/// instead of the generic not-found one.
+fn is_suspended_error(e: &Error) -> bool {
+    matches!(e, Error::RustError(message) if message == "Suspended.")
 }
 
 fn generate_request_id() -> String {

@@ -395,6 +395,18 @@ fn i18n_en_ja_parity_count() {
             EN_ADMIN_HELP_SIGNIN_COPY_FAILED,
             JA_ADMIN_HELP_SIGNIN_COPY_FAILED,
         ),
+        (EN_ADMIN_SUSPENDED_BADGE, JA_ADMIN_SUSPENDED_BADGE),
+        (EN_ADMIN_SUSPEND_ACTION, JA_ADMIN_SUSPEND_ACTION),
+        (EN_ADMIN_UNSUSPEND_ACTION, JA_ADMIN_UNSUSPEND_ACTION),
+        (EN_ADMIN_SUSPEND_TITLE, JA_ADMIN_SUSPEND_TITLE),
+        (EN_ADMIN_SUSPEND_CONSEQUENCE, JA_ADMIN_SUSPEND_CONSEQUENCE),
+        (EN_ADMIN_UNSUSPEND_TITLE, JA_ADMIN_UNSUSPEND_TITLE),
+        (
+            EN_ADMIN_UNSUSPEND_CONSEQUENCE,
+            JA_ADMIN_UNSUSPEND_CONSEQUENCE,
+        ),
+        (EN_ADMIN_LAST_ADMIN_SUSPEND, JA_ADMIN_LAST_ADMIN_SUSPEND),
+        (EN_MEMBERSHIP_SUSPENDED, JA_MEMBERSHIP_SUSPENDED),
         (EN_RELINK_TITLE, JA_RELINK_TITLE),
         (EN_RELINK_BODY, JA_RELINK_BODY),
         (EN_RELINK_CODE_LABEL, JA_RELINK_CODE_LABEL),
@@ -1513,7 +1525,7 @@ fn sw_cache_version_matches_workspace_version() {
 // (Handoff 040 §7.3 re-pinned this digest with no version bump, and that
 // was correct — the prior wording here said otherwise and was wrong).
 const RELEASE_CACHE_ASSET_CONTENT_HASH: &str =
-    "ae2f31bb1d75bffb0b2636148e3e841ab5d9ec2b2fa3a7a22d81d9507f1506c3";
+    "314117b2b1239a8f90d47d43ab7490a64d777aa924365520e190711d7c526966";
 
 fn cached_asset_content_hash() -> String {
     use sha2::{Digest, Sha256};
@@ -1598,6 +1610,9 @@ const MEMBER_REMOVE_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/admin/member_remove.rs");
 const HELP_SIGNIN_HANDLER_SRC: &str =
     include_str!("../../../workers/ssr/src/handlers/admin/help_signin.rs");
+const SUSPENSION_HANDLER_SRC: &str =
+    include_str!("../../../workers/ssr/src/handlers/admin/suspension.rs");
+const MIGRATION_0018_SRC: &str = include_str!("../../../migrations/0018_membership_suspension.sql");
 const RELINK_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/relink.rs");
 const RECOVERY_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/recovery.rs");
 const OPERATOR_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/operator.rs");
@@ -2025,7 +2040,7 @@ fn rfc062_role_transfer_writes_are_scoped_and_guarded() {
             && MEMBERSHIP_DB_SRC.contains("SET role = 'admin'")
             && MEMBERSHIP_DB_SRC.contains("id = ?1")
             && MEMBERSHIP_DB_SRC.contains("community_id = ?2")
-            && MEMBERSHIP_DB_SRC.contains("removed_at IS NULL")
+            && MEMBERSHIP_DB_SRC.contains("MEMBERSHIP_ACTIVE")
             && MEMBERSHIP_DB_SRC.contains("role = 'member'"),
         "RFC-062 promote update must be scoped by membership id, community id, active membership, and current role"
     );
@@ -2076,6 +2091,13 @@ fn rfc063_removal_only_policy_is_locked() {
         "RFC-063 removal copy must say access ends and past records remain in both locales"
     );
 
+    // RFC-082 (Handoff 058) amends RFC-063: it explicitly adds a reversible
+    // `suspend`/`unsuspend` state alongside the still-terminal `removed_at`,
+    // so "suspend" is dropped from the forbidden list here — it is no
+    // longer an undocumented escape hatch, it is the reviewed feature.
+    // `removed_at` itself remains one-way: RFC-082 §1's own transition
+    // table refuses every `removed → anything` transition, so "reactivate"
+    // and "restore" (un-removing) stay locked out.
     for (label, src) in [
         ("members handler", MEMBERS_HANDLER_SRC),
         ("member remove handler", MEMBER_REMOVE_HANDLER_SRC),
@@ -2083,10 +2105,10 @@ fn rfc063_removal_only_policy_is_locked() {
         ("community router", COMMUNITY_HANDLER_SRC),
     ] {
         let lowered = src.to_ascii_lowercase();
-        for forbidden in ["reactivate", "suspend", "restore"] {
+        for forbidden in ["reactivate", "restore"] {
             assert!(
                 !lowered.contains(forbidden),
-                "RFC-063 Option A must not expose {forbidden:?} in {label}"
+                "RFC-063 removal must stay terminal — {forbidden:?} must not appear in {label}"
             );
         }
     }
@@ -2121,7 +2143,7 @@ fn rfc063_active_member_queries_exclude_removed_members() {
         .expect("find_active_summary should follow list_all_active");
     let list_all_active = &MEMBERSHIP_DB_SRC[list_start..list_end];
     assert!(
-        list_all_active.contains("removed_at IS NULL"),
+        list_all_active.contains("MEMBERSHIP_ACTIVE"),
         "RFC-063 active member list must exclude removed memberships"
     );
 
@@ -2134,7 +2156,7 @@ fn rfc063_active_member_queries_exclude_removed_members() {
         .expect("find_active_by_id should follow find_active");
     let find_active = &MEMBERSHIP_DB_SRC[find_start..find_end];
     assert!(
-        find_active.contains("removed_at IS NULL"),
+        find_active.contains("MEMBERSHIP_ACTIVE"),
         "RFC-063 active authorization lookup must exclude removed memberships"
     );
 }
@@ -2165,13 +2187,17 @@ fn rfc024_help_signin_copy_and_ttl_are_locked() {
     );
     assert_eq!(EN_RELINK_INVALID, "This code is invalid or has expired.");
 
+    // RFC-082 (Handoff 058) legitimately adds "suspend"/"unsuspend" routes to
+    // the shared community router — dropped from the forbidden list here for
+    // the same reason `rfc063_removal_only_policy_is_locked` drops it above.
+    // `removed_at` stays terminal, so "reactivate"/"restore" stay locked.
     for (label, src) in [
         ("help-signin handler", HELP_SIGNIN_HANDLER_SRC),
         ("relink handler", RELINK_HANDLER_SRC),
         ("community router", COMMUNITY_HANDLER_SRC),
     ] {
         let lowered = src.to_ascii_lowercase();
-        for forbidden in ["reactivate", "suspend", "restore"] {
+        for forbidden in ["reactivate", "restore"] {
             assert!(
                 !lowered.contains(forbidden),
                 "RFC-024 help-signin surface must not expose {forbidden:?} in {label}"
@@ -2209,7 +2235,7 @@ fn rfc024_relink_codes_are_membership_scoped_hmacs() {
 fn rfc024_redemption_rechecks_active_membership_and_community() {
     assert!(
         RELINK_DB_SRC.contains("JOIN community_memberships m ON m.id = r.membership_id")
-            && RELINK_DB_SRC.contains("m.removed_at IS NULL")
+            && RELINK_DB_SRC.contains("MEMBERSHIP_ACTIVE")
             && RELINK_DB_SRC.contains("m.community_id = r.community_id")
             && RELINK_DB_SRC.contains("m.user_id"),
         "RFC-024 redemption must resolve membership_id to user_id and re-check active community membership"
@@ -2642,7 +2668,7 @@ fn rfc070_display_name_update_audit_and_result_are_batched() {
             && ME_HANDLER_SRC.contains("SET display_name = ?1")
             && ME_HANDLER_SRC.contains("AND community_id = ?3")
             && ME_HANDLER_SRC.contains("AND user_id = ?4")
-            && ME_HANDLER_SRC.contains("AND removed_at IS NULL")
+            && ME_HANDLER_SRC.contains("AND {MEMBERSHIP_ACTIVE}")
             && ME_HANDLER_SRC.contains("AND display_name != ?1"),
         "RFC-070 display-name update must be scoped to active membership, community, and authenticated user"
     );
@@ -3273,7 +3299,7 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     },
     LocalizationException {
         path: "handlers/admin/members.rs",
-        ja_count: 27,
+        ja_count: 30,
         calls_bare_page: true,
         reason: "admin-only surface, RFC-072 Slice D",
     },
@@ -3282,6 +3308,12 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
         ja_count: 10,
         calls_bare_page: true,
         reason: "admin-only surface, RFC-072 Slice D",
+    },
+    LocalizationException {
+        path: "handlers/admin/suspension.rs",
+        ja_count: 10,
+        calls_bare_page: true,
+        reason: "admin-only surface, RFC-072 Slice D — RFC-082, structurally the same shape as role_transfer.rs",
     },
     LocalizationException {
         path: "handlers/calendar.rs",
@@ -3351,7 +3383,7 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     },
     LocalizationException {
         path: "render/errors.rs",
-        ja_count: 17,
+        ja_count: 20,
         calls_bare_page: false,
         reason: "these functions take no arguments, so they have no membership and no locale to resolve (RFC-072 §6 non-change scope)",
     },
@@ -4783,7 +4815,7 @@ fn rfc079_package3_simple_required_batches_are_pinned() {
     for (name, source, expected_batches) in [
         ("templates", RFC079_EVENT_TEMPLATE_DB_SRC, 2usize),
         ("invites", INVITE_DB_SRC, 2),
-        ("membership", MEMBERSHIP_DB_SRC, 3),
+        ("membership", MEMBERSHIP_DB_SRC, 5),
         ("note moderation", RFC079_EVENT_NOTE_DB_SRC, 1),
         ("single attendance", RFC079_ATTENDANCE_DB_SRC, 1),
     ] {
@@ -4795,7 +4827,7 @@ fn rfc079_package3_simple_required_batches_are_pinned() {
             "Package 3 {name} helper count changed"
         );
         assert!(
-            source.contains("role = 'admin'") && source.contains("removed_at IS NULL"),
+            source.contains("role = 'admin'") && source.contains("MEMBERSHIP_ACTIVE"),
             "Package 3 {name} mutation must repeat active-admin authorization in SQL"
         );
     }
@@ -4888,7 +4920,7 @@ fn rfc079_package4_event_calendar_and_attendance_batches_are_pinned() {
     );
     for required in [
         "actor.role='admin'",
-        "actor.removed_at IS NULL",
+        "MEMBERSHIP_ACTIVE",
         "e.status='scheduled'",
         "occurrence_status='scheduled'",
         "WHERE changes()=1",
@@ -4930,7 +4962,7 @@ fn rfc079_package4_event_calendar_and_attendance_batches_are_pinned() {
             && CALENDAR_DB_SRC.contains("pub async fn revoke_required")
             && CALENDAR_DB_SRC.contains("execute_required_tail")
             && CALENDAR_DB_SRC.contains("execute_required_bounded")
-            && CALENDAR_DB_SRC.contains("m.removed_at IS NULL")
+            && CALENDAR_DB_SRC.contains("MEMBERSHIP_ACTIVE")
             && !CALENDAR_HANDLER_SRC.contains("write_calendar_token_audit"),
         "Package 4 calendar-token rotation/revocation must remain typed and atomic"
     );
@@ -5194,6 +5226,7 @@ fn rfc079_package7_removal_and_documentation_boundary_are_pinned() {
         "0015_session_authenticated_at.sql",
         "0016_auth_transaction_initiating_user.sql",
         "0017_account_recovery_credentials.sql",
+        "0018_membership_suspension.sql",
     ];
     assert_eq!(
         migration_filenames, expected_migration_filenames,
@@ -6175,5 +6208,341 @@ fn prompt_login_is_sent_for_link_and_reauthentication() {
          {last_argument:?}) — link's own case is unconditional (proven by \
          link_always_sends_prompt_login_regardless_of_session_state), so a literal true here is \
          the correct, equivalent value, not a bypass of a different decision"
+    );
+}
+
+/// RFC-082 §3 / Handoff 058 §7: the structural control behind the
+/// two-predicate rule. `MEMBERSHIP_ACTIVE` and `MEMBERSHIP_PRESENT`
+/// (`db/membership.rs`) are defined exactly once; every one of the 54
+/// pre-existing call sites (plus every new one this package adds) must
+/// interpolate one of the two, never spell `removed_at IS NULL` inline.
+/// Default-fail, comments stripped first — the third occurrence of the
+/// "gate matches its own explanatory prose" failure mode in this project
+/// (after the flash gate and Handoff 057's abuse-limiter gate) is treated
+/// as the standing rule, not rediscovered here: this gate strips comments
+/// from the start rather than finding the need the hard way a fourth time.
+/// The gate is the control; the per-site classification in the review
+/// request is the evidence — neither alone proves every site chose
+/// correctly, only that no site spells the predicate inline.
+#[test]
+fn rfc082_no_inline_membership_active_predicate_outside_the_two_constants() {
+    let src_dir = workers_ssr_src_dir();
+    let mut files = Vec::new();
+    walk_rs_files(&src_dir, &mut files);
+    let files: Vec<_> = files
+        .into_iter()
+        .filter(|p| p.file_name().and_then(|n| n.to_str()) != Some("tests.rs"))
+        .collect();
+    assert!(
+        files.len() > 80,
+        "expected many .rs files under workers/ssr/src, found only {} — directory walk is \
+         probably broken, not the codebase actually shrinking",
+        files.len()
+    );
+
+    let mut violations: Vec<String> = Vec::new();
+    for path in &files {
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let stripped = strip_line_comments(&content);
+        let rel = path
+            .strip_prefix(&src_dir)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        for (line_no, line) in stripped.lines().enumerate() {
+            if !line.contains("removed_at IS NULL") {
+                continue;
+            }
+            let is_active_constant_definition = rel == "db/membership.rs"
+                && line.contains("const MEMBERSHIP_ACTIVE")
+                && line.contains("removed_at IS NULL AND suspended_at IS NULL");
+            let is_present_constant_definition =
+                rel == "db/membership.rs" && line.contains("const MEMBERSHIP_PRESENT");
+            if is_active_constant_definition || is_present_constant_definition {
+                continue;
+            }
+            violations.push(format!("{rel}:{}: {}", line_no + 1, line.trim()));
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "removed_at IS NULL spelled inline outside the two named predicates in \
+         db/membership.rs (MEMBERSHIP_ACTIVE / MEMBERSHIP_PRESENT) — every activeness query \
+         must interpolate one of the two via format!(\"... {{MEMBERSHIP_ACTIVE}} ...\") instead, \
+         never spell the condition out itself:\n{}",
+        violations.join("\n")
+    );
+}
+
+/// RFC-082 §2 / §5.1: the migration is additive only — two nullable
+/// columns, no table rebuild — and the partial-index comment in migration
+/// 0001 already anticipated a suspended row occupying the
+/// (community_id, user_id) pair.
+#[test]
+fn rfc082_migration_0018_is_additive_and_index_compatible() {
+    assert!(
+        MIGRATION_0018_SRC.contains("ALTER TABLE community_memberships ADD COLUMN suspended_at")
+            && MIGRATION_0018_SRC.contains(
+                "ALTER TABLE community_memberships ADD COLUMN suspended_by_membership_id"
+            )
+            && MIGRATION_0018_SRC.contains("REFERENCES community_memberships(id)"),
+        "migration 0018 must add exactly the two nullable columns RFC-082 §2 specifies"
+    );
+    for forbidden in ["DROP TABLE", "CREATE TABLE", "RENAME TABLE"] {
+        assert!(
+            !MIGRATION_0018_SRC.contains(forbidden),
+            "migration 0018 must be purely additive — found {forbidden:?}, which implies a \
+             rebuild RFC-082 §2 says is deliberately avoided"
+        );
+    }
+
+    const MIGRATION_0001_SRC: &str = include_str!("../../../migrations/0001_initial.sql");
+    assert!(
+        MIGRATION_0001_SRC.contains("idx_memberships_one_active_per_user")
+            && MIGRATION_0001_SRC.contains("WHERE removed_at IS NULL")
+            && MIGRATION_0001_SRC.to_ascii_lowercase().contains("suspend"),
+        "the partial unique index (migration 0001) must remain WHERE removed_at IS NULL — a \
+         suspended row is not removed and must still occupy the (community_id, user_id) pair — \
+         and its own comment must already name suspension, confirmed rather than assumed \
+         (RFC-082 §5.1)"
+    );
+}
+
+/// RFC-082 §5.2 / §1: `suspend_required` and `unsuspend_required` must
+/// scope their guarded UPDATE the same way every other role-changing
+/// mutation in this file does — actor re-checked `MEMBERSHIP_ACTIVE` and
+/// `role = 'admin'` in the same statement, target state re-checked to
+/// match the RFC-082 §1 transition being attempted, and (for suspend) the
+/// at-least-one-admin invariant preserved.
+#[test]
+fn rfc082_suspend_and_unsuspend_writes_are_scoped_and_guarded() {
+    assert!(
+        MEMBERSHIP_DB_SRC.contains("pub async fn suspend_required")
+            && MEMBERSHIP_DB_SRC.contains("SET suspended_at = ?1, suspended_by_membership_id = ?4")
+            && MEMBERSHIP_DB_SRC.contains("AuditAction::MembershipSuspended"),
+        "suspend_required must exist, set both suspension columns together, and audit as \
+         MembershipSuspended"
+    );
+    assert!(
+        MEMBERSHIP_DB_SRC.contains("pub async fn unsuspend_required")
+            && MEMBERSHIP_DB_SRC
+                .contains("SET suspended_at = NULL, suspended_by_membership_id = NULL")
+            && MEMBERSHIP_DB_SRC.contains("AuditAction::MembershipUnsuspended"),
+        "unsuspend_required must exist, clear both suspension columns together, and audit as \
+         MembershipUnsuspended"
+    );
+
+    // active -> suspended: the target's *current* state must be ACTIVE
+    // (removed_at IS NULL AND suspended_at IS NULL) before suspending it —
+    // MEMBERSHIP_ACTIVE covers both terminal-removal and already-suspended
+    // as refused starting states in one predicate.
+    let suspend_start = MEMBERSHIP_DB_SRC
+        .find("pub async fn suspend_required")
+        .expect("suspend_required should exist");
+    let suspend_end = MEMBERSHIP_DB_SRC[suspend_start..]
+        .find("pub async fn unsuspend_required")
+        .map(|offset| suspend_start + offset)
+        .expect("unsuspend_required should follow suspend_required");
+    let suspend_fn = &MEMBERSHIP_DB_SRC[suspend_start..suspend_end];
+    // Comments stripped first (the standing rule this project now applies
+    // to every source-scanning gate, per Handoff 058 §7): suspend_required's
+    // own doc comment mentions `MEMBERSHIP_ACTIVE` in prose, which would
+    // otherwise inflate this count without the SQL itself changing.
+    let suspend_fn_code = strip_line_comments(suspend_fn);
+    assert_eq!(
+        suspend_fn_code.matches("MEMBERSHIP_ACTIVE").count(),
+        3,
+        "suspend_required's mutation must re-check MEMBERSHIP_ACTIVE three times: the target's \
+         own current state, the actor's admin membership, and the admin-count subquery"
+    );
+    assert!(
+        suspend_fn.contains("role != 'admin' OR")
+            && suspend_fn.contains("SELECT COUNT(*) FROM community_memberships")
+            && suspend_fn.contains("> 1"),
+        "suspend_required must preserve the at-least-one-admin invariant the same way \
+         soft_remove_guarded_required does — suspending a community's last active admin would \
+         leave nobody who could ever unsuspend anyone"
+    );
+    assert!(
+        suspend_fn.contains("id != ?4"),
+        "suspend_required must deny self-targeting in SQL, not only in the handler"
+    );
+
+    // suspended -> active: the target's *current* state must be PRESENT
+    // and specifically suspended (suspended_at IS NOT NULL) — PRESENT
+    // alone would also match an already-active row.
+    let unsuspend_fn = &MEMBERSHIP_DB_SRC[suspend_end..];
+    assert!(
+        unsuspend_fn.contains("MEMBERSHIP_PRESENT")
+            && unsuspend_fn.contains("suspended_at IS NOT NULL"),
+        "unsuspend_required's target check must be MEMBERSHIP_PRESENT AND suspended_at IS NOT \
+         NULL — PRESENT alone would also match an already-active membership, which must not be \
+         accepted by an unsuspend"
+    );
+    // Comments stripped first, same reason as suspend_fn_code above —
+    // unsuspend_required's own doc comment also mentions MEMBERSHIP_ACTIVE.
+    let unsuspend_fn_code = strip_line_comments(unsuspend_fn);
+    assert_eq!(
+        unsuspend_fn_code.matches("MEMBERSHIP_ACTIVE").count(),
+        1,
+        "unsuspend_required's actor check must be MEMBERSHIP_ACTIVE — a suspended admin (who \
+         could not have suspended themselves, since suspend denies self-targeting) must not be \
+         able to unsuspend anyone either"
+    );
+
+    // active|suspended -> removed: soft_remove_guarded_required's target
+    // check is MEMBERSHIP_PRESENT (RFC-082 §1's one deliberate exception to
+    // the fail-closed default) so an already-suspended member remains
+    // removable, while its actor check stays ACTIVE.
+    let remove_start = MEMBERSHIP_DB_SRC
+        .find("pub async fn soft_remove_guarded_required")
+        .expect("soft_remove_guarded_required should exist");
+    let remove_fn = &MEMBERSHIP_DB_SRC[remove_start..];
+    let remove_fn = &remove_fn[..remove_fn
+        .find("\n}\n")
+        .map(|offset| offset + 3)
+        .unwrap_or(remove_fn.len())];
+    assert!(
+        remove_fn.contains("MEMBERSHIP_PRESENT"),
+        "soft_remove_guarded_required's target check must be MEMBERSHIP_PRESENT, not \
+         MEMBERSHIP_ACTIVE — RFC-082 §1 requires suspended -> removed to remain a valid \
+         transition"
+    );
+    assert!(
+        remove_fn.contains("MEMBERSHIP_ACTIVE"),
+        "soft_remove_guarded_required's actor check must stay MEMBERSHIP_ACTIVE — a suspended \
+         admin must not be able to remove anyone"
+    );
+
+    // removed -> anything: no function anywhere in this file clears
+    // removed_at or otherwise treats it as reversible — asserted by
+    // absence, matching rfc063_removal_only_policy_is_locked's own
+    // "reactivate"/"restore" lock.
+    assert!(
+        !MEMBERSHIP_DB_SRC.contains("SET removed_at = NULL")
+            && !MEMBERSHIP_DB_SRC.to_ascii_lowercase().contains("unremove")
+            && !MEMBERSHIP_DB_SRC
+                .to_ascii_lowercase()
+                .contains("reactivate"),
+        "removed must stay terminal — no function may clear removed_at (RFC-082 §1: \
+         removed -> anything is refused for everyone, no exception)"
+    );
+}
+
+/// RFC-082 §6: the two Class A audit actions exist, are wired into the
+/// closed model the same way every other membership-lifecycle action is,
+/// and record no more than the standard (community, actor, target) triple.
+#[test]
+fn rfc082_audit_actions_are_wired() {
+    assert!(
+        RFC079_AUDIT_CORE_SRC.contains("MembershipSuspended,")
+            && RFC079_AUDIT_CORE_SRC.contains("MembershipUnsuspended,")
+            && RFC079_AUDIT_CORE_SRC.contains("\"membership.suspended\"")
+            && RFC079_AUDIT_CORE_SRC.contains("\"membership.unsuspended\""),
+        "MembershipSuspended/MembershipUnsuspended must exist with the expected canonical names"
+    );
+    assert!(
+        RFC079_AUDIT_CORE_SRC.contains("pub(crate) const ALL: [Self; 37]"),
+        "AuditAction::ALL must be re-pinned to 37 after adding the two RFC-082 actions (was 35)"
+    );
+    let all_start = RFC079_AUDIT_CORE_SRC
+        .find("pub(crate) const ALL")
+        .expect("ALL should exist");
+    let all_end = RFC079_AUDIT_CORE_SRC[all_start..]
+        .find("];")
+        .map(|offset| all_start + offset)
+        .expect("ALL array should close");
+    let all_array = &RFC079_AUDIT_CORE_SRC[all_start..all_end];
+    assert!(
+        all_array.contains("Self::MembershipSuspended")
+            && all_array.contains("Self::MembershipUnsuspended"),
+        "both new actions must be listed in AuditAction::ALL, not only defined on the enum"
+    );
+}
+
+/// RFC-082 §4 / Handoff 058: the "access is paused" mechanism — a
+/// sentinel error parallel to `authz::not_found`, caught by `lib.rs`'s
+/// top-level dispatch the same way, rendered by a dedicated
+/// `render::suspended()` — chosen specifically so
+/// `require_membership`'s signature and every one of its call sites stay
+/// unchanged.
+#[test]
+fn rfc082_paused_page_mechanism_is_wired() {
+    assert!(
+        AUTHZ_SRC.contains("pub(crate) fn suspended() -> worker::Error")
+            && AUTHZ_SRC.contains("\"Suspended.\""),
+        "authz.rs must define a suspended() sentinel parallel to not_found()"
+    );
+    assert!(
+        AUTHZ_SRC.contains("membership_db::exists_present(&db, &auth.user_id, community_id)")
+            && AUTHZ_SRC.contains("return Err(suspended())"),
+        "require_membership must distinguish a present-but-suspended membership from a \
+         genuinely absent one and return the suspended() sentinel for the former"
+    );
+    assert!(
+        LIB_SRC.contains("fn is_suspended_error")
+            && LIB_SRC.contains("\"Suspended.\"")
+            && LIB_SRC.contains("if is_suspended_error(&error)")
+            && LIB_SRC.contains("render::suspended()"),
+        "lib.rs's top-level dispatch must catch the suspended() sentinel the same way it \
+         catches not_found(), rendering render::suspended() instead of a generic 500"
+    );
+    assert!(
+        RENDER_SRC.contains("pub fn suspended() -> Result<Response>")
+            && RENDER_SRC.contains("i18n::JA_MEMBERSHIP_SUSPENDED")
+            && RENDER_SRC.contains(".with_status(403)"),
+        "render::suspended() must exist, use the explicit paused-access copy, and return 403"
+    );
+    assert!(
+        !RENDER_SRC.contains("suspended() -> Result<Response> {\n    let body = format!(\n        \"<main class=\\\"cz-anon-main\\\">\\\n         <p>{}</p>{}</main>\",\n        i18n::JA_MEMBERSHIP_SUSPENDED,\n        recovery_links()"),
+        "the paused page must not reuse recovery_links() (which offers /join) — a suspended \
+         member is already a member, and /join is not their path back"
+    );
+}
+
+/// RFC-082 §5 / §8.6: the admin surface. A suspended member must appear in
+/// the member list (via the PRESENT-based listing, not the ACTIVE one),
+/// marked suspended, with an unsuspend action; self-targeting is denied in
+/// the handler the same way promote/demote/remove already deny it.
+#[test]
+fn rfc082_suspension_handlers_are_registered_and_self_target_denied() {
+    assert!(
+        COMMUNITY_HANDLER_SRC.contains("\"suspend\" => {")
+            && COMMUNITY_HANDLER_SRC.contains("super::admin::get_suspend_member")
+            && COMMUNITY_HANDLER_SRC.contains("super::admin::post_suspend_member")
+            && COMMUNITY_HANDLER_SRC.contains("\"unsuspend\" => {")
+            && COMMUNITY_HANDLER_SRC.contains("super::admin::get_unsuspend_member")
+            && COMMUNITY_HANDLER_SRC.contains("super::admin::post_unsuspend_member"),
+        "suspend/unsuspend GET and POST routes must be registered under /c/:cid/admin/members/:mid/"
+    );
+    assert!(
+        SUSPENSION_HANDLER_SRC.contains("token_purpose::SUSPEND_MEMBER")
+            && SUSPENSION_HANDLER_SRC.contains("token_purpose::UNSUSPEND_MEMBER")
+            && SUSPENSION_HANDLER_SRC.contains("target_membership_id == membership.membership_id"),
+        "suspension handlers must use dedicated token purposes and deny self-targeting \
+         server-side, matching role_transfer.rs's own discipline"
+    );
+    assert!(
+        SUSPENSION_HANDLER_SRC.contains("membership_db::find_present_summary")
+            && SUSPENSION_HANDLER_SRC.contains("membership_db::suspend_required")
+            && SUSPENSION_HANDLER_SRC.contains("membership_db::unsuspend_required"),
+        "suspension handlers must target present (not only active) memberships and call the \
+         guarded RFC-082 mutations"
+    );
+    assert!(
+        MEMBERS_HANDLER_SRC.contains("membership_db::list_present_for_admin")
+            && MEMBERS_HANDLER_SRC.contains("JA_ADMIN_SUSPENDED_BADGE")
+            && MEMBERS_HANDLER_SRC.contains("/suspend\\\"")
+            && MEMBERS_HANDLER_SRC.contains("/unsuspend\\\""),
+        "the admin member list must use the PRESENT-based listing (RFC-082 §5), render the \
+         suspended badge, and link both the suspend and unsuspend actions"
+    );
+    assert!(
+        MEMBER_REMOVE_HANDLER_SRC.contains("membership_db::find_present_summary"),
+        "member_remove.rs's confirmation page must target present (not only active) \
+         memberships — RFC-082 §1 requires suspended -> removed to remain reachable"
     );
 }

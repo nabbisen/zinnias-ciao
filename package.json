@@ -54,7 +54,8 @@
     "smoke:identity-callback": "node scripts/smoke/external-identity-callback.mjs",
     "smoke:account-surface": "node scripts/smoke/account-surface.mjs",
     "smoke:account-link-reauth": "node scripts/smoke/account-link-and-reauthentication.mjs",
-    "smoke:account-recovery-unlink": "node scripts/smoke/account-recovery-and-unlink.mjs"
+    "smoke:account-recovery-unlink": "node scripts/smoke/account-recovery-and-unlink.mjs",
+    "smoke:membership-suspension": "node scripts/smoke/membership-suspension.mjs"
   },
   "devDependencies": {
     "wrangler": "4.113.0"

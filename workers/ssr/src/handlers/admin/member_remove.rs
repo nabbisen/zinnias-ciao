@@ -40,8 +40,11 @@ pub async fn get_remove_member(
     )
     .await?;
 
+    // RFC-082 §1: suspended → removed is a valid transition, so the target
+    // lookup here is present-based, not active-based — an already-suspended
+    // member must still be reachable for removal.
     let target =
-        match membership_db::find_active_summary(&db, target_membership_id, community_id).await? {
+        match membership_db::find_present_summary(&db, target_membership_id, community_id).await? {
             Some(target) => target,
             None => return render::not_found(),
         };

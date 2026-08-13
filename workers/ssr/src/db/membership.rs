@@ -1,8 +1,25 @@
 //! Membership and user table access — RFC-002 / RFC-004.
+//!
+//! RFC-082 / Handoff 058: two named predicates, defined once, are the
+//! structural answer to the fail-open risk of a suspension column added
+//! without touching every site that decides "is this membership active."
+//! No query anywhere in this codebase spells either condition inline —
+//! `packages/contracts/tests/release_gates.rs` enforces that with a
+//! default-fail, comment-stripped scan.
 
 use crate::audit::{self, AuditAction, AuditMetadata};
 use worker::{D1Database, Result};
 use zinnias_ciao_contracts::Locale;
+
+/// Authorization. The fail-closed default: if a site's intent is unclear,
+/// it takes this one. Excludes both terminal removal and reversible
+/// suspension.
+pub(crate) const MEMBERSHIP_ACTIVE: &str = "removed_at IS NULL AND suspended_at IS NULL";
+
+/// Presence. For listing a member, and for targeting an admin action at a
+/// suspended one — an unsuspend cannot find its own target otherwise.
+/// Excludes only terminal removal; a suspended row is present.
+pub(crate) const MEMBERSHIP_PRESENT: &str = "removed_at IS NULL";
 
 pub struct MembershipRow {
     pub id: String,
@@ -55,19 +72,21 @@ fn resolve_locale(stored: Option<&str>) -> Locale {
 /// reads `ui_language` from this same row rather than adding a second query,
 /// and resolves it here into [`ActiveMembershipRow::locale`] — the only
 /// trustworthy source of a page's locale.
-/// Returns `None` if absent or removed (`removed_at IS NOT NULL`).
+/// Returns `None` if absent, removed, or suspended (`MEMBERSHIP_ACTIVE`) —
+/// this is the front door `authz::require_membership` calls on every
+/// community-scoped request.
 pub async fn find_active(
     db: &D1Database,
     user_id: &str,
     community_id: &str,
 ) -> Result<Option<ActiveMembershipRow>> {
     let row = db
-        .prepare(
+        .prepare(format!(
             "SELECT id, community_id, user_id, role, display_name, ui_language \
              FROM community_memberships \
-             WHERE user_id = ?1 AND community_id = ?2 AND removed_at IS NULL \
-             LIMIT 1",
-        )
+             WHERE user_id = ?1 AND community_id = ?2 AND {MEMBERSHIP_ACTIVE} \
+             LIMIT 1"
+        ))
         .bind(&[user_id.into(), community_id.into()])?
         .first::<serde_json::Value>(None)
         .await?;
@@ -115,6 +134,25 @@ mod tests {
     }
 }
 
+/// Does a present (not-removed) membership exist for this user in this
+/// community? RFC-082 / Handoff 058: `authz::require_membership` calls this
+/// only after `find_active` has already failed, to distinguish "suspended"
+/// (present, not active — an explicit page) from "genuinely absent"
+/// (generic not-found). By the RFC-082 state model, present-but-not-active
+/// necessarily means suspended, so no further check is needed here.
+pub async fn exists_present(db: &D1Database, user_id: &str, community_id: &str) -> Result<bool> {
+    let row = db
+        .prepare(format!(
+            "SELECT 1 FROM community_memberships \
+             WHERE user_id = ?1 AND community_id = ?2 AND {MEMBERSHIP_PRESENT} \
+             LIMIT 1"
+        ))
+        .bind(&[user_id.into(), community_id.into()])?
+        .first::<serde_json::Value>(None)
+        .await?;
+    Ok(row.is_some())
+}
+
 /// Verify a membership_id is still active in a given community.
 /// Used by the ICS feed handler to confirm access without a session.
 pub async fn find_active_by_id(
@@ -123,12 +161,12 @@ pub async fn find_active_by_id(
     community_id: &str,
 ) -> Result<Option<MembershipRow>> {
     let row = db
-        .prepare(
+        .prepare(format!(
             "SELECT id, community_id, role \
              FROM community_memberships \
-             WHERE id = ?1 AND community_id = ?2 AND removed_at IS NULL \
-             LIMIT 1",
-        )
+             WHERE id = ?1 AND community_id = ?2 AND {MEMBERSHIP_ACTIVE} \
+             LIMIT 1"
+        ))
         .bind(&[membership_id.into(), community_id.into()])?
         .first::<serde_json::Value>(None)
         .await?;
@@ -158,23 +196,23 @@ pub async fn list_active_for_user(
     scope_community_id: Option<&str>,
 ) -> Result<Vec<MembershipRow>> {
     let rows = if let Some(scope) = scope_community_id {
-        db.prepare(
+        db.prepare(format!(
             "SELECT id, community_id, role \
              FROM community_memberships \
-             WHERE user_id = ?1 AND removed_at IS NULL AND community_id = ?2 \
-             ORDER BY joined_at ASC",
-        )
+             WHERE user_id = ?1 AND {MEMBERSHIP_ACTIVE} AND community_id = ?2 \
+             ORDER BY joined_at ASC"
+        ))
         .bind(&[user_id.into(), scope.into()])?
         .all()
         .await?
         .results::<serde_json::Value>()?
     } else {
-        db.prepare(
+        db.prepare(format!(
             "SELECT id, community_id, role \
              FROM community_memberships \
-             WHERE user_id = ?1 AND removed_at IS NULL \
-             ORDER BY joined_at ASC",
-        )
+             WHERE user_id = ?1 AND {MEMBERSHIP_ACTIVE} \
+             ORDER BY joined_at ASC"
+        ))
         .bind(&[user_id.into()])?
         .all()
         .await?
@@ -203,12 +241,12 @@ pub async fn find_first_admin_for_user(
     user_id: &str,
 ) -> Result<Option<AdminMembershipRow>> {
     let row = db
-        .prepare(
+        .prepare(format!(
             "SELECT id, community_id, user_id, role, display_name, ui_language \
              FROM community_memberships \
-             WHERE user_id = ?1 AND role = 'admin' AND removed_at IS NULL \
-             ORDER BY joined_at ASC LIMIT 1",
-        )
+             WHERE user_id = ?1 AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
+             ORDER BY joined_at ASC LIMIT 1"
+        ))
         .bind(&[user_id.into()])?
         .first::<serde_json::Value>(None)
         .await?;
@@ -232,21 +270,33 @@ pub async fn find_first_admin_for_user(
 /// Count active memberships in a community (for no_answer calculation).
 pub async fn count_active(db: &D1Database, community_id: &str) -> Result<u32> {
     let row = db
-        .prepare(
+        .prepare(format!(
             "SELECT COUNT(*) AS cnt FROM community_memberships \
-             WHERE community_id = ?1 AND removed_at IS NULL",
-        )
+             WHERE community_id = ?1 AND {MEMBERSHIP_ACTIVE}"
+        ))
         .bind(&[community_id.into()])?
         .first::<serde_json::Value>(None)
         .await?;
     Ok(row.and_then(|v| v.get("cnt")?.as_u64()).unwrap_or(0) as u32)
 }
 
-/// All active memberships for a community (for participant list).
+/// One member row for participant-facing contexts (event/attendance/matrix
+/// views). Never includes a suspended member — see [`PresentMemberSummary`]
+/// for the admin member-management row, which does.
 pub struct MemberSummary {
     pub id: String,
     pub display_name: String,
     pub role: String,
+}
+
+/// One member row for admin member-management contexts (RFC-082 §5): the
+/// member list must show a suspended member, marked suspended, with an
+/// unsuspend action — the reason `MEMBERSHIP_PRESENT` exists.
+pub struct PresentMemberSummary {
+    pub id: String,
+    pub display_name: String,
+    pub role: String,
+    pub suspended_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -264,13 +314,34 @@ pub enum RemoveMemberResult {
     InvalidTarget,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SuspendResult {
+    Suspended,
+    AlreadySuspended,
+    LastAdminBlocked,
+    InvalidTarget,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnsuspendResult {
+    Unsuspended,
+    AlreadyActive,
+    InvalidTarget,
+}
+
+/// Event/attendance/participant-tracking contexts (event.rs, communities.rs
+/// matrix view, admin attendance override, admin note moderation): a
+/// suspended member cannot use the app, so excluding them keeps these
+/// surfaces consistent with `count_active` and with `db/attendance.rs`'s own
+/// `MEMBERSHIP_ACTIVE` target check — see the coupling note in the review
+/// request. For the admin member list, use [`list_present_for_admin`].
 pub async fn list_all_active(db: &D1Database, community_id: &str) -> Result<Vec<MemberSummary>> {
     let rows = db
-        .prepare(
+        .prepare(format!(
             "SELECT id, display_name, role FROM community_memberships \
-             WHERE community_id = ?1 AND removed_at IS NULL \
-             ORDER BY display_name ASC, id ASC",
-        )
+             WHERE community_id = ?1 AND {MEMBERSHIP_ACTIVE} \
+             ORDER BY display_name ASC, id ASC"
+        ))
         .bind(&[community_id.into()])?
         .all()
         .await?
@@ -288,17 +359,56 @@ pub async fn list_all_active(db: &D1Database, community_id: &str) -> Result<Vec<
         .collect())
 }
 
+/// RFC-082 §5: the admin member list, listing present (not-removed) members
+/// including suspended ones, so an admin can see and unsuspend them.
+pub async fn list_present_for_admin(
+    db: &D1Database,
+    community_id: &str,
+) -> Result<Vec<PresentMemberSummary>> {
+    let rows = db
+        .prepare(format!(
+            "SELECT id, display_name, role, suspended_at FROM community_memberships \
+             WHERE community_id = ?1 AND {MEMBERSHIP_PRESENT} \
+             ORDER BY display_name ASC, id ASC"
+        ))
+        .bind(&[community_id.into()])?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            Some(PresentMemberSummary {
+                id: v.get("id")?.as_str()?.to_owned(),
+                display_name: v.get("display_name")?.as_str()?.to_owned(),
+                role: v.get("role")?.as_str()?.to_owned(),
+                suspended_at: v
+                    .get("suspended_at")
+                    .and_then(|value| value.as_str())
+                    .map(str::to_owned),
+            })
+        })
+        .collect())
+}
+
+/// Role-transfer and help-signin confirmation targets: kept ACTIVE, since
+/// neither promoting/demoting nor handing a signin code to an already-
+/// suspended member has a clear need. For the removal-confirmation page
+/// (which must remain reachable for a suspended target, since
+/// suspended→removed is a valid RFC-082 §1 transition) and the
+/// suspend/unsuspend confirmation pages, use [`find_present_summary`].
 pub async fn find_active_summary(
     db: &D1Database,
     membership_id: &str,
     community_id: &str,
 ) -> Result<Option<MemberSummary>> {
     let row = db
-        .prepare(
+        .prepare(format!(
             "SELECT id, display_name, role FROM community_memberships \
-             WHERE id = ?1 AND community_id = ?2 AND removed_at IS NULL \
-             LIMIT 1",
-        )
+             WHERE id = ?1 AND community_id = ?2 AND {MEMBERSHIP_ACTIVE} \
+             LIMIT 1"
+        ))
         .bind(&[membership_id.into(), community_id.into()])?
         .first::<serde_json::Value>(None)
         .await?;
@@ -312,13 +422,45 @@ pub async fn find_active_summary(
     }))
 }
 
+/// Present (not-removed) target lookup — reaches an already-suspended
+/// member, unlike [`find_active_summary`]. Used by the removal-confirmation
+/// page (RFC-082 §1: suspended→removed is a valid transition) and the
+/// suspend/unsuspend confirmation pages and mutations.
+pub async fn find_present_summary(
+    db: &D1Database,
+    membership_id: &str,
+    community_id: &str,
+) -> Result<Option<PresentMemberSummary>> {
+    let row = db
+        .prepare(format!(
+            "SELECT id, display_name, role, suspended_at FROM community_memberships \
+             WHERE id = ?1 AND community_id = ?2 AND {MEMBERSHIP_PRESENT} \
+             LIMIT 1"
+        ))
+        .bind(&[membership_id.into(), community_id.into()])?
+        .first::<serde_json::Value>(None)
+        .await?;
+
+    Ok(row.and_then(|v| {
+        Some(PresentMemberSummary {
+            id: v.get("id")?.as_str()?.to_owned(),
+            display_name: v.get("display_name")?.as_str()?.to_owned(),
+            role: v.get("role")?.as_str()?.to_owned(),
+            suspended_at: v
+                .get("suspended_at")
+                .and_then(|value| value.as_str())
+                .map(str::to_owned),
+        })
+    }))
+}
+
 /// Count active admins in a community (for last-admin guard).
 pub async fn count_admins(db: &D1Database, community_id: &str) -> Result<u32> {
     let row = db
-        .prepare(
+        .prepare(format!(
             "SELECT COUNT(*) AS cnt FROM community_memberships \
-             WHERE community_id = ?1 AND role = 'admin' AND removed_at IS NULL",
-        )
+             WHERE community_id = ?1 AND role = 'admin' AND {MEMBERSHIP_ACTIVE}"
+        ))
         .bind(&[community_id.into()])?
         .first::<serde_json::Value>(None)
         .await?;
@@ -332,10 +474,10 @@ pub async fn get_role(
     community_id: &str,
 ) -> Result<Option<String>> {
     let row = db
-        .prepare(
+        .prepare(format!(
             "SELECT role FROM community_memberships \
-             WHERE id = ?1 AND community_id = ?2 AND removed_at IS NULL LIMIT 1",
-        )
+             WHERE id = ?1 AND community_id = ?2 AND {MEMBERSHIP_ACTIVE} LIMIT 1"
+        ))
         .bind(&[membership_id.into(), community_id.into()])?
         .first::<serde_json::Value>(None)
         .await?;
@@ -350,20 +492,20 @@ pub async fn promote_to_admin_required(
     actor_membership_id: &str,
 ) -> Result<RoleUpdateResult> {
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "UPDATE community_memberships \
              SET role = 'admin' \
              WHERE id = ?1 \
                AND community_id = ?2 \
-               AND removed_at IS NULL \
+               AND {MEMBERSHIP_ACTIVE} \
                AND role = 'member' \
                AND id != ?3 \
                AND EXISTS ( \
                  SELECT 1 FROM community_memberships \
                  WHERE id = ?3 AND community_id = ?2 \
-                   AND role = 'admin' AND removed_at IS NULL \
-               )",
-        )
+                   AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
+               )"
+        ))
         .bind(&[
             membership_id.into(),
             community_id.into(),
@@ -395,22 +537,22 @@ pub async fn demote_to_member_required(
     actor_membership_id: &str,
 ) -> Result<RoleUpdateResult> {
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "UPDATE community_memberships \
              SET role = 'member' \
              WHERE id = ?1 \
                AND community_id = ?2 \
-               AND removed_at IS NULL \
+               AND {MEMBERSHIP_ACTIVE} \
                AND role = 'admin' \
                AND id != ?3 \
                AND EXISTS ( \
                  SELECT 1 FROM community_memberships \
                  WHERE id = ?3 AND community_id = ?2 \
-                   AND role = 'admin' AND removed_at IS NULL \
+                   AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
                ) \
                AND (SELECT COUNT(*) FROM community_memberships \
-                    WHERE community_id = ?2 AND role = 'admin' AND removed_at IS NULL) > 1",
-        )
+                    WHERE community_id = ?2 AND role = 'admin' AND {MEMBERSHIP_ACTIVE}) > 1"
+        ))
         .bind(&[
             membership_id.into(),
             community_id.into(),
@@ -438,6 +580,11 @@ pub async fn demote_to_member_required(
 }
 
 /// Soft-remove a member while preserving the at-least-one-admin invariant.
+///
+/// RFC-082 §1: `suspended → removed` is a valid transition, so the target
+/// check here is `MEMBERSHIP_PRESENT`, not `MEMBERSHIP_ACTIVE` — the one
+/// deliberate exception in this file to the fail-closed default. Removing an
+/// already-suspended member must succeed; the actor check stays ACTIVE.
 pub async fn soft_remove_guarded_required(
     db: &D1Database,
     request_id: &str,
@@ -447,22 +594,22 @@ pub async fn soft_remove_guarded_required(
 ) -> Result<RemoveMemberResult> {
     let now = crate::db::now_utc();
     let mutation = db
-        .prepare(
+        .prepare(format!(
             "UPDATE community_memberships \
              SET removed_at = ?1 \
              WHERE id = ?2 \
                AND community_id = ?3 \
-               AND removed_at IS NULL \
+               AND {MEMBERSHIP_PRESENT} \
                AND id != ?4 \
                AND EXISTS ( \
                  SELECT 1 FROM community_memberships \
                  WHERE id = ?4 AND community_id = ?3 \
-                   AND role = 'admin' AND removed_at IS NULL \
+                   AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
                ) \
                AND (role != 'admin' OR \
                     (SELECT COUNT(*) FROM community_memberships \
-                     WHERE community_id = ?3 AND role = 'admin' AND removed_at IS NULL) > 1)",
-        )
+                     WHERE community_id = ?3 AND role = 'admin' AND {MEMBERSHIP_ACTIVE}) > 1)"
+        ))
         .bind(&[
             now.as_str().into(),
             membership_id.into(),
@@ -481,8 +628,12 @@ pub async fn soft_remove_guarded_required(
         return Ok(RemoveMemberResult::Removed);
     }
 
-    match get_role(db, membership_id, community_id).await?.as_deref() {
-        Some("admin") if count_admins(db, community_id).await? <= 1 => {
+    // `find_present_summary`, not `get_role` (which is ACTIVE-scoped): the
+    // target may be suspended, and that must still resolve to
+    // `LastAdminBlocked` when it's the community's last admin, not fall
+    // through to `InvalidTarget`.
+    match find_present_summary(db, membership_id, community_id).await? {
+        Some(row) if row.role == "admin" && count_admins(db, community_id).await? <= 1 => {
             Ok(RemoveMemberResult::LastAdminBlocked)
         }
         _ => Ok(RemoveMemberResult::InvalidTarget),
@@ -497,8 +648,9 @@ pub struct CommunitySummary {
     pub role: String,
 }
 
-/// All communities a user is an active member of, with display metadata,
-/// ordered by joined_at. Used for navigation and multi-community summaries.
+/// All communities a user is present in (RFC-082: including suspended ones),
+/// with display metadata, ordered by joined_at. Used for navigation and
+/// multi-community summaries.
 ///
 /// RFC-081 §2 (Handoff 049): `scope_community_id` is required, not optional
 /// with a default, so a caller cannot forget it the way `get_communities`
@@ -506,31 +658,40 @@ pub struct CommunitySummary {
 /// `Some(id)` restricts the result to that one community (a community-bound
 /// session must never see or reach any other); `None` (a first-class,
 /// unscoped session) returns every community, as before.
+///
+/// RFC-082 / Handoff 058: `MEMBERSHIP_PRESENT`, not `MEMBERSHIP_ACTIVE` — a
+/// suspended community must stay in the switcher and the `/account` list.
+/// Suspension is meant to be discoverable (RFC-082 §4's explicit paused
+/// page), not indistinguishable from never having joined; hiding a
+/// suspended community here would look identical to removal and defeat
+/// that transparency goal. `community_memberships` is the only table with a
+/// `removed_at`/`suspended_at` column, so the bare predicate resolves
+/// unambiguously against `m` despite the join.
 pub async fn list_communities_for_user(
     db: &D1Database,
     user_id: &str,
     scope_community_id: Option<&str>,
 ) -> Result<Vec<CommunitySummary>> {
     let rows = if let Some(scope) = scope_community_id {
-        db.prepare(
+        db.prepare(format!(
             "SELECT m.community_id, c.name AS community_name, c.timezone, m.role \
              FROM community_memberships m \
              JOIN communities c ON c.id = m.community_id \
-             WHERE m.user_id = ?1 AND m.removed_at IS NULL AND m.community_id = ?2 \
-             ORDER BY m.joined_at ASC",
-        )
+             WHERE m.user_id = ?1 AND {MEMBERSHIP_PRESENT} AND m.community_id = ?2 \
+             ORDER BY m.joined_at ASC"
+        ))
         .bind(&[user_id.into(), scope.into()])?
         .all()
         .await?
         .results::<serde_json::Value>()?
     } else {
-        db.prepare(
+        db.prepare(format!(
             "SELECT m.community_id, c.name AS community_name, c.timezone, m.role \
              FROM community_memberships m \
              JOIN communities c ON c.id = m.community_id \
-             WHERE m.user_id = ?1 AND m.removed_at IS NULL \
-             ORDER BY m.joined_at ASC",
-        )
+             WHERE m.user_id = ?1 AND {MEMBERSHIP_PRESENT} \
+             ORDER BY m.joined_at ASC"
+        ))
         .bind(&[user_id.into()])?
         .all()
         .await?
@@ -552,4 +713,118 @@ pub async fn list_communities_for_user(
             })
         })
         .collect())
+}
+
+/// Suspend a member while preserving the at-least-one-admin invariant —
+/// RFC-082 §1: active → suspended, community admin only. No role change
+/// (RFC-082 §8.10).
+///
+/// The last-admin guard here is not itself required by RFC-082's transition
+/// table, but follows the same shape `soft_remove_guarded_required` already
+/// enforces, for a reason specific to suspension: unsuspending requires an
+/// *active* admin actor (`MEMBERSHIP_ACTIVE`), and no other path in this
+/// package restores one. Suspending a community's last active admin would
+/// leave nobody who could ever unsuspend anyone — a permanent lockout, and
+/// a worse failure than the visible "last admin blocked" refusal this
+/// guard produces instead.
+pub async fn suspend_required(
+    db: &D1Database,
+    request_id: &str,
+    membership_id: &str,
+    community_id: &str,
+    actor_membership_id: &str,
+) -> Result<SuspendResult> {
+    let now = crate::db::now_utc();
+    let mutation = db
+        .prepare(format!(
+            "UPDATE community_memberships \
+             SET suspended_at = ?1, suspended_by_membership_id = ?4 \
+             WHERE id = ?2 \
+               AND community_id = ?3 \
+               AND {MEMBERSHIP_ACTIVE} \
+               AND id != ?4 \
+               AND EXISTS ( \
+                 SELECT 1 FROM community_memberships \
+                 WHERE id = ?4 AND community_id = ?3 \
+                   AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
+               ) \
+               AND (role != 'admin' OR \
+                    (SELECT COUNT(*) FROM community_memberships \
+                     WHERE community_id = ?3 AND role = 'admin' AND {MEMBERSHIP_ACTIVE}) > 1)"
+        ))
+        .bind(&[
+            now.as_str().into(),
+            membership_id.into(),
+            community_id.into(),
+            actor_membership_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(actor_membership_id),
+        Some(membership_id),
+        AuditAction::MembershipSuspended,
+        AuditMetadata::None,
+    )?;
+    if audit::execute_required(db, mutation, &record).await? {
+        return Ok(SuspendResult::Suspended);
+    }
+
+    match find_present_summary(db, membership_id, community_id).await? {
+        Some(row) if row.suspended_at.is_some() => Ok(SuspendResult::AlreadySuspended),
+        Some(row) if row.role == "admin" && count_admins(db, community_id).await? <= 1 => {
+            Ok(SuspendResult::LastAdminBlocked)
+        }
+        _ => Ok(SuspendResult::InvalidTarget),
+    }
+}
+
+/// Reverse a suspension, restoring the member's prior role unchanged —
+/// RFC-082 §1: suspended → active, community admin only. No session
+/// revocation (RFC-082 §7): a session carries a principal, not an
+/// authorization, and the member's next request to any community simply
+/// passes `MEMBERSHIP_ACTIVE` again.
+pub async fn unsuspend_required(
+    db: &D1Database,
+    request_id: &str,
+    membership_id: &str,
+    community_id: &str,
+    actor_membership_id: &str,
+) -> Result<UnsuspendResult> {
+    let mutation = db
+        .prepare(format!(
+            "UPDATE community_memberships \
+             SET suspended_at = NULL, suspended_by_membership_id = NULL \
+             WHERE id = ?1 \
+               AND community_id = ?2 \
+               AND {MEMBERSHIP_PRESENT} \
+               AND suspended_at IS NOT NULL \
+               AND id != ?3 \
+               AND EXISTS ( \
+                 SELECT 1 FROM community_memberships \
+                 WHERE id = ?3 AND community_id = ?2 \
+                   AND role = 'admin' AND {MEMBERSHIP_ACTIVE} \
+               )"
+        ))
+        .bind(&[
+            membership_id.into(),
+            community_id.into(),
+            actor_membership_id.into(),
+        ])?;
+    let record = audit::required_record(
+        request_id,
+        Some(community_id),
+        Some(actor_membership_id),
+        Some(membership_id),
+        AuditAction::MembershipUnsuspended,
+        AuditMetadata::None,
+    )?;
+    if audit::execute_required(db, mutation, &record).await? {
+        return Ok(UnsuspendResult::Unsuspended);
+    }
+
+    match find_present_summary(db, membership_id, community_id).await? {
+        Some(row) if row.suspended_at.is_none() => Ok(UnsuspendResult::AlreadyActive),
+        _ => Ok(UnsuspendResult::InvalidTarget),
+    }
 }

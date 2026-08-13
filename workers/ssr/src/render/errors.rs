@@ -29,6 +29,27 @@ pub fn not_found() -> Result<Response> {
     Ok(Response::from_html(shell(i18n::JA_NOT_FOUND, &body))?.with_status(404))
 }
 
+/// RFC-082 §4: the explicit "access is paused" page for a suspended
+/// member, distinct from [`not_found`] — suspension is not a secret from
+/// the person suspended, and hiding it would defeat the RFC's transparency
+/// goal. The member's other communities remain reachable, so this links
+/// home rather than offering `/join` (irrelevant — they are already a
+/// member, just paused). Japanese-only, matching `not_found`'s convention:
+/// this dispatches from `lib.rs::main`'s top-level error handler, which has
+/// no resolvable per-community locale to read.
+pub fn suspended() -> Result<Response> {
+    let body = format!(
+        "<main class=\"cz-anon-main\">\
+         <p class=\"cz-anon-error-text\">{msg}</p>\
+         <div class=\"cz-error-recovery-links\">\
+           <a href=\"/\" class=\"cz-error-recovery-link\">{home}</a>\
+         </div></main>",
+        msg = i18n::JA_MEMBERSHIP_SUSPENDED,
+        home = i18n::JA_NAV_HOME,
+    );
+    Ok(Response::from_html(shell(i18n::JA_GENERAL_ERROR, &body))?.with_status(403))
+}
+
 pub fn internal_error() -> Result<Response> {
     let body = format!(
         "<main class=\"cz-anon-main\">\

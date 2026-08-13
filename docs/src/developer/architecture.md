@@ -72,6 +72,7 @@ migrations/
   0015_session_authenticated_at.sql  authenticated_at on sessions, additive/nullable, distinct from created_at ahead of session rotation (RFC-080 §6, Handoff 055)
   0016_auth_transaction_initiating_user.sql  initiating_user_id on auth_transactions, additive/nullable, pins a link transaction's target account at creation (RFC-081 §4, Handoff 056)
   0017_account_recovery_credentials.sql  account_recovery_credentials table, HMAC at rest, nullable non-expiring expires_at (RFC-081 §3, Handoff 057)
+  0018_membership_suspension.sql  suspended_at + suspended_by_membership_id on community_memberships, additive/nullable, reversible state beside terminal removed_at (RFC-082, Handoff 058)
 scripts/
   setup.mjs                  Dev bootstrap: D1 migrations + seed data
 docs/src/                    mdbook documentation (SUMMARY.md is the index)
