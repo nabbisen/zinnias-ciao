@@ -1,10 +1,32 @@
 # RFC 080 - External Identity Foundation
 
-**Status.** Accepted — owner-accepted 2026-08-09. Stage 1 of the four-stage
-external-identity track recorded in the 2026-07-17 pre-RFC consultation and
-unblocked by the 2026-08-09 hold-lift (`ROADMAP.md`, Post-Hold Feature
-Candidates §1). **Acceptance confers no implementation authority** — Stage 2 must
-also be accepted first; see §12.
+**Status.** Implemented — design owner-accepted 2026-08-09; delivered across
+**seven packages in five slices**, each architecture-reviewed and Approved:
+
+| Slice | Commit | This RFC's part |
+|---|---|---|
+| 1 — session provenance and community binding | `5d1ad94` | §6 session provenance |
+| 2 — identity schema and namespaces | `8d9ba2e` | §3 in full |
+| 3 — schema re-baseline | `e3a51e8` | §3.4 `idp_subject` removed |
+| 4a — transaction, JWT verification, fake issuer | `ea5e631` | §4, §4.1, §5, §10 |
+| 4b — the callback route | `78b5a28` | §5.1, §5.2, §9 |
+| 5a — session freshness and the account surface | `6694c4a` | §6 step-up |
+| 5b — linking and re-authentication | `a31856f` | §5, §6 rotation |
+
+**No provider is chosen, and that is the completed state, not an omission.**
+Stage 1's whole contract was to be provider-independent; §3.1's namespaced key,
+§4.1's namespace-pinned algorithm selection, and §10's local fake issuer are all
+exercised end to end with no provider account, no secrets, and no network.
+
+**Stage 3 — choosing a provider — is outside this RFC** and blocked on the
+Stage 0 user research that does not yet exist. Four findings from implementation
+belong to its checklist: the `aud`-array limitation (§5.1 anticipated "audience
+or authorized party"; the array form is unsupported and fails closed), whether a
+provider honours `prompt=login` (a selection criterion — one that ignores it
+cannot support step-up), LINE's `sub` scope, and Google's PKCE support.
+
+One dated correction: **§3.3, 2026-08-09** — the digest covers the namespace and
+the subject together, not the subject alone.
 
 **This RFC chooses no provider.** Provider selection is Stage 3 and depends on
 user research that does not yet exist. Every mechanism here is

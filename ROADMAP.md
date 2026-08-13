@@ -361,13 +361,27 @@ RFC is.
    before any real community joins avoids that entirely. That window closes when
    the first one does.
 
-   **Stages 1 and 2 accepted 2026-08-09** — RFC-080 *External Identity
-   Foundation* and RFC-081 *Account Recovery and Membership Continuity*, both in
-   `rfcs/accepted/`. Neither chooses a provider. Together they meet the
-   precondition for a **provider-independent** implementation handoff, testable
-   against a local fake issuer with no provider account, no secrets, and no
-   network. **Stage 3 (first provider rollout) still requires the Stage 0 user
-   research, which does not exist.**
+   **Stages 1 and 2 implemented; moved to `rfcs/done/` 2026-08-13.** RFC-080
+   *External Identity Foundation* and RFC-081 *Account Recovery and Membership
+   Continuity*, delivered across **seven packages in five slices**
+   (`5d1ad94`…`9b121f1`), each architecture-reviewed and Approved. Neither
+   chooses a provider, and that is the completed state rather than an omission:
+   the whole contract is exercised against a local fake issuer with no provider
+   account, no secrets, and no network — with a feature gate proven from the
+   compiled artifact that a production build cannot reach that issuer.
+
+   **The theme is finished. No next theme is selected.**
+
+   **Stage 3 (first provider rollout) still requires the Stage 0 user research,
+   which does not exist**, and its checklist now carries four items — three found
+   during implementation rather than anticipated: the `aud`-array limitation,
+   whether a provider honours `prompt=login` (a selection criterion, since one
+   that ignores it cannot support step-up), LINE's `sub` scope, and Google's PKCE
+   support.
+
+   **Under the standing rule, this triggers `0.62.0`** — see *Tagging is not
+   deploying*. RFC-082 *Membership Suspension* (`ba37d60`) moved to `done/` in
+   the same pass and belongs to the same release.
 
    RFC-081 amends two shipped RFCs: **RFC-024** (relink and help-signin sessions
    become bound to the granting community, because a stable `users.id` would

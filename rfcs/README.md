@@ -21,8 +21,12 @@ RFC numbers and the tables below are stable identifiers and lifecycle indexes,
 not execution priority. The active order is maintained in
 [ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-072,
 RFC-073, and RFC-074 shipped in `0.60.0` and RFC-075 in `0.61.0` (tagged
-2026-08-02, neither deployed). No next theme is selected. The RFC-050 hosted campaign and its sink remain deferred to
-the point a pilot is scheduled.
+2026-08-02, neither deployed). **RFC-080, RFC-081, and RFC-082 are implemented
+and moved to `done/` on 2026-08-13, pending the `0.62.0` tag** — the
+external-identity foundation and membership suspension. **No next theme is
+selected**; Stage 3 (choosing an identity provider) is deliberately outside
+RFC-080/081 and blocked on user research that does not exist. The RFC-050 hosted
+campaign and its sink remain deferred to the point a pilot is scheduled.
 
 ## Accepted — approved for implementation
 
@@ -32,9 +36,6 @@ the point a pilot is scheduled.
 | 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Local implementation reviewed/accepted/committed at `b72f22b`; corrected isolated automation and bounded human no-JS/network evidence were architecture-reviewed and owner-accepted, closing criterion 8 locally. RFC-050 hosted evidence remains required before public/production B1 closure |
 | 078 | [Fail-Closed Strongly Consistent Abuse Controls](./accepted/078-fail-closed-strongly-consistent-abuse-controls.md) | 2026-07-23 | Corrected architecture accepted; implemented and committed at `c991b82` on 2026-07-28, including the required I-B1 concurrency-burst evidence. RFC-050 exact-candidate hosted evidence remains pending, so B3 and all staging/public/production holds remain open |
 | 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 0A–8 and the Class A telemetry correction reviewed/committed. Persistent delivery and exact-candidate hosted B5 evidence remain required |
-| 080 | [External Identity Foundation](./accepted/080-external-identity-foundation.md) | 2026-08-09 | Stage 1 of the external-identity track; chooses **no provider**. Design only. Stage 2 (RFC-081) is accepted, so the provider-independent implementation precondition is met; provider rollout remains Stage 3 and needs user research that does not exist. Follows the 2026-07-17 pre-RFC consultation and the 2026-08-09 hold-lift |
-| 081 | [Account Recovery and Membership Continuity](./accepted/081-account-recovery-and-membership-continuity.md) | 2026-08-09 | Stage 2; prerequisite companion to RFC-080. Amends **RFC-024** (relink sessions become community-bound) and **RFC-063** (`UNIQUE(community_id, user_id)` → partial unique index on `removed_at IS NULL`). Owner decisions 1–3 resolved on acceptance; **decision 4 — expiring pre-cutover sessions — is deliberately open** and must be answered in the implementation handoff. **§1.2a (2026-08-10)** records that §1's invariant is unreachable by migration under D1 and is instead reached by a one-time pre-deployment schema re-baseline |
-| 082 | [Membership Suspension](./accepted/082-membership-suspension.md) | 2026-08-10 | Amends **RFC-063**, which asked whether a suspension state should exist and deferred it. Adds a reversible `suspended_at` beside the terminal `removed_at`, additively — no table rebuild. **The risk is a fail-open**: 52 sites decide activeness by `removed_at IS NULL` and must each be classified, guarded by two named predicates and a default-fail gate. Owner decision 1 resolved on acceptance; **decision 2 — sequencing against external-identity Slices 4–5 — is open** |
 
 ## Done — MVP core (001–019)
 
@@ -111,6 +112,19 @@ the point a pilot is scheduled.
 | 068 | [Calendar Matrix CSV Export](./done/068-calendar-matrix-csv-export.md) | v0.57.0 |
 | 064 | [Rust Module and Crate Boundary Cleanup](./done/064-rust-module-and-crate-boundary-cleanup.md) | v0.52.0 / v0.53.0 / v0.58.0 |
 | 069 | [Total Community Access Recovery](./done/069-total-community-access-recovery.md) | v0.59.0 |
+
+## Done — pending release in 0.62.0
+
+Moved to `done/` 2026-08-13. Under the standing rule (`ROADMAP.md`, *Tag when an
+RFC reaches `rfcs/done/`*), this triggers the `0.62.0` tag; until that tag is cut
+these are implemented and merged but unreleased. **Tagged, not deployed** applies
+as ever — B1, B3, B4, and B5 remain open.
+
+| ID | Title | Shipped in |
+|----|-------|------------|
+| 080 | [External Identity Foundation](./done/080-external-identity-foundation.md) | pending 0.62.0 (`5d1ad94`…`a31856f`) — seven packages across five slices, every one Approved. Namespaced identity keys, namespace-pinned JWT verification, the server-side authentication transaction, and a local fake issuer. **Chooses no provider**, which is the completed state: the whole contract is exercised with no provider account, no secrets, and no network |
+| 081 | [Account Recovery and Membership Continuity](./done/081-account-recovery-and-membership-continuity.md) | pending 0.62.0 (`5d1ad94`…`9b121f1`) — amends **RFC-024** and **RFC-063**. §2 turned out to be a **live gap**: one community's admin could already mint a session reaching every community a member belonged to. Closed in Slice 1. **AD-2 holds** — the recovery credential cannot be removed while it is a member's last usable method, enforced in the same SQL statement as the unlink |
+| 082 | [Membership Suspension](./done/082-membership-suspension.md) | pending 0.62.0 (`ba37d60`) — amends **RFC-063**, answering the suspension question it deferred. Two additive columns; the work was classifying **54** activeness decisions into two named predicates, three of them `PRESENT`, gated against inline use |
 
 ## Done — shipped in 0.61.0
 

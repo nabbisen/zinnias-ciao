@@ -1,9 +1,31 @@
 # RFC 082 - Membership Suspension
 
-**Status.** Accepted — owner-accepted 2026-08-10. Amends **RFC-063** (Member
-Removal, Re-add, and Suspension Policy), which asked whether a suspension state
-should exist and deferred the answer. **Acceptance settles the policy; it confers
-no implementation authority** — an implementation handoff is separate, see §10.
+**Status.** Implemented — design owner-accepted 2026-08-10; delivered in one
+package at `ba37d60`, architecture-reviewed and Approved. Amends **RFC-063**,
+which asked whether a suspension state should exist and deferred the answer.
+
+**The risk was never the schema; it was the 54 activeness decisions.** Two
+additive columns were the easy part. Every site deciding "is this membership
+active" now names which of two questions it asks — `MEMBERSHIP_ACTIVE` for
+authorization, `MEMBERSHIP_PRESENT` for presence — with **three** of the 54
+classified `PRESENT`, each with a written reason, and a default-fail gate
+forbidding the predicate inline anywhere.
+
+Two findings came from the implementation rather than this design:
+
+- **A last-admin guard on `active → suspended`**, beyond §1's transition table.
+  Unsuspending needs an active admin actor, so suspending a community's last one
+  would leave nobody able to unsuspend anyone — a silent permanent lockout,
+  replaced by a visible refusal.
+- **A coupling in `db/attendance.rs`**: the admin attendance-matrix mutation is
+  all-or-nothing, and its submitted set comes from `list_all_active`. Had the two
+  disagreed about suspended members, every submission in a community holding one
+  would have silently written zero rows while the handler redirected with a
+  success flash.
+
+Owner decision **§11.1** was resolved on acceptance (an explicit paused page, not
+an indistinguishable not-found) and **§11.2** on 2026-08-10 (after the
+external-identity track, not parallel to it).
 
 **Target release.** None. Design only.
 

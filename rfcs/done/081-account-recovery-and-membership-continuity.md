@@ -1,10 +1,36 @@
 # RFC 081 - Account Recovery and Membership Continuity
 
-**Status.** Accepted — owner-accepted 2026-08-09. Stage 2 of the external-identity
-track; companion and **prerequisite** to RFC-080. Both stages are now accepted,
-which is the precondition for a provider-independent implementation handoff.
-Provider rollout remains Stage 3 and still requires user research that does not
-exist. **Acceptance confers no implementation authority by itself** — see §12.
+**Status.** Implemented — design owner-accepted 2026-08-09; delivered alongside
+RFC-080 across the same seven packages, each architecture-reviewed and Approved:
+
+| Slice | Commit | This RFC's part |
+|---|---|---|
+| 1 — session provenance and community binding | `5d1ad94` | §2 / §2.1a — the live gap closed |
+| 3 — schema re-baseline | `e3a51e8` | §1 membership continuity |
+| 5a — the account surface | `6694c4a` | §6 no-membership surface |
+| 5b — linking and re-authentication | `a31856f` | §4 linking |
+| 5c — recovery credential and unlink prevention | `9b121f1` | §3, §3.1, §3.2, §3.3 |
+
+**§2 was a live gap, not a precaution.** §2.1a records that a single community's
+admin could already mint a session reaching every community a member belonged to,
+reachable at `9d280b4` without RFC-080 — found while reviewing this RFC's own
+design, and closed by Slice 1.
+
+**AD-2 holds.** No member is walled behind an external account: the
+provider-independent recovery credential exists, is visible before it is needed,
+cannot be removed by any admin, and cannot be removed at all while it is the
+member's last usable method — enforced in the same SQL statement as the unlink,
+so the concurrent-unlink race cannot leave a member with none.
+
+Two dated corrections: **§1.2a, 2026-08-10** — §1's invariant is unreachable by
+migration under D1, and was instead reached by a one-time pre-deployment schema
+re-baseline; **§2.1a, 2026-08-09** — §2's gap was already reachable.
+
+Owner decision **§11.4** (expiring pre-cutover sessions) was answered in Slice 1
+while it was still free: no real community had used the service, so all
+pre-cutover sessions were expired and no legacy-assurance class exists.
+
+**Stage 3 — choosing a provider — is outside this RFC**, and unchanged.
 
 **This RFC chooses no provider.** It does assume more than one will eventually
 exist, because the owner's recorded expectation is **Google Account and LINE, at
