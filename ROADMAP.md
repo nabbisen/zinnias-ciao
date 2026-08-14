@@ -264,12 +264,30 @@ section remains the tracked summary of record.
    three RFCs reaching `rfcs/done/`. Commit and annotated tag **pushed**; `main`
    and `origin/main` in sync. **Tagged, not deployed** — B1, B3, B4, and B5
    remain open and nothing in the release closes a finding.
-9. **Choose the next user-facing theme** — an owner decision, currently open.
-   `rfcs/proposed/` holds eight. **RFC-054 (Japanese UX copy review) is the only
-   one both unblocked and unstarted**: RFC-044 and RFC-045 are partly discharged,
-   RFC-020 predates most of what shipped and is likely overtaken, and RFC-021,
-   RFC-031, RFC-033, and RFC-034 are direction-only stubs gated on pilot evidence
-   that does not exist.
+9. ~~**Choose the next user-facing theme.**~~ **Complete 2026-08-15** —
+   **RFC-054, Japanese UX copy review**, selected and accepted the same day after
+   a substantial revision.
+
+   The revision matters more than the selection. The RFC was written in June 2026
+   against v0.36.0 and its premise had expired: it inventoried 143 strings in one
+   `i18n.rs` (there are now **319 across 13 modules**), and the jargon it existed
+   to remove — セッション, トークン, 同期 — appears in **no** Japanese string
+   today, having been fixed incidentally by RFC-049 and RFC-072.
+
+   What the review is actually for is **54 strings no one has ever reviewed**,
+   added by the external-identity track and RFC-082: the suspension paused page,
+   the account surface, and the recovery credential. Those are read by a member
+   who is confused or worried, which is when copy quality matters most.
+
+   The original §4 blocker — *"requires a Japanese native speaker"* — was never
+   about finding a person. It was that nobody had prepared the work so the native
+   speaker's time went to judgement rather than sorting. The accepted split:
+   architect prepares the inventory, scans, and a proposed rewrite for every
+   finding; owner decides what sounds natural; developers apply.
+
+10. **When a pilot is scheduled** — and not before — the RFC-050 hosted evidence
+    campaign, unchanged. Stage 3 of the external-identity track (choosing a
+    provider) also waits on Stage 0 user research that does not exist.
 8. **When a pilot is scheduled** — and not before — provision the persistent
    incident sink (Logpush → R2), then build and freeze one exact immutable
    release candidate and execute the RFC-050 hosted evidence campaign for the

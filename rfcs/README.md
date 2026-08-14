@@ -23,9 +23,10 @@ not execution priority. The active order is maintained in
 RFC-073, and RFC-074 shipped in `0.60.0` and RFC-075 in `0.61.0` (tagged
 2026-08-02, neither deployed). **RFC-080, RFC-081, and RFC-082 shipped in
 `0.62.0`** (tagged 2026-08-15, not deployed) — the external-identity foundation
-and membership suspension. **No next theme is
-selected**; Stage 3 (choosing an identity provider) is deliberately outside
-RFC-080/081 and blocked on user research that does not exist. The RFC-050 hosted
+and membership suspension. **RFC-054 (Japanese UX copy review) is the
+active theme** as of 2026-08-15. Stage 3 (choosing an identity provider) remains
+deliberately outside RFC-080/081 and blocked on user research that does not
+exist. The RFC-050 hosted
 campaign and its sink remain deferred to the point a pilot is scheduled.
 
 ## Accepted — approved for implementation
@@ -33,6 +34,7 @@ campaign and its sink remain deferred to the point a pilot is scheduled.
 | ID | Title | Accepted | Note |
 |----|-------|----------|------|
 | 050 | [Exact-Candidate Hosted Staging Evidence and Pilot Gate](./accepted/050-staging-runtime-verification-evidence-pack.md) | 2026-07-28 | B4 remediation revision architecture-reviewed and owner-accepted; authorizes local tooling implementation (RFC-050 Tooling Slices) only, not hosted execution. Slices 1–7 committed at `15b9409`/`c55787a`; Slices 8–9 remain; B4 still open because local tooling is not evidence until run against a frozen candidate. **IPv6 client support is not confirmed/implemented for this deployment** — see RFC-078 § Dated owner risk acceptances and this document's E4a |
+| 054 | [Japanese UX Copy Review](./accepted/054-japanese-ux-copy-review.md) | 2026-08-15 | **The active theme after `0.62.0`.** Substantially revised on acceptance: the original 143-string inventory (v0.36.0, one `i18n.rs`) is superseded — there are now **319 `JA_*` constants across 13 modules** and 94 `Localized` pairs. Its original headline problem is already solved: セッション/トークン/同期 appear in **no** Japanese string today. The real work is the **54 strings never reviewed by anyone** (`account.rs`, `access.rs`, `recovery.rs` — the suspension paused page and the recovery credential), then cross-module consistency. Acceptance authorizes the review; each slice's edits need their own package |
 | 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Local implementation reviewed/accepted/committed at `b72f22b`; corrected isolated automation and bounded human no-JS/network evidence were architecture-reviewed and owner-accepted, closing criterion 8 locally. RFC-050 hosted evidence remains required before public/production B1 closure |
 | 078 | [Fail-Closed Strongly Consistent Abuse Controls](./accepted/078-fail-closed-strongly-consistent-abuse-controls.md) | 2026-07-23 | Corrected architecture accepted; implemented and committed at `c991b82` on 2026-07-28, including the required I-B1 concurrency-burst evidence. RFC-050 exact-candidate hosted evidence remains pending, so B3 and all staging/public/production holds remain open |
 | 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 0A–8 and the Class A telemetry correction reviewed/committed. Persistent delivery and exact-candidate hosted B5 evidence remain required |
@@ -181,7 +183,6 @@ first-real-community deployment remain No-Go while B1, B3, B4, and B5 are open.
 |----|-------|------|------|
 | 044 | D1 Query-Budget Gate and Integration Test Harness | [./proposed/044-d1-query-budget-gate-and-integration-test-harness.md](./proposed/044-d1-query-budget-gate-and-integration-test-harness.md) | **Narrowed 2026-07-29.** Harness and all four deferred regression tests discharged by RFC-050 local tooling at `c55787a`; only the runtime query-counting shim remains (gates beta) |
 | 045 | Pre-Pilot Runtime Verification Matrix | [./proposed/045-pre-pilot-runtime-verification-matrix.md](./proposed/045-pre-pilot-runtime-verification-matrix.md) | Source verification discharged; staging-runtime matrix pending environment |
-| 054 | [Japanese UX Copy Review](./proposed/054-japanese-ux-copy-review.md) | Needs native-speaker reviewer |
 
 ## Archive
 
