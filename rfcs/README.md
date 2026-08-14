@@ -21,9 +21,9 @@ RFC numbers and the tables below are stable identifiers and lifecycle indexes,
 not execution priority. The active order is maintained in
 [ROADMAP.md](../ROADMAP.md#active-remediation-and-release-sequence): RFC-072,
 RFC-073, and RFC-074 shipped in `0.60.0` and RFC-075 in `0.61.0` (tagged
-2026-08-02, neither deployed). **RFC-080, RFC-081, and RFC-082 are implemented
-and moved to `done/` on 2026-08-13, pending the `0.62.0` tag** — the
-external-identity foundation and membership suspension. **No next theme is
+2026-08-02, neither deployed). **RFC-080, RFC-081, and RFC-082 shipped in
+`0.62.0`** (tagged 2026-08-15, not deployed) — the external-identity foundation
+and membership suspension. **No next theme is
 selected**; Stage 3 (choosing an identity provider) is deliberately outside
 RFC-080/081 and blocked on user research that does not exist. The RFC-050 hosted
 campaign and its sink remain deferred to the point a pilot is scheduled.
@@ -113,18 +113,18 @@ campaign and its sink remain deferred to the point a pilot is scheduled.
 | 064 | [Rust Module and Crate Boundary Cleanup](./done/064-rust-module-and-crate-boundary-cleanup.md) | v0.52.0 / v0.53.0 / v0.58.0 |
 | 069 | [Total Community Access Recovery](./done/069-total-community-access-recovery.md) | v0.59.0 |
 
-## Done — pending release in 0.62.0
+## Done — shipped in 0.62.0
 
-Moved to `done/` 2026-08-13. Under the standing rule (`ROADMAP.md`, *Tag when an
-RFC reaches `rfcs/done/`*), this triggers the `0.62.0` tag; until that tag is cut
-these are implemented and merged but unreleased. **Tagged, not deployed** applies
-as ever — B1, B3, B4, and B5 remain open.
+Tagged 2026-08-15 at `6c05b69`, triggered by three RFCs reaching `done/` — the
+cadence rule working again: 25 commits and three RFCs, not 49 and five. Commit
+and annotated tag pushed. **Tagged, not deployed**; B1, B3, B4, and B5 remain
+open and nothing in this release closes a finding.
 
 | ID | Title | Shipped in |
 |----|-------|------------|
-| 080 | [External Identity Foundation](./done/080-external-identity-foundation.md) | pending 0.62.0 (`5d1ad94`…`a31856f`) — seven packages across five slices, every one Approved. Namespaced identity keys, namespace-pinned JWT verification, the server-side authentication transaction, and a local fake issuer. **Chooses no provider**, which is the completed state: the whole contract is exercised with no provider account, no secrets, and no network |
-| 081 | [Account Recovery and Membership Continuity](./done/081-account-recovery-and-membership-continuity.md) | pending 0.62.0 (`5d1ad94`…`9b121f1`) — amends **RFC-024** and **RFC-063**. §2 turned out to be a **live gap**: one community's admin could already mint a session reaching every community a member belonged to. Closed in Slice 1. **AD-2 holds** — the recovery credential cannot be removed while it is a member's last usable method, enforced in the same SQL statement as the unlink |
-| 082 | [Membership Suspension](./done/082-membership-suspension.md) | pending 0.62.0 (`ba37d60`) — amends **RFC-063**, answering the suspension question it deferred. Two additive columns; the work was classifying **54** activeness decisions into two named predicates, three of them `PRESENT`, gated against inline use |
+| 080 | [External Identity Foundation](./done/080-external-identity-foundation.md) | 0.62.0 (`5d1ad94`…`a31856f`) — seven packages across five slices, every one Approved. Namespaced identity keys, namespace-pinned JWT verification, the server-side authentication transaction, and a local fake issuer. **Chooses no provider**, which is the completed state: the whole contract is exercised with no provider account, no secrets, and no network |
+| 081 | [Account Recovery and Membership Continuity](./done/081-account-recovery-and-membership-continuity.md) | 0.62.0 (`5d1ad94`…`9b121f1`) — amends **RFC-024** and **RFC-063**. §2 turned out to be a **live gap**: one community's admin could already mint a session reaching every community a member belonged to. Closed in Slice 1. **AD-2 holds** — the recovery credential cannot be removed while it is a member's last usable method, enforced in the same SQL statement as the unlink |
+| 082 | [Membership Suspension](./done/082-membership-suspension.md) | 0.62.0 (`ba37d60`) — amends **RFC-063**, answering the suspension question it deferred. Two additive columns; the work was classifying **54** activeness decisions into two named predicates, three of them `PRESENT`, gated against inline use |
 
 ## Done — shipped in 0.61.0
 

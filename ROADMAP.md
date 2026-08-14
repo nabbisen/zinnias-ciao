@@ -251,7 +251,25 @@ section remains the tracked summary of record.
    RFC-075 reaching `rfcs/done/`. The cadence rule worked as intended: 21 commits
    and one RFC, not 49 commits and five. Tagged locally, **not pushed and not
    deployed**.
-7. **Choose the next user-facing theme** — an owner decision.
+7. ~~**External identity foundation and membership suspension.**~~ **Complete
+   2026-08-13** — RFC-080, RFC-081, and RFC-082 implemented across eight reviewed
+   packages (`5d1ad94`…`ba37d60`) and moved to `rfcs/done/` at `d001d60`.
+   RFC-081 §2 turned out to be a **live authorization gap**, not a precaution:
+   one community's admin could already mint a session reaching every community a
+   member belonged to. Found while reviewing the RFC's own design, closed in the
+   first slice. **No provider is chosen, and that is the finished state** — Stage
+   3 is deliberately outside RFC-080/081 and blocked on Stage 0 user research
+   that does not exist.
+8. ~~Cut `0.62.0`.~~ **Complete 2026-08-15** — tagged at `6c05b69`, triggered by
+   three RFCs reaching `rfcs/done/`. Commit and annotated tag **pushed**; `main`
+   and `origin/main` in sync. **Tagged, not deployed** — B1, B3, B4, and B5
+   remain open and nothing in the release closes a finding.
+9. **Choose the next user-facing theme** — an owner decision, currently open.
+   `rfcs/proposed/` holds eight. **RFC-054 (Japanese UX copy review) is the only
+   one both unblocked and unstarted**: RFC-044 and RFC-045 are partly discharged,
+   RFC-020 predates most of what shipped and is likely overtaken, and RFC-021,
+   RFC-031, RFC-033, and RFC-034 are direction-only stubs gated on pilot evidence
+   that does not exist.
 8. **When a pilot is scheduled** — and not before — provision the persistent
    incident sink (Logpush → R2), then build and freeze one exact immutable
    release candidate and execute the RFC-050 hosted evidence campaign for the
