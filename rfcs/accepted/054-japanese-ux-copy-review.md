@@ -50,7 +50,24 @@ solved problem would waste the one reviewer who can do the work.
 
 Three things, in descending order of value:
 
-### 2.1 The 54 strings no one has ever reviewed
+### 2.1 The strings no one has ever reviewed
+
+> **Corrected 2026-08-15, immediately after acceptance.** This section originally
+> said "the 54 strings no one has ever reviewed" and attributed them to three
+> whole modules. **That was a module-level estimate, not a measurement, and it was
+> wrong in both directions.** Diffing the superseded inventory's constant names
+> against the current tree gives **180 constants that were never in it**, spread
+> across *every* module — and `access.rs` contributes 12, not 23, because its
+> eleven `JA_JOIN_*` strings *were* reviewed.
+>
+> Measured breakdown: `events.rs` 35, `admin.rs` 29, `calendar.rs` 29,
+> `account.rs` 26, `community.rs` 16, `access.rs` 12, `me.rs` 12, `general.rs` 5,
+> `home.rs` 5, `recovery.rs` 5, `templates.rs` 3, `notes.rs` 2, `export.rs` 1.
+>
+> This is the same failure this project keeps catching in handoffs — counting a
+> list instead of deriving it — and it is worth recording rather than silently
+> fixing, because it moved the slice boundary. **Novelty no longer selects slice
+> 1; consequence does.** See the corrected §6.
 
 The external-identity track and RFC-082 added member-facing copy that has never
 been through any copy review:
@@ -143,16 +160,30 @@ cannot be delegated.
 
 ## 6. Slicing
 
-Not one review of 319 strings. Proposed order, highest value first:
+Not one review of 319 strings. **Corrected 2026-08-15** — sliced by consequence,
+since §2.1's correction showed novelty spans every module and therefore selects
+nothing.
 
-1. **The never-reviewed 54** — `account.rs`, `access.rs`, `recovery.rs`.
-2. **Error and refusal copy** — the strings a member reads when something has
-   gone wrong, across all modules.
-3. **Everything else**, by module, in whatever order suits.
+**Slice 1 — the strings a member reads at their worst moment (44).** Someone
+locked out, suspended, or holding a recovery code reads these while confused or
+worried, which is when jargon does the most damage and when a misunderstanding is
+most expensive:
+
+- `general.rs::JA_MEMBERSHIP_SUSPENDED` — the paused page, the single string a
+  suspended member sees;
+- `recovery.rs` (5) — the recovery credential's issuance, reveal, and
+  consumption;
+- `account.rs` (26) — the account surface, linking, and unlink confirmation;
+- `access.rs`'s 12 never-reviewed — relink and external sign-in failure.
+
+**Slice 2 — admin destructive-action copy.** `admin.rs`'s removal, suspension,
+and last-admin refusals: read by a volunteer about to do something irreversible
+to another person.
+
+**Slice 3 — everything else**, by module.
 
 Slices 2 and 3 may be deferred indefinitely without blocking a pilot. **Slice 1
-should not be** — it is the newest copy, the least reviewed, and the most
-consequential.
+should not be.**
 
 ## 7. Non-goals
 
