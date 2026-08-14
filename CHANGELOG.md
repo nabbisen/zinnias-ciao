@@ -2,6 +2,109 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.62.0] — 2026-08-13
+
+Three RFCs: the external identity foundation, membership suspension, and a
+closed security gap that was reachable on `main`. **RFC-081 §2 closes a live
+gap, not a precaution** — one community's admin could already mint a session
+reaching every community a member belonged to; that path is now refused
+fail-closed. RFC-080/081 add sign-in and account recovery through an external
+identity provider, with **no provider chosen — that is the finished state**
+of this slice, not a gap: the whole contract is exercised against a local
+fake issuer, with no provider account, no secrets, and no network. RFC-082
+gives membership a reversible suspended state beside the terminal removed
+one, finally answering the question RFC-063 deferred. Alongside the RFCs, a
+three-package dead-code audit, a `worker` crate toolchain repair, and a
+one-time schema re-baseline. This is a tag, not a deployment — see
+`ROADMAP.md` § *Tagging is not deploying*. Production, public-pilot, and
+first-real-community deployment remain **No-Go**; B1, B3, B4, and B5 remain
+open.
+
+### Changed
+
+- **A live cross-community session gap is closed (RFC-081 §2).** Before this
+  release, a session minted by one community's admin-mediated relink flow
+  could reach any other community the same member belonged to — the session
+  carried no record of which community had granted it. This was reachable on
+  `main`, was never deployed anywhere, and is now closed: every session
+  records its granting provenance and, where applicable, the one community
+  it is scoped to, and every community-scoped request is refused fail-closed
+  outside that scope. This is this release's most significant security
+  content.
+- **The initial schema was re-baselined, once, before first deployment**
+  (`e3a51e8`). Two corrections — removing the table-level
+  `UNIQUE(community_id, user_id)` on `community_memberships` in favor of a
+  partial unique index, and removing `users.idp_subject` in favor of the
+  namespaced `user_identities` table RFC-080 introduces — were applied
+  directly to `migrations/0001_initial.sql` instead of as forward
+  migrations, under the one-time pre-deployment exception recorded in
+  `ROADMAP.md` § *Migration immutability begins at first deployment*: no
+  database outside a developer's machine had ever applied the schema being
+  corrected, and a forward migration doing the same rebuild is impossible
+  under D1 once a table has live foreign-key dependents. This exception does
+  not recur after first deployment.
+- **Three packages of dead code were removed**: sixteen unguarded duplicate
+  writers already superseded by guarded live paths, queries fetching
+  twenty-four columns nothing read, and the last blanket `#[allow(dead_code)]`
+  suppressions, each replaced by a targeted, reasoned one where still needed.
+- **Release version bumped to v0.62.0.** `Cargo.toml`, `Cargo.lock`,
+  `package.json`, `workers/ssr/static/sw.js`, and both the `app.js`
+  cache-buster and the offline page's matching `<script>` tag are aligned.
+
+### Added
+
+- **RFC-080 — External Identity Foundation.** Namespaced identity keys,
+  namespace-pinned JWT verification, a server-side authentication
+  transaction, and a local fake issuer exercising the full sign-in/link/join
+  contract with no real provider. Seven packages across five slices, every
+  one reviewed and approved.
+- **RFC-081 — Account Recovery and Membership Continuity.** A
+  member-held, provider-independent recovery credential that cannot be
+  removed while it is a member's last usable method (enforced in the same
+  SQL statement as the unlink it guards), and the session-scope fix above.
+  Amends RFC-024 and RFC-063.
+- **RFC-082 — Membership Suspension.** A reversible `suspended_at` state
+  beside the terminal `removed_at`, amending RFC-063's deferred question.
+  Two additive columns; the work was classifying all 54 pre-existing
+  "is this membership active" call sites into two named predicates
+  (`MEMBERSHIP_ACTIVE`, `MEMBERSHIP_PRESENT`) — three of them `PRESENT` —
+  gated by a default-fail check against any of the 54 (or a future site)
+  spelling the condition inline instead.
+
+### Fixed
+
+- **The `worker` crate toolchain mismatch is repaired** (`3499e71`): updated
+  to `0.8.5` so the local build matches the installed `worker-build`, which
+  had begun passing a `wasm-bindgen` CLI flag the previously-pinned version
+  did not accept.
+- **The language-preference smoke's event fixture can no longer expire.**
+  Its date is now seeded relative to the run instead of a fixed calendar
+  date.
+
+### Testing
+
+- `cargo test --workspace` — 628 passed, 0 failed
+- `cargo test --workspace --features dev_fake_issuer` — 631 passed, 0 failed
+- `cargo clippy --workspace --target wasm32-unknown-unknown --all-targets -- -D warnings` —
+  clean in both feature states
+- `cargo fmt --check`
+- `cargo check --workspace --target wasm32-unknown-unknown` — clean in both
+  feature states
+- `bun run build`, then all sixteen smokes (`smoke:language`,
+  `smoke:calendar-views`, `smoke:matrix`, `smoke:matrix-csv`,
+  `smoke:community-switch`, `smoke:display-name`, `smoke:admin-event-forms`,
+  `smoke:admin-member-management`, `smoke:admin-tools-onboarding`,
+  `smoke:final-migration`, `smoke:session-scope`, `smoke:identity-callback`,
+  `smoke:account-surface`, `smoke:account-link-reauth`,
+  `smoke:account-recovery-unlink`, `smoke:membership-suspension`), each
+  reporting zero CSP violations
+- `mdbook build docs`
+- `git diff --check`
+
+Hosted staging/production evidence was not collected in this release — none
+is required for a tag, only for a deployment, which remains **No-Go** per the
+architecture review remediation hold. B1, B3, B4, and B5 remain open.
+
 ## [0.61.0] — 2026-08-02
 
 RFC-075's internal CSS architecture migration is complete, and `style-src` no
