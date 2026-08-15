@@ -282,6 +282,27 @@ verified usable authentication or recovery method**, a required audit, and
 revocation or rotation of affected sessions. A member may not remove their last
 way in.
 
+**Clarified 2026-08-15, owner-confirmed: unlink is permanent for that provider
+identity.** This RFC did not say whether an unlinked identity could later be
+re-linked. It cannot, and the behaviour is intended rather than incidental —
+surfaced by the RFC-054 copy review, which asked whether
+`JA_ACCOUNT_UNLINK_BODY`'s 「この操作は取り消せません」 was accurate.
+
+It is accurate, and enforced at two independent levels:
+
+- **Application** — `handlers/identity/mod.rs::link_outcome` calls
+  `db::identity::find_by_subject_lookup`, which deliberately does **not** filter
+  on `status` (Slice 2's decision: collision policy belongs to the authentication
+  transaction, not the accessor). A revoked row is therefore returned, the link is
+  treated as a collision, and it fails closed with generic copy.
+- **Schema** — `UNIQUE(identity_namespace_id, subject_lookup)` still holds the
+  pair, so the insert could not succeed even if the application check were
+  bypassed.
+
+The member-facing consequence is that unlinking is a one-way door for that
+identity, which is why §3.3's other-usable-method requirement is the load-bearing
+protection rather than a formality.
+
 **Owner decision (3).** Is a one-time code shown once acceptable for this
 audience? For low-technology-familiarity members it is a known failure point —
 people lose it. The alternatives are worse for this product (email needs an
