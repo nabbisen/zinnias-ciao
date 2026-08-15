@@ -1805,3 +1805,19 @@ can remove a credential (5b's job).
       (200) instead, since a redirect has nowhere to carry the plaintext
       code. Updated to assert the reveal markup is present, plus a new
       check that the credential was issued exactly once.
+
+## RFC-054 A1: the recovery failure message no longer names an expiry that cannot happen (Handoff 060)
+
+- [x] `JA_RECOVERY_INVALID`/`EN_RECOVERY_INVALID` no longer say "or has
+      expired" — recovery credentials never expire
+      (`migrations/0017_account_recovery_credentials.sql` leaves
+      `expires_at` nullable and nothing ever sets it, deliberately, so a
+      member with no other way in can always use it). The old text named a
+      cause the system cannot produce; a member reading it could conclude
+      their code had aged out and go looking for a new one, when the real
+      cause is a mistyped or already-used code. The replacement still
+      names two possibilities without saying which applies — the
+      generic-failure property (RFC-081 §3.2: unknown, consumed, and
+      revoked codes are indistinguishable) is unchanged, confirmed by
+      reading every branch of `handlers/recovery.rs::post_recovery` and
+      finding all five render this same one constant.

@@ -585,7 +585,9 @@ try {
     },
     checks: {
       allSameStatus: allAttempts.every((a) => a.status === consumedAttempt.status),
-      allShowGenericInvalidMessage: allAttempts.every((a) => a.body.includes('このコードは無効か、有効期限が切れています')),
+      // RFC-054 A1 (Handoff 060): the message no longer claims an expiry
+      // recovery credentials cannot have — updated with the constant.
+      allShowGenericInvalidMessage: allAttempts.every((a) => a.body.includes('このコードは使用できません。すでに使われているか、正しくない可能性があります')),
       noneIssuedASessionCookie: allAttempts.every((a) => !a.hasSetCookie),
       bodiesIdenticalApartFromTheirOwnCsrfToken: allAttempts.every(
         (a) => stripToken(a.body) === stripToken(consumedAttempt.body),
