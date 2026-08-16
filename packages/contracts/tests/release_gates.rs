@@ -3460,6 +3460,315 @@ fn rfc072_every_handler_and_render_file_is_localized_or_documented_exception() {
     );
 }
 
+/// Handoff 064 (F3 of the RFC-054 Slice 1 review, corrected): what
+/// `en_ja_parity` in `packages/contracts/src/i18n/tests.rs` used to be named
+/// for. That test's entire body asserted a literal 230-element array's
+/// length against a literal `230` and that no literal in the array was
+/// empty — it never referenced a single `EN_`/`JA_` identifier, so it would
+/// have passed unchanged if every `JA_` constant in the project were
+/// deleted. This gate replaces it: default-fail, same shape as
+/// `LOCALIZATION_EXCEPTIONS`/`SMOKE_COVERAGE_EXCEPTIONS`, a pinned exception
+/// table for the genuinely-unpaired stems with a written reason each.
+struct EnJaParityException {
+    stem: &'static str,
+    reason: &'static str,
+}
+
+/// RFC-083 Slice D's six not-yet-converted stems (Handoff 064 §2.1,
+/// independently re-derived, not copied from the finding that reported
+/// them). Each is expected to be deleted from this table as its own
+/// sub-slice lands — the table shrinking as designed, not a permanent
+/// carve-out. No entry here may be added to make the six unpaired
+/// constants themselves change; that is RFC-054/RFC-083's business.
+const EN_JA_PARITY_EXCEPTIONS: &[EnJaParityException] = &[
+    EnJaParityException {
+        stem: "ADMIN_INVITE_REVOKED_FLASH",
+        reason: "RFC-083 Slice D1b (handlers/admin/members.rs) — not yet converted",
+    },
+    EnJaParityException {
+        stem: "ADMIN_EXPORT_SUMMARY_COUNTS",
+        reason: "RFC-083 Slice D1c (handlers/export.rs) — not yet converted",
+    },
+    EnJaParityException {
+        stem: "ADMIN_TEMPLATE_TITLE_REQUIRED_FLASH",
+        reason: "RFC-083 Slice D1c (handlers/templates.rs) — not yet converted",
+    },
+    EnJaParityException {
+        stem: "ADMIN_TEMPLATE_SAVED_FLASH",
+        reason: "RFC-083 Slice D1c (handlers/templates.rs) — not yet converted",
+    },
+    EnJaParityException {
+        stem: "ADMIN_TEMPLATE_DELETED_FLASH",
+        reason: "RFC-083 Slice D1c (handlers/templates.rs) — not yet converted",
+    },
+    EnJaParityException {
+        stem: "ADMIN_USE_TEMPLATE_LINK",
+        reason: "RFC-083 Slice D1a follow-up (handlers/admin/events/create.rs) — deferred pending an architect decision on new English copy, see Handoff 062's review F1",
+    },
+];
+
+fn i18n_module_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/i18n")
+}
+
+/// Every `packages/contracts/src/i18n/*.rs` file except `tests.rs` — the
+/// module that defines the constants this gate checks, not fixtures for
+/// checking them.
+fn i18n_module_files() -> Vec<std::path::PathBuf> {
+    let dir = i18n_module_dir();
+    let mut files: Vec<std::path::PathBuf> = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("failed to read directory {}: {e}", dir.display()))
+        .map(|entry| {
+            entry
+                .unwrap_or_else(|e| panic!("failed to read directory entry: {e}"))
+                .path()
+        })
+        .filter(|p| p.extension().is_some_and(|ext| ext == "rs"))
+        .filter(|p| p.file_name().and_then(|n| n.to_str()) != Some("tests.rs"))
+        .collect();
+    files.sort();
+    files
+}
+
+/// Every `{...}` placeholder in `s`, in order, as raw tokens (`{}`,
+/// `{events}`, ...) — this codebase's own two substitution conventions
+/// (`substitute_positional`'s positional `{}`, and `.replace("{name}", ...)`
+/// by name), neither of which is `format!`, so `{{`/`}}` escaping never
+/// applies here.
+fn placeholders(s: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut base = 0usize;
+    let mut rest = s;
+    while let Some(start) = rest.find('{') {
+        match rest[start..].find('}') {
+            Some(rel_end) => {
+                let end = start + rel_end + 1;
+                out.push(&s[base + start..base + end]);
+                base += end;
+                rest = &s[base..];
+            }
+            None => break,
+        }
+    }
+    out
+}
+
+/// One `pub const EN_<STEM>`/`pub const JA_<STEM>: &str = "..."` found by
+/// `extract_i18n_constants`.
+struct I18nConstant {
+    stem: String,
+    value: String,
+    file: String,
+}
+
+/// Parses every `pub const EN_<STEM>`/`JA_<STEM>: &str = "..."` out of
+/// `content` (already comment-stripped by the caller). Scans the string
+/// value character by character rather than with a regex — Handoff 061's
+/// own hand-rolled extractor undercounted by two because its regex lacked
+/// `DOTALL` and so didn't match value text across a `\`-newline
+/// continuation; scanning characters (not `.`) has no such mode to forget.
+/// Every `\`-escape (including `\`-newline continuation) is copied through
+/// unresolved rather than decoded — this gate only needs accurate value
+/// *boundaries* and raw `{...}` placeholder text, not a fully decoded Rust
+/// string, and copying escapes through verbatim can never accidentally
+/// terminate the scan early on an escaped quote.
+fn extract_i18n_constants(file: &str, content: &str) -> (Vec<I18nConstant>, Vec<I18nConstant>) {
+    let mut en = Vec::new();
+    let mut ja = Vec::new();
+    let marker = "pub const ";
+    let mut search_from = 0usize;
+    while let Some(rel) = content[search_from..].find(marker) {
+        let after_marker = search_from + rel + marker.len();
+        search_from = after_marker;
+        let rest = &content[after_marker..];
+        let lang = if rest.starts_with("EN_") {
+            "EN"
+        } else if rest.starts_with("JA_") {
+            "JA"
+        } else {
+            continue;
+        };
+        let after_prefix = &rest[3..];
+        let Some(colon_rel) = after_prefix.find(':') else {
+            continue;
+        };
+        let stem = after_prefix[..colon_rel].trim().to_string();
+        let after_colon = &after_prefix[colon_rel..];
+        let Some(quote_rel) = after_colon.find('"') else {
+            continue;
+        };
+        let value_region = &after_colon[quote_rel + 1..];
+        let mut value = String::new();
+        let mut chars = value_region.char_indices();
+        let mut closed = false;
+        while let Some((_, c)) = chars.next() {
+            if c == '\\' {
+                value.push('\\');
+                if let Some((_, escaped)) = chars.next() {
+                    value.push(escaped);
+                }
+                continue;
+            }
+            if c == '"' {
+                closed = true;
+                break;
+            }
+            value.push(c);
+        }
+        if !closed {
+            continue;
+        }
+        let constant = I18nConstant {
+            stem,
+            value,
+            file: file.to_string(),
+        };
+        match lang {
+            "EN" => en.push(constant),
+            "JA" => ja.push(constant),
+            _ => unreachable!(),
+        }
+    }
+    (en, ja)
+}
+
+/// Handoff 064: the property `en_ja_parity` was named for but never
+/// checked. Default-fail, walking `packages/contracts/src/i18n/*.rs` itself
+/// rather than trusting a hand-maintained list — the exact defect that let
+/// the old test drift to zero real coverage without anyone noticing.
+#[test]
+fn en_ja_parity_is_derived_from_the_constants_themselves() {
+    let files = i18n_module_files();
+    assert!(
+        files.len() >= 13,
+        "expected at least 13 i18n module files, found {} — has the directory moved, or did \
+         modules merge? An unexpectedly small count likely means this gate's file walk is \
+         broken, not that there is nothing left to check.",
+        files.len()
+    );
+
+    let mut en_map: std::collections::BTreeMap<String, I18nConstant> =
+        std::collections::BTreeMap::new();
+    let mut ja_map: std::collections::BTreeMap<String, I18nConstant> =
+        std::collections::BTreeMap::new();
+
+    for path in &files {
+        let raw = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let stripped = strip_line_comments(&raw);
+        let rel = path.file_name().unwrap().to_string_lossy().into_owned();
+        let (en, ja) = extract_i18n_constants(&rel, &stripped);
+        for constant in en {
+            if let Some(prior) = en_map.insert(constant.stem.clone(), constant) {
+                panic!(
+                    "EN_{} is declared more than once (last seen in {}) — duplicate stems are \
+                     not a parity gap, they are a compile-time-shadowing bug waiting to happen",
+                    prior.stem, prior.file
+                );
+            }
+        }
+        for constant in ja {
+            if let Some(prior) = ja_map.insert(constant.stem.clone(), constant) {
+                panic!(
+                    "JA_{} is declared more than once (last seen in {}) — duplicate stems are \
+                     not a parity gap, they are a compile-time-shadowing bug waiting to happen",
+                    prior.stem, prior.file
+                );
+            }
+        }
+    }
+
+    assert!(
+        en_map.len() > 100 && ja_map.len() > 100,
+        "expected well over 100 EN_/JA_ constants each, found {} EN_ and {} JA_ — this gate's \
+         extractor is likely broken, not that the corpus shrank this much",
+        en_map.len(),
+        ja_map.len()
+    );
+
+    let mut seen_exceptions = std::collections::HashSet::new();
+    let mut unpaired: Vec<String> = Vec::new();
+
+    for stem in en_map.keys() {
+        if !ja_map.contains_key(stem) {
+            match EN_JA_PARITY_EXCEPTIONS.iter().find(|e| e.stem == stem) {
+                Some(exc) => {
+                    seen_exceptions.insert(exc.stem);
+                }
+                None => unpaired.push(format!("EN_{stem} has no JA_{stem}")),
+            }
+        }
+    }
+    for stem in ja_map.keys() {
+        if !en_map.contains_key(stem) {
+            match EN_JA_PARITY_EXCEPTIONS.iter().find(|e| e.stem == stem) {
+                Some(exc) => {
+                    seen_exceptions.insert(exc.stem);
+                }
+                None => unpaired.push(format!("JA_{stem} has no EN_{stem}")),
+            }
+        }
+    }
+
+    assert!(
+        unpaired.is_empty(),
+        "these stems are unpaired and not in EN_JA_PARITY_EXCEPTIONS:\n{}\n\nEvery EN_ constant \
+         must have a JA_ counterpart with the same stem, and vice versa, or a pinned exception \
+         with a written reason — this is the property en_ja_parity was named for and never \
+         checked.",
+        unpaired.join("\n")
+    );
+
+    for exc in EN_JA_PARITY_EXCEPTIONS {
+        assert!(
+            seen_exceptions.contains(exc.stem),
+            "EN_JA_PARITY_EXCEPTIONS names {} ({}) but that stem is not currently unpaired — \
+             either it was paired (delete the entry, the table is meant to shrink) or it no \
+             longer exists (stale entry, delete it) or it is unpaired on both sides at once \
+             (a stop condition per Handoff 064 §11, not something to silently accept)",
+            exc.stem,
+            exc.reason
+        );
+    }
+
+    let mut empty_or_whitespace: Vec<String> = Vec::new();
+    for constant in en_map.values().chain(ja_map.values()) {
+        if constant.value.trim().is_empty() {
+            empty_or_whitespace.push(format!(
+                "{} in {} is empty or whitespace-only",
+                constant.stem, constant.file
+            ));
+        }
+    }
+    assert!(
+        empty_or_whitespace.is_empty(),
+        "these constants are empty or whitespace-only:\n{}",
+        empty_or_whitespace.join("\n")
+    );
+
+    let mut placeholder_mismatches: Vec<String> = Vec::new();
+    for (stem, en_constant) in &en_map {
+        let Some(ja_constant) = ja_map.get(stem) else {
+            continue;
+        };
+        let mut en_ph = placeholders(&en_constant.value);
+        let mut ja_ph = placeholders(&ja_constant.value);
+        en_ph.sort_unstable();
+        ja_ph.sort_unstable();
+        if en_ph != ja_ph {
+            placeholder_mismatches.push(format!(
+                "{stem}: EN placeholders {en_ph:?} != JA placeholders {ja_ph:?}"
+            ));
+        }
+    }
+    assert!(
+        placeholder_mismatches.is_empty(),
+        "these pairs disagree on {{...}} placeholders between EN and JA — this is a live \
+         rendering-argument-mismatch bug, not a gate gap:\n{}",
+        placeholder_mismatches.join("\n")
+    );
+}
+
 /// Handoff 041 §7.4: same shape as `LOCALIZATION_EXCEPTIONS` (explicit key,
 /// written reason, stale-entry assertion). Keyed by class name, not by
 /// file: the property is about the class being safe to rename/restyle

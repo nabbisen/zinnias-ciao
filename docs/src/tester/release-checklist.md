@@ -2088,3 +2088,47 @@ output behind it is not acceptable evidence.
 - [x] **No product code changed** — only `package.json`, `scripts/`, and
       `packages/contracts/tests/release_gates.rs`, per §4's explicit
       non-change scope.
+
+## EN/JA parity is now derived from the constants themselves (Handoff 064)
+
+**`en_ja_parity` never checked parity.** Its entire body asserted a literal
+230-element array's length against a literal `230`, and that no literal in the
+array was itself empty — it never referenced a single `EN_`/`JA_` identifier, so
+it would have passed unchanged if every `JA_` constant in the project were
+deleted. Replaced with
+`en_ja_parity_is_derived_from_the_constants_themselves` in `release_gates.rs`,
+which parses every `packages/contracts/src/i18n/*.rs` file (comments stripped,
+`\`-newline string continuation handled by character scanning, not a regex that
+can forget `DOTALL`) and checks, project-wide: every `EN_` stem has a `JA_`
+counterpart and vice versa (or a pinned, reasoned exception); no value is empty
+or whitespace-only; and every paired constant's `{...}` placeholders match
+between halves. Independently cross-checked (`grep -c`): 313 `EN_` / 319 `JA_`
+constants, matching the parser's derived counts exactly.
+
+- [x] `EN_JA_PARITY_EXCEPTIONS` holds exactly the six genuinely-unpaired stems,
+      all RFC-083 Slice D scope (five D1b/D1c, one D1a's `create.rs` follow-up).
+      **Expected to shrink to empty** as those sub-slices land — a table growing
+      back would mean a new pair went in unpaired, not a documented decision.
+- [x] Four failure demonstrations, each captured and each file restored
+      byte-identical afterward: an EN constant made structurally absent (its
+      declaration line removed, its one caller inlined so the crate still
+      builds), a value set to `""`, a `{}` placeholder removed from one half of
+      a pair, and a stale exception entry naming a stem that isn't actually
+      unpaired. All four produced the expected failure message and nothing
+      else.
+- [x] `en_ja_parity` and its 230-name array deleted from
+      `packages/contracts/src/i18n/tests.rs` entirely — not kept alongside the
+      new gate.
+- [x] **A second, real, hand-maintained parity mechanism was found that the
+      handoff did not know about** — see the review request's own section on
+      it. Not touched in this package; flagged for a decision.
+- [x] `cargo test --workspace`: **633 → 633, net zero** (contracts lib: 85 → 84,
+      the deleted `en_ja_parity`; `release_gates`: 109 → 110, the new gate — one
+      test disappears, one appears, the totals happen to net out).
+      `--features dev_fake_issuer`: **636 → 636**, same composition. Clippy
+      (both feature states), fmt, wasm check, `mdbook build docs`,
+      `git diff --check` all clean. `bun run build`: `index.js` unchanged at
+      28.6kb — no product code touched.
+- [x] `bun run smoke:all`: see the review request for the full run; expected
+      23/24 with `smoke:recurrence`'s known, unrelated
+      `calendarShowsSeededTitle` failure unchanged.
