@@ -274,10 +274,14 @@ section remains the tracked summary of record.
    to remove — セッション, トークン, 同期 — appears in **no** Japanese string
    today, having been fixed incidentally by RFC-049 and RFC-072.
 
-   What the review is actually for is **54 strings no one has ever reviewed**,
+   What the review is actually for is the constants **no one has ever reviewed**,
    added by the external-identity track and RFC-082: the suspension paused page,
    the account surface, and the recovery credential. Those are read by a member
    who is confused or worried, which is when copy quality matters most.
+
+   **Corrected 2026-08-15 (`03821bc`): that count is 180, not 54.** The "54" was a
+   module-level estimate rather than a measurement, and correcting it moved the
+   slice boundary — novelty no longer selects slice 1, consequence does.
 
    The original §4 blocker — *"requires a Japanese native speaker"* — was never
    about finding a person. It was that nobody had prepared the work so the native
@@ -285,7 +289,20 @@ section remains the tracked summary of record.
    architect prepares the inventory, scans, and a proposed rewrite for every
    finding; owner decides what sounds natural; developers apply.
 
-10. **When a pilot is scheduled** — and not before — the RFC-050 hosted evidence
+10. **Execute RFC-054, then RFC-083.** Slice 1 finding A1 shipped at `6ea3765`.
+    Findings B1–B4 are accepted and packaged with two copy-harmony items derived
+    from a full comparison of all 632 `&str` constants: **H1**, one word for
+    dismissing a form (three キャンセル → やめる, because キャンセル already means
+    *an event was called off* in this product); **H2**, one word for the role
+    (管理者/administrator — 運営者 appeared exactly once).
+
+    **RFC-083 (localization Slice D) is accepted and follows, not overlaps.**
+    Doing both at once produces a diff in which changed wording and changed
+    plumbing are indistinguishable. Slice D1 (admin surfaces) carries the bulk at
+    no extra D1 cost; **Slice D2 is blocked** on whether anonymous routes should
+    honour `Accept-Language`.
+
+11. **When a pilot is scheduled** — and not before — the RFC-050 hosted evidence
     campaign, unchanged. Stage 3 of the external-identity track (choosing a
     provider) also waits on Stage 0 user research that does not exist.
 8. **When a pilot is scheduled** — and not before — provision the persistent
