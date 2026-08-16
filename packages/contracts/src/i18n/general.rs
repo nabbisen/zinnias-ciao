@@ -57,6 +57,24 @@ pub const EN_ADMIN_EDIT_CANCELLED: &str = "Cancelled events cannot be edited.";
 pub const JA_ADMIN_EDIT_CANCELLED: &str = "キャンセル済みのイベントは編集できません。";
 pub const EN_ADMIN_EDIT_STARTED: &str = "This event has already started and cannot be edited.";
 pub const JA_ADMIN_EDIT_STARTED: &str = "すでに開始したイベントは編集できません。";
+
+/// RFC-072 locale-aware pairs; see `i18n::Localized`.
+pub const GENERAL_BACK: Localized = Localized {
+    ja: JA_GENERAL_BACK,
+    en: EN_GENERAL_BACK,
+};
+pub const ADMIN_ATTEND_CANCELLED: Localized = Localized {
+    ja: JA_ADMIN_ATTEND_CANCELLED,
+    en: EN_ADMIN_ATTEND_CANCELLED,
+};
+pub const ADMIN_EDIT_CANCELLED: Localized = Localized {
+    ja: JA_ADMIN_EDIT_CANCELLED,
+    en: EN_ADMIN_EDIT_CANCELLED,
+};
+pub const ADMIN_EDIT_STARTED: Localized = Localized {
+    ja: JA_ADMIN_EDIT_STARTED,
+    en: EN_ADMIN_EDIT_STARTED,
+};
 pub const JA_OFFLINE_BANNER: &str = "オフライン — 最後に読み込んだ情報を表示しています";
 pub const JA_EMPTY_EVENTS: &str = "イベントはまだありません。";
 pub const JA_EMPTY_EVENTS_HINT: &str = "コミュニティの管理者にイベントの追加をお願いしてください。";
@@ -79,6 +97,10 @@ pub const JA_NAV_COMMUNITIES: &str = "カレンダー";
 pub const JA_NAV_ME: &str = "マイページ";
 pub const EN_NAV_BACK: &str = "Back to event";
 pub const JA_NAV_BACK: &str = "イベントに戻る";
+pub const NAV_BACK: Localized = Localized {
+    ja: JA_NAV_BACK,
+    en: EN_NAV_BACK,
+};
 pub const EN_NAV_SWITCH_GO: &str = "Switch";
 pub const JA_NAV_SWITCH_GO: &str = "切り替え";
 pub const EN_NAV_SWITCH_ARIA_LABEL: &str = "Switch community";

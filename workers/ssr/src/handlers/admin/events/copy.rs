@@ -1,6 +1,6 @@
 use worker::{Env, Request, Response, Result};
 use zinnias_ciao_contracts::auth::token_purpose;
-use zinnias_ciao_contracts::{i18n, tz};
+use zinnias_ciao_contracts::{Locale, i18n, tz};
 use zinnias_ciao_domain::recurrence_materialization_window;
 
 use crate::authz::require_admin;
@@ -29,7 +29,8 @@ pub async fn get_copy_event(
     event_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     let source_event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -50,9 +51,13 @@ pub async fn get_copy_event(
     let offset = match tz::offset_minutes(community_tz) {
         Some(o) => o,
         None => {
-            return render::page(
-                i18n::JA_GENERAL_ERROR,
-                &format!("<p class=\"cz-admin-error-text\">{}</p>", i18n::JA_TZ_ERROR),
+            return render::page_localized(
+                locale,
+                i18n::t(locale, i18n::GENERAL_ERROR),
+                &format!(
+                    "<p class=\"cz-admin-error-text\">{}</p>",
+                    i18n::t(locale, i18n::TZ_ERROR)
+                ),
             );
         }
     };
@@ -62,6 +67,7 @@ pub async fn get_copy_event(
         None => return render::internal_error(),
     };
     let prefill = build_event_copy_prefill(
+        locale,
         &source_event,
         &source_days,
         source_series.as_ref(),
@@ -83,7 +89,7 @@ pub async fn get_copy_event(
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
 
     let body = format!(
         "{header}\
@@ -98,25 +104,27 @@ pub async fn get_copy_event(
            <a href=\"/c/{cid}/events/{eid}\" class=\"cz-admin-back-link\">{back}</a>\
          </div>\
          </main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_ADMIN_COPY_EVENT_TITLE,
+        header = render::header_with_switcher_next_localized(
+            i18n::t(locale, i18n::ADMIN_COPY_EVENT_TITLE),
             community_id,
             &community_pairs,
             "admin_events_new",
+            locale,
         ),
-        title = i18n::JA_ADMIN_COPY_EVENT_TITLE,
+        title = i18n::t(locale, i18n::ADMIN_COPY_EVENT_TITLE),
         cid = render::escape_html(community_id),
         eid = render::escape_html(event_id),
         tok = render::escape_html(&token),
-        fields = render_copy_event_create_fields(event_id, &prefill, None),
-        submit = i18n::JA_ADMIN_CREATE_EVENT_SUBMIT,
-        back = i18n::JA_NAV_BACK,
+        fields = render_copy_event_create_fields(locale, event_id, &prefill, None),
+        submit = i18n::t(locale, i18n::ADMIN_CREATE_EVENT_SUBMIT),
+        back = i18n::t(locale, i18n::NAV_BACK),
         nav = nav,
     );
-    render::page(i18n::JA_ADMIN_COPY_EVENT_TITLE, &body)
+    render::page_localized(locale, i18n::t(locale, i18n::ADMIN_COPY_EVENT_TITLE), &body)
 }
 
 pub(super) fn render_copy_event_create_fields(
+    locale: Locale,
     source_event_id: &str,
     prefill: &EventCopyPrefill,
     error: Option<&str>,
@@ -139,6 +147,7 @@ pub(super) fn render_copy_event_create_fields(
         eid = render::escape_html(source_event_id),
         helpers = helpers,
         fields = render_event_create_fields_with_repeat(
+            locale,
             Some(&prefill.title),
             prefill.location.as_deref(),
             prefill.description.as_deref(),
@@ -151,7 +160,9 @@ pub(super) fn render_copy_event_create_fields(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn build_event_copy_prefill(
+    locale: Locale,
     event: &event_db::EventRow,
     days: &[event_db::EventDayRow],
     series: Option<&series_db::EventSeriesRow>,
@@ -163,7 +174,7 @@ pub(super) fn build_event_copy_prefill(
         title: event.title.clone(),
         location: event.location.clone(),
         description: event.description.clone(),
-        helpers: vec![i18n::JA_ADMIN_COPY_EVENT_HELPER],
+        helpers: vec![i18n::t(locale, i18n::ADMIN_COPY_EVENT_HELPER)],
         day_date: None,
         starts_at: None,
         ends_at: None,
@@ -171,23 +182,24 @@ pub(super) fn build_event_copy_prefill(
     };
 
     if event_is_recurring(event) {
-        apply_recurring_prefill(&mut prefill, series, today_local, window_through);
+        apply_recurring_prefill(locale, &mut prefill, series, today_local, window_through);
     } else if days.len() == 1 {
-        apply_single_day_prefill(&mut prefill, &days[0], community_tz);
+        apply_single_day_prefill(locale, &mut prefill, &days[0], community_tz);
     } else if days.len() > 1 {
         prefill
             .helpers
-            .push(i18n::JA_ADMIN_COPY_EVENT_MULTI_DAY_HELPER);
+            .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_MULTI_DAY_HELPER));
     } else {
         prefill
             .helpers
-            .push(i18n::JA_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE);
+            .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE));
     }
 
     prefill
 }
 
 fn apply_single_day_prefill(
+    locale: Locale,
     prefill: &mut EventCopyPrefill,
     day: &event_db::EventDayRow,
     community_tz: &str,
@@ -198,10 +210,13 @@ fn apply_single_day_prefill(
     prefill.day_date = Some(day.day_date.clone());
     prefill.starts_at = Some(starts_at);
     prefill.ends_at = Some(ends_at);
-    prefill.helpers.push(i18n::JA_ADMIN_COPY_EVENT_DATE_WARNING);
+    prefill
+        .helpers
+        .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_DATE_WARNING));
 }
 
 fn apply_recurring_prefill(
+    locale: Locale,
     prefill: &mut EventCopyPrefill,
     series: Option<&series_db::EventSeriesRow>,
     today_local: &str,
@@ -210,7 +225,7 @@ fn apply_recurring_prefill(
     let Some(series) = series else {
         prefill
             .helpers
-            .push(i18n::JA_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE);
+            .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE));
         return;
     };
     let (Some(starts_at), Some(ends_at)) = (
@@ -219,7 +234,7 @@ fn apply_recurring_prefill(
     ) else {
         prefill
             .helpers
-            .push(i18n::JA_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE);
+            .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE));
         return;
     };
 
@@ -230,18 +245,20 @@ fn apply_recurring_prefill(
     if series.start_day_date.as_str() < today_local {
         prefill
             .helpers
-            .push(i18n::JA_ADMIN_COPY_EVENT_RECURRING_PAST);
+            .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_RECURRING_PAST));
         return;
     }
     if series.start_day_date.as_str() > window_through {
         prefill
             .helpers
-            .push(i18n::JA_ADMIN_COPY_EVENT_RECURRING_WINDOW);
+            .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_RECURRING_WINDOW));
         return;
     }
 
     prefill.day_date = Some(series.start_day_date.clone());
-    prefill.helpers.push(i18n::JA_ADMIN_COPY_EVENT_DATE_WARNING);
+    prefill
+        .helpers
+        .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_DATE_WARNING));
     match series.end_mode.as_str() {
         "open_ended" => prefill.repeat.repeat_end_mode = "open_ended".to_string(),
         "after_count" => match series.occurrence_count {
@@ -251,7 +268,7 @@ fn apply_recurring_prefill(
             }
             None => prefill
                 .helpers
-                .push(i18n::JA_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE),
+                .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE)),
         },
         "until_date" => match series.until_day_date.as_deref() {
             Some(until) if until >= series.start_day_date.as_str() => {
@@ -260,10 +277,10 @@ fn apply_recurring_prefill(
             }
             _ => prefill
                 .helpers
-                .push(i18n::JA_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE),
+                .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE)),
         },
         _ => prefill
             .helpers
-            .push(i18n::JA_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE),
+            .push(i18n::t(locale, i18n::ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE)),
     }
 }

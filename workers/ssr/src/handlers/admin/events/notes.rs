@@ -17,7 +17,8 @@ pub async fn get_admin_hide_note_confirm(
     target_membership_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     let token = crate::codlet::issue_token(
@@ -46,8 +47,9 @@ pub async fn get_admin_hide_note_confirm(
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
 
+    let nd = i18n::t(locale, i18n::NOTE_DELETE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -66,18 +68,18 @@ pub async fn get_admin_hide_note_confirm(
              </form>\
            </div>\
          </main>{nav}",
-        header = render::header_with_switcher(i18n::JA_NOTE_DELETE, community_id, &pairs),
+        header = render::header_with_switcher_localized(nd, community_id, &pairs, locale),
         name = render::escape_html(target_name),
         cid = render::escape_html(community_id),
         eid = render::escape_html(event_id),
         mid = render::escape_html(target_membership_id),
         tok = render::escape_html(&token),
         nav = nav,
-        nd = i18n::JA_NOTE_DELETE,
-        keep = i18n::JA_NOTE_KEEP_ACTION,
-        consequence = i18n::JA_ADMIN_REMOVE_CONSEQUENCE,
+        nd = nd,
+        keep = i18n::t(locale, i18n::NOTE_KEEP_ACTION),
+        consequence = i18n::t(locale, i18n::ADMIN_REMOVE_CONSEQUENCE),
     );
-    render::page(i18n::JA_NOTE_DELETE, &body)
+    render::page_localized(locale, nd, &body)
 }
 
 pub async fn post_admin_hide_note(

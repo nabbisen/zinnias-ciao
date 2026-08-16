@@ -15,7 +15,7 @@ pub use errors::{
 };
 pub use event_card::CardDay;
 pub use nav::{
-    bottom_nav, bottom_nav_localized, header, header_with_switcher, header_with_switcher_localized,
+    bottom_nav, bottom_nav_localized, header, header_with_switcher_localized,
     header_with_switcher_next, header_with_switcher_next_localized,
 };
 pub use notes::{admin_note_hide_form, note_form};
@@ -23,7 +23,7 @@ pub use participants::{ParticipantEntry, participant_list};
 pub use shell::{escape_html, page, page_localized};
 pub use status::status_form;
 pub use time::{
-    apply_offset_time_pub, format_day_time_tz, format_day_time_tz_localized, tz_offset_minutes_pub,
+    apply_offset_time_pub, format_day_time_tz_localized, tz_offset_minutes_pub,
     utc_to_local_parts_pub,
 };
 

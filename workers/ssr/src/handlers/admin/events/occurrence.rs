@@ -16,7 +16,8 @@ pub async fn get_cancel_occurrence(
     day_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&_req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
         Some(e) if e.status != "cancelled" => e,
@@ -45,18 +46,22 @@ pub async fn get_cancel_occurrence(
          </form>\
          <a href=\"/c/{cid}/events/{eid}\" class=\"cz-admin-occurrence-back-link\">{back}</a>\
          </main>",
-        title = i18n::JA_OCCURRENCE_CANCEL_TITLE,
-        helper = i18n::JA_OCCURRENCE_CANCEL_HELPER,
+        title = i18n::t(locale, i18n::OCCURRENCE_CANCEL_TITLE),
+        helper = i18n::t(locale, i18n::OCCURRENCE_CANCEL_HELPER),
         event_title = render::escape_html(&event.title),
         date = render::escape_html(&day.day_date),
         cid = render::escape_html(community_id),
         eid = render::escape_html(event_id),
         did = render::escape_html(day_id),
         token = render::escape_html(&token),
-        submit = i18n::JA_OCCURRENCE_CANCEL_SUBMIT,
-        back = i18n::JA_EVENT_TITLE_HEADER,
+        submit = i18n::t(locale, i18n::OCCURRENCE_CANCEL_SUBMIT),
+        back = i18n::t(locale, i18n::EVENT_TITLE_HEADER),
     );
-    render::page(i18n::JA_OCCURRENCE_CANCEL_TITLE, &body)
+    render::page_localized(
+        locale,
+        i18n::t(locale, i18n::OCCURRENCE_CANCEL_TITLE),
+        &body,
+    )
 }
 
 pub async fn post_cancel_occurrence(

@@ -1,4 +1,5 @@
 use worker::{Env, Request, Response, Result};
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::{
@@ -106,7 +107,17 @@ pub async fn get_create_event(
         ),
         cid = render::escape_html(community_id),
         tok = render::escape_html(&token),
+        // Handoff 062: this page still uses require_admin's discarded
+        // `_membership` above, not a bound locale — JA_ADMIN_USE_TEMPLATE_LINK
+        // (the "Use a template" link, immediately above) has no English half
+        // and this handoff is not authorized to write one. Converting this
+        // page's other sites while leaving that one link Japanese-only would
+        // violate RFC-083 §12's own stop condition (correct `html lang`,
+        // wrong-language body text). Deferred pending an architect decision;
+        // see this package's review request. `Locale::Ja` here is an explicit
+        // literal, not a resolved value — this page's behavior is unchanged.
         fields = render_event_create_fields(
+            Locale::Ja,
             prefill_title.as_deref(),
             prefill_location.as_deref(),
             None,

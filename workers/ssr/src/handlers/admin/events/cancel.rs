@@ -17,7 +17,8 @@ pub async fn get_cancel_event(
     event_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
     let token = crate::codlet::issue_token(
         env,
@@ -46,7 +47,7 @@ pub async fn get_cancel_event(
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
 
     let body = format!(
         "{header}\
@@ -66,30 +67,35 @@ pub async fn get_cancel_event(
                {confirm}</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher(
-            i18n::JA_ADMIN_CANCEL_EVENT_TITLE,
+        header = render::header_with_switcher_localized(
+            i18n::t(locale, i18n::ADMIN_CANCEL_EVENT_TITLE),
             community_id,
-            &_community_pairs
+            &_community_pairs,
+            locale,
         ),
         title = render::escape_html(&event.title),
         cid = render::escape_html(community_id),
         eid = render::escape_html(event_id),
         tok = render::escape_html(&token),
         nav = nav,
-        cat = i18n::JA_ADMIN_CANCEL_EVENT_TITLE,
+        cat = i18n::t(locale, i18n::ADMIN_CANCEL_EVENT_TITLE),
         body_text = if whole_event_scope {
-            i18n::JA_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS
+            i18n::t(locale, i18n::ADMIN_CANCEL_EVENT_BODY_ALL_DAYS)
         } else {
-            i18n::JA_ADMIN_CANCEL_EVENT_BODY
+            i18n::t(locale, i18n::ADMIN_CANCEL_EVENT_BODY)
         },
-        keep = i18n::JA_ADMIN_CANCEL_EVENT_KEEP,
+        keep = i18n::t(locale, i18n::ADMIN_CANCEL_EVENT_KEEP),
         confirm = if whole_event_scope {
-            i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS
+            i18n::t(locale, i18n::ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS)
         } else {
-            i18n::JA_ADMIN_CANCEL_EVENT_CONFIRM
+            i18n::t(locale, i18n::ADMIN_CANCEL_EVENT_CONFIRM)
         },
     );
-    render::page(i18n::JA_ADMIN_CANCEL_EVENT_TITLE, &body)
+    render::page_localized(
+        locale,
+        i18n::t(locale, i18n::ADMIN_CANCEL_EVENT_TITLE),
+        &body,
+    )
 }
 
 pub async fn post_cancel_event(

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use worker::{Env, Request, Response, Result};
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
@@ -10,12 +11,12 @@ use crate::render;
 
 use super::support::redirect;
 
-/// Handoff 037: the `calendar_flash_message` pattern, admin-only Japanese
-/// (RFC-072 Slice D — no locale to resolve). Unknown codes return `None`;
-/// the caller must render no flash element in that case, not echo the code.
-fn attendance_flash_message(code: Option<&str>) -> Option<&'static str> {
+/// Handoff 037: the `calendar_flash_message` pattern. Handoff 062: locale-
+/// aware (RFC-083 Slice D1a). Unknown codes return `None`; the caller must
+/// render no flash element in that case, not echo the code.
+fn attendance_flash_message(locale: Locale, code: Option<&str>) -> Option<&'static str> {
     match code {
-        Some("attendance_saved") => Some(i18n::JA_ADMIN_ATTENDANCE_SAVED_FLASH),
+        Some("attendance_saved") => Some(i18n::t(locale, i18n::ADMIN_ATTENDANCE_SAVED_FLASH)),
         _ => None,
     }
 }
@@ -54,7 +55,8 @@ pub async fn get_attendance(
     event_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -64,12 +66,13 @@ pub async fn get_attendance(
     // Only allow attendance correction after the event (status=ended or any non-scheduled)
     // For MVP we allow it for any non-cancelled event (the admin controls when to correct).
     if event.status == "cancelled" {
-        return render::page(
-            i18n::JA_GENERAL_ERROR,
+        return render::page_localized(
+            locale,
+            i18n::t(locale, i18n::GENERAL_ERROR),
             &format!(
                 "<main class=\"cz-admin-error-main\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
-                i18n::JA_ADMIN_ATTEND_CANCELLED,
-                i18n::JA_GENERAL_BACK
+                i18n::t(locale, i18n::ADMIN_ATTEND_CANCELLED),
+                i18n::t(locale, i18n::GENERAL_BACK)
             ),
         );
     }
@@ -95,7 +98,7 @@ pub async fn get_attendance(
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
 
     let mut days_html = String::new();
     for day in &days {
@@ -127,7 +130,7 @@ pub async fn get_attendance(
                  </div>",
                 name = render::escape_html(&m.display_name),
                 aria_label = substitute_positional(
-                    i18n::JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL,
+                    i18n::t(locale, i18n::ADMIN_ATTEND_MEMBER_ARIA_LABEL),
                     &[&render::escape_html(&m.display_name)]
                 ),
                 day_id = render::escape_html(&day.id),
@@ -135,10 +138,10 @@ pub async fn get_attendance(
                 no_ans = if current.is_none() { " selected" } else { "" },
                 going = sel("going"),
                 notgoing = sel("not_going"),
-                opt_na = i18n::JA_STATUS_NO_ANSWER,
-                opt_go = i18n::JA_STATUS_GOING,
-                opt_ng = i18n::JA_STATUS_NOT_GOING,
-                opt_at = i18n::JA_STATUS_ATTENDED,
+                opt_na = i18n::t(locale, i18n::STATUS_NO_ANSWER),
+                opt_go = i18n::t(locale, i18n::STATUS_GOING),
+                opt_ng = i18n::t(locale, i18n::STATUS_NOT_GOING),
+                opt_at = i18n::t(locale, i18n::STATUS_ATTENDED),
                 attended = sel("attended"),
             ));
         }
@@ -149,7 +152,7 @@ pub async fn get_attendance(
         .query_pairs()
         .find(|(k, _)| k == "flash")
         .map(|(_, v)| v.to_string());
-    let flash_html = attendance_flash_message(flash_code.as_deref())
+    let flash_html = attendance_flash_message(locale, flash_code.as_deref())
         .map(|message| {
             format!(
                 "<p role=\"status\" class=\"cz-admin-flash-success\">{}</p>",
@@ -175,10 +178,11 @@ pub async fn get_attendance(
              {back}</a>\
          </div>\
          </main>{nav}",
-        header = render::header_with_switcher(
-            i18n::JA_ADMIN_ATTEND_TITLE,
+        header = render::header_with_switcher_localized(
+            i18n::t(locale, i18n::ADMIN_ATTEND_TITLE),
             community_id,
-            &community_pairs
+            &community_pairs,
+            locale,
         ),
         title = render::escape_html(&event.title),
         cid = render::escape_html(community_id),
@@ -187,11 +191,11 @@ pub async fn get_attendance(
         days = days_html,
         flash = flash_html,
         nav = nav,
-        at = i18n::JA_ADMIN_ATTEND_TITLE,
-        aas = i18n::JA_ADMIN_ATTEND_SUBMIT,
-        back = i18n::JA_NAV_BACK,
+        at = i18n::t(locale, i18n::ADMIN_ATTEND_TITLE),
+        aas = i18n::t(locale, i18n::ADMIN_ATTEND_SUBMIT),
+        back = i18n::t(locale, i18n::NAV_BACK),
     );
-    render::page(i18n::JA_ADMIN_ATTEND_TITLE, &body)
+    render::page_localized(locale, i18n::t(locale, i18n::ADMIN_ATTEND_TITLE), &body)
 }
 
 pub async fn post_attendance(

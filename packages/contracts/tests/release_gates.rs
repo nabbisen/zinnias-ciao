@@ -3226,64 +3226,10 @@ struct LocalizationException {
 // silently added to make a prior list "complete."
 const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     LocalizationException {
-        path: "handlers/admin/events/attendance.rs",
-        ja_count: 14,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/events/cancel.rs",
-        ja_count: 8,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/events/copy.rs",
-        ja_count: 19,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
         path: "handlers/admin/events/create.rs",
         ja_count: 7,
         calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/events/edit.rs",
-        ja_count: 14,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/events/forms.rs",
-        ja_count: 30,
-        calls_bare_page: false,
-        reason: "shared admin event-form rendering helper, called only from admin-only surfaces above — found by this gate's walk, not carried over from any prior list",
-    },
-    LocalizationException {
-        path: "handlers/admin/events/notes.rs",
-        ja_count: 5,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/events/occurrence.rs",
-        ja_count: 5,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/events/recreate.rs",
-        ja_count: 5,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/events/summary.rs",
-        ja_count: 5,
-        calls_bare_page: false,
-        reason: "shared admin event-summary rendering helper, called only from admin-only surfaces above — found by this gate's walk, not carried over from any prior list",
+        reason: "admin-only surface, RFC-072 Slice D — Handoff 062 (RFC-083 Slice D1a) deferred this file: its \"Use a template\" link (JA_ADMIN_USE_TEMPLATE_LINK) has no English half, and converting the rest of the page to page_localized while leaving that one link Japanese-only would trip RFC-083 §12's own stop condition (correct html lang, wrong-language body text). Open question raised to the architect; see that package's review request.",
     },
     LocalizationException {
         path: "handlers/admin/help_signin.rs",
@@ -3388,6 +3334,31 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
         reason: "these functions take no arguments, so they have no membership and no locale to resolve (RFC-072 §6 non-change scope)",
     },
 ];
+
+/// RFC-083 §6.1: the exception table may only shrink. Pinned at Handoff 062
+/// (RFC-083 Slice D1a), which converted 9 of the table's 10 D1a files (27→18
+/// entries, 308→203 sites — `create.rs` stays pending an architect decision,
+/// see its own entry's reason). A future addition to the table must lower
+/// this pinned value deliberately, not raise it: growth here means a page
+/// stopped being localized, not a documented decision to leave one alone.
+#[test]
+fn rfc083_localization_exceptions_table_only_shrinks() {
+    assert_eq!(
+        LOCALIZATION_EXCEPTIONS.len(),
+        18,
+        "LOCALIZATION_EXCEPTIONS grew to {} entries. This table is shrink-only \
+         (RFC-083 §6.1) — re-pin this value only alongside a deliberate, reviewed \
+         decision to leave a newly-discovered file unlocalized, never to make a \
+         gate pass silently.",
+        LOCALIZATION_EXCEPTIONS.len()
+    );
+    let total_sites: usize = LOCALIZATION_EXCEPTIONS.iter().map(|e| e.ja_count).sum();
+    assert_eq!(
+        total_sites, 203,
+        "LOCALIZATION_EXCEPTIONS site total grew to {total_sites}. Re-pin only \
+         alongside a reviewed, deliberate change to an individual entry's ja_count."
+    );
+}
 
 fn handlers_and_render_files() -> Vec<std::path::PathBuf> {
     let mut files = Vec::new();
@@ -3786,9 +3757,9 @@ fn rfc051_event_edit_semantics_are_details_only_for_multi_day() {
         "RFC-051 edit UI must split single-day edit from details-only edit with a schedule summary"
     );
     assert!(
-        ADMIN_EVENTS_SRC.contains("JA_ADMIN_EDIT_MULTI_DAY_HELPER")
-            && ADMIN_EVENTS_SRC.contains("JA_ADMIN_EDIT_RECURRING_HELPER")
-            && ADMIN_EVENTS_SRC.contains("JA_ADMIN_EDIT_RESPONSES_PRESERVED"),
+        ADMIN_EVENTS_SRC.contains("ADMIN_EDIT_MULTI_DAY_HELPER")
+            && ADMIN_EVENTS_SRC.contains("ADMIN_EDIT_RECURRING_HELPER")
+            && ADMIN_EVENTS_SRC.contains("ADMIN_EDIT_RESPONSES_PRESERVED"),
         "Details-only edit must explain what can be changed and that schedule/attendance stay unchanged"
     );
     let details_only_src = ADMIN_EVENTS_SRC
@@ -3810,14 +3781,14 @@ fn rfc051_event_edit_semantics_are_details_only_for_multi_day() {
     }
     assert!(
         ADMIN_EVENTS_SRC.contains("edit_post_contains_schedule_fields")
-            && ADMIN_EVENTS_SRC.contains("JA_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE")
+            && ADMIN_EVENTS_SRC.contains("ADMIN_EDIT_SCHEDULE_NOT_EDITABLE")
             && ADMIN_EVENTS_SRC.contains("validate_event_details")
             && RFC079_EVENT_WRITE_DB_SRC.contains("edit_scope"),
         "Details-only POST must reject direct schedule fields, validate only details, and audit the edit scope"
     );
     assert!(
-        ADMIN_EVENTS_SRC.contains("JA_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS")
-            && ADMIN_EVENTS_SRC.contains("JA_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS"),
+        ADMIN_EVENTS_SRC.contains("ADMIN_CANCEL_EVENT_BODY_ALL_DAYS")
+            && ADMIN_EVENTS_SRC.contains("ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS"),
         "Cancellation confirmation must state whole-event scope for multi-day/recurring events"
     );
 }
@@ -3857,7 +3828,7 @@ fn rfc060_cancelled_event_recreate_is_admin_only_and_details_only() {
         .and_then(|s| s.split("fn render_single_day_edit_fields").next())
         .expect("recreate form renderer must exist");
     assert!(
-        recreate_fields_src.contains("JA_ADMIN_RECREATE_EVENT_HELPER")
+        recreate_fields_src.contains("ADMIN_RECREATE_EVENT_HELPER")
             && recreate_fields_src.contains("event.location.as_deref()")
             && recreate_fields_src.contains("event.description.as_deref()"),
         "Recreate form must explain the boundary and prefill only title/location/description"
@@ -3921,8 +3892,8 @@ fn rfc066_event_copy_is_admin_reviewed_prefill_not_clone() {
         "Create POST must separate RFC-066 event-copy provenance from RFC-060 cancelled-event recreate"
     );
     assert!(
-        ADMIN_EVENTS_COPY_SRC.contains("JA_ADMIN_COPY_EVENT_RECURRING_PAST")
-            && ADMIN_EVENTS_COPY_SRC.contains("JA_ADMIN_COPY_EVENT_RECURRING_WINDOW")
+        ADMIN_EVENTS_COPY_SRC.contains("ADMIN_COPY_EVENT_RECURRING_PAST")
+            && ADMIN_EVENTS_COPY_SRC.contains("ADMIN_COPY_EVENT_RECURRING_WINDOW")
             && ADMIN_EVENTS_COPY_SRC.contains("normal_create_default")
             && ADMIN_EVENTS_COPY_SRC.contains("until >= series.start_day_date.as_str()"),
         "Copy prefill must implement reviewed recurring normalization rules"

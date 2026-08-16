@@ -61,15 +61,6 @@ pub fn header(title: &str, community_name: &str) -> String {
     )
 }
 
-/// Header with a community switcher `<select>` in place of the static name.
-pub fn header_with_switcher(
-    title: &str,
-    current_community_id: &str,
-    communities: &[(impl AsRef<str>, impl AsRef<str>)],
-) -> String {
-    header_with_switcher_next(title, current_community_id, communities, "home")
-}
-
 /// Header with a community switcher, falling back to target Home on switch
 /// (RFC-074) with the switch button's own label locale-selected (RFC-072).
 /// Used by pages that have no cross-community equivalent to preserve (Event

@@ -1901,3 +1901,117 @@ can remove a credential (5b's job).
       at a label no longer on the page. Fixed to 「やめて」;
       `EN_IDENTITY_SIGN_IN_FAILED_BODY` correctly left alone, since its
       button is still `Cancel`.
+
+## RFC-083 Slice D1a: admin event surfaces resolve locale (Handoff 062)
+
+- [x] **Nine of the ten scoped files converted**; `require_admin`'s
+      `MembershipContext` is bound and its `.locale` threaded through every
+      render site: `attendance.rs`, `cancel.rs`, `copy.rs`, `edit.rs`,
+      `notes.rs`, `occurrence.rs`, `recreate.rs`, and the two shared helpers
+      `forms.rs`/`summary.rs` (both now take `locale: Locale` as a required
+      parameter — no `Option`, per Handoff 049's rule). `create.rs` is
+      **deferred**, see below.
+- [x] **`create.rs` deferred, not converted.** Its "Use a template" link
+      (`JA_ADMIN_USE_TEMPLATE_LINK`) has no English half, and the handoff's
+      own §5 claim that the other six JA-only constants "belong to D1b and
+      D1c" was wrong for this one — it's used only in this file, squarely
+      D1a. Converting the rest of the page while leaving that one link
+      Japanese-only would trip RFC-083 §12's own stop condition (correct
+      `html lang`, wrong-language body text). Left un-migrated exactly as
+      before (still passes `Locale::Ja` explicitly to `forms.rs`, since that
+      helper's locale parameter is now required); its exception-table entry
+      stays at `ja_count: 7`, with the reason field recording the open
+      question. Raised to the architect as a review-request finding rather
+      than decided here.
+- [x] **Two new English strings written**, proposed wording flagged for
+      owner review, not treated as settled:
+      `EN_ADMIN_ATTENDANCE_SAVED_FLASH` = "Attendance saved." and
+      `EN_ADMIN_ATTEND_MEMBER_ARIA_LABEL` = "Attendance for {}" (pairs
+      `JA_ADMIN_ATTENDANCE_SAVED_FLASH`/`JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL`,
+      both Handoff 036 leftovers). The other six pre-existing JA-only
+      constants in Slice D were **not** given English halves — five belong
+      to D1b/D1c as the handoff said; the sixth is `create.rs`'s deferred
+      link, above.
+- [x] **A genuine defect found and fixed by the conversion, not by
+      inspection**: `summary.rs`'s schedule card called the non-locale-aware
+      `render::format_day_time_tz`, so its date labels ("7月5日（日）")
+      would have stayed Japanese on an English-locale edit page even after
+      every other string on the card was threaded. Caught by the new
+      both-locales rendered-output test below, which failed on first run
+      with the Japanese date label as the only leak — not by manual
+      review. Fixed by switching to the already-existing
+      `format_day_time_tz_localized(day, tz, locale)`. The non-localized
+      `format_day_time_tz` and (separately) `render::header_with_switcher`
+      (the two-argument, non-`_localized`, non-`_next` wrapper) both became
+      dead code once every caller in this package converted to their
+      `_localized`/`_next` siblings — both removed, along with their
+      `render.rs` re-exports, to keep clippy `-D warnings` green.
+- [x] **A rendered-output assertion, not a source scan** (RFC-083 §6.3):
+      two new tests in `workers/ssr/src/handlers/admin/events/tests.rs`
+      compose real page content — the edit page's header + hint + details-
+      only fields (which itself pulls in `summary.rs`'s schedule card), and
+      separately the recurring create-fields form (covering the `REPEAT_*`
+      group `render_details_only_event_edit_fields` doesn't touch) — at
+      `Locale::En`, then scan the *whole* composed string for any codepoint
+      in the ranges Japanese text in this codebase actually uses (Hiragana,
+      Katakana, CJK ideographs, CJK punctuation, fullwidth forms), not
+      against a fixed list of known constants. Each test also renders the
+      same composition at `Locale::Ja` and asserts a Japanese codepoint *is*
+      present, so the English-side assertion is proven discriminating, not
+      vacuous. This is the check whose absence let RFC-072 claim completion
+      twice; a source-file gate does not substitute for it.
+- [x] **`LOCALIZATION_EXCEPTIONS` shrunk 27 → 18 entries, 308 → 203 sites**
+      (independently summed from the table, not taken from the handoff's
+      stated 27→17/308→196 — that arithmetic assumed all ten files
+      converted; `create.rs` staying put changes both numbers by exactly
+      one entry and seven sites). A new pinned shrink-only test,
+      `rfc083_localization_exceptions_table_only_shrinks`, asserts both
+      numbers exactly (RFC-083 §6.1) — this is the package's first, since
+      none existed before.
+      `rfc072_every_handler_and_render_file_is_localized_or_documented_exception`
+      passes with the nine converted files removed from the table.
+- [x] Three source-scanning gates in `release_gates.rs`
+      (`rfc051_event_edit_semantics_are_details_only_for_multi_day`,
+      `rfc060_cancelled_event_recreate_is_admin_only_and_details_only`,
+      `rfc066_event_copy_is_admin_reviewed_prefill_not_clone`) asserted the
+      literal substring `"JA_ADMIN_..."` for nine constants this package
+      moved behind `i18n::t(locale, i18n::...)` — updated to check for the
+      bare constant name instead (still a substring of the new call), same
+      property, no gate weakened.
+- [x] **Admin event route query counts unchanged.** Every file binds
+      `require_admin`'s already-returned `MembershipContext` instead of
+      discarding it — no new D1 query added anywhere in this package.
+- [x] **`require_admin`'s `?` verified intact on every path** in all nine
+      converted files (and `create.rs`) — binding the result to `membership`
+      instead of `_membership` does not change control flow; every early
+      return this handoff touched already existed before this package.
+- [x] `cargo test --workspace`: **628 → 631** (+3: the shrink-only gate
+      test, and the two both-locales rendered-output tests).
+      `--features dev_fake_issuer`: **631 → 634** (+3, same three tests;
+      neither depends on the feature). Clippy (both feature states), fmt,
+      wasm check (both states), `mdbook build docs`, `git diff --check` all
+      clean. `bun run build`: `index.js` unchanged at 28.6kb — no cached
+      asset changed, no re-pin.
+- [x] **Smokes**: `smoke:admin-event-forms` green (`html lang="ja"` on all
+      three admin pages it captures, matching these admin fixtures' NULL
+      `ui_language` — Japanese fallback, unchanged). Of `package.json`'s 21
+      `smoke:*` scripts, `smoke:runtime` needs an explicit URL argument and
+      isn't a self-contained smoke; of the remaining 20, 19 pass clean and
+      `smoke:recurrence` fails identically on this checkpoint's own
+      unmodified baseline (`bbf804b`, confirmed via `git stash` + rebuild
+      before restoring) — two sub-checks
+      (`calendar-materializes-rolling-open-ended-series`,
+      `far-future-calendar-month-does-not-materialize`) fail regardless of
+      this package, most likely date-fixture drift against real wall-clock
+      time. Pre-existing, unrelated, not fixed here; disclosed rather than
+      silently skipped.
+- [x] **Minor, not fixed**: `scripts/smoke/rfc075-slice4-admin-event-forms.mjs`'s
+      header comment still says the three pages it captures are "Japanese
+      only, by documented decision (RFC-072 Slice D) — no English rendering
+      exists for any of these pages." That's now stale for two of the
+      three — the attendance and cancel-confirmation pages it screenshots
+      are genuinely locale-aware after this package; only the create-event
+      form (`create.rs`, deferred above) still matches the comment as
+      written. The smoke still passes, since its fixtures' `ui_language` is
+      NULL (Japanese fallback). Noted for whoever next touches that script,
+      not corrected here — out of this handoff's authorized scope.

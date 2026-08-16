@@ -24,7 +24,8 @@ pub async fn get_edit_event(
     event_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     let event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -32,12 +33,13 @@ pub async fn get_edit_event(
         None => return render::not_found(),
     };
     if event.status == "cancelled" {
-        return render::page(
-            i18n::JA_GENERAL_ERROR,
+        return render::page_localized(
+            locale,
+            i18n::t(locale, i18n::GENERAL_ERROR),
             &format!(
                 "<main class=\"cz-admin-error-main\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
-                i18n::JA_ADMIN_EDIT_CANCELLED,
-                i18n::JA_GENERAL_BACK
+                i18n::t(locale, i18n::ADMIN_EDIT_CANCELLED),
+                i18n::t(locale, i18n::GENERAL_BACK)
             ),
         );
     }
@@ -48,12 +50,13 @@ pub async fn get_edit_event(
         classify_day(&d.starts_at_utc, &d.ends_at_utc, &now_utc) != DayTimeState::Upcoming
     });
     if already_started {
-        return render::page(
-            i18n::JA_GENERAL_ERROR,
+        return render::page_localized(
+            locale,
+            i18n::t(locale, i18n::GENERAL_ERROR),
             &format!(
                 "<main class=\"cz-admin-error-main\"><p>{}</p><p><a href=\"javascript:history.back()\">{}</a></p></main>",
-                i18n::JA_ADMIN_EDIT_STARTED,
-                i18n::JA_GENERAL_BACK
+                i18n::t(locale, i18n::ADMIN_EDIT_STARTED),
+                i18n::t(locale, i18n::GENERAL_BACK)
             ),
         );
     }
@@ -93,7 +96,7 @@ pub async fn get_edit_event(
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
 
     let url = req.url()?;
     let err: Option<String> = url
@@ -103,6 +106,7 @@ pub async fn get_edit_event(
 
     let fields = if schedule_editable {
         render_single_day_edit_fields(
+            locale,
             Some(&event.title),
             event.location.as_deref(),
             event.description.as_deref(),
@@ -112,17 +116,17 @@ pub async fn get_edit_event(
             prefill_end.as_deref(),
         )
     } else {
-        render_details_only_event_edit_fields(&event, &days, &community_tz, err.as_deref())
+        render_details_only_event_edit_fields(locale, &event, &days, &community_tz, err.as_deref())
     };
 
-    let eet = i18n::JA_ADMIN_EDIT_EVENT_TITLE;
-    let ees = i18n::JA_ADMIN_EDIT_EVENT_SUBMIT;
+    let eet = i18n::t(locale, i18n::ADMIN_EDIT_EVENT_TITLE);
+    let ees = i18n::t(locale, i18n::ADMIN_EDIT_EVENT_SUBMIT);
+    let hint = i18n::t(locale, i18n::ADMIN_EDIT_EVENT_HINT);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
          <h1 class=\"cz-admin-title cz-admin-title--snug\">{eet}</h1>\
-         <p class=\"cz-admin-edit-notice\">\
-           Members will see the updated event details.</p>\
+         <p class=\"cz-admin-edit-notice\">{hint}</p>\
          <form method=\"post\" action=\"/c/{cid}/admin/events/{eid}/edit\">\
            <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
            {fields}\
@@ -133,19 +137,20 @@ pub async fn get_edit_event(
               class=\"cz-admin-back-link\">{back}</a>\
          </div>\
          </main>{nav}",
-        header = render::header_with_switcher(
-            i18n::JA_ADMIN_EDIT_EVENT_TITLE,
+        header = render::header_with_switcher_localized(
+            i18n::t(locale, i18n::ADMIN_EDIT_EVENT_TITLE),
             community_id,
-            &community_pairs
+            &community_pairs,
+            locale,
         ),
         cid = render::escape_html(community_id),
         eid = render::escape_html(event_id),
         tok = render::escape_html(&token),
-        back = i18n::JA_NAV_BACK,
+        back = i18n::t(locale, i18n::NAV_BACK),
         fields = fields,
         nav = nav,
     );
-    render::page(i18n::JA_ADMIN_EDIT_EVENT_TITLE, &body)
+    render::page_localized(locale, i18n::t(locale, i18n::ADMIN_EDIT_EVENT_TITLE), &body)
 }
 
 pub async fn post_edit_event(
@@ -157,6 +162,7 @@ pub async fn post_edit_event(
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -218,9 +224,13 @@ pub async fn post_edit_event(
         let off = match zinnias_ciao_contracts::tz::offset_minutes(&community_tz) {
             Some(o) => o,
             None => {
-                return render::page(
-                    i18n::JA_GENERAL_ERROR,
-                    &format!("<p class=\"cz-admin-error-text\">{}</p>", i18n::JA_TZ_ERROR),
+                return render::page_localized(
+                    locale,
+                    i18n::t(locale, i18n::GENERAL_ERROR),
+                    &format!(
+                        "<p class=\"cz-admin-error-text\">{}</p>",
+                        i18n::t(locale, i18n::TZ_ERROR)
+                    ),
                 );
             }
         };
@@ -245,7 +255,7 @@ pub async fn post_edit_event(
         if edit_post_contains_schedule_fields(&body) {
             return redirect(&format!(
                 "/c/{community_id}/admin/events/{event_id}/edit?err={}",
-                query_escape(i18n::JA_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE)
+                query_escape(i18n::t(locale, i18n::ADMIN_EDIT_SCHEDULE_NOT_EDITABLE))
             ));
         }
         let details = match validate_event_details(

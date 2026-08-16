@@ -104,6 +104,11 @@ pub const EN_ADMIN_CANNOT_ATTEND_CANCELLED: &str =
     "Attendance cannot be corrected for a cancelled event.";
 pub const EN_ADMIN_ATTEND_TITLE: &str = "Mark Attendance";
 pub const EN_ADMIN_ATTEND_SUBMIT: &str = "Save Attendance";
+// Handoff 062: proposed wording, flagged for owner review — see this
+// package's review request. Written to pair the two constants Handoff 036
+// left Japanese-only when it first extracted them.
+pub const EN_ADMIN_ATTENDANCE_SAVED_FLASH: &str = "Attendance saved.";
+pub const EN_ADMIN_ATTEND_MEMBER_ARIA_LABEL: &str = "Attendance for {}";
 
 pub const JA_ADMIN_CREATE_EVENT_TITLE: &str = "イベントを作成";
 pub const JA_ADMIN_CREATE_EVENT_SUBMIT: &str = "イベントを作成";
@@ -177,6 +182,164 @@ pub const JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL: &str = "{}の出欠";
 // into rendered text on this Japanese-only admin page.
 pub const JA_ADMIN_ATTENDANCE_SAVED_FLASH: &str = "保存しました。";
 
+/// RFC-072 locale-aware pairs; see `i18n::Localized`. Handoff 062.
+pub const ADMIN_CREATE_EVENT_TITLE: super::Localized = super::Localized {
+    ja: JA_ADMIN_CREATE_EVENT_TITLE,
+    en: EN_ADMIN_CREATE_EVENT_TITLE,
+};
+pub const ADMIN_CREATE_EVENT_SUBMIT: super::Localized = super::Localized {
+    ja: JA_ADMIN_CREATE_EVENT_SUBMIT,
+    en: EN_ADMIN_CREATE_EVENT_SUBMIT,
+};
+pub const REPEAT_END_OPEN: super::Localized = super::Localized {
+    ja: JA_REPEAT_END_OPEN,
+    en: EN_REPEAT_END_OPEN,
+};
+pub const REPEAT_END_UNTIL: super::Localized = super::Localized {
+    ja: JA_REPEAT_END_UNTIL,
+    en: EN_REPEAT_END_UNTIL,
+};
+pub const REPEAT_END_COUNT: super::Localized = super::Localized {
+    ja: JA_REPEAT_END_COUNT,
+    en: EN_REPEAT_END_COUNT,
+};
+pub const REPEAT_COUNT_LABEL: super::Localized = super::Localized {
+    ja: JA_REPEAT_COUNT_LABEL,
+    en: EN_REPEAT_COUNT_LABEL,
+};
+pub const REPEAT_UNTIL_LABEL: super::Localized = super::Localized {
+    ja: JA_REPEAT_UNTIL_LABEL,
+    en: EN_REPEAT_UNTIL_LABEL,
+};
+pub const ADMIN_RECREATE_EVENT_HELPER: super::Localized = super::Localized {
+    ja: JA_ADMIN_RECREATE_EVENT_HELPER,
+    en: EN_ADMIN_RECREATE_EVENT_HELPER,
+};
+pub const ADMIN_COPY_EVENT_TITLE: super::Localized = super::Localized {
+    ja: JA_ADMIN_COPY_EVENT_TITLE,
+    en: EN_ADMIN_COPY_EVENT_TITLE,
+};
+pub const ADMIN_COPY_EVENT_HELPER: super::Localized = super::Localized {
+    ja: JA_ADMIN_COPY_EVENT_HELPER,
+    en: EN_ADMIN_COPY_EVENT_HELPER,
+};
+pub const ADMIN_COPY_EVENT_DATE_WARNING: super::Localized = super::Localized {
+    ja: JA_ADMIN_COPY_EVENT_DATE_WARNING,
+    en: EN_ADMIN_COPY_EVENT_DATE_WARNING,
+};
+pub const ADMIN_COPY_EVENT_MULTI_DAY_HELPER: super::Localized = super::Localized {
+    ja: JA_ADMIN_COPY_EVENT_MULTI_DAY_HELPER,
+    en: EN_ADMIN_COPY_EVENT_MULTI_DAY_HELPER,
+};
+pub const ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE: super::Localized = super::Localized {
+    ja: JA_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE,
+    en: EN_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE,
+};
+pub const ADMIN_COPY_EVENT_RECURRING_PAST: super::Localized = super::Localized {
+    ja: JA_ADMIN_COPY_EVENT_RECURRING_PAST,
+    en: EN_ADMIN_COPY_EVENT_RECURRING_PAST,
+};
+pub const ADMIN_COPY_EVENT_RECURRING_WINDOW: super::Localized = super::Localized {
+    ja: JA_ADMIN_COPY_EVENT_RECURRING_WINDOW,
+    en: EN_ADMIN_COPY_EVENT_RECURRING_WINDOW,
+};
+pub const ADMIN_EDIT_EVENT_TITLE: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_EVENT_TITLE,
+    en: EN_ADMIN_EDIT_EVENT_TITLE,
+};
+pub const ADMIN_EDIT_EVENT_SUBMIT: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_EVENT_SUBMIT,
+    en: EN_ADMIN_EDIT_EVENT_SUBMIT,
+};
+pub const ADMIN_EDIT_EVENT_HINT: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_EVENT_HINT,
+    en: EN_ADMIN_EDIT_EVENT_HINT,
+};
+pub const ADMIN_EDIT_DETAILS_ONLY_HEADING: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_DETAILS_ONLY_HEADING,
+    en: EN_ADMIN_EDIT_DETAILS_ONLY_HEADING,
+};
+pub const ADMIN_EDIT_SCHEDULE_HEADING: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_SCHEDULE_HEADING,
+    en: EN_ADMIN_EDIT_SCHEDULE_HEADING,
+};
+pub const ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX,
+    en: EN_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX,
+};
+pub const ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX,
+    en: EN_ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX,
+};
+pub const ADMIN_EDIT_SCHEDULE_FIRST: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_SCHEDULE_FIRST,
+    en: EN_ADMIN_EDIT_SCHEDULE_FIRST,
+};
+pub const ADMIN_EDIT_SCHEDULE_LAST: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_SCHEDULE_LAST,
+    en: EN_ADMIN_EDIT_SCHEDULE_LAST,
+};
+pub const ADMIN_EDIT_MULTI_DAY_HELPER: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_MULTI_DAY_HELPER,
+    en: EN_ADMIN_EDIT_MULTI_DAY_HELPER,
+};
+pub const ADMIN_EDIT_RECURRING_HELPER: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_RECURRING_HELPER,
+    en: EN_ADMIN_EDIT_RECURRING_HELPER,
+};
+pub const ADMIN_EDIT_RESPONSES_PRESERVED: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_RESPONSES_PRESERVED,
+    en: EN_ADMIN_EDIT_RESPONSES_PRESERVED,
+};
+pub const ADMIN_EDIT_SCHEDULE_NOT_EDITABLE: super::Localized = super::Localized {
+    ja: JA_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE,
+    en: EN_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE,
+};
+pub const ADMIN_CANCEL_EVENT_TITLE: super::Localized = super::Localized {
+    ja: JA_ADMIN_CANCEL_EVENT_TITLE,
+    en: EN_ADMIN_CANCEL_EVENT_TITLE,
+};
+pub const ADMIN_CANCEL_EVENT_BODY: super::Localized = super::Localized {
+    ja: JA_ADMIN_CANCEL_EVENT_BODY,
+    en: EN_ADMIN_CANCEL_EVENT_BODY,
+};
+pub const ADMIN_CANCEL_EVENT_BODY_ALL_DAYS: super::Localized = super::Localized {
+    ja: JA_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS,
+    en: EN_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS,
+};
+pub const ADMIN_CANCEL_EVENT_KEEP: super::Localized = super::Localized {
+    ja: JA_ADMIN_CANCEL_EVENT_KEEP,
+    en: EN_ADMIN_CANCEL_EVENT_KEEP,
+};
+pub const ADMIN_CANCEL_EVENT_CONFIRM: super::Localized = super::Localized {
+    ja: JA_ADMIN_CANCEL_EVENT_CONFIRM,
+    en: EN_ADMIN_CANCEL_EVENT_CONFIRM,
+};
+pub const ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS: super::Localized = super::Localized {
+    ja: JA_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS,
+    en: EN_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS,
+};
+pub const ADMIN_ATTEND_TITLE: super::Localized = super::Localized {
+    ja: JA_ADMIN_ATTEND_TITLE,
+    en: EN_ADMIN_ATTEND_TITLE,
+};
+pub const ADMIN_ATTEND_SUBMIT: super::Localized = super::Localized {
+    ja: JA_ADMIN_ATTEND_SUBMIT,
+    en: EN_ADMIN_ATTEND_SUBMIT,
+};
+pub const ADMIN_ATTENDANCE_SAVED_FLASH: super::Localized = super::Localized {
+    ja: JA_ADMIN_ATTENDANCE_SAVED_FLASH,
+    en: EN_ADMIN_ATTENDANCE_SAVED_FLASH,
+};
+pub const ADMIN_ATTEND_MEMBER_ARIA_LABEL: super::Localized = super::Localized {
+    ja: JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL,
+    en: EN_ADMIN_ATTEND_MEMBER_ARIA_LABEL,
+};
+pub const TZ_ERROR: super::Localized = super::Localized {
+    ja: JA_TZ_ERROR,
+    en: EN_TZ_ERROR,
+};
+
 // ── Recurrence fields (RFC-022) ───────────────────────────────────────────
 pub const EN_REPEAT_LABEL: &str = "Repeat";
 pub const EN_REPEAT_NONE: &str = "Do not repeat";
@@ -206,6 +369,60 @@ pub const EN_FORM_FIELD_LOCATION: &str = "Location (optional)";
 pub const JA_FORM_FIELD_LOCATION: &str = "場所（任意）";
 pub const EN_FORM_FIELD_DESC: &str = "Description (optional)";
 pub const JA_FORM_FIELD_DESC: &str = "説明（任意）";
+
+/// RFC-072 locale-aware pairs; see `i18n::Localized`. Handoff 062.
+pub const REPEAT_LABEL: super::Localized = super::Localized {
+    ja: JA_REPEAT_LABEL,
+    en: EN_REPEAT_LABEL,
+};
+pub const REPEAT_NONE: super::Localized = super::Localized {
+    ja: JA_REPEAT_NONE,
+    en: EN_REPEAT_NONE,
+};
+pub const REPEAT_WEEKLY: super::Localized = super::Localized {
+    ja: JA_REPEAT_WEEKLY,
+    en: EN_REPEAT_WEEKLY,
+};
+pub const REPEAT_BIWEEKLY: super::Localized = super::Localized {
+    ja: JA_REPEAT_BIWEEKLY,
+    en: EN_REPEAT_BIWEEKLY,
+};
+pub const REPEAT_MONTHLY: super::Localized = super::Localized {
+    ja: JA_REPEAT_MONTHLY,
+    en: EN_REPEAT_MONTHLY,
+};
+pub const REPEAT_COUNT_UNIT: super::Localized = super::Localized {
+    ja: JA_REPEAT_COUNT_UNIT,
+    en: EN_REPEAT_COUNT_UNIT,
+};
+pub const REPEAT_COUNT_HINT: super::Localized = super::Localized {
+    ja: JA_REPEAT_COUNT_HINT,
+    en: EN_REPEAT_COUNT_HINT,
+};
+pub const FORM_FIELD_TITLE: super::Localized = super::Localized {
+    ja: JA_FORM_FIELD_TITLE,
+    en: EN_FORM_FIELD_TITLE,
+};
+pub const FORM_FIELD_DATE: super::Localized = super::Localized {
+    ja: JA_FORM_FIELD_DATE,
+    en: EN_FORM_FIELD_DATE,
+};
+pub const FORM_FIELD_START: super::Localized = super::Localized {
+    ja: JA_FORM_FIELD_START,
+    en: EN_FORM_FIELD_START,
+};
+pub const FORM_FIELD_END: super::Localized = super::Localized {
+    ja: JA_FORM_FIELD_END,
+    en: EN_FORM_FIELD_END,
+};
+pub const FORM_FIELD_LOCATION: super::Localized = super::Localized {
+    ja: JA_FORM_FIELD_LOCATION,
+    en: EN_FORM_FIELD_LOCATION,
+};
+pub const FORM_FIELD_DESC: super::Localized = super::Localized {
+    ja: JA_FORM_FIELD_DESC,
+    en: EN_FORM_FIELD_DESC,
+};
 
 // ── Event detail page (RFC-006 / RFC-025) ─────────────────────────────────
 pub const EN_EVENT_TITLE_HEADER: &str = "Event";
@@ -270,4 +487,16 @@ pub const ADMIN_RECREATE_EVENT_ACTION: super::Localized = super::Localized {
 pub const ADMIN_COPY_EVENT_ACTION: super::Localized = super::Localized {
     ja: JA_ADMIN_COPY_EVENT_ACTION,
     en: EN_ADMIN_COPY_EVENT_ACTION,
+};
+pub const OCCURRENCE_CANCEL_TITLE: super::Localized = super::Localized {
+    ja: JA_OCCURRENCE_CANCEL_TITLE,
+    en: EN_OCCURRENCE_CANCEL_TITLE,
+};
+pub const OCCURRENCE_CANCEL_HELPER: super::Localized = super::Localized {
+    ja: JA_OCCURRENCE_CANCEL_HELPER,
+    en: EN_OCCURRENCE_CANCEL_HELPER,
+};
+pub const OCCURRENCE_CANCEL_SUBMIT: super::Localized = super::Localized {
+    ja: JA_OCCURRENCE_CANCEL_SUBMIT,
+    en: EN_OCCURRENCE_CANCEL_SUBMIT,
 };

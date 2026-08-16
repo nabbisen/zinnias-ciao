@@ -2,13 +2,6 @@ use super::event_card::CardDay;
 use zinnias_ciao_contracts::Locale;
 
 /// Format a day's time range for display, adjusted for the community
-/// timezone. Non-migrated pages: always Japanese. Behavior unchanged by
-/// RFC-072. Migrated pages call [`format_day_time_tz_localized`] instead.
-pub fn format_day_time_tz(day: &CardDay<'_>, tz: &str) -> String {
-    format_day_time_tz_localized(day, tz, Locale::Ja)
-}
-
-/// Format a day's time range for display, adjusted for the community
 /// timezone, with the date label following `locale` (RFC-072 Slice C).
 pub fn format_day_time_tz_localized(day: &CardDay<'_>, tz: &str, locale: Locale) -> String {
     let offset_mins = tz_offset_minutes(tz);

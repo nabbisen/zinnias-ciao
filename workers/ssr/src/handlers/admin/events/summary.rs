@@ -1,8 +1,10 @@
 use crate::db::event as event_db;
 use crate::render;
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::i18n;
 
 pub(super) fn render_schedule_summary(
+    locale: Locale,
     days: &[event_db::EventDayRow],
     community_tz: &str,
 ) -> String {
@@ -12,13 +14,14 @@ pub(super) fn render_schedule_summary(
     let labels: Vec<String> = days
         .iter()
         .map(|day| {
-            render::format_day_time_tz(
+            render::format_day_time_tz_localized(
                 &render::CardDay {
                     starts_at_utc: &day.starts_at_utc,
                     ends_at_utc: &day.ends_at_utc,
                     day_date: &day.day_date,
                 },
                 community_tz,
+                locale,
             )
         })
         .collect();
@@ -44,12 +47,12 @@ pub(super) fn render_schedule_summary(
              {first_label}: {first}</p>\
              <p class=\"cz-admin-summary-line\">\
              {last_label}: {last}</p>",
-            total_prefix = i18n::JA_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX,
+            total_prefix = i18n::t(locale, i18n::ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX),
             count = labels.len(),
-            total_suffix = i18n::JA_ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX,
-            first_label = i18n::JA_ADMIN_EDIT_SCHEDULE_FIRST,
+            total_suffix = i18n::t(locale, i18n::ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX),
+            first_label = i18n::t(locale, i18n::ADMIN_EDIT_SCHEDULE_FIRST),
             first = render::escape_html(first),
-            last_label = i18n::JA_ADMIN_EDIT_SCHEDULE_LAST,
+            last_label = i18n::t(locale, i18n::ADMIN_EDIT_SCHEDULE_LAST),
             last = render::escape_html(last),
         )
     };
@@ -58,7 +61,7 @@ pub(super) fn render_schedule_summary(
         "<section aria-label=\"{heading}\" class=\"cz-admin-summary-card\">\
          <h2 class=\"cz-admin-summary-card-heading\">{heading}</h2>\
          {content}</section>",
-        heading = i18n::JA_ADMIN_EDIT_SCHEDULE_HEADING,
+        heading = i18n::t(locale, i18n::ADMIN_EDIT_SCHEDULE_HEADING),
         content = content,
     )
 }

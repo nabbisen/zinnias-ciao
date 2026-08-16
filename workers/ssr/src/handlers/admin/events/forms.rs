@@ -1,5 +1,6 @@
 use crate::db::event as event_db;
 use crate::render;
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::i18n;
 
 use super::policy::event_is_recurring;
@@ -24,7 +25,9 @@ impl RepeatFieldPrefill {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn render_event_create_fields(
+    locale: Locale,
     title: Option<&str>,
     location: Option<&str>,
     description: Option<&str>,
@@ -34,6 +37,7 @@ pub(super) fn render_event_create_fields(
     ends_at: Option<&str>,
 ) -> String {
     render_event_create_fields_with_repeat(
+        locale,
         title,
         location,
         description,
@@ -47,6 +51,7 @@ pub(super) fn render_event_create_fields(
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render_event_create_fields_with_repeat(
+    locale: Locale,
     title: Option<&str>,
     location: Option<&str>,
     description: Option<&str>,
@@ -67,46 +72,47 @@ pub(super) fn render_event_create_fields_with_repeat(
          {desc}",
         err = render_error_html(error),
         title = form_field(
-            i18n::JA_FORM_FIELD_TITLE,
+            i18n::t(locale, i18n::FORM_FIELD_TITLE),
             "title",
             "text",
             title.unwrap_or(""),
             true
         ),
         date = form_field(
-            i18n::JA_FORM_FIELD_DATE,
+            i18n::t(locale, i18n::FORM_FIELD_DATE),
             "day_date",
             "date",
             day_date.unwrap_or(""),
             true
         ),
         start = form_field(
-            i18n::JA_FORM_FIELD_START,
+            i18n::t(locale, i18n::FORM_FIELD_START),
             "starts_at",
             "time",
             starts_at.unwrap_or(""),
             true
         ),
         end = form_field(
-            i18n::JA_FORM_FIELD_END,
+            i18n::t(locale, i18n::FORM_FIELD_END),
             "ends_at",
             "time",
             ends_at.unwrap_or(""),
             true
         ),
         loc = form_field(
-            i18n::JA_FORM_FIELD_LOCATION,
+            i18n::t(locale, i18n::FORM_FIELD_LOCATION),
             "location",
             "text",
             location.unwrap_or(""),
             false
         ),
-        repeat = render_repeat_fields(repeat),
-        desc = description_field(description),
+        repeat = render_repeat_fields(locale, repeat),
+        desc = description_field(locale, description),
     )
 }
 
 pub(super) fn render_recreate_event_create_fields(
+    locale: Locale,
     event: &event_db::EventRow,
     error: Option<&str>,
 ) -> String {
@@ -116,8 +122,9 @@ pub(super) fn render_recreate_event_create_fields(
          <p role=\"note\" class=\"cz-admin-form-helper\">{helper}</p>\
          {fields}",
         eid = render::escape_html(&event.id),
-        helper = i18n::JA_ADMIN_RECREATE_EVENT_HELPER,
+        helper = i18n::t(locale, i18n::ADMIN_RECREATE_EVENT_HELPER),
         fields = render_event_create_fields(
+            locale,
             Some(&event.title),
             event.location.as_deref(),
             event.description.as_deref(),
@@ -131,6 +138,7 @@ pub(super) fn render_recreate_event_create_fields(
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render_single_day_edit_fields(
+    locale: Locale,
     title: Option<&str>,
     location: Option<&str>,
     description: Option<&str>,
@@ -149,45 +157,46 @@ pub(super) fn render_single_day_edit_fields(
          {desc}",
         err = render_error_html(error),
         title = form_field(
-            i18n::JA_FORM_FIELD_TITLE,
+            i18n::t(locale, i18n::FORM_FIELD_TITLE),
             "title",
             "text",
             title.unwrap_or(""),
             true
         ),
         date = form_field(
-            i18n::JA_FORM_FIELD_DATE,
+            i18n::t(locale, i18n::FORM_FIELD_DATE),
             "day_date",
             "date",
             day_date.unwrap_or(""),
             true
         ),
         start = form_field(
-            i18n::JA_FORM_FIELD_START,
+            i18n::t(locale, i18n::FORM_FIELD_START),
             "starts_at",
             "time",
             starts_at.unwrap_or(""),
             true
         ),
         end = form_field(
-            i18n::JA_FORM_FIELD_END,
+            i18n::t(locale, i18n::FORM_FIELD_END),
             "ends_at",
             "time",
             ends_at.unwrap_or(""),
             true
         ),
         loc = form_field(
-            i18n::JA_FORM_FIELD_LOCATION,
+            i18n::t(locale, i18n::FORM_FIELD_LOCATION),
             "location",
             "text",
             location.unwrap_or(""),
             false
         ),
-        desc = description_field(description),
+        desc = description_field(locale, description),
     )
 }
 
 pub(super) fn render_details_only_event_edit_fields(
+    locale: Locale,
     event: &event_db::EventRow,
     days: &[event_db::EventDayRow],
     community_tz: &str,
@@ -195,9 +204,9 @@ pub(super) fn render_details_only_event_edit_fields(
 ) -> String {
     let is_recurring = event_is_recurring(event);
     let helper = if is_recurring {
-        i18n::JA_ADMIN_EDIT_RECURRING_HELPER
+        i18n::t(locale, i18n::ADMIN_EDIT_RECURRING_HELPER)
     } else {
-        i18n::JA_ADMIN_EDIT_MULTI_DAY_HELPER
+        i18n::t(locale, i18n::ADMIN_EDIT_MULTI_DAY_HELPER)
     };
 
     format!(
@@ -209,25 +218,25 @@ pub(super) fn render_details_only_event_edit_fields(
          <p class=\"cz-admin-edit-note\">{preserved}</p>\
          {title}{loc}{desc}</section>",
         err = render_error_html(error),
-        summary = render_schedule_summary(days, community_tz),
-        heading = i18n::JA_ADMIN_EDIT_DETAILS_ONLY_HEADING,
+        summary = render_schedule_summary(locale, days, community_tz),
+        heading = i18n::t(locale, i18n::ADMIN_EDIT_DETAILS_ONLY_HEADING),
         helper = helper,
-        preserved = i18n::JA_ADMIN_EDIT_RESPONSES_PRESERVED,
+        preserved = i18n::t(locale, i18n::ADMIN_EDIT_RESPONSES_PRESERVED),
         title = form_field(
-            i18n::JA_FORM_FIELD_TITLE,
+            i18n::t(locale, i18n::FORM_FIELD_TITLE),
             "title",
             "text",
             &event.title,
             true
         ),
         loc = form_field(
-            i18n::JA_FORM_FIELD_LOCATION,
+            i18n::t(locale, i18n::FORM_FIELD_LOCATION),
             "location",
             "text",
             event.location.as_deref().unwrap_or(""),
             false
         ),
-        desc = description_field(event.description.as_deref()),
+        desc = description_field(locale, event.description.as_deref()),
     )
 }
 
@@ -257,7 +266,7 @@ fn form_field(label: &str, name: &str, ftype: &str, val: &str, required: bool) -
     )
 }
 
-fn description_field(description: Option<&str>) -> String {
+fn description_field(locale: Locale, description: Option<&str>) -> String {
     let dval = render::escape_html(description.unwrap_or(""));
     format!(
         "<label class=\"cz-admin-field\">\
@@ -266,11 +275,11 @@ fn description_field(description: Option<&str>) -> String {
          <textarea name=\"description\" rows=\"3\" \
            class=\"cz-field-input\">{dval}</textarea>\
          </label>",
-        desc_lbl = i18n::JA_FORM_FIELD_DESC,
+        desc_lbl = i18n::t(locale, i18n::FORM_FIELD_DESC),
     )
 }
 
-fn render_repeat_fields(repeat: &RepeatFieldPrefill) -> String {
+fn render_repeat_fields(locale: Locale, repeat: &RepeatFieldPrefill) -> String {
     format!(
         "<div class=\"cz-admin-repeat-group\">\
          <label class=\"cz-admin-field-label\">{repeat_lbl}</label>\
@@ -294,24 +303,40 @@ fn render_repeat_fields(repeat: &RepeatFieldPrefill) -> String {
          </div>\
          <p class=\"cz-admin-repeat-hint\">{hint}</p>\
          </div>",
-        repeat_lbl = i18n::JA_REPEAT_LABEL,
-        opt_none = option_html("none", i18n::JA_REPEAT_NONE, &repeat.repeat_rule),
-        opt_weekly = option_html("weekly", i18n::JA_REPEAT_WEEKLY, &repeat.repeat_rule),
-        opt_biweekly = option_html("biweekly", i18n::JA_REPEAT_BIWEEKLY, &repeat.repeat_rule),
-        opt_monthly = option_html("monthly", i18n::JA_REPEAT_MONTHLY, &repeat.repeat_rule),
+        repeat_lbl = i18n::t(locale, i18n::REPEAT_LABEL),
+        opt_none = option_html(
+            "none",
+            i18n::t(locale, i18n::REPEAT_NONE),
+            &repeat.repeat_rule
+        ),
+        opt_weekly = option_html(
+            "weekly",
+            i18n::t(locale, i18n::REPEAT_WEEKLY),
+            &repeat.repeat_rule
+        ),
+        opt_biweekly = option_html(
+            "biweekly",
+            i18n::t(locale, i18n::REPEAT_BIWEEKLY),
+            &repeat.repeat_rule
+        ),
+        opt_monthly = option_html(
+            "monthly",
+            i18n::t(locale, i18n::REPEAT_MONTHLY),
+            &repeat.repeat_rule
+        ),
         end_open = option_html(
             "open_ended",
-            i18n::JA_REPEAT_END_OPEN,
+            i18n::t(locale, i18n::REPEAT_END_OPEN),
             &repeat.repeat_end_mode
         ),
         end_until = option_html(
             "until_date",
-            i18n::JA_REPEAT_END_UNTIL,
+            i18n::t(locale, i18n::REPEAT_END_UNTIL),
             &repeat.repeat_end_mode
         ),
         end_count = option_html(
             "after_count",
-            i18n::JA_REPEAT_END_COUNT,
+            i18n::t(locale, i18n::REPEAT_END_COUNT),
             &repeat.repeat_end_mode
         ),
         repeat_count = repeat
@@ -323,10 +348,10 @@ fn render_repeat_fields(repeat: &RepeatFieldPrefill) -> String {
             .as_deref()
             .map(render::escape_html)
             .unwrap_or_default(),
-        count_ph = i18n::JA_REPEAT_COUNT_UNIT,
-        count_lbl = i18n::JA_REPEAT_COUNT_LABEL,
-        until_lbl = i18n::JA_REPEAT_UNTIL_LABEL,
-        hint = i18n::JA_REPEAT_COUNT_HINT,
+        count_ph = i18n::t(locale, i18n::REPEAT_COUNT_UNIT),
+        count_lbl = i18n::t(locale, i18n::REPEAT_COUNT_LABEL),
+        until_lbl = i18n::t(locale, i18n::REPEAT_UNTIL_LABEL),
+        hint = i18n::t(locale, i18n::REPEAT_COUNT_HINT),
     )
 }
 

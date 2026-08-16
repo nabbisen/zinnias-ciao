@@ -85,6 +85,12 @@ pub const JA_ADMIN_REMOVE_KEEP: &str = "やめる";
 pub const JA_ADMIN_REMOVE_CONFIRM: &str = "メンバーから外す";
 pub const JA_ADMIN_REMOVE_CONSEQUENCE: &str =
     "このメンバーはイベントやメモを見ることができなくなります。過去の参加状況やメモは残ります。";
+
+/// RFC-072 locale-aware pair; see `i18n::Localized`.
+pub const ADMIN_REMOVE_CONSEQUENCE: super::Localized = super::Localized {
+    ja: JA_ADMIN_REMOVE_CONSEQUENCE,
+    en: EN_ADMIN_REMOVE_CONSEQUENCE,
+};
 pub const JA_ADMIN_LAST_ADMIN: &str =
     "最後の管理者はメンバーから外せません。先に管理者権限を移譲してください。";
 pub const JA_ADMIN_HELP_SIGNIN_ACTION: &str = "サインインを手伝う";

@@ -17,7 +17,8 @@ pub async fn get_recreate_event(
     event_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     let source_event = match event_db::find_for_community(&db, event_id, community_id).await? {
@@ -38,7 +39,7 @@ pub async fn get_recreate_event(
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
 
     let body = format!(
         "{header}\
@@ -53,20 +54,25 @@ pub async fn get_recreate_event(
            <a href=\"/c/{cid}/events/{eid}\" class=\"cz-admin-back-link\">{back}</a>\
          </div>\
          </main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_ADMIN_CREATE_EVENT_TITLE,
+        header = render::header_with_switcher_next_localized(
+            i18n::t(locale, i18n::ADMIN_CREATE_EVENT_TITLE),
             community_id,
             &community_pairs,
             "admin_events_new",
+            locale,
         ),
-        title = i18n::JA_ADMIN_CREATE_EVENT_TITLE,
+        title = i18n::t(locale, i18n::ADMIN_CREATE_EVENT_TITLE),
         cid = render::escape_html(community_id),
         eid = render::escape_html(event_id),
         tok = render::escape_html(&token),
-        fields = render_recreate_event_create_fields(&source_event, None),
-        submit = i18n::JA_ADMIN_CREATE_EVENT_SUBMIT,
-        back = i18n::JA_NAV_BACK,
+        fields = render_recreate_event_create_fields(locale, &source_event, None),
+        submit = i18n::t(locale, i18n::ADMIN_CREATE_EVENT_SUBMIT),
+        back = i18n::t(locale, i18n::NAV_BACK),
         nav = nav,
     );
-    render::page(i18n::JA_ADMIN_CREATE_EVENT_TITLE, &body)
+    render::page_localized(
+        locale,
+        i18n::t(locale, i18n::ADMIN_CREATE_EVENT_TITLE),
+        &body,
+    )
 }

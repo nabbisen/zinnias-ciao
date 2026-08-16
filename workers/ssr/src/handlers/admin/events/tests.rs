@@ -1,12 +1,14 @@
 use crate::db::event as event_db;
 use crate::db::event_series as series_db;
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::EventValidationError;
 
 use super::copy::{build_event_copy_prefill, render_copy_event_create_fields};
 use super::create::{CreateEventProvenance, create_event_audit_metadata};
 use super::forms::{
-    RepeatFieldPrefill, render_details_only_event_edit_fields, render_recreate_event_create_fields,
+    RepeatFieldPrefill, render_details_only_event_edit_fields,
+    render_event_create_fields_with_repeat, render_recreate_event_create_fields,
 };
 use super::policy::{
     admin_events_new_next, event_can_seed_copy, event_can_seed_recreate, event_schedule_editable,
@@ -116,6 +118,7 @@ fn schedule_editable_only_for_single_non_recurring_event() {
 #[test]
 fn details_only_edit_form_hides_schedule_controls() {
     let html = render_details_only_event_edit_fields(
+        Locale::Ja,
         &event_row("weekly", Some(4)),
         &[day(1, "2026-07-05"), day(2, "2026-07-12")],
         "Asia/Tokyo",
@@ -132,7 +135,7 @@ fn details_only_edit_form_hides_schedule_controls() {
 
 #[test]
 fn recreate_form_prefills_details_only_and_warns_about_memos() {
-    let html = render_recreate_event_create_fields(&cancelled_event_row(), None);
+    let html = render_recreate_event_create_fields(Locale::Ja, &cancelled_event_row(), None);
     assert!(html.contains("name=\"copy_source_event_id\""));
     assert!(html.contains("name=\"copy_mode\" value=\"cancelled_recreate\""));
     assert!(html.contains("Cancelled title"));
@@ -159,6 +162,7 @@ fn recreate_source_requires_cancelled_event_but_copy_accepts_scheduled() {
 #[test]
 fn copy_form_prefills_single_day_source_and_uses_event_copy_mode() {
     let prefill = build_event_copy_prefill(
+        Locale::Ja,
         &event_row("none", None),
         &[day(1, "2026-07-05")],
         None,
@@ -177,7 +181,7 @@ fn copy_form_prefills_single_day_source_and_uses_event_copy_mode() {
             .contains(&i18n::JA_ADMIN_COPY_EVENT_DATE_WARNING)
     );
 
-    let html = render_copy_event_create_fields("evt", &prefill, None);
+    let html = render_copy_event_create_fields(Locale::Ja, "evt", &prefill, None);
     assert!(html.contains("name=\"copy_source_event_id\" value=\"evt\""));
     assert!(html.contains("name=\"copy_mode\" value=\"event_copy\""));
     assert!(html.contains("name=\"day_date\" value=\"2026-07-05\""));
@@ -189,6 +193,7 @@ fn copy_form_prefills_single_day_source_and_uses_event_copy_mode() {
 #[test]
 fn copy_prefill_for_multi_day_source_keeps_schedule_blank() {
     let prefill = build_event_copy_prefill(
+        Locale::Ja,
         &event_row("none", None),
         &[day(1, "2026-07-05"), day(2, "2026-07-06")],
         None,
@@ -210,6 +215,7 @@ fn copy_prefill_for_multi_day_source_keeps_schedule_blank() {
 fn past_recurring_copy_resets_date_and_end_controls_but_keeps_template_time() {
     let source_series = series("2026-06-01", "after_count", Some(6), None);
     let prefill = build_event_copy_prefill(
+        Locale::Ja,
         &event_row("weekly", Some(6)),
         &[day(1, "2026-06-01")],
         Some(&source_series),
@@ -235,6 +241,7 @@ fn past_recurring_copy_resets_date_and_end_controls_but_keeps_template_time() {
 fn valid_recurring_copy_preserves_after_count_end_controls() {
     let source_series = series("2026-07-05", "after_count", Some(6), None);
     let prefill = build_event_copy_prefill(
+        Locale::Ja,
         &event_row("weekly", Some(6)),
         &[day(1, "2026-07-05")],
         Some(&source_series),
@@ -257,6 +264,7 @@ fn valid_recurring_copy_preserves_after_count_end_controls() {
 fn recurring_until_before_base_resets_only_end_controls() {
     let source_series = series("2026-07-05", "until_date", None, Some("2026-07-01"));
     let prefill = build_event_copy_prefill(
+        Locale::Ja,
         &event_row("weekly", None),
         &[day(1, "2026-07-05")],
         Some(&source_series),
@@ -298,6 +306,96 @@ fn audit_metadata_separates_cancelled_recreate_from_event_copy() {
             source_event_id: Some(source),
         } if source == "evt-src"
     ));
+}
+
+/// RFC-083 §6.3: a rendered-output assertion, not a source scan. Scans the
+/// *whole* composed string for any codepoint in the ranges Japanese text in
+/// this codebase actually uses (Hiragana, Katakana, CJK Unified Ideographs,
+/// CJK punctuation, fullwidth forms) — not a check against a fixed list of
+/// known constants, which would miss exactly the class of leak RFC-072
+/// caught twice: a page half-migrated in a way nobody wrote a specific
+/// assertion for.
+fn contains_japanese_codepoint(s: &str) -> bool {
+    s.chars().any(|c| {
+        let cp = c as u32;
+        (0x3040..=0x30FF).contains(&cp) // Hiragana + Katakana
+            || (0x4E00..=0x9FFF).contains(&cp) // CJK Unified Ideographs
+            || (0x3000..=0x303F).contains(&cp) // CJK punctuation (、。「」etc.)
+            || (0xFF00..=0xFFEF).contains(&cp) // Fullwidth forms (？ etc.)
+    })
+}
+
+#[test]
+fn admin_edit_page_renders_with_no_japanese_codepoint_in_english_locale() {
+    // Composes the same pieces get_edit_event's body assembles (header +
+    // hint + details-only fields, which itself pulls in summary.rs's
+    // schedule card) — everything but the outer <html> shell, whose
+    // lang-follows-locale behavior is already covered generically by
+    // render::tests::shell_lang_matches_the_locale_code_passed_in.
+    let event = event_row("weekly", Some(4));
+    let days = [day(1, "2026-07-05"), day(2, "2026-07-12")];
+
+    let header = crate::render::header_with_switcher_localized(
+        i18n::t(Locale::En, i18n::ADMIN_EDIT_EVENT_TITLE),
+        "community-a",
+        &[("community-a".to_string(), "Community A".to_string())],
+        Locale::En,
+    );
+    let fields =
+        render_details_only_event_edit_fields(Locale::En, &event, &days, "Asia/Tokyo", None);
+    let en_page = format!(
+        "{header}<main>{hint}{fields}</main>",
+        hint = i18n::t(Locale::En, i18n::ADMIN_EDIT_EVENT_HINT)
+    );
+
+    assert!(
+        !contains_japanese_codepoint(&en_page),
+        "English-locale admin edit page must contain no Japanese codepoint, found some in: {en_page}"
+    );
+
+    // Sanity: the same composition at Locale::Ja must contain Japanese —
+    // proves the assertion above is discriminating, not vacuously true.
+    let ja_fields =
+        render_details_only_event_edit_fields(Locale::Ja, &event, &days, "Asia/Tokyo", None);
+    assert!(
+        contains_japanese_codepoint(&ja_fields),
+        "Japanese-locale render must contain Japanese text"
+    );
+}
+
+#[test]
+fn admin_create_recurring_form_renders_with_no_japanese_codepoint_in_english_locale() {
+    let html = render_event_create_fields_with_repeat(
+        Locale::En,
+        Some("Title"),
+        Some("Location"),
+        Some("Description"),
+        None,
+        Some("2026-07-05"),
+        Some("10:00"),
+        Some("11:00"),
+        &RepeatFieldPrefill::normal_create_default(),
+    );
+    assert!(
+        !contains_japanese_codepoint(&html),
+        "English-locale recurring create form must contain no Japanese codepoint, found some in: {html}"
+    );
+
+    let ja_html = render_event_create_fields_with_repeat(
+        Locale::Ja,
+        Some("Title"),
+        Some("Location"),
+        Some("Description"),
+        None,
+        Some("2026-07-05"),
+        Some("10:00"),
+        Some("11:00"),
+        &RepeatFieldPrefill::normal_create_default(),
+    );
+    assert!(
+        contains_japanese_codepoint(&ja_html),
+        "Japanese-locale recurring create form must contain Japanese text"
+    );
 }
 
 #[test]
