@@ -223,9 +223,8 @@ pub const EN_EVENT_WHOS_GOING: &str = "Who's going?";
 pub const JA_EVENT_WHOS_GOING: &str = "参加予定者";
 pub const EN_EVENT_NOTES_SECTION: &str = "Notes";
 pub const JA_EVENT_NOTES_SECTION: &str = "メモ";
-pub const EN_TZ_ERROR: &str = "Community timezone is not configured correctly. Please ask the operator to set a valid timezone.";
-pub const JA_TZ_ERROR: &str =
-    "コミュニティのタイムゾーンが正しく設定されていません。運営者にお問い合わせください。";
+pub const EN_TZ_ERROR: &str = "Community timezone is not configured correctly. Please ask your community administrator to set a valid timezone.";
+pub const JA_TZ_ERROR: &str = "コミュニティのタイムゾーンが正しく設定されていません。コミュニティの管理者にお問い合わせください。";
 
 /// RFC-072 locale-aware pairs; see `i18n::Localized`.
 pub const OCCURRENCE_CANCELLED_BADGE: super::Localized = super::Localized {

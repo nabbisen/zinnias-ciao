@@ -6,8 +6,7 @@ pub const EN_ADMIN_INVITES_ACTIVE: &str = "Active codes";
 pub const EN_ADMIN_INVITES_NONE: &str = "No unused codes.";
 pub const EN_ADMIN_INVITES_NEW_CODE_HINT: &str =
     "Share with one person only — expires in 24 hours.";
-pub const EN_ADMIN_INVITES_REVEAL_WARNING: &str =
-    "Copy this code now. It will not be shown again after you leave or reload this page.";
+pub const EN_ADMIN_INVITES_REVEAL_WARNING: &str = "Write down or copy this code now. If you leave or reload this page, it will never be shown again.";
 pub const EN_ADMIN_INVITES_REVOKE: &str = "Revoke";
 pub const EN_ADMIN_INVITES_BACK_TO_MEMBERS: &str = "Back to member management";
 
@@ -18,7 +17,7 @@ pub const JA_ADMIN_INVITES_ACTIVE: &str = "有効なコード";
 pub const JA_ADMIN_INVITES_NONE: &str = "未使用のコードはありません。";
 pub const JA_ADMIN_INVITES_NEW_CODE_HINT: &str =
     "一人だけに共有してください — 24時間で失効します。";
-pub const JA_ADMIN_INVITES_REVEAL_WARNING: &str = "このコードを今コピーしてください。このページを離れたり再読み込みしたりすると、二度と表示されません。";
+pub const JA_ADMIN_INVITES_REVEAL_WARNING: &str = "このコードを今すぐ書き留めるか、コピーしてください。このページを離れたり再読み込みしたりすると、二度と表示されません。";
 pub const JA_ADMIN_INVITES_REVOKE: &str = "無効化";
 pub const JA_ADMIN_INVITES_BACK_TO_MEMBERS: &str = "メンバー管理へ戻る";
 // Handoff 037: was a raw-English `?flash=Code+revoked` query value matched

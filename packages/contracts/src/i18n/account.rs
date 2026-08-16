@@ -27,8 +27,7 @@ pub const EN_ACCOUNT_LINK_CANCEL: &str = "Cancel";
 // ── Recovery credential and unlink (RFC-081 §3, Handoff 057) ─────────────
 pub const EN_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS: &str = "Set up.";
 pub const EN_ACCOUNT_RECOVERY_REGENERATE_LABEL: &str = "Generate a new code";
-pub const EN_ACCOUNT_RECOVERY_REVEAL_WARNING: &str =
-    "Copy this code now. If you leave or reload this page, it will never be shown again.";
+pub const EN_ACCOUNT_RECOVERY_REVEAL_WARNING: &str = "Write down or copy this code now. If you leave or reload this page, it will never be shown again.";
 pub const EN_ACCOUNT_RECOVERY_REVEAL_HINT: &str = "Keep it somewhere safe, the same way you would a password. \
      Anyone who has it can sign in to your account.";
 pub const EN_ACCOUNT_RECOVERY_CONTINUE: &str = "Continue to your account";
@@ -57,11 +56,11 @@ pub const JA_ACCOUNT_LINK_ENTRY_LABEL: &str = "外部アカウントを連携す
 pub const JA_ACCOUNT_LINK_TITLE: &str = "外部アカウントを連携する";
 pub const JA_ACCOUNT_LINK_BODY: &str = "連携したい外部アカウントでサインインする画面に移動します。既存のサインイン方法が失われることはありません。";
 pub const JA_ACCOUNT_LINK_SUBMIT: &str = "続ける";
-pub const JA_ACCOUNT_LINK_CANCEL: &str = "キャンセル";
+pub const JA_ACCOUNT_LINK_CANCEL: &str = "やめる";
 
 pub const JA_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS: &str = "設定済みです。";
 pub const JA_ACCOUNT_RECOVERY_REGENERATE_LABEL: &str = "新しいコードを発行する";
-pub const JA_ACCOUNT_RECOVERY_REVEAL_WARNING: &str = "このコードを今コピーしてください。このページを離れたり再読み込みしたりすると、二度と表示されません。";
+pub const JA_ACCOUNT_RECOVERY_REVEAL_WARNING: &str = "このコードを今すぐ書き留めるか、コピーしてください。このページを離れたり再読み込みしたりすると、二度と表示されません。";
 pub const JA_ACCOUNT_RECOVERY_REVEAL_HINT: &str = "パスワードと同じように、安全な場所に保管してください。このコードを持っている人は誰でもあなたのアカウントにサインインできます。";
 pub const JA_ACCOUNT_RECOVERY_CONTINUE: &str = "アカウントに進む";
 pub const JA_ACCOUNT_UNLINK_LABEL: &str = "連携を解除する";
@@ -69,6 +68,6 @@ pub const JA_ACCOUNT_UNLINK_TITLE: &str = "この連携を解除する";
 pub const JA_ACCOUNT_UNLINK_BODY: &str =
     "この外部アカウントをサインイン方法から削除します。この操作は取り消せません。";
 pub const JA_ACCOUNT_UNLINK_SUBMIT: &str = "連携を解除する";
-pub const JA_ACCOUNT_UNLINK_CANCEL: &str = "キャンセル";
+pub const JA_ACCOUNT_UNLINK_CANCEL: &str = "やめる";
 pub const JA_ACCOUNT_UNLINK_REFUSED: &str =
     "連携を解除できませんでした。他にサインインする方法が少なくとも1つ必要です。";

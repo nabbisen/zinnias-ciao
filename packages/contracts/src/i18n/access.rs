@@ -58,6 +58,6 @@ pub const EN_IDENTITY_SIGN_IN_CANCEL: &str = "Cancel";
 pub const JA_IDENTITY_SIGN_IN_LINK: &str = "外部アカウントでサインイン";
 pub const JA_IDENTITY_SIGN_IN_FAILED_TITLE: &str = "サインインを完了できませんでした";
 pub const JA_IDENTITY_SIGN_IN_FAILED_BODY: &str =
-    "サインインを完了できませんでした。もう一度お試しいただくか、キャンセルしてお戻りください。";
+    "サインインを完了できませんでした。もう一度お試しいただくか、やめてお戻りください。";
 pub const JA_IDENTITY_SIGN_IN_RETRY: &str = "もう一度試す";
-pub const JA_IDENTITY_SIGN_IN_CANCEL: &str = "キャンセル";
+pub const JA_IDENTITY_SIGN_IN_CANCEL: &str = "やめる";

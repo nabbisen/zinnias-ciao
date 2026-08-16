@@ -1821,3 +1821,83 @@ can remove a credential (5b's job).
       revoked codes are indistinguishable) is unchanged, confirmed by
       reading every branch of `handlers/recovery.rs::post_recovery` and
       finding all five render this same one constant.
+
+## RFC-054 Slice 1: findings B1–B4, plus copy harmony (Handoff 061)
+
+- [x] **B1** — `JA_RECOVERY_BODY`/`EN_RECOVERY_BODY` now say the code was
+      *saved earlier by the member*, distinguishing it from an invite or
+      relink code (both admin-issued) — `JA_RELINK_BODY` already told the
+      member where to look; recovery did not.
+- [x] **B2** — `JA_MEMBERSHIP_SUSPENDED`/`EN_MEMBERSHIP_SUSPENDED` gained a
+      middle sentence stating the member's other communities are
+      unaffected — true by construction (RFC-082 §1: suspension is
+      per-membership) and proven by `smoke:membership-suspension`, not
+      reassurance but a fact the member has no other way to learn. States
+      only that other communities are unaffected — nothing about why the
+      member was suspended or by whom.
+- [x] **B3** — the one-time-code reveal warning
+      (`*_ACCOUNT_RECOVERY_REVEAL_WARNING` and
+      `*_ADMIN_INVITES_REVEAL_WARNING`) now says "write down or copy",
+      not just "copy" — these pages have no application JavaScript (AD-1),
+      so a copy-only instruction may be one the reader cannot follow. Both
+      constants converged onto identical wording in both languages; only
+      the instruction changed, not what is revealed or for how long.
+- [x] **B4** — `JA_RECOVERY_SUBMIT`/`EN_RECOVERY_SUBMIT` now say
+      "サインイン"/"Sign in" instead of "続ける"/"Continue" — consuming a
+      recovery code signs the member in, exactly as relink already says.
+      `JA_ACCOUNT_LINK_SUBMIT` (linking hands off to a provider, it does
+      not sign in) correctly keeps "続ける" — a collision, not a
+      contradiction, and left alone.
+- [x] **Vocabulary convention established: やめる for dismissing a form.**
+      The six `*_CANCEL` button labels (English already uniform: `Cancel`)
+      had split three ways to やめる and three to キャンセル. Converged the
+      three キャンセル constants (`JA_IDENTITY_SIGN_IN_CANCEL`,
+      `JA_ACCOUNT_LINK_CANCEL`, `JA_ACCOUNT_UNLINK_CANCEL`) onto やめる.
+      キャンセル stays reserved for cancelling an event
+      (`JA_ADMIN_CANCEL_EVENT_TITLE` and siblings), where it already means
+      something with real consequences for members — the three converged
+      constants were all on identity surfaces built most recently, new
+      work that hadn't yet matched established vocabulary.
+- [x] **Vocabulary convention established: 管理者 / administrator for the
+      role**, not 運営者 / operator. `JA_TZ_ERROR`/`EN_TZ_ERROR` was the
+      sole outlier — 管理者 appears fourteen times elsewhere in the
+      corpus, 運営者 appeared exactly once, in this one constant, in both
+      halves. Now matches `MEMBERSHIP_SUSPENDED`, the product's other
+      "something is wrong, go ask someone" message.
+- [x] **Independently re-derived, not taken on trust**: all 632 `&str`
+      constants across the thirteen i18n modules extracted and compared by
+      value. Confirmed every specifically-named collision/contradiction
+      group and both substring counts (管理者 ×14, 運営者 ×1) exactly.
+      Found and fixed an extraction bug in the first pass (two constants
+      using Rust's `\`-newline string continuation weren't matched) before
+      trusting the corrected 632 total. Could not exactly reconcile the
+      handoff's own "23 other identical-text groups" summary figure to a
+      single counting method (variously got 21 or 25 JA-only groups
+      depending on how a group already mid-convergence is bucketed) —
+      noted in the review request as an unreconciled but non-blocking
+      count, since every specifically *named* group and constant checked
+      out exactly.
+- [x] **No smoke assertion needed updating.** Grepped every `.mjs` for
+      every old string (full sentences, and the short shared words
+      続ける/キャンセル/やめる/サインイン individually) before making any
+      edit — zero hits beyond Handoff 060's own already-fixed one. The
+      five smokes named as likely to break
+      (`smoke:account-recovery-unlink`, `smoke:membership-suspension`,
+      `smoke:admin-tools-onboarding`, `smoke:account-link-reauth`,
+      `smoke:identity-callback`) and the remaining eleven all passed
+      unmodified.
+- [x] `cargo test --workspace`: **628**, unchanged. `--features
+      dev_fake_issuer`: **631**, unchanged. Clippy (both feature states),
+      fmt, wasm check (both states), `mdbook build docs`, `git diff
+      --check` all clean. `bun run build`: `index.js` unchanged at
+      28.6kb. No version bump, no digest re-pin (no cached asset
+      changed). All sixteen smokes green.
+- [x] **Review correction (F1): prose naming a button must move with the
+      button's own label, not just duplicate-value strings.**
+      `JA_IDENTITY_SIGN_IN_FAILED_BODY` named its cancel button as
+      「キャンセルして」 in running prose — a different relationship than a
+      shared *value*, and outside the value-equality sweep above, so H1's
+      button-label rename (キャンセル → やめる) left this sentence pointing
+      at a label no longer on the page. Fixed to 「やめて」;
+      `EN_IDENTITY_SIGN_IN_FAILED_BODY` correctly left alone, since its
+      button is still `Cancel`.
