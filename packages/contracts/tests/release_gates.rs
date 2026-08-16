@@ -4127,6 +4127,7 @@ const RFC079_BOUNDARY_FIXTURE_SRC: &str =
     include_str!("../../../workers/ssr/tests/fixtures/audit_response_boundaries.sql");
 const RFC079_COMMUNITY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/community.rs");
 const PACKAGE_JSON_SRC: &str = include_str!("../../../package.json");
+const RECURRENCE_V2_SMOKE_SRC: &str = include_str!("../../../scripts/smoke/recurrence-v2.mjs");
 
 #[derive(Default)]
 struct AuditSourceScan {
@@ -5888,6 +5889,117 @@ fn handoff049_smoke_session_fixtures_all_set_a_provenance() {
          provenance = 'invite_redemption' on the fixture (these all simulate a member who \
          joined by redeeming an invite):\n{}",
         missing.join("\n")
+    );
+}
+
+/// Handoff 063 (F2 of the RFC-083 Slice D1a review): a documented exception
+/// to the smoke-coverage gate below. `reason` must say why the script
+/// genuinely cannot or should not be reachable by any `package.json` name —
+/// never used to make an oversight pass quietly.
+struct SmokeCoverageException {
+    path: &'static str,
+    reason: &'static str,
+}
+
+/// Empty by design: Handoff 063 gave every `scripts/smoke/*.mjs` file a
+/// runnable name (including the three that had none —
+/// `admin-role-transfer.mjs`, `help-signin.mjs`, `member-management.mjs`)
+/// rather than excepting them. A future addition here should be rare and
+/// should say why running the script by name isn't possible, not why nobody
+/// got around to it.
+const SMOKE_COVERAGE_EXCEPTIONS: &[SmokeCoverageException] = &[];
+
+/// Handoff 063, origin F2 of the RFC-083 Slice D1a review: eight of
+/// twenty-four smoke scripts were not running, and nobody knew, because the
+/// run set was carried by hand from package to package — the same shape
+/// `LOCALIZATION_EXCEPTIONS`' own comment describes for its predecessor,
+/// "only checked a file if someone remembered to add it." This gate walks
+/// every `scripts/smoke/*.mjs` file and fails on anything neither referenced
+/// by some `package.json` script value nor listed in
+/// `SMOKE_COVERAGE_EXCEPTIONS` with a written reason — an unlisted,
+/// unreferenced file is a failure, not a silent pass.
+#[test]
+fn every_smoke_script_is_reachable_by_name_or_documented_exception() {
+    let dir = scripts_smoke_dir();
+    let entries = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("failed to read directory {}: {e}", dir.display()));
+
+    let mut checked = 0usize;
+    let mut unreferenced: Vec<String> = Vec::new();
+    let mut seen_exceptions = std::collections::HashSet::new();
+
+    for entry in entries {
+        let path = entry
+            .unwrap_or_else(|e| panic!("failed to read directory entry: {e}"))
+            .path();
+        if path.is_dir() || !path.extension().is_some_and(|ext| ext == "mjs") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        checked += 1;
+        let referenced = PACKAGE_JSON_SRC.contains(&format!("scripts/smoke/{name}"));
+
+        match SMOKE_COVERAGE_EXCEPTIONS.iter().find(|e| e.path == name) {
+            Some(exc) => {
+                seen_exceptions.insert(exc.path);
+                assert!(
+                    !referenced,
+                    "{name} is both referenced by a package.json script AND listed in \
+                     SMOKE_COVERAGE_EXCEPTIONS ({}) — remove the now-stale exception entry.",
+                    exc.reason
+                );
+            }
+            None => {
+                if !referenced {
+                    unreferenced.push(name);
+                }
+            }
+        }
+    }
+
+    assert!(
+        checked > 0,
+        "found zero .mjs files under scripts/smoke/ — has the directory moved? This gate \
+         expects the existing scripts to still be there; an empty result likely means the gate \
+         itself is broken, not that there is nothing left to check."
+    );
+    assert!(
+        unreferenced.is_empty(),
+        "these scripts/smoke/*.mjs files are not referenced by any package.json script value \
+         and are not in SMOKE_COVERAGE_EXCEPTIONS: {} — add a package.json script entry so the \
+         file can be run by name, or add a pinned exception with a written reason. This is the \
+         defect that let eight of twenty-four smoke scripts go unrun without anyone noticing.",
+        unreferenced.join(", ")
+    );
+    for exc in SMOKE_COVERAGE_EXCEPTIONS {
+        assert!(
+            seen_exceptions.contains(exc.path),
+            "SMOKE_COVERAGE_EXCEPTIONS names {} ({}) but no file with that name exists under \
+             scripts/smoke/ — stale table entry?",
+            exc.path,
+            exc.reason
+        );
+    }
+}
+
+/// Handoff 063 §3.3's cross-language pin: `recurrence-v2.mjs` cannot import
+/// `RECURRENCE_MATERIALIZATION_MONTHS_AHEAD` from Rust, so it carries its own
+/// literal copy, used to derive a "definitely outside the horizon" Calendar
+/// month at smoke-run time. This reads the *live* constant (not a duplicated
+/// number on this side) and fails if the JS literal drifts from it — the
+/// exact way a hardcoded `?month=2027-02` silently stopped meaning "far
+/// future" once real time caught up to it.
+#[test]
+fn rfc065_recurrence_smoke_pins_the_materialization_horizon_constant() {
+    let expected = zinnias_ciao_domain::event_admin::RECURRENCE_MATERIALIZATION_MONTHS_AHEAD;
+    let needle = format!("const RECURRENCE_MATERIALIZATION_MONTHS_AHEAD = {expected};");
+    assert!(
+        RECURRENCE_V2_SMOKE_SRC.contains(&needle),
+        "scripts/smoke/recurrence-v2.mjs does not contain `{needle}` — its far-future Calendar \
+         month is derived from this literal, and it must track \
+         packages/domain/src/event_admin.rs's RECURRENCE_MATERIALIZATION_MONTHS_AHEAD (currently \
+         {expected}) exactly, or the smoke's \"beyond the horizon\" assertion silently stops \
+         meaning that."
     );
 }
 

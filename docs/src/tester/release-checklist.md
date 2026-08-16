@@ -2015,3 +2015,76 @@ can remove a credential (5b's job).
       written. The smoke still passes, since its fixtures' `ui_language` is
       NULL (Japanese fallback). Noted for whoever next touches that script,
       not corrected here — out of this handoff's authorized scope.
+
+## Smoke coverage: derive the run set, fix the wall-clock break (Handoff 063)
+
+**Smoke evidence must now come from `bun run smoke:all`'s summary output, not a
+remembered count.** "Sixteen smokes green" had been quoted across several recent
+packages — including reviews of Handoffs 060 and 061 — while the real,
+runnable set was twenty (and the real total on disk was twenty-four). A
+package's evidence section that states a smoke count without `smoke:all`'s
+output behind it is not acceptable evidence.
+
+- [x] **A default-fail coverage gate**
+      (`every_smoke_script_is_reachable_by_name_or_documented_exception` in
+      `release_gates.rs`), same shape as `LOCALIZATION_EXCEPTIONS`: walks every
+      `scripts/smoke/*.mjs` file and fails on anything not referenced by some
+      `package.json` script value and not listed in the (currently empty)
+      `SMOKE_COVERAGE_EXCEPTIONS` table. Demonstrated failing: temporarily
+      removed `smoke:invite` from `package.json`, re-ran the gate, got the
+      expected failure naming `invite-redemption.mjs`, restored, re-ran green.
+- [x] **`bun run smoke:all`** (`scripts/smoke-all.mjs`) runs every self-contained
+      smoke and reports total run / total passed / named failures, derived at
+      run time from `package.json`, not hand-maintained. Includes
+      `test:abuse-controls` explicitly even though its name doesn't start with
+      `smoke:` — omitting it on a naming technicality would recreate the exact
+      defect this script exists to fix.
+- [x] **Three previously-unreachable scripts given `smoke:*` names**:
+      `smoke:admin-role-transfer`, `smoke:help-signin`,
+      `smoke:member-management`. All three run and pass in full (no failing
+      checks); their subject matter (RFC-062 role transfer, RFC-024 relink,
+      member-management workflows) is not obviously duplicated by any other
+      current smoke, so they stay as their own scripts rather than being
+      folded into anything. Their evidence output was scanned with
+      `evidence:scan-leakage`; each flagged a pre-existing raw-resource-id
+      finding (a community ID captured in a form field snapshot) — not new,
+      not fixed here, and no raw evidence copied into any tracked file.
+- [x] **`smoke:recurrence`'s wall-clock break fixed.** The far-future Calendar
+      month was hardcoded (`2027-02`); `RECURRENCE_MATERIALIZATION_MONTHS_AHEAD`
+      (6 months) meant today (2026-08-16) + 6 months landed exactly on that
+      literal, so it silently stopped being "far future" roughly two weeks
+      before this package. Now derived as today + (horizon + 2 months margin)
+      at run time — always outside the window, permanently. The near-future
+      month (`2026-09`, with a hardcoded expected materialized date
+      `2026-09-25`) had the mirror-image problem; also re-derived, from the
+      (now also relative) series start date + 11 weeks, matching the original
+      dates' relationship. A cross-language pin
+      (`rfc065_recurrence_smoke_pins_the_materialization_horizon_constant`)
+      reads the live Rust `RECURRENCE_MATERIALIZATION_MONTHS_AHEAD` and fails
+      if the JS literal drifts from it.
+- [x] **A separate, pre-existing, unrelated failure remains in
+      `smoke:recurrence`**, confirmed present at the pre-Handoff-063 baseline
+      too and left untouched (out of §3.3's authorized scope, which covers
+      only date derivation): `calendarShowsSeededTitle` — the Calendar
+      month-grid view (`render_calendar_month`) never renders event titles at
+      all; only `render_calendar_day_detail`, gated on a `day=` selection this
+      smoke's navigation never makes, does. Root-caused, not fixed — this
+      looks like a pre-existing smoke-authoring assertion that was never
+      actually true of the page it's checking, not a product regression.
+      Flagged for the architect rather than silently patched or silently left
+      unmentioned; `smoke:recurrence` therefore still exits non-zero, on this
+      one unrelated check only.
+- [x] **`smoke:language` audited for the same wall-clock shape (§12, carried,
+      not fixed)** — it does not have the defect. Handoff 042 §7.1–7.3 already
+      derives its fixture's event date relative to real run time (`runAt + 3
+      days`) and carries its own `assertFixtureStillUpcoming()` self-guard,
+      explicitly anticipating this exact class of drift. Confirmed still
+      passing.
+- [x] `cargo test --workspace`: **631 → 633** (+2: the coverage gate and the
+      cross-language pin). `--features dev_fake_issuer`: **634 → 636** (+2,
+      same two tests). Clippy (both feature states), fmt, wasm check,
+      `mdbook build docs`, `git diff --check` all clean. `bun run build`:
+      `index.js` unchanged at 28.6kb — this package touches no product code.
+- [x] **No product code changed** — only `package.json`, `scripts/`, and
+      `packages/contracts/tests/release_gates.rs`, per §4's explicit
+      non-change scope.

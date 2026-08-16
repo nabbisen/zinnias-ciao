@@ -18,6 +18,54 @@ const isolated = await prepareIsolatedWorkerTest("recurrence-v2");
 const pepper = isolated.pepper;
 const now = '2026-07-09T00:00:00.000Z';
 
+// Handoff 063: the two Calendar-month checks below must be derived from the
+// real wall clock, not a fixed literal — a hardcoded "far future" month
+// eventually enters the rolling materialization horizon (it did, silently,
+// once the real date passed 2026-08), and a hardcoded "near future" month
+// eventually falls out of relevance the same way. `now` above is unrelated:
+// it only timestamps fixture rows (created_at/joined_at), which the
+// materialization window never reads.
+//
+// RECURRENCE_MATERIALIZATION_MONTHS_AHEAD must equal
+// packages/domain/src/event_admin.rs's constant of the same name — pinned by
+// rfc065_recurrence_smoke_pins_the_materialization_horizon_constant in
+// release_gates.rs, which reads the live Rust value and fails if this
+// literal drifts from it.
+const RECURRENCE_MATERIALIZATION_MONTHS_AHEAD = 6;
+const FAR_FUTURE_MARGIN_MONTHS = 2;
+
+const realNow = new Date();
+const pad2 = (n) => String(n).padStart(2, '0');
+const fmtDate = (d) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+const fmtMonth = (d) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
+const addDays = (d, days) => new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
+const addMonths = (d, months) => {
+  const r = new Date(d.getTime());
+  r.setUTCMonth(r.getUTCMonth() + months);
+  return r;
+};
+
+// Series start: one day ahead of "today" (mirrors the original fixture's
+// now/start relationship). Always well inside the horizon regardless of
+// when this runs, since everything below is computed from this same
+// `realNow`.
+const materializeSeriesStartDate = addDays(realNow, 1);
+const materializeSeriesStartDayDate = fmtDate(materializeSeriesStartDate);
+
+// Near-future: the occurrence 11 weeks (77 days) after series start — the
+// same distance the original fixed dates used (2026-07-10 -> 2026-09-25).
+// 77 days is always comfortably inside a 6-month horizon, so this month
+// (and the exact day within it) never goes stale.
+const nearOccurrenceDate = addDays(materializeSeriesStartDate, 77);
+const nearMaterializeMonth = fmtMonth(nearOccurrenceDate);
+const nearOccurrenceDayDate = fmtDate(nearOccurrenceDate);
+
+// Far-future: today + (horizon + margin) months — always outside the
+// rolling window, by construction, no matter what today is.
+const farFutureMonth = fmtMonth(
+  addMonths(realNow, RECURRENCE_MATERIALIZATION_MONTHS_AHEAD + FAR_FUTURE_MARGIN_MONTHS),
+);
+
 const communityId = 'com_rfc065_primary';
 const adminUserId = 'usr_rfc065_admin';
 const memberUserId = 'usr_rfc065_member';
@@ -131,8 +179,8 @@ function seed() {
     `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('sess_rfc065_admin', '${adminUserId}', '${adminSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`,
     `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance) VALUES ('sess_rfc065_member', '${memberUserId}', '${memberSessionHmac}', '${now}', '2099-12-31T23:59:59.000Z', '${now}', 'invite_redemption')`,
     `INSERT INTO events (id, community_id, created_by_membership_id, title, location, description, status, repeat_rule, repeat_count, created_at, updated_at) VALUES ('${materializeEventId}', '${communityId}', '${adminMembershipId}', '${materializeTitle}', 'Local room', '', 'scheduled', 'weekly', NULL, '${now}', '${now}')`,
-    `INSERT INTO event_series (id, event_id, community_id, frequency, start_day_date, starts_at_local, ends_at_local, timezone, end_mode, occurrence_count, until_day_date, materialized_through_day_date, created_at, updated_at) VALUES ('${materializeSeriesId}', '${materializeEventId}', '${communityId}', 'weekly', '2026-07-10', '09:00', '10:00', 'Asia/Tokyo', 'open_ended', NULL, NULL, '2026-07-10', '${now}', '${now}')`,
-    `INSERT INTO event_days (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at, occurrence_status, series_id, series_occurrence_date) VALUES ('${materializeDayId}', '${materializeEventId}', '${communityId}', 1, '2026-07-10', '2026-07-10T00:00:00.000Z', '2026-07-10T01:00:00.000Z', '${now}', 'scheduled', '${materializeSeriesId}', '2026-07-10')`,
+    `INSERT INTO event_series (id, event_id, community_id, frequency, start_day_date, starts_at_local, ends_at_local, timezone, end_mode, occurrence_count, until_day_date, materialized_through_day_date, created_at, updated_at) VALUES ('${materializeSeriesId}', '${materializeEventId}', '${communityId}', 'weekly', '${materializeSeriesStartDayDate}', '09:00', '10:00', 'Asia/Tokyo', 'open_ended', NULL, NULL, '${materializeSeriesStartDayDate}', '${now}', '${now}')`,
+    `INSERT INTO event_days (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at, occurrence_status, series_id, series_occurrence_date) VALUES ('${materializeDayId}', '${materializeEventId}', '${communityId}', 1, '${materializeSeriesStartDayDate}', '${materializeSeriesStartDayDate}T00:00:00.000Z', '${materializeSeriesStartDayDate}T01:00:00.000Z', '${now}', 'scheduled', '${materializeSeriesId}', '${materializeSeriesStartDayDate}')`,
   ];
   for (const statement of statements) sql(statement);
 }
@@ -494,12 +542,14 @@ try {
   const beforeMaterialize = countRows(
     `SELECT COUNT(*) AS n FROM event_days WHERE event_id='${materializeEventId}'`,
   );
-  await navigate(page, `/c/${communityId}/communities?month=2026-09`, { textScale: 2 });
-  const septemberCalendar = await collect(page);
+  await navigate(page, `/c/${communityId}/communities?month=${nearMaterializeMonth}`, {
+    textScale: 2,
+  });
+  const nearMonthCalendar = await collect(page);
   const afterMaterialize = countRows(
     `SELECT COUNT(*) AS n FROM event_days WHERE event_id='${materializeEventId}'`,
   );
-  const septemberRows = query(
+  const nearMonthRows = query(
     `SELECT day_date, seq FROM event_days WHERE event_id='${materializeEventId}' ORDER BY day_date ASC`,
   );
   results.push({
@@ -508,14 +558,18 @@ try {
     observed: {
       beforeMaterialize,
       afterMaterialize,
-      septemberRows,
-      path: septemberCalendar.path,
+      nearMaterializeMonth,
+      nearOccurrenceDayDate,
+      nearMonthRows,
+      path: nearMonthCalendar.path,
     },
     checks: {
-      noHorizontalScroll: septemberCalendar.noHorizontalScroll,
+      noHorizontalScroll: nearMonthCalendar.noHorizontalScroll,
       rowCountIncreased: beforeMaterialize === 1 && afterMaterialize > beforeMaterialize,
-      materializedThroughSeptember: septemberRows.some((row) => row.day_date === '2026-09-25'),
-      calendarShowsSeededTitle: septemberCalendar.text.includes(materializeTitle),
+      materializedThroughNearMonth: nearMonthRows.some(
+        (row) => row.day_date === nearOccurrenceDayDate,
+      ),
+      calendarShowsSeededTitle: nearMonthCalendar.text.includes(materializeTitle),
     },
   });
 
@@ -523,7 +577,7 @@ try {
   const beforeFarFuture = countRows(
     `SELECT COUNT(*) AS n FROM event_days WHERE event_id='${materializeEventId}'`,
   );
-  await navigate(page, `/c/${communityId}/communities?month=2027-02`, { textScale: 2 });
+  await navigate(page, `/c/${communityId}/communities?month=${farFutureMonth}`, { textScale: 2 });
   const farFutureCalendar = await collect(page);
   const afterFarFuture = countRows(
     `SELECT COUNT(*) AS n FROM event_days WHERE event_id='${materializeEventId}'`,
@@ -534,6 +588,7 @@ try {
     observed: {
       beforeFarFuture,
       afterFarFuture,
+      farFutureMonth,
       path: farFutureCalendar.path,
       text: farFutureCalendar.text,
     },
