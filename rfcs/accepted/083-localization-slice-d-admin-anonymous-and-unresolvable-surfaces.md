@@ -29,25 +29,45 @@ proposes is closing the gap the table documents.
 
 ### 1.1 Measured scope
 
-Measured against the tree at `6ea3765`, by the same counting method the gate uses
-(verified by reproducing four of its pinned counts exactly):
+> **Corrected 2026-08-16, before any implementation.** The figures below
+> originally read **409** render sites over **224** constants, **216** paired.
+> **Those counts included `i18n::JA_*` references inside test files** — 101 of
+> them — which are assertions, not render sites. The corrected render-site count is
+> **308**, which reconciles exactly with the sum of the gate's own pinned
+> `ja_count` values (27 entries, 308 total). The **8** needing English is
+> unchanged, having come from the independent name-pairing method.
+>
+> This is the same failure the project keeps catching: a count stated as measured
+> that a second method would have caught. Reproducing the gate's per-file pins is
+> what surfaced it, and §6 of this RFC is the reason to keep doing that.
+
+Measured against the tree at `2799250`, by the same counting method the gate uses
+and reconciled against the sum of its pinned per-file counts:
 
 | Quantity | Count |
 |---|---|
-| Bare `i18n::JA_*` render sites | **409** |
-| Localized `i18n::t(...)` sites | 176 |
-| Distinct JA constants at bare sites | **224** |
-| — of those, **already have an English half** | **216** |
+| Bare `i18n::JA_*` render sites (excluding tests) | **308** |
+| Distinct JA constants at bare sites | **191** |
+| — of those, **already have an English half** | **183** |
 | — of those, needing new English copy | **8** |
 | Files in `LOCALIZATION_EXCEPTIONS` | **27** |
 
-**The English copy for this work almost entirely already exists.** 216 of 224
+**The English copy for this work almost entirely already exists.** 183 of 191
 constants are complete `EN_`/`JA_` pairs whose render site simply does not call
 `t()`. This is plumbing, not translation. The eight exceptions are listed in §4.3.
 
-The 224/216/8 split was derived twice by independent methods — a name-level
-pairing comparison across all 632 `&str` constants, and a reference-level walk of
-every bare render site — which agree exactly.
+The 8 was derived twice by independent methods — a name-level pairing comparison
+across all 632 `&str` constants, and a reference-level walk of every bare render
+site — which agree exactly on the same eight names.
+
+### 1.2 The three buckets, by the gate's own table
+
+| Bucket | Files | Sites |
+|---|---|---|
+| **D1 — admin** (§4.1) | 17 | **210** |
+| **D2 — no community scope** (§4.2) | 7 | **75** |
+| **D3 — unresolvable** (§4.4) | 3 | **23** |
+| | **27** | **308** |
 
 ## 2. Goals
 
@@ -91,15 +111,45 @@ discarding it, and pass it to `t()` and to `render::page_localized`.
 
 This is the cheapest slice and covers the most ground. It should go first.
 
-### 4.2 Anonymous routes — there is no membership to ask
+### 4.2 No community scope — two different problems, not one
 
-`handlers/join.rs` (18), `handlers/relink.rs` (10), `handlers/recovery.rs` (10),
-`handlers/identity/mod.rs` (6), and the account surfaces reached before a
-community is chosen.
+> **Corrected 2026-08-16.** This section originally called all seven files
+> "anonymous routes" that run "before they have an account at all." **That is true
+> of only four of them.** The account surfaces are authenticated; they simply are
+> not community-scoped. The distinction changes the answer, so the two are split
+> below.
 
-These run **before** the visitor has a membership, often before they have an
-account at all. There is no stored preference to read. RFC-072 named the three
-candidate sources and settled none of them:
+Seven files, 75 sites, sharing one symptom — `db/membership.rs::find_active` is
+*"the only trustworthy source of a page's locale"* and it requires a community —
+but for two different reasons.
+
+**D2a — genuinely anonymous** (44 sites): `handlers/join.rs` (18),
+`handlers/relink.rs` (10), `handlers/recovery.rs` (10), `handlers/identity/mod.rs`
+(6). No session, no account, nothing stored to read. This is the group §8 is about.
+
+**D2b — authenticated, not community-scoped** (31 sites):
+`handlers/account/mod.rs` (20), `handlers/account/unlink.rs` (6),
+`handlers/account/link.rs` (5). These run behind `require_account_surface`, so the
+member *is* signed in and may hold several memberships — each with its own stored
+preference.
+
+**`Accept-Language` is the wrong answer for D2b, and §8 must not be read as
+covering it.** These members have made an explicit choice; letting a browser header
+override it breaks the ladder's first principle exactly as it would on any
+community page. The real obstacle is different, and it is an architecture question:
+
+> **`ui_language` is a column on `community_memberships`** (migration
+> `0011_membership_ui_language.sql`), not on the user. A member of two communities
+> can hold two different preferences, so an account-level page has **no single
+> correct answer** to "what language is this member reading in?"
+
+That is a schema-shaped question, not a plumbing one. The options — resolve from
+the most recently active membership, require agreement across memberships, or
+promote the preference to the user — differ in cost and in what they mean, and one
+of them is a migration. **D2b is therefore deferred to its own RFC** and is out of
+scope here. Recorded so it is a known question rather than a surprise.
+
+For D2a, RFC-072 named three candidate sources and settled none:
 
 - **`Accept-Language`** — available, costs nothing, and is the browser's own
   answer. But it is attacker-controlled input on routes that redeem secrets, so it
