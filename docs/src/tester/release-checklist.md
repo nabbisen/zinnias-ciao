@@ -2294,3 +2294,35 @@ same "control nobody runs" shape this project has now fixed four times
 - [x] No evidence file touched, moved, deleted, or regenerated. No detection
       logic changed (`FORBIDDEN_KEY_PATTERN` and every other rule are
       Handoff 067's territory, untouched here).
+
+## `.log` evidence is scanned, and a coverage widening can re-pin upward (Handoff 069)
+
+**`.log` joined the scanned set.** Verified first, not assumed: all 105
+`.log` files under `.git-exclude/evidence/` start with a `$ node ...`
+shell-transcript line and none parse as JSON, so `.log` uses the same text
+path as `.md`/`.txt`/`.csv`. `.png` stays out, by design, unchanged.
+
+- [x] **Baseline re-pinned upward: 996 total** (`raw_resource_id` 534, up
+      from 484 — every other category unchanged: `raw_or_hashed_secret` 450,
+      `forbidden_key` 5, `sql` 7). The +50 delta is 50 previously-unscanned
+      `.log` files, one `raw_resource_id` finding each, across six
+      directories that had read as fully clean under the old, `.log`-blind
+      scan. Same known pattern as the rest of the backlog — local `com_…`
+      community ids — nothing new in kind. **This reconciles to 50 files,
+      not the 43 the prior review estimated** — re-derived independently by
+      two methods (the scanner itself, and a separate `grep`), both agreeing
+      exactly; the discrepancy is in the earlier estimate, not this
+      measurement.
+- [x] **The gate's failure messages now name the one legitimate exception**:
+      a rise is still a failure to investigate by default — the exception
+      applies only when a run deliberately widened what the scanner scans,
+      and requires the reason recorded next to the pinned numbers (done,
+      inline, in `test-evidence-leakage-baseline.mjs`). A rise with no
+      coverage change remains a failure with no re-pin option, demonstrated.
+- [x] All four failure directions re-demonstrated after the re-pin — rise
+      with no coverage change, fall, same-total category swap, and (new)
+      `.log` content actually being scanned — each verified with a direct
+      (non-piped) exit-code check, not just the printed message.
+- [x] No evidence file touched, moved, deleted, or regenerated; every
+      demonstration mutation reverted and independently verified reverted.
+      No detection-rule change; no extension other than `.log` added.

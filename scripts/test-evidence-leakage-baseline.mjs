@@ -26,10 +26,26 @@ const target = join(root, '.git-exclude', 'evidence');
 // explicitly, including the ones currently at zero — a category going from
 // 0 to nonzero is exactly the "new violation type" this gate exists to
 // catch, not something a missing key should let through silently.
+//
+// RE-PINNED UPWARD, Handoff 069 (F1 of the Handoffs-067/068 review): `.log`
+// evidence joined the scanned set (previously invisible to this gate
+// entirely). +50, all `raw_resource_id` — 50 previously-unscanned `.log`
+// files, one finding each (`scanTextForLeakage` reports a category at most
+// once per file, by presence, not per occurrence), across six directories
+// that had read as fully clean under the old, `.log`-blind scan
+// (`english-leak-fix`, `flash-message-localization`,
+// `handoff041-admin-class-leak`, `rfc075-carried-cleanup`,
+// `rfc075-terminal`, `v0.61.0-release`). Same known pattern as the rest of
+// the backlog — local `com_…` community ids these smoke scripts created in
+// their own local D1 — nothing new in kind. No `raw_or_hashed_secret`,
+// `sql`, or `forbidden_key` findings came from `.log` content at all; those
+// three categories are unchanged (450 / 7 / 5). This is the one legitimate,
+// named exception this file's own failure messages describe: a coverage
+// widening, not an unreviewed new violation.
 const PINNED_BASELINE = {
-  total: 946,
+  total: 996,
   categories: {
-    raw_resource_id: 484,
+    raw_resource_id: 534,
     raw_or_hashed_secret: 450,
     forbidden_key: 5,
     sql: 7,
@@ -85,13 +101,27 @@ const report = {
 
 console.log(JSON.stringify(report, null, 2));
 
+// Handoff 069 §3.1: the one named, narrow exception to "a rise is always a
+// failure to investigate" — widening what the scanner *looks at* (a new
+// extension added to JSON_EXTENSIONS/TEXT_EXTENSIONS) can legitimately raise
+// the count, since files that were always contaminated become visible for
+// the first time. This is not a general permission for the number to grow:
+// a rise with no coverage change is still a failure, always. The default
+// stays "do not re-pin upward" — this sentence only names when that default
+// does not apply.
+const COVERAGE_WIDENING_EXCEPTION =
+  ' — UNLESS this run deliberately widened what the scanner scans (a new extension '
+  + 'added to JSON_EXTENSIONS/TEXT_EXTENSIONS), in which case re-pin upward with the '
+  + 'reason recorded next to PINNED_BASELINE. A rise with no coverage change is still '
+  + 'a failure to investigate, never a re-pin.';
+
 if (!totalMatches) {
   const direction = totalMeasured > PINNED_BASELINE.total ? 'rose' : 'fell';
   console.error(
     `[evidence-leakage-baseline] FAIL: total findings ${direction} from the pinned `
     + `baseline (${PINNED_BASELINE.total} -> ${totalMeasured}).`
     + (direction === 'rose'
-      ? ' A new, unreviewed violation appeared — investigate it, do not re-pin upward.'
+      ? ` A new, unreviewed violation appeared — investigate it, do not re-pin upward${COVERAGE_WIDENING_EXCEPTION}`
       : ' The backlog shrank — re-pin PINNED_BASELINE.total downward to the new, lower count.'),
   );
 }
@@ -100,7 +130,7 @@ for (const mismatch of mismatches) {
     `[evidence-leakage-baseline] FAIL: category "${mismatch.category}" ${mismatch.direction} `
     + `from the pinned baseline (${mismatch.pinned} -> ${mismatch.measured}).`
     + (mismatch.direction === 'rose'
-      ? ' A new, unreviewed violation appeared — investigate it, do not re-pin upward.'
+      ? ` A new, unreviewed violation appeared — investigate it, do not re-pin upward${COVERAGE_WIDENING_EXCEPTION}`
       : ' This category shrank — re-pin it downward in PINNED_BASELINE.categories.'),
   );
 }

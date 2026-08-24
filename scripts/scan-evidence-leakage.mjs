@@ -25,7 +25,11 @@ export const JSON_EXTENSIONS = new Set(['.json']);
 // generates CSV exports containing member display names and attendance
 // data (RFC-068 matrix export) — if one is ever retained as evidence, it
 // must not fall through to the skip-content-scan branch unscanned.
-export const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.csv']);
+// Handoff 069: `.log` joins the text path, not the JSON one — verified
+// against all 105 `.log` files under `.git-exclude/evidence/` before adding
+// it (every one starts with a `$ node ...` shell-transcript line and zero
+// parse as JSON), not assumed from the extension alone.
+export const TEXT_EXTENSIONS = new Set(['.md', '.txt', '.csv', '.log']);
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
