@@ -7,7 +7,7 @@ does **not** complete the production-pilot RFC-050 gate by itself, and it
 predates most of the local tooling that now exists alongside it.
 
 **Reconciled 2026-07-29 (RFC-050 Tooling Slice 9).** RFC-050 Tooling Slices
-1–8 (all local-only; see `.git-exclude/tasks/018-rfc050-local-evidence-tooling-handoff.md`)
+1–8 (all local-only; see `.git-exclude/tasks/dev-team/018-rfc050-local-evidence-tooling-handoff.md`)
 have since landed a much larger local evidence suite than this one prototype
 script: version-metadata/manifest utilities, exact-identity smoke mode,
 authenticated/browser flow collection (E3), concurrency/postcondition
