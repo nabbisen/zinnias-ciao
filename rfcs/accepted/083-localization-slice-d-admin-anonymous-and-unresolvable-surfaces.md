@@ -3,8 +3,9 @@
 **Status:** Accepted
 **Author:** high-capability model
 **Date:** 2026-08-16
-**Accepted:** 2026-08-16 by nabbisen. Acceptance authorizes Slices D1 and D3;
-**Slice D2 remains blocked on §8**, which acceptance did not settle.
+**Accepted:** 2026-08-16 by nabbisen. Acceptance authorized Slices D1 and D3.
+**§8 was settled 2026-08-16**, unblocking **D2a**; **D2b** is deferred to its own
+RFC (§4.2).
 **Amends:** RFC-072 (member language preference and runtime localization), which
 defers Slice D explicitly: *"Admin surfaces, anonymous routes (`/join`,
 `/relink`), static offline HTML, `Accept-Language`, and a community default — is
@@ -94,7 +95,7 @@ difficulty. Treating them as one slice is the main risk this RFC exists to avoid
 
 ### 4.1 Admin surfaces — the locale is already fetched and thrown away
 
-~21 files, the large majority of the 409 sites.
+17 files, **210** of the 308 sites (§1.2) — the large majority.
 
 `require_admin` returns a `MembershipContext`, and `db/membership.rs` defines
 admin membership rows that carry a **resolved `locale`** field. Admin handlers
@@ -238,9 +239,12 @@ means a diff in which changed wording and changed plumbing are indistinguishable
 and the reviewer cannot tell a translation error from a threading error. This is
 cheap to honour — RFC-054 slice 1 is a small package — and expensive to unwind.
 
-## 8. The one decision required from the owner
+## 8. Locale resolution where no membership exists — decided
 
-**Slice D2 only. Slices D1 and D3 need nothing.**
+> **Decided 2026-08-16 by nabbisen.** The ladder below is accepted. The floor is
+> **Japanese for now**; an English-first default is **planned as a future
+> advancement**, recorded in §8.2. Applies to **D2a** — the genuinely anonymous
+> routes. Slices D1 and D3 needed no decision.
 
 > On anonymous routes (`/join`, `/relink`, recovery, identity sign-in), where no
 > membership and therefore no stored preference exists — should the page honour the
@@ -253,10 +257,71 @@ injection risk — but it remains a visitor-controlled input influencing what a
 redemption page renders, and RFC-076 deliberately narrowed what those pages vary
 on.
 
-**My recommendation: stay Japanese for now, and revisit with Stage 0 user
-research.** The community is Japanese-speaking and invite-only; an English-reading
-visitor on `/join` is a hypothesis, not an observed user. Slice D1 delivers nearly
-all the real value without touching the redemption path at all.
+### 8.1 The accepted rule
+
+A three-rung ladder, first match wins:
+
+| | Source | Applies when |
+|---|---|---|
+| 1 | Membership preference | a membership exists — **always outranks the rest** |
+| 2 | `Accept-Language` | no membership exists |
+| 3 | **Japanese** | nothing above resolved |
+
+**Rung 1 outranks rung 2 unconditionally.** `Accept-Language` is the browser's
+guess; a stored preference is a member's decision. If a header could override it,
+a member who chose Japanese would be shown English because their laptop is set to
+English, and the setting would silently stop working. On anonymous routes there is
+no stored preference to conflict with, so the header fills a hole rather than
+beating anything.
+
+Requirements on rung 2:
+
+- Parse into the closed `Locale` type; anything unparseable falls to rung 3.
+- **Never echo the raw header**, anywhere.
+- **No `Vary: Accept-Language` needed** — `workers/ssr/src/lib.rs:281` already
+  defaults every response without an explicit header to `Cache-Control: no-store`,
+  and only `handlers/static_files.rs` opts into public caching. Nothing caches
+  these pages. Pin that with a gate rather than relying on it; a future
+  `Cache-Control` change would otherwise reintroduce a wrong-language-from-cache
+  failure silently.
+
+This is **not** an oracle. The render varies on the visitor's own request header,
+not on server state, so it cannot reveal whether a code is valid, who owns it, or
+whether a community exists. That is a different concern from the one RFC-076
+addresses.
+
+### 8.2 The Japanese floor is provisional, and why
+
+> **Correction, 2026-08-16.** An earlier draft of this section argued for a
+> Japanese floor on the grounds that *"the community is Japanese-speaking and
+> invite-only; an English-reading visitor on `/join` is a hypothesis, not an
+> observed user."* **The first half of that was not evidence.** With no production
+> use there are no members at all, so Japanese-speaking members are exactly as
+> hypothetical as English-speaking ones. The premise was inferred from the
+> codebase's history and the owner's own language and stated as though observed —
+> and it applied to Japanese a standard the same sentence applied to English.
+> Withdrawn.
+
+What survives is a fact about the artifact, not about users, and it is about
+**timing rather than direction**:
+
+**English is currently the less complete surface.** After Slice D1a, **203 render
+sites still emit Japanese regardless of locale** — 23 structurally unresolvable
+(§4.4) and **180 simply not yet converted** (D1b, D1c, D2). Six constants have no
+English half at all. A default user meeting the product today would meet a
+substantially Japanese admin surface.
+
+**Decision: Japanese remains the floor for now. An English-first default is
+planned as a future advancement**, to be taken when Slice D's remaining 180 sites
+are converted and the product can actually serve it.
+
+The change itself is trivial when that time comes — `Locale::default()` at
+`packages/contracts/src/locale.rs:43`, one line, no migration, no data touched:
+`ui_language` stays NULL everywhere and simply resolves differently. Migration
+`0011_membership_ui_language.sql`'s comment (*"NULL means Japanese fallback"*)
+would need updating with it, as prose describing intent rather than a constraint.
+
+**Nothing blocks it but readiness.** There is no installed base to disrupt.
 
 ## 9. Risks
 
@@ -265,7 +330,9 @@ all the real value without touching the redemption path at all.
 | A slice lands half-migrated and is claimed complete | **Was high, twice** | The exact defect RFC-072 corrected twice | §6.3 asserts on rendered output under both locales, not on source files |
 | Copy revision and plumbing land in one diff | Medium | Reviewer cannot separate a translation error from a threading error | §7 sequencing after RFC-054 slice 1 |
 | Locale threading adds a D1 query per admin render | Low | Query budget regression (RFC-044) | §4.1 — the value is already fetched and discarded; assert the await count does not move |
-| Accept-Language parsing accepts something unexpected | Low | Untrusted input on the redemption path | Deferred entirely by §8's recommendation; if adopted, parse into the closed `Locale` type, never echo |
+| Accept-Language parsing accepts something unexpected | Low | Untrusted input on the redemption path | §8.1 — parse into the closed `Locale` type, never echo, unparseable falls to the floor |
+| A cache serves a wrong-language anonymous page | Low | A visitor sees another visitor's language | §8.1 — responses are `no-store` today; pin it with a gate so a future `Cache-Control` change cannot reintroduce this silently |
+| The English-first flip lands before Slice D completes | Medium | The default user meets a substantially Japanese product | §8.2 — the flip is sequenced after the remaining 180 sites convert |
 | The exception table quietly regrows | Medium | The gap reopens without anyone deciding to reopen it | §6.1 shrink-only assertion |
 | `EXPORT_SUMMARY_COUNTS` loses a placeholder in translation | Medium | A render showing a literal `{events}` | Assert both placeholders survive in both halves |
 

@@ -84,6 +84,34 @@ move is a forward migration — however inconvenient.
 
 Anyone reading this after a deployment has happened: the answer is no.
 
+### The default language flips to English when Slice D completes — owner decision 2026-08-16
+
+`Locale::default()` is Japanese today (`packages/contracts/src/locale.rs:43`), and
+migration `0011_membership_ui_language.sql` was additive with no backfill, so
+**every membership has `ui_language = NULL`** and resolves through that default.
+The default is therefore not an edge case — it is what every member sees.
+
+**Decided: an English-first default is a planned future advancement, deferred on
+readiness, not on principle.** It was not taken now because English is currently
+the less complete surface: after RFC-083 Slice D1a, **203 render sites still emit
+Japanese regardless of locale** — 23 structurally unresolvable, **180 simply not
+yet converted** (RFC-083 D1b, D1c, D2). A default user today would meet a
+substantially Japanese admin surface.
+
+**The trigger is RFC-083 Slice D reaching completion**, measurable as
+`LOCALIZATION_EXCEPTIONS` containing only the three structurally-unresolvable
+entries (`render/errors.rs`, `handlers/calendar.rs`, `handlers/communities.rs`).
+
+The change itself is one line and touches no data: `ui_language` stays NULL
+everywhere and simply resolves differently. Migration `0011`'s comment
+(*"NULL means Japanese fallback"*) updates with it, as prose describing intent
+rather than a constraint. **There is no installed base to disrupt** — the service
+has never been deployed.
+
+Recorded in **RFC-083 §8.2**. A tripwire gate is owed so this surfaces when its
+trigger fires rather than depending on anyone remembering; until that gate exists,
+this entry is the only control.
+
 ### Tagging is not deploying — clarified 2026-07-30
 
 The hold amendment separated **source remediation** from **hosted evidence** for
