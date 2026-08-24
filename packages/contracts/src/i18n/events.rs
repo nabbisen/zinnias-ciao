@@ -49,6 +49,9 @@ pub const STATUS_CLEAR_LABEL: super::Localized = super::Localized {
 // ── Admin: event management ───────────────────────────────────────────────
 pub const EN_ADMIN_CREATE_EVENT_TITLE: &str = "Create Event";
 pub const EN_ADMIN_CREATE_EVENT_SUBMIT: &str = "Create Event";
+// Handoff 071: RFC-083 F1, closing Slice D1a. Handoff 062 deferred this one
+// (of the ten admin event files) because this link had no English half yet.
+pub const EN_ADMIN_USE_TEMPLATE_LINK: &str = "Use a template";
 pub const EN_REPEAT_END_OPEN: &str = "No end date";
 pub const EN_REPEAT_END_UNTIL: &str = "Until date";
 pub const EN_REPEAT_END_COUNT: &str = "Number of times";
@@ -112,9 +115,10 @@ pub const EN_ADMIN_ATTEND_MEMBER_ARIA_LABEL: &str = "Attendance for {}";
 
 pub const JA_ADMIN_CREATE_EVENT_TITLE: &str = "イベントを作成";
 pub const JA_ADMIN_CREATE_EVENT_SUBMIT: &str = "イベントを作成";
-// Handoff 036: was a bare "Use a template" link on this Japanese-only admin
-// page (RFC-072 Slice D). A bare constant, not a Localized pair, since this
-// page has no English rendering to pair against.
+// Handoff 036: originally a bare "Use a template" link on this admin page,
+// added when the page was Japanese-only (RFC-072 Slice D). Handoff 071 gave
+// it an English half (see EN_ADMIN_USE_TEMPLATE_LINK above) and paired it
+// below as ADMIN_USE_TEMPLATE_LINK — RFC-083 F1, closing Slice D1a.
 pub const JA_ADMIN_USE_TEMPLATE_LINK: &str = "テンプレートを使う";
 pub const JA_REPEAT_END_OPEN: &str = "終了日を決めない";
 pub const JA_REPEAT_END_UNTIL: &str = "この日まで";
@@ -190,6 +194,10 @@ pub const ADMIN_CREATE_EVENT_TITLE: super::Localized = super::Localized {
 pub const ADMIN_CREATE_EVENT_SUBMIT: super::Localized = super::Localized {
     ja: JA_ADMIN_CREATE_EVENT_SUBMIT,
     en: EN_ADMIN_CREATE_EVENT_SUBMIT,
+};
+pub const ADMIN_USE_TEMPLATE_LINK: super::Localized = super::Localized {
+    ja: JA_ADMIN_USE_TEMPLATE_LINK,
+    en: EN_ADMIN_USE_TEMPLATE_LINK,
 };
 pub const REPEAT_END_OPEN: super::Localized = super::Localized {
     ja: JA_REPEAT_END_OPEN,

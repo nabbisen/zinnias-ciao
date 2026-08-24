@@ -3,9 +3,12 @@
 // migration): the create-event form (forms.rs's densest row — the repeat
 // selector — plus its shared field vocabulary), the attendance override
 // page, and the cancel-event confirmation, at mobile width and 200% text.
-// Japanese only, by documented decision (RFC-072 Slice D) — no English
-// rendering exists for any of these pages. Functional behavior is already
-// covered by smoke:calendar-views, smoke:matrix, smoke:matrix-csv,
+// All three pages now resolve locale (RFC-083 Slice D1a, Handoffs 062 and
+// 071) rather than being Japanese-only; this script still captures them in
+// Japanese, the pre-D1a documented layout evidence, and does not exercise
+// their English rendering — that is covered by the rendered-output tests in
+// workers/ssr/src/handlers/admin/events/tests.rs. Functional behavior is
+// already covered by smoke:calendar-views, smoke:matrix, smoke:matrix-csv,
 // smoke:community-switch, and smoke:language, all re-run unmodified for
 // this slice — this script exists only to capture the required visual
 // evidence and numeric 200% margins for the CSS extraction itself.
@@ -405,7 +408,7 @@ try {
     baseUrl,
     userDataDir,
     flags,
-    note: 'Evidence capture only (screenshots + numeric 200% margins). Functional behavior is covered by smoke:calendar-views, smoke:matrix, smoke:matrix-csv, smoke:community-switch, and smoke:language, all re-run unmodified for this slice. Japanese only — these are RFC-072 Slice D admin surfaces with no English rendering.',
+    note: 'Evidence capture only (screenshots + numeric 200% margins). Functional behavior is covered by smoke:calendar-views, smoke:matrix, smoke:matrix-csv, smoke:community-switch, and smoke:language, all re-run unmodified for this slice. Captured in Japanese, the pre-RFC-083-D1a documented layout evidence; all three pages now resolve locale (Handoffs 062, 071) and their English rendering is covered by rendered-output tests, not this script.',
     localOnlyGuard: true,
     results,
     passed: results.every((result) => result.passed),

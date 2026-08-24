@@ -2722,12 +2722,6 @@ struct LocalizationException {
 // silently added to make a prior list "complete."
 const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     LocalizationException {
-        path: "handlers/admin/events/create.rs",
-        ja_count: 7,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D — Handoff 062 (RFC-083 Slice D1a) deferred this file: its \"Use a template\" link (JA_ADMIN_USE_TEMPLATE_LINK) has no English half, and converting the rest of the page to page_localized while leaving that one link Japanese-only would trip RFC-083 §12's own stop condition (correct html lang, wrong-language body text). Open question raised to the architect; see that package's review request.",
-    },
-    LocalizationException {
         path: "handlers/admin/help_signin.rs",
         ja_count: 17,
         calls_bare_page: true,
@@ -2832,16 +2826,19 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
 ];
 
 /// RFC-083 §6.1: the exception table may only shrink. Pinned at Handoff 062
-/// (RFC-083 Slice D1a), which converted 9 of the table's 10 D1a files (27→18
-/// entries, 308→203 sites — `create.rs` stays pending an architect decision,
-/// see its own entry's reason). A future addition to the table must lower
-/// this pinned value deliberately, not raise it: growth here means a page
-/// stopped being localized, not a documented decision to leave one alone.
+/// (RFC-083 Slice D1a), which converted 9 of the table's 10 D1a files
+/// (27→18 entries, 308→203 sites — `create.rs` stayed pending an architect
+/// decision). Handoff 071 (RFC-083 F1) resolved that decision and converted
+/// the tenth: 18→17 entries, 203→196 sites — the table now holds **no
+/// `handlers/admin/events/` entry**, closing Slice D1a. A future addition to
+/// the table must lower this pinned value deliberately, not raise it:
+/// growth here means a page stopped being localized, not a documented
+/// decision to leave one alone.
 #[test]
 fn rfc083_localization_exceptions_table_only_shrinks() {
     assert_eq!(
         LOCALIZATION_EXCEPTIONS.len(),
-        18,
+        17,
         "LOCALIZATION_EXCEPTIONS grew to {} entries. This table is shrink-only \
          (RFC-083 §6.1) — re-pin this value only alongside a deliberate, reviewed \
          decision to leave a newly-discovered file unlocalized, never to make a \
@@ -2850,7 +2847,7 @@ fn rfc083_localization_exceptions_table_only_shrinks() {
     );
     let total_sites: usize = LOCALIZATION_EXCEPTIONS.iter().map(|e| e.ja_count).sum();
     assert_eq!(
-        total_sites, 203,
+        total_sites, 196,
         "LOCALIZATION_EXCEPTIONS site total grew to {total_sites}. Re-pin only \
          alongside a reviewed, deliberate change to an individual entry's ja_count."
     );
@@ -2996,10 +2993,6 @@ const EN_JA_PARITY_EXCEPTIONS: &[EnJaParityException] = &[
     EnJaParityException {
         stem: "ADMIN_TEMPLATE_DELETED_FLASH",
         reason: "RFC-083 Slice D1c (handlers/templates.rs) — not yet converted",
-    },
-    EnJaParityException {
-        stem: "ADMIN_USE_TEMPLATE_LINK",
-        reason: "RFC-083 Slice D1a follow-up (handlers/admin/events/create.rs) — deferred pending an architect decision on new English copy, see Handoff 062's review F1",
     },
 ];
 

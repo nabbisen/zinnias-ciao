@@ -7,7 +7,7 @@ use zinnias_ciao_domain::EventValidationError;
 use super::copy::{build_event_copy_prefill, render_copy_event_create_fields};
 use super::create::{CreateEventProvenance, create_event_audit_metadata};
 use super::forms::{
-    RepeatFieldPrefill, render_details_only_event_edit_fields,
+    RepeatFieldPrefill, render_details_only_event_edit_fields, render_event_create_fields,
     render_event_create_fields_with_repeat, render_recreate_event_create_fields,
 };
 use super::policy::{
@@ -359,6 +359,56 @@ fn admin_edit_page_renders_with_no_japanese_codepoint_in_english_locale() {
         render_details_only_event_edit_fields(Locale::Ja, &event, &days, "Asia/Tokyo", None);
     assert!(
         contains_japanese_codepoint(&ja_fields),
+        "Japanese-locale render must contain Japanese text"
+    );
+}
+
+/// Handoff 071 (RFC-083 F1): closes the gap `admin_create_recurring_form_...`
+/// below leaves open — that test only covers the form-fields component, not
+/// the template link (`ADMIN_USE_TEMPLATE_LINK`, the site this handoff
+/// converted), the header, or the page title. Composes the same pieces
+/// `get_create_event`'s body assembles.
+#[test]
+fn admin_create_page_renders_with_no_japanese_codepoint_in_english_locale() {
+    let header = crate::render::header_with_switcher_next_localized(
+        i18n::t(Locale::En, i18n::ADMIN_CREATE_EVENT_TITLE),
+        "community-a",
+        &[("community-a".to_string(), "Community A".to_string())],
+        "admin_events_new",
+        Locale::En,
+    );
+    let templates_link = format!(
+        "<a href=\"/c/community-a/admin/templates\">{label}</a>",
+        label = i18n::t(Locale::En, i18n::ADMIN_USE_TEMPLATE_LINK)
+    );
+    let fields = render_event_create_fields(
+        Locale::En,
+        Some("Title"),
+        Some("Location"),
+        None,
+        None,
+        Some("2026-07-05"),
+        None,
+        None,
+    );
+    let en_page = format!(
+        "{header}<main><h1>{cet}</h1>{fields}{templates_link}</main>",
+        cet = i18n::t(Locale::En, i18n::ADMIN_CREATE_EVENT_TITLE)
+    );
+
+    assert!(
+        !contains_japanese_codepoint(&en_page),
+        "English-locale admin create page must contain no Japanese codepoint, found some in: {en_page}"
+    );
+
+    // Sanity: the same composition at Locale::Ja must contain Japanese —
+    // proves the assertion above is discriminating, not vacuously true.
+    let ja_templates_link = format!(
+        "<a href=\"/c/community-a/admin/templates\">{label}</a>",
+        label = i18n::t(Locale::Ja, i18n::ADMIN_USE_TEMPLATE_LINK)
+    );
+    assert!(
+        contains_japanese_codepoint(&ja_templates_link),
         "Japanese-locale render must contain Japanese text"
     );
 }

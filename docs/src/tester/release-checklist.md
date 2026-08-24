@@ -2390,3 +2390,54 @@ shape this project has now derived away four times.
 - [x] No product code touched; no constant added, removed, renamed, or
       reworded. `node scripts/test-evidence-leakage-baseline.mjs` stays
       green at 996 — this package writes no evidence.
+
+## RFC-083 F1: Slice D1a is closed (Handoff 071)
+
+Handoff 062 converted nine of the ten admin event files and correctly
+deferred the tenth: `handlers/admin/events/create.rs`'s "Use a template"
+link had no English half, and converting the rest of the page while
+leaving that one link Japanese-only would have produced `lang="en"` with
+Japanese body text — RFC-083 §12's stop condition verbatim.
+
+- [x] **`EN_ADMIN_USE_TEMPLATE_LINK` added** ("Use a template"), paired with
+      the existing `JA_ADMIN_USE_TEMPLATE_LINK` as `ADMIN_USE_TEMPLATE_LINK`.
+      The only new constant in this package.
+- [x] **Both functions in `create.rs` now resolve locale** from
+      `require_admin`'s `MembershipContext` — `get_create_event` (five
+      former bare-`JA_` sites, including the template link) and
+      `post_create_event` (its invalid-timezone error path, which already
+      had `membership` in hand and was discarding the locale at render).
+      The Handoff 062 deferral comment is deleted, not left in place —
+      it is false the moment this lands.
+- [x] **`LOCALIZATION_EXCEPTIONS` is now 17 entries / 196 sites** (was
+      18/203) — **no `handlers/admin/events/` entry remains in the table**.
+      This is what "Slice D1a is closed" means concretely.
+      `rfc072_every_handler_and_render_file_is_localized_or_documented_exception`
+      passes with the file removed from the table, not re-added to force a
+      pass.
+- [x] A new rendered-output test,
+      `admin_create_page_renders_with_no_japanese_codepoint_in_english_locale`,
+      composes the header, title, form fields, and (unlike the pre-existing
+      recurring-form test) the template link itself, and asserts no
+      Japanese codepoint at `Locale::En`, with a `Locale::Ja` discriminating
+      half. Demonstrated failing (a deliberately unconverted template link
+      caught, with the offending text in the panic output), then restored
+      byte-identical.
+- [x] Per-route query counts unchanged: `get_create_event` 5/5 `.await`
+      sites, `post_create_event` 6/6, before and after — binding a
+      previously-discarded value adds no query.
+- [x] `smoke:admin-event-forms` unaffected (still asserts `htmlLangJa: true`
+      — this smoke intentionally still captures Japanese evidence; only its
+      stale header comment and evidence `note` were corrected, not its
+      assertions). `bun run smoke:all` at 25/25.
+- [x] **Deviation from §4's literal text, disclosed**: adding
+      `EN_ADMIN_USE_TEMPLATE_LINK` mechanically pairs the
+      `ADMIN_USE_TEMPLATE_LINK` stem Handoff 070 had pinned in
+      `EN_JA_PARITY_EXCEPTIONS` as unpaired. The derived gate's own
+      stale-entry assertion then fails exactly as designed ("it was paired
+      — delete the entry, the table is meant to shrink"). §4 said not to
+      touch that table; leaving the now-stale entry in place is not a
+      coherent alternative — it fails a gate for a reason unrelated to any
+      new wording, as a direct, unavoidable consequence of the work §3.1
+      explicitly required. The entry was removed; see the review request
+      for the full disclosure.

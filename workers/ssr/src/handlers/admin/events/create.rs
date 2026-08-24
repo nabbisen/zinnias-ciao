@@ -1,5 +1,4 @@
 use worker::{Env, Request, Response, Result};
-use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 use zinnias_ciao_domain::{
@@ -32,7 +31,8 @@ pub async fn get_create_event(
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
     let token =
         crate::codlet::issue_token(env, &auth.user_id, token_purpose::CREATE_EVENT, None).await?;
@@ -49,7 +49,6 @@ pub async fn get_create_event(
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let nav = render::bottom_nav(community_id, "home");
 
     // RFC-032: pre-fill from template if ?template=TID is present.
     let url = req.url()?;
@@ -66,6 +65,7 @@ pub async fn get_create_event(
         .find(|(k, _)| k == "day")
         .map(|(_, v)| v.to_string())
         .filter(|day| valid_prefill_day(day));
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
     let (prefill_title, prefill_location) = if let Some(ref tid) = template_id {
         let tmpl = db::event_template::find_active(&db, tid, community_id)
             .await
@@ -84,10 +84,10 @@ pub async fn get_create_event(
            class=\"cz-admin-template-link\">\
            {label}</a>",
         cid = render::escape_html(community_id),
-        label = i18n::JA_ADMIN_USE_TEMPLATE_LINK,
+        label = i18n::t(locale, i18n::ADMIN_USE_TEMPLATE_LINK),
     );
 
-    let cet = i18n::JA_ADMIN_CREATE_EVENT_TITLE;
+    let cet = i18n::t(locale, i18n::ADMIN_CREATE_EVENT_TITLE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -99,25 +99,17 @@ pub async fn get_create_event(
          </form>\
          {tmpl_link}\
          </main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_ADMIN_CREATE_EVENT_TITLE,
+        header = render::header_with_switcher_next_localized(
+            i18n::t(locale, i18n::ADMIN_CREATE_EVENT_TITLE),
             community_id,
             &_community_pairs,
-            &admin_events_new_next(prefill_day.as_deref())
+            &admin_events_new_next(prefill_day.as_deref()),
+            locale,
         ),
         cid = render::escape_html(community_id),
         tok = render::escape_html(&token),
-        // Handoff 062: this page still uses require_admin's discarded
-        // `_membership` above, not a bound locale — JA_ADMIN_USE_TEMPLATE_LINK
-        // (the "Use a template" link, immediately above) has no English half
-        // and this handoff is not authorized to write one. Converting this
-        // page's other sites while leaving that one link Japanese-only would
-        // violate RFC-083 §12's own stop condition (correct `html lang`,
-        // wrong-language body text). Deferred pending an architect decision;
-        // see this package's review request. `Locale::Ja` here is an explicit
-        // literal, not a resolved value — this page's behavior is unchanged.
         fields = render_event_create_fields(
-            Locale::Ja,
+            locale,
             prefill_title.as_deref(),
             prefill_location.as_deref(),
             None,
@@ -126,11 +118,11 @@ pub async fn get_create_event(
             None,
             None,
         ),
-        submit = i18n::JA_ADMIN_CREATE_EVENT_SUBMIT,
+        submit = i18n::t(locale, i18n::ADMIN_CREATE_EVENT_SUBMIT),
         tmpl_link = templates_link,
         nav = nav,
     );
-    render::page(i18n::JA_ADMIN_CREATE_EVENT_TITLE, &body)
+    render::page_localized(locale, cet, &body)
 }
 
 pub async fn post_create_event(
@@ -141,6 +133,7 @@ pub async fn post_create_event(
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     let body = req.form_data().await?;
@@ -241,9 +234,13 @@ pub async fn post_create_event(
     let off = match zinnias_ciao_contracts::tz::offset_minutes(&community_tz) {
         Some(o) => o,
         None => {
-            return render::page(
-                i18n::JA_GENERAL_ERROR,
-                &format!("<p class=\"cz-admin-error-text\">{}</p>", i18n::JA_TZ_ERROR),
+            return render::page_localized(
+                locale,
+                i18n::t(locale, i18n::GENERAL_ERROR),
+                &format!(
+                    "<p class=\"cz-admin-error-text\">{}</p>",
+                    i18n::t(locale, i18n::TZ_ERROR)
+                ),
             );
         }
     };
