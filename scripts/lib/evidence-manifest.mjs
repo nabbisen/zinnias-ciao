@@ -101,7 +101,14 @@ export function clearRegisteredRunSecrets() {
   registeredRunSecrets.clear();
 }
 
-function checkStringValue(value, path) {
+// Handoff 065: every category a single string value could violate, collected
+// rather than returned on the first hit — the shared core both
+// `checkStringValue` (throws the first one, for the existing fail-fast
+// construction/parse callers below) and the exhaustive scanner (collects all
+// of them) are built from, so the two can never drift on what counts as a
+// violation or in what order.
+function stringViolations(value, path) {
+  const violations = [];
   // Case-insensitive (S3-N1 from the Slices 3+4 review): the application
   // itself accepts invite codes case-insensitively, so a collector may
   // legitimately hold or record a code in a different case than it was
@@ -110,41 +117,91 @@ function checkStringValue(value, path) {
   const lowerValue = value.toLowerCase();
   for (const secret of registeredRunSecrets) {
     if (lowerValue.includes(secret.toLowerCase())) {
-      throw new EvidenceRedactionError(
+      violations.push(new EvidenceRedactionError(
         'registered_run_secret',
         path,
         `value at ${path} contains a registered run-scoped value (never the value itself, only its presence)`,
-      );
+      ));
     }
   }
   const hexExemption = HEX_FIELD_PATH_EXEMPTIONS.find((entry) => entry.pattern.test(path));
   if (hexExemption) {
     if (!hexExemption.valuePattern.test(value)) {
-      throw new EvidenceRedactionError(
+      violations.push(new EvidenceRedactionError(
         'malformed_exempt_field',
         path,
         `"${hexExemption.name}" at ${path} does not match its required shape`,
-      );
+      ));
     }
   } else if (HEX_ONLY_PATTERN.test(value) && HEX_SECRET_LENGTHS.has(value.length)) {
-    throw new EvidenceRedactionError(
+    violations.push(new EvidenceRedactionError(
       'raw_or_hashed_secret',
       path,
       `bare ${value.length}-hex-char value at ${path} (secret, digest, subject identifier, or Durable Object id shape)`,
-    );
+    ));
   }
   if (RAW_RESOURCE_ID_PREFIXES.some((prefix) => value.startsWith(prefix))) {
-    throw new EvidenceRedactionError('raw_resource_id', path, `raw resource-id-shaped value at ${path}`);
+    violations.push(new EvidenceRedactionError('raw_resource_id', path, `raw resource-id-shaped value at ${path}`));
   }
   if (COOKIE_SHAPED_VALUE_PATTERN.test(value)) {
-    throw new EvidenceRedactionError('cookie', path, `cookie-shaped value at ${path}`);
+    violations.push(new EvidenceRedactionError('cookie', path, `cookie-shaped value at ${path}`));
   }
   if (D1_ERROR_PATTERN.test(value)) {
-    throw new EvidenceRedactionError('d1_error_body', path, `D1 error body at ${path}`);
+    violations.push(new EvidenceRedactionError('d1_error_body', path, `D1 error body at ${path}`));
   }
   if (SQL_KEYWORD_PATTERN.test(value)) {
-    throw new EvidenceRedactionError('sql', path, `SQL-shaped text at ${path}`);
+    violations.push(new EvidenceRedactionError('sql', path, `SQL-shaped text at ${path}`));
   }
+  return violations;
+}
+
+// Fail-fast: throws the first violation `stringViolations` finds, in the same
+// order it always has. Used by `assertRedacted` (construction/parsing), where
+// one bad value is already reason enough to reject the whole record — those
+// callers have never needed, and do not now need, every violation in one
+// value at once.
+function checkStringValue(value, path) {
+  const violations = stringViolations(value, path);
+  if (violations.length > 0) {
+    throw violations[0];
+  }
+}
+
+// Handoff 065 §3.1: the exhaustive counterpart to `assertRedacted`'s
+// tree-walk, collecting into `violations` instead of throwing on the first
+// hit. Mirrors `assertRedacted`'s structure exactly (same HAR-shape check,
+// same forbidden-key check, same recursion into arrays/objects) so the two
+// can never see a different set of fields — only what happens once a
+// violation is found (stop vs. collect-and-continue) differs.
+function collectRedactionViolations(value, path, violations) {
+  if (value === null || value === undefined) return;
+  if (typeof value === 'string') {
+    violations.push(...stringViolations(value, path));
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => collectRedactionViolations(item, `${path}[${index}]`, violations));
+    return;
+  }
+  if (typeof value === 'object') {
+    if (isHarShaped(value)) {
+      violations.push(new EvidenceRedactionError('har_file', path, `HAR-shaped object at ${path}`));
+      return;
+    }
+    for (const [key, nested] of Object.entries(value)) {
+      if (FORBIDDEN_KEY_PATTERN.test(key)) {
+        violations.push(new EvidenceRedactionError('forbidden_key', `${path}.${key}`, `forbidden field name "${key}" at ${path}.${key}`));
+      }
+      // Recurse regardless of whether the key itself was just flagged — a
+      // forbidden-keyed field's value can hold its own, distinct violation
+      // (e.g. a raw resource id nested under a field also named badly), and
+      // under-reporting one to avoid a second finding on the same branch is
+      // exactly the failure mode this handoff exists to remove.
+      collectRedactionViolations(nested, `${path}.${key}`, violations);
+    }
+    return;
+  }
+  // numbers and booleans carry no redaction risk.
 }
 
 function isHarShaped(value) {
@@ -521,36 +578,51 @@ const EMBEDDED_HEX_PATTERNS = EMBEDDED_SECRET_HEX_LENGTHS.map(
 // from the other. JSON evidence files remain fully covered for every length
 // via `scanJsonValueForLeakage`'s path-scoped exemptions; this residual is
 // free text only.
+//
+// Handoff 065 §3.1: returns every violation found, not just the first — a
+// control whose purpose is to prove absence cannot stop at the first
+// presence it finds. Returns an empty array when the text is clean; never
+// throws for a leakage finding (an unrelated bug in this function itself
+// would still throw normally).
 export function scanTextForLeakage(text, path) {
+  const violations = [];
   for (const secret of registeredRunSecrets) {
     if (text.toLowerCase().includes(secret.toLowerCase())) {
-      throw new EvidenceLeakageError(
+      violations.push(new EvidenceLeakageError(
         'registered_run_secret',
         path,
         `${path} contains a registered run-scoped value (never the value itself, only its presence)`,
-      );
+      ));
     }
   }
   for (const pattern of EMBEDDED_HEX_PATTERNS) {
     if (pattern.test(text)) {
-      throw new EvidenceLeakageError(
+      violations.push(new EvidenceLeakageError(
         'raw_or_hashed_secret',
         path,
         `${path} contains a bare hex value at a secret/digest/token/Durable-Object-id length`,
-      );
+      ));
     }
   }
   for (const [category, pattern] of TEXT_LEAKAGE_PATTERNS) {
     if (pattern.test(text)) {
-      throw new EvidenceLeakageError(category, path, `${path} contains ${category}-shaped content`);
+      violations.push(new EvidenceLeakageError(category, path, `${path} contains ${category}-shaped content`));
     }
   }
   if (EMBEDDED_RESOURCE_ID_PATTERN.test(text)) {
-    throw new EvidenceLeakageError('raw_resource_id', path, `${path} contains a raw resource-id-shaped value`);
+    violations.push(new EvidenceLeakageError('raw_resource_id', path, `${path} contains a raw resource-id-shaped value`));
   }
+  return violations;
 }
 
-// JSON evidence files get the full field-aware `assertRedacted` sweep.
+// JSON evidence files get the full field-aware sweep. Handoff 065 §3.1: like
+// `scanTextForLeakage`, returns every violation found (empty array if none)
+// rather than throwing on the first — `assertRedacted` itself keeps its
+// original throw-on-first contract for the construction/parsing callers
+// below, which only ever need to know a record is invalid, not enumerate
+// every way it is.
 export function scanJsonValueForLeakage(value, path) {
-  assertRedacted(value, path);
+  const violations = [];
+  collectRedactionViolations(value, path, violations);
+  return violations;
 }

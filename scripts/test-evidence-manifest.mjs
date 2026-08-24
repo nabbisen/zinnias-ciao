@@ -310,15 +310,24 @@ assert.throws(
 assert.equal(hashToArtifactHash('hello'), 'sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824');
 assert.match(hashToArtifactHash(Buffer.from('hello')), /^sha256:[0-9a-f]{64}$/u, 'accepts a Buffer, not just a string');
 
+// Handoff 065 §3.1: `scanTextForLeakage`/`scanJsonValueForLeakage` return
+// every violation found instead of throwing on the first (the change this
+// package makes) — these two helpers assert against the returned array
+// rather than a thrown error, but check the same thing: that this exact
+// category is present.
 function assertTextLeakageCategory(text, category, description) {
-  assert.throws(
-    () => scanTextForLeakage(text, 'evidence-templates/test.md'),
-    (error) => {
-      assert.ok(error instanceof EvidenceLeakageError, `${description}: expected EvidenceLeakageError, got ${error}`);
-      assert.equal(error.category, category, `${description}: expected category "${category}", got "${error.category}"`);
-      return true;
-    },
-    description,
+  const violations = scanTextForLeakage(text, 'evidence-templates/test.md');
+  assert.ok(
+    violations.length > 0,
+    `${description}: expected at least one violation, got none`,
+  );
+  assert.ok(
+    violations.every((v) => v instanceof EvidenceLeakageError),
+    `${description}: expected every violation to be an EvidenceLeakageError`,
+  );
+  assert.ok(
+    violations.some((v) => v.category === category),
+    `${description}: expected category "${category}" among [${violations.map((v) => v.category).join(', ')}]`,
   );
 }
 
@@ -342,17 +351,25 @@ assertTextLeakageCategory(`artifact hash: sha256:${'c'.repeat(64)}`, 'raw_or_has
 // The residual, deliberate gap: 32/40-hex values remain unscannable in free
 // text (no field path to exempt a legitimate commit sha with) — this test
 // pins that the residual is intentional and narrow, not the whole class.
-scanTextForLeakage(
-  `candidate commit: ${'c991b820b31943219da207acc83f19182236f9bb'}`,
-  'evidence-templates/test.md',
+assert.deepEqual(
+  scanTextForLeakage(
+    `candidate commit: ${'c991b820b31943219da207acc83f19182236f9bb'}`,
+    'evidence-templates/test.md',
+  ),
+  [],
+  'a bare commit sha in prose produces no findings (the documented residual gap)',
 );
-scanTextForLeakage('the admin can select an event and update its attendance note', 'evidence-templates/test.md');
+assert.deepEqual(
+  scanTextForLeakage('the admin can select an event and update its attendance note', 'evidence-templates/test.md'),
+  [],
+  'ordinary prose produces no findings',
+);
 
 try {
   registerRunSecrets(['ACDEFG']);
-  assert.throws(
-    () => scanTextForLeakage('redeemed invite code ACDEFG successfully', 'evidence-templates/test.md'),
-    (error) => error instanceof EvidenceLeakageError && error.category === 'registered_run_secret',
+  const violations = scanTextForLeakage('redeemed invite code ACDEFG successfully', 'evidence-templates/test.md');
+  assert.ok(
+    violations.some((v) => v instanceof EvidenceLeakageError && v.category === 'registered_run_secret'),
     'a registered run secret is caught in free-text scanning too',
   );
 } finally {
@@ -360,13 +377,48 @@ try {
 }
 
 // JSON evidence files still get the full field-aware sweep (commit/artifactHash
-// exemptions included), via the same `assertRedacted` used elsewhere.
-scanJsonValueForLeakage(record, '$');
-assert.throws(
-  () => scanJsonValueForLeakage({ pepper: 'x' }, '$'),
-  (error) => error instanceof EvidenceRedactionError && error.category === 'forbidden_key',
-  'scanJsonValueForLeakage rejects a forbidden key the same way assertRedacted does',
-);
+// exemptions included), via the same violation logic `assertRedacted` uses.
+assert.deepEqual(scanJsonValueForLeakage(record, '$'), [], 'a clean record produces no findings');
+{
+  const violations = scanJsonValueForLeakage({ pepper: 'x' }, '$');
+  assert.ok(
+    violations.some((v) => v instanceof EvidenceRedactionError && v.category === 'forbidden_key'),
+    'scanJsonValueForLeakage rejects a forbidden key the same way assertRedacted does',
+  );
+}
+
+// Handoff 065 §3.1's own regression guard: the whole point of this package is
+// that a document with several distinct violations reports all of them, not
+// the first one found. Three unrelated categories in one object, none of
+// which would suppress detection of the others.
+{
+  const violations = scanJsonValueForLeakage(
+    {
+      community: 'com_exhaustiveness_demo',
+      token: 'd'.repeat(64),
+      note: 'ran SELECT hmac_pepper FROM secrets WHERE id = 1',
+    },
+    '$',
+  );
+  const categories = violations.map((v) => v.category).sort();
+  assert.deepEqual(
+    categories,
+    ['raw_or_hashed_secret', 'raw_resource_id', 'sql'].sort(),
+    `expected all three distinct categories in one scan, got [${categories.join(', ')}]`,
+  );
+}
+{
+  const violations = scanTextForLeakage(
+    `community com_exhaustiveness_demo, token ${'d'.repeat(64)}, ran SELECT hmac_pepper FROM secrets WHERE id = 1`,
+    'evidence-templates/test.md',
+  );
+  const categories = violations.map((v) => v.category).sort();
+  assert.deepEqual(
+    categories,
+    ['raw_or_hashed_secret', 'raw_resource_id', 'sql'].sort(),
+    `expected all three distinct categories in one text scan, got [${categories.join(', ')}]`,
+  );
+}
 
 console.log(JSON.stringify({
   ok: true,

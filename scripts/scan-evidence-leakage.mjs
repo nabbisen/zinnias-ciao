@@ -13,12 +13,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  EvidenceLeakageError,
-  EvidenceRedactionError,
-  scanJsonValueForLeakage,
-  scanTextForLeakage,
-} from './lib/evidence-manifest.mjs';
+import { scanJsonValueForLeakage, scanTextForLeakage } from './lib/evidence-manifest.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -74,14 +69,9 @@ for (const filePath of files) {
       const parsed = JSON.parse(await readFile(filePath, 'utf8'));
       const values = Array.isArray(parsed) ? parsed : [parsed];
       values.forEach((value, index) => {
-        try {
-          scanJsonValueForLeakage(value, Array.isArray(parsed) ? `${relPath}[${index}]` : relPath);
-        } catch (error) {
-          if (error instanceof EvidenceRedactionError) {
-            findings.push({ path: relPath, category: error.category, message: error.message });
-          } else {
-            throw error;
-          }
+        const violations = scanJsonValueForLeakage(value, Array.isArray(parsed) ? `${relPath}[${index}]` : relPath);
+        for (const violation of violations) {
+          findings.push({ path: relPath, category: violation.category, message: violation.message });
         }
       });
     } catch (error) {
@@ -89,14 +79,9 @@ for (const filePath of files) {
     }
   } else if (TEXT_EXTENSIONS.has(ext)) {
     textScanned += 1;
-    try {
-      scanTextForLeakage(await readFile(filePath, 'utf8'), relPath);
-    } catch (error) {
-      if (error instanceof EvidenceLeakageError) {
-        findings.push({ path: relPath, category: error.category, message: error.message });
-      } else {
-        throw error;
-      }
+    const violations = scanTextForLeakage(await readFile(filePath, 'utf8'), relPath);
+    for (const violation of violations) {
+      findings.push({ path: relPath, category: violation.category, message: violation.message });
     }
   } else {
     skipped += 1;

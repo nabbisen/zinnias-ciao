@@ -2132,3 +2132,53 @@ constants, matching the parser's derived counts exactly.
 - [x] `bun run smoke:all`: see the review request for the full run; expected
       23/24 with `smoke:recurrence`'s known, unrelated
       `calendarShowsSeededTitle` failure unchanged.
+
+## The leakage scanner reports every violation, and three smokes stopped capturing whole forms (Handoff 065)
+
+**The scanner used to report at most one violation per document** —
+`scanJsonValueForLeakage`/`scanTextForLeakage` threw on the first hit and the
+caller stopped there. A control whose purpose is to prove absence cannot do
+that: fixing one reported violation and re-running only ever reveals the
+*next* one, with no way to know how many remain. Both functions now return
+**every** violation found (empty array when clean); `assertRedacted` itself
+(used during record construction/parsing, which only ever needs to know a
+record is invalid, not enumerate every way it is) keeps its original
+throw-on-first behavior, unchanged, for every existing caller.
+
+- [x] **Demonstrated exhaustive**, both as a permanent regression test and as
+      a real CLI run against a throwaway fixture (deleted afterward, tree
+      confirmed clean): a single document with three unrelated violation
+      categories reports all three in one scan, not one.
+- [x] `scripts/test-evidence-manifest.mjs` updated: the scan-function tests
+      now check the returned array for expected categories instead of
+      asserting a thrown error, since that is the contract that changed. Two
+      new tests pin exhaustiveness itself (one JSON, one free-text) so a
+      future regression to first-match-and-stop would be caught here, not
+      discovered by hand again.
+- [x] **A non-empty findings list still fails the run.** No `--force`,
+      `--allow`, or override flag exists or was added.
+- [x] **All 67 top-level entries under `.git-exclude/evidence/` scanned**
+      (66 directories plus one loose `.log` file). **A much larger finding
+      than the originating review anticipated**: 47 of those 67 have at least
+      one violation, categories `raw_resource_id`, `raw_or_hashed_secret`,
+      `forbidden_key`, and `sql` — not only the three smoke scripts this
+      package fixes. Reported in full in the review request (counts and
+      categories per directory, no values). **Not fixed, not deleted, not
+      rewritten** — per this package's explicit scope, the contaminated
+      directories stay exactly as they are pending an owner decision. This is
+      its own, separate, much larger finding.
+- [x] `scripts/smoke/admin-role-transfer.mjs`, `help-signin.mjs`, and
+      `member-management.mjs`: the blanket `values: Object.fromEntries(...)`
+      whole-form capture is removed entirely, not narrowed to an allow-list —
+      reading every assertion in all three confirmed none of them reads
+      field values *or* field names from the captured object; it was pure
+      unused dead weight riding along in the evidence JSON. `_token` (a
+      64-character single-use form token) was one of the values silently
+      captured this way. Re-ran all three smokes (still pass in full) and
+      re-scanned their evidence: **rfc062 (admin-role-transfer) 7 → 0,
+      rfc024 (help-signin) 5 → 0, rfc061 (member-management) 14 → 0**
+      findings.
+- [x] `cargo test --workspace` / `--features dev_fake_issuer`: **633 / 636,
+      unchanged** — this package touches no Rust.
+- [x] clippy, fmt, wasm check, `mdbook build docs`, `git diff --check`,
+      `bun run build` (`index.js` unchanged at 28.6kb): all clean.
