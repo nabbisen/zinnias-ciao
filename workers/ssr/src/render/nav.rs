@@ -2,12 +2,6 @@ use super::shell::escape_html;
 use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::i18n;
 
-/// Bottom tab navigation (Home | Communities | Me). Non-migrated pages:
-/// always Japanese labels. Behavior unchanged by RFC-072.
-pub fn bottom_nav(community_id: &str, active: &str) -> String {
-    bottom_nav_localized(community_id, active, Locale::Ja)
-}
-
 /// Bottom tab navigation with locale-selected labels (RFC-072).
 pub fn bottom_nav_localized(community_id: &str, active: &str, locale: Locale) -> String {
     let tab = |label: &str, href: &str, id: &str| -> String {
@@ -73,18 +67,6 @@ pub fn header_with_switcher_localized(
     locale: Locale,
 ) -> String {
     header_with_switcher_next_localized(title, current_community_id, communities, "home", locale)
-}
-
-/// Non-migrated pages: always the Japanese "Switch" button label. Behavior
-/// unchanged by RFC-072; migrated pages call
-/// [`header_with_switcher_next_localized`] instead.
-pub fn header_with_switcher_next(
-    title: &str,
-    current_community_id: &str,
-    communities: &[(impl AsRef<str>, impl AsRef<str>)],
-    next: &str,
-) -> String {
-    header_with_switcher_next_localized(title, current_community_id, communities, next, Locale::Ja)
 }
 
 /// Header with a community switcher, with the switch button's own label

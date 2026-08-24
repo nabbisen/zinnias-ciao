@@ -6,6 +6,7 @@
 //!   POST /c/:cid/admin/templates/:tid/delete  — soft-delete template
 
 use worker::{Env, Request, Response, Result};
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 
 use crate::authz::require_admin;
@@ -20,14 +21,17 @@ fn redirect(location: &str) -> Result<Response> {
     Ok(resp.with_status(303))
 }
 
-/// Handoff 037: the `calendar_flash_message` pattern, admin-only Japanese
-/// (RFC-072 Slice D — no locale to resolve). Unknown codes return `None`;
-/// the caller must render no flash element in that case, not echo the code.
-fn templates_flash_message(code: Option<&str>) -> Option<&'static str> {
+/// Handoff 037: the `calendar_flash_message` pattern. Unknown codes return
+/// `None`; the caller must render no flash element in that case, not echo
+/// the code. Handoff 074 (RFC-083 Slice D1c): takes a required `Locale`,
+/// following `calendar_flash_message` and D1b's `invites_flash_message` —
+/// not an `Option<Locale>` default, so a missed call site is a compile
+/// error.
+fn templates_flash_message(code: Option<&str>, locale: Locale) -> Option<&'static str> {
     match code {
-        Some("title_required") => Some(i18n::JA_ADMIN_TEMPLATE_TITLE_REQUIRED_FLASH),
-        Some("template_saved") => Some(i18n::JA_ADMIN_TEMPLATE_SAVED_FLASH),
-        Some("template_deleted") => Some(i18n::JA_ADMIN_TEMPLATE_DELETED_FLASH),
+        Some("title_required") => Some(i18n::t(locale, i18n::ADMIN_TEMPLATE_TITLE_REQUIRED_FLASH)),
+        Some("template_saved") => Some(i18n::t(locale, i18n::ADMIN_TEMPLATE_SAVED_FLASH)),
+        Some("template_deleted") => Some(i18n::t(locale, i18n::ADMIN_TEMPLATE_DELETED_FLASH)),
         _ => None,
     }
 }
@@ -41,7 +45,8 @@ pub async fn get_templates(
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     let create_token = crate::codlet::issue_token(
@@ -72,7 +77,7 @@ pub async fn get_templates(
         .query_pairs()
         .find(|(k, _)| k == "flash")
         .map(|(_, v)| v.to_string());
-    let flash_html = templates_flash_message(flash_code.as_deref())
+    let flash_html = templates_flash_message(flash_code.as_deref(), locale)
         .map(|message| {
             format!(
                 "<p role=\"status\" class=\"cz-admin-invite-flash\">{}</p>",
@@ -128,21 +133,22 @@ pub async fn get_templates(
             cid = render::escape_html(community_id),
             tid = render::escape_html(&t.id),
             tok = render::escape_html(&delete_tok),
-            use_btn = i18n::JA_TEMPLATES_USE_BTN,
-            del_btn = i18n::JA_TEMPLATES_DELETE_BTN,
+            use_btn = i18n::t(locale, i18n::TEMPLATES_USE_BTN),
+            del_btn = i18n::t(locale, i18n::TEMPLATES_DELETE_BTN),
         ));
     }
 
     let empty_msg = if templates.is_empty() {
         &format!(
             "<p class=\"cz-admin-invites-body\">{}</p>",
-            i18n::JA_TEMPLATES_EMPTY
+            i18n::t(locale, i18n::TEMPLATES_EMPTY)
         )
     } else {
         ""
     };
 
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
+    let title_h1 = i18n::t(locale, i18n::TEMPLATES_TITLE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -178,18 +184,19 @@ pub async fn get_templates(
            </form>\
          </section>\
          </main>{nav}",
-        title_h1 = i18n::JA_TEMPLATES_TITLE,
-        desc = i18n::JA_TEMPLATES_DESCRIPTION,
-        save_section_h2 = i18n::JA_TEMPLATES_SAVE_SECTION,
-        lbl_title = i18n::JA_TEMPLATES_TITLE_LABEL,
-        lbl_loc = i18n::JA_TEMPLATES_LOC_LABEL,
-        lbl_dur = i18n::JA_TEMPLATES_DUR_LABEL,
-        btn_save = i18n::JA_TEMPLATES_SAVE_BTN,
-        header = render::header_with_switcher_next(
-            i18n::JA_TEMPLATES_TITLE,
+        title_h1 = title_h1,
+        desc = i18n::t(locale, i18n::TEMPLATES_DESCRIPTION),
+        save_section_h2 = i18n::t(locale, i18n::TEMPLATES_SAVE_SECTION),
+        lbl_title = i18n::t(locale, i18n::TEMPLATES_TITLE_LABEL),
+        lbl_loc = i18n::t(locale, i18n::TEMPLATES_LOC_LABEL),
+        lbl_dur = i18n::t(locale, i18n::TEMPLATES_DUR_LABEL),
+        btn_save = i18n::t(locale, i18n::TEMPLATES_SAVE_BTN),
+        header = render::header_with_switcher_next_localized(
+            title_h1,
             community_id,
             &community_pairs,
-            "admin_templates"
+            "admin_templates",
+            locale,
         ),
         flash = flash_html,
         empty = empty_msg,
@@ -202,7 +209,7 @@ pub async fn get_templates(
         tok = render::escape_html(&create_token),
         nav = nav,
     );
-    render::page(i18n::JA_TEMPLATES_TITLE, &body)
+    render::page_localized(locale, title_h1, &body)
 }
 
 // ── POST /c/:cid/admin/templates ──────────────────────────────────────────

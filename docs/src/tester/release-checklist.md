@@ -2553,3 +2553,70 @@ which compose the page themselves rather than invoking the handler) green.
 - [x] `cargo test --workspace`/`--features dev_fake_issuer`: unchanged at
       635/638 — this package strengthens two existing gates, it adds no
       new `#[test]` fn. `bun run smoke:all` 25/25; evidence baseline 996.
+
+## RFC-083 Slice D1 is closed: templates and export resolve locale (Handoff 074)
+
+The last two admin surfaces converted: `handlers/templates.rs` (15 sites)
+and `handlers/export.rs` (8 sites). **This was the first slice enforced end
+to end** by Handoff 073's gate — both a file's `i18n::JA_` count and its
+locale-blind-helper count had to reach zero independently.
+
+- [x] Both files resolve locale from `require_admin`'s `MembershipContext`;
+      no `_membership` remains in either.
+- [x] **Four new English strings added**, all proposed wording flagged for
+      owner review: `EN_ADMIN_TEMPLATE_TITLE_REQUIRED_FLASH` ("Enter a
+      title."), `EN_ADMIN_TEMPLATE_SAVED_FLASH` ("Template saved."),
+      `EN_ADMIN_TEMPLATE_DELETED_FLASH` ("Template deleted."), and
+      `EN_ADMIN_EXPORT_SUMMARY_COUNTS` ("{events} events · {members} active
+      members" — restores the exact pre-Japanese-only English phrasing the
+      Handoff 036 comment already documented, rather than inventing new
+      copy). **These were the corpus's last four JA-only constants.**
+- [x] `ADMIN_EXPORT_SUMMARY_COUNTS`'s English half keeps both named
+      placeholders (`{events}`, `{members}`) — substitution is by name, so
+      English word order was free; demonstrated: dropping the `{members}`
+      substitution step leaves a literal `{members}` surviving into
+      rendered output, caught and restored.
+- [x] `templates_flash_message` takes a **required** `Locale`, following
+      `calendar_flash_message`/D1b's `invites_flash_message`; both stale
+      "no locale to resolve" doc comments corrected.
+- [x] **All three dimensions re-pinned**: `LOCALIZATION_EXCEPTIONS` 12→10
+      entries, 121→98 `ja_count` sites, 14→8 `bare_helper_calls` — the
+      last of which never had its own table-level shrink-only total before
+      this package; added one. **`EN_JA_PARITY_EXCEPTIONS` is now empty**
+      — confirmed inert (the stale-entry loop iterates zero times; no
+      other assertion requires non-emptiness) and left in place as the
+      table Slice D2/D3's next unpaired stem will land in.
+- [x] **`render::bottom_nav` and `render::header_with_switcher_next`
+      removed** (D1b was told to keep them for exactly this moment) along
+      with their `render.rs` re-exports, after confirming zero remaining
+      callers repo-wide. The derived helper set (Handoff 073) shrank to
+      `{page}` **with no gate edit** — confirmed live via instrumented
+      output, not assumed. The remaining 8 pinned `bare_helper_calls`
+      sites are, verified directly, all bare `render::page` calls in D2's
+      seven files.
+- [x] Rendered-output tests added for both pages, each covering header,
+      nav, and body at `Locale::En` with a `Locale::Ja` discriminating
+      half on header/nav; the export test additionally asserts neither
+      placeholder survives literally. Demonstrated failing in both
+      classes Handoff 073 made separate: a bare `i18n::JA_` site
+      (temporarily substituted into a test's own composition), and a
+      locale-blind helper (the two removed helpers were temporarily
+      reintroduced solely to prove the assertion still catches this class,
+      then removed again — byte-identical to the post-removal state).
+- [x] Export-token security (§9) verified by diff, not assumed: the
+      entire change to `export.rs` is confined to `get_export_page`
+      (the landing page). `get_export_json` — token consumption,
+      `require_admin`, the pre-disclosure audit write, and `build_export`'s
+      payload — has zero diff.
+- [x] Per-function `.await` counts unchanged across all 7 routes touched
+      (verified against the checkpoint, function by function).
+- [x] `smoke:admin-tools-onboarding` and `bun run smoke:all` green —
+      **25/25**. `cargo test --workspace`: 638 (was 635, +3 — two
+      rendered-output tests plus the placeholder test). `--features
+      dev_fake_issuer`: 641 (was 638, +3). Evidence baseline unchanged at
+      996.
+- [x] **RFC-083 Slice D1 is now finished.** `LOCALIZATION_EXCEPTIONS`
+      holds exactly the three structurally-unresolvable files and D2's
+      seven — every admin surface honours the member's language
+      preference. Remaining convertible work: D2a (four anonymous routes)
+      and D2b (account surfaces, its own RFC).

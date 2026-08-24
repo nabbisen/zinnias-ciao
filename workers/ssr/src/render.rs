@@ -15,8 +15,8 @@ pub use errors::{
 };
 pub use event_card::CardDay;
 pub use nav::{
-    bottom_nav, bottom_nav_localized, header, header_with_switcher_localized,
-    header_with_switcher_next, header_with_switcher_next_localized,
+    bottom_nav_localized, header, header_with_switcher_localized,
+    header_with_switcher_next_localized,
 };
 pub use notes::{admin_note_hide_form, note_form};
 pub use participants::{ParticipantEntry, participant_list};

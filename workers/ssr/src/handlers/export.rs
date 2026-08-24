@@ -25,7 +25,8 @@ pub async fn get_export_page(
     community_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     // Issue a one-time download token bound to this admin.
@@ -58,16 +59,17 @@ pub async fn get_export_page(
         .await
         .unwrap_or(0);
 
-    let nav = render::bottom_nav(community_id, "home");
-    // Handoff 036 §A: was a bare "{events} events · {members} active
-    // members" literal. `JA_ADMIN_EXPORT_SUMMARY_COUNTS` is a runtime &str
-    // (an i18n constant), so it can't sit inside the outer format!'s
-    // compile-time literal — substituted by name here instead of via
-    // `substitute_positional` (positional `{}`, not this template's named
-    // `{events}`/`{members}`).
-    let summary_counts = i18n::JA_ADMIN_EXPORT_SUMMARY_COUNTS
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
+    // Handoff 074: the resolved i18n string is a runtime &str, so it can't
+    // sit inside the outer format!'s compile-time literal — substituted by
+    // name here instead of via `substitute_positional` (positional `{}`,
+    // not this template's named `{events}`/`{members}`). Both placeholders
+    // must survive whichever locale resolves — see
+    // `EN_ADMIN_EXPORT_SUMMARY_COUNTS`'s doc comment.
+    let summary_counts = i18n::t(locale, i18n::ADMIN_EXPORT_SUMMARY_COUNTS)
         .replace("{events}", &event_count.to_string())
         .replace("{members}", &member_count.to_string());
+    let exp_title = i18n::t(locale, i18n::EXPORT_TITLE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -90,16 +92,17 @@ pub async fn get_export_page(
            {single_use}\
          </p>\
          </main>{nav}",
-        exp_title = i18n::JA_EXPORT_TITLE,
-        exp_desc = i18n::JA_EXPORT_DESCRIPTION,
-        privacy_note = i18n::JA_EXPORT_PRIVACY_NOTE,
-        download_btn = i18n::JA_EXPORT_DOWNLOAD_BTN,
-        single_use = i18n::JA_EXPORT_SINGLE_USE,
-        header = render::header_with_switcher_next(
-            i18n::JA_EXPORT_TITLE,
+        exp_title = exp_title,
+        exp_desc = i18n::t(locale, i18n::EXPORT_DESCRIPTION),
+        privacy_note = i18n::t(locale, i18n::EXPORT_PRIVACY_NOTE),
+        download_btn = i18n::t(locale, i18n::EXPORT_DOWNLOAD_BTN),
+        single_use = i18n::t(locale, i18n::EXPORT_SINGLE_USE),
+        header = render::header_with_switcher_next_localized(
+            exp_title,
             community_id,
             &community_pairs,
-            "admin_export"
+            "admin_export",
+            locale,
         ),
         name = render::escape_html(&community_name),
         summary_counts = summary_counts,
@@ -108,7 +111,7 @@ pub async fn get_export_page(
         slug = render::escape_html(&slugify(&community_name)),
         nav = nav,
     );
-    render::page(i18n::JA_EXPORT_TITLE, &body)
+    render::page_localized(locale, exp_title, &body)
 }
 
 // ── GET /c/:cid/admin/export/json?token=… ────────────────────────────────
@@ -457,3 +460,6 @@ fn redirect(location: &str) -> Result<Response> {
     resp.headers_mut().set("Location", location)?;
     Ok(resp.with_status(303))
 }
+
+#[cfg(test)]
+mod tests;

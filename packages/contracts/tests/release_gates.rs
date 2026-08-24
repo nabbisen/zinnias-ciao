@@ -2736,12 +2736,6 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
         reason: "post_matrix_export_audit's pre-auth 401 branch rejects before any membership lookup exists, so no locale is resolvable yet — same rationale as render/errors.rs",
     },
     LocalizationException {
-        path: "handlers/export.rs",
-        ja_count: 8,
-        bare_helper_calls: 3,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
         path: "handlers/account/mod.rs",
         ja_count: 20,
         bare_helper_calls: 1,
@@ -2784,12 +2778,6 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
         reason: "anonymous route, no membership/session yet, RFC-072 Slice D",
     },
     LocalizationException {
-        path: "handlers/templates.rs",
-        ja_count: 15,
-        bare_helper_calls: 3,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
         path: "render/errors.rs",
         ja_count: 20,
         bare_helper_calls: 0,
@@ -2803,14 +2791,20 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
 /// decision). Handoff 071 (RFC-083 F1) resolved that decision and converted
 /// the tenth: 18→17 entries, 203→196 sites, closing Slice D1a. Handoff 072
 /// (RFC-083 Slice D1b) converted the five member-administration files:
-/// 17→12 entries, 196→121 sites. A future addition to the table must lower
-/// this pinned value deliberately, not raise it: growth here means a page
-/// stopped being localized, not a documented decision to leave one alone.
+/// 17→12 entries, 196→121 sites. Handoff 074 (RFC-083 Slice D1c) converted
+/// the last two admin files, `templates.rs` and `export.rs`: 12→10 entries,
+/// 121→98 `ja_count` sites, and — the third dimension this table has
+/// carried since Handoff 073 but never had its own shrink-only total until
+/// now — 14→8 `bare_helper_calls` sites. This closes RFC-083 Slice D1: the
+/// ten entries remaining are the three structurally-unresolvable files and
+/// D2's seven. A future addition to the table must lower these pinned
+/// values deliberately, not raise them: growth here means a page stopped
+/// being localized, not a documented decision to leave one alone.
 #[test]
 fn rfc083_localization_exceptions_table_only_shrinks() {
     assert_eq!(
         LOCALIZATION_EXCEPTIONS.len(),
-        12,
+        10,
         "LOCALIZATION_EXCEPTIONS grew to {} entries. This table is shrink-only \
          (RFC-083 §6.1) — re-pin this value only alongside a deliberate, reviewed \
          decision to leave a newly-discovered file unlocalized, never to make a \
@@ -2819,9 +2813,19 @@ fn rfc083_localization_exceptions_table_only_shrinks() {
     );
     let total_sites: usize = LOCALIZATION_EXCEPTIONS.iter().map(|e| e.ja_count).sum();
     assert_eq!(
-        total_sites, 121,
+        total_sites, 98,
         "LOCALIZATION_EXCEPTIONS site total grew to {total_sites}. Re-pin only \
          alongside a reviewed, deliberate change to an individual entry's ja_count."
+    );
+    let total_bare_helper_calls: usize = LOCALIZATION_EXCEPTIONS
+        .iter()
+        .map(|e| e.bare_helper_calls)
+        .sum();
+    assert_eq!(
+        total_bare_helper_calls, 8,
+        "LOCALIZATION_EXCEPTIONS bare_helper_calls total grew to {total_bare_helper_calls}. \
+         Re-pin only alongside a reviewed, deliberate change to an individual entry's \
+         bare_helper_calls."
     );
 }
 
@@ -3094,28 +3098,17 @@ struct EnJaParityException {
 /// independently re-derived, not copied from the finding that reported
 /// them; originally six — Handoff 071 removed `ADMIN_USE_TEMPLATE_LINK`
 /// closing D1a, Handoff 072 removed `ADMIN_INVITE_REVOKED_FLASH` closing
-/// D1b, leaving D1c's four). Each is expected to be deleted from this table
-/// as its own sub-slice lands — the table shrinking as designed, not a
-/// permanent carve-out. No entry here may be added to make an unpaired
-/// constant itself change; that is RFC-054/RFC-083's business.
-const EN_JA_PARITY_EXCEPTIONS: &[EnJaParityException] = &[
-    EnJaParityException {
-        stem: "ADMIN_EXPORT_SUMMARY_COUNTS",
-        reason: "RFC-083 Slice D1c (handlers/export.rs) — not yet converted",
-    },
-    EnJaParityException {
-        stem: "ADMIN_TEMPLATE_TITLE_REQUIRED_FLASH",
-        reason: "RFC-083 Slice D1c (handlers/templates.rs) — not yet converted",
-    },
-    EnJaParityException {
-        stem: "ADMIN_TEMPLATE_SAVED_FLASH",
-        reason: "RFC-083 Slice D1c (handlers/templates.rs) — not yet converted",
-    },
-    EnJaParityException {
-        stem: "ADMIN_TEMPLATE_DELETED_FLASH",
-        reason: "RFC-083 Slice D1c (handlers/templates.rs) — not yet converted",
-    },
-];
+/// D1b, Handoff 074 removed the last four (`ADMIN_EXPORT_SUMMARY_COUNTS`,
+/// `ADMIN_TEMPLATE_TITLE_REQUIRED_FLASH`, `ADMIN_TEMPLATE_SAVED_FLASH`,
+/// `ADMIN_TEMPLATE_DELETED_FLASH`) closing D1c). **Empty since Handoff
+/// 074** — every `EN_` constant in the corpus now has a `JA_` counterpart.
+/// Confirmed inert: the stale-entry loop below simply iterates zero times
+/// over an empty slice, and no other assertion in this gate requires the
+/// table to be non-empty. Left in place (not deleted) as the table this
+/// project's next Slice D2/D3 unpaired stem will land in — the shape that
+/// shrinks to zero and stays ready, not a table that must be re-created
+/// from scratch.
+const EN_JA_PARITY_EXCEPTIONS: &[EnJaParityException] = &[];
 
 /// Handoff 070 Part B: folds the `EN != JA` check that `i18n_en_ja_parity_count`
 /// used to perform (via a one-entry `INTENTIONALLY_IDENTICAL` list) into this
