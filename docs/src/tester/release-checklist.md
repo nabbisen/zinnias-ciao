@@ -2502,3 +2502,54 @@ member list — 30 sites), `help_signin.rs` (17), `role_transfer.rs`
       635, +3).
 - [x] No Japanese wording changed; `node scripts/test-evidence-leakage-baseline.mjs`
       stays green at 996.
+
+## The localization gate now catches a locale-blind helper, not just bare `i18n::JA_` (Handoff 073)
+
+D1b's review (F1) found that nothing stopped a converted file from calling
+`render::bottom_nav`/`render::header_with_switcher_next` directly — a page
+with the correct `html lang`, an English body, and a **Japanese navigation
+bar**, with every gate (including D1b's own new rendered-output tests,
+which compose the page themselves rather than invoking the handler) green.
+
+- [x] **A converted file may not call a locale-blind render helper** — any
+      `render::<name>(` where `<name>_localized` also exists. The helper
+      set is **derived**, not listed: scans `workers/ssr/src/render.rs`/
+      `render/*.rs` for `pub fn <name>_localized` with a bare `pub fn
+      <name>` sibling, comments stripped first. Today that derives
+      `{bottom_nav, header_with_switcher_next, page}` —
+      `header_with_switcher_localized`/`format_day_time_tz_localized` are
+      correctly excluded (no bare sibling), not by name.
+- [x] `LocalizationException`'s `calls_bare_page: bool` is gone, replaced
+      by `bare_helper_calls: usize` — an exact pinned count, same
+      discipline as `ja_count`. Non-excepted files must be 0; excepted
+      files pin their exact count (`export.rs`/`templates.rs`: 3 each; the
+      other seven table entries: 0–2).
+- [x] Confirmed bare `render::page(` in a non-excepted file still fails —
+      the property this check has always caught is unchanged by the
+      rewrite, verified with its own mutation.
+- [x] Five demonstrations, all mutated/verified/restored byte-identical:
+      the exact §2.1 defect (`bottom_nav_localized` → `bottom_nav` in
+      `members.rs`); a different helper
+      (`header_with_switcher_next_localized` → `header_with_switcher_next`
+      in `help_signin.rs`) — proving the derived set, not one hard-coded
+      name; the pinned-count assertion firing on a partial edit to an
+      excepted file (`export.rs`, 3→4); the derivation being live (a
+      throwaway `zz_demo`/`zz_demo_localized` pair entering the checked
+      set, confirmed via instrumented output, then removed); and the
+      ROADMAP tripwire's subset refinement firing when the table is
+      reduced to a **proper subset** of the trigger (two of three), which
+      the prior equality-only check would have missed.
+- [x] The tripwire (`roadmap_english_default_tripwire_fires_when_slice_d_completes`)
+      now fires on `remaining ⊆ trigger`, not `remaining == trigger` — a
+      future RFC threading `render/errors.rs` (RFC-083 §4.4 considered and
+      rejected this, but did not forbid it) would otherwise shrink the
+      table to a proper subset and leave the decision silently overdue.
+      Everything else unchanged: no numeric literal, the ROADMAP
+      reference, "not a gate to re-pin."
+- [x] No product code, no conversion work — this package touches only
+      `packages/contracts/tests/release_gates.rs`. `bottom_nav` and
+      `header_with_switcher_next` were not removed (D1c still needs them);
+      confirmed no clippy dead-code warning.
+- [x] `cargo test --workspace`/`--features dev_fake_issuer`: unchanged at
+      635/638 — this package strengthens two existing gates, it adds no
+      new `#[test]` fn. `bun run smoke:all` 25/25; evidence baseline 996.

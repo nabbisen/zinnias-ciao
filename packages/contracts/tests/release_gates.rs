@@ -2692,15 +2692,17 @@ fn rfc072_language_settings_post_is_reject_no_op_replay_and_target_safe() {
 
 /// RFC-072 criterion 9, Handoff 030 §7.3: one documented exception to the
 /// default-fail localization gate below. `ja_count` is the file's exact,
-/// pinned bare `i18n::JA_` reference count; `calls_bare_page` records
-/// whether it calls the non-locale-aware `render::page(` shell (as opposed
-/// to `render::page_localized(`, or no page call at all). Both are asserted
-/// exactly, not as a floor or ceiling, so a partial edit to an excluded file
-/// — the exact defect this gate exists to catch — still fails it.
+/// pinned bare `i18n::JA_` reference count; `bare_helper_calls` is the
+/// file's exact, pinned count of calls to any render helper that has a
+/// `_localized` sibling (Handoff 073 — generalizes what used to be a
+/// single-helper `calls_bare_page: bool`, see
+/// `locale_blind_helpers_with_localized_sibling` below). Both are asserted
+/// exactly, not as a floor or ceiling, so a partial edit to an excluded
+/// file — the exact defect this gate exists to catch — still fails it.
 struct LocalizationException {
     path: &'static str,
     ja_count: usize,
-    calls_bare_page: bool,
+    bare_helper_calls: usize,
     reason: &'static str,
 }
 
@@ -2724,73 +2726,73 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     LocalizationException {
         path: "handlers/calendar.rs",
         ja_count: 2,
-        calls_bare_page: false,
+        bare_helper_calls: 0,
         reason: "get_ics_feed is an unauthenticated bearer-token route with no membership lookup, so no locale is resolvable yet — same rationale as render/errors.rs (Handoff 030 §7.1)",
     },
     LocalizationException {
         path: "handlers/communities.rs",
         ja_count: 1,
-        calls_bare_page: false,
+        bare_helper_calls: 0,
         reason: "post_matrix_export_audit's pre-auth 401 branch rejects before any membership lookup exists, so no locale is resolvable yet — same rationale as render/errors.rs",
     },
     LocalizationException {
         path: "handlers/export.rs",
         ja_count: 8,
-        calls_bare_page: true,
+        bare_helper_calls: 3,
         reason: "admin-only surface, RFC-072 Slice D",
     },
     LocalizationException {
         path: "handlers/account/mod.rs",
         ja_count: 20,
-        calls_bare_page: true,
+        bare_helper_calls: 1,
         reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 055; +1 in Handoff 056 for the link entry-point label; +5 in Handoff 057 for recovery-credential status/regenerate and per-identity unlink labels)",
     },
     LocalizationException {
         path: "handlers/account/link.rs",
         ja_count: 5,
-        calls_bare_page: true,
+        bare_helper_calls: 1,
         reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 056)",
     },
     LocalizationException {
         path: "handlers/account/unlink.rs",
         ja_count: 6,
-        calls_bare_page: true,
+        bare_helper_calls: 1,
         reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 057)",
     },
     LocalizationException {
         path: "handlers/recovery.rs",
         ja_count: 10,
-        calls_bare_page: true,
+        bare_helper_calls: 1,
         reason: "anonymous route, no membership/session yet, RFC-072 Slice D — matches handlers/relink.rs's own convention (Handoff 057)",
     },
     LocalizationException {
         path: "handlers/identity/mod.rs",
         ja_count: 6,
-        calls_bare_page: true,
+        bare_helper_calls: 1,
         reason: "anonymous route, no membership/session yet, RFC-072 Slice D — matches handlers/join.rs's own convention (Handoff 054)",
     },
     LocalizationException {
         path: "handlers/join.rs",
         ja_count: 18,
-        calls_bare_page: true,
+        bare_helper_calls: 2,
         reason: "anonymous route, no membership/session yet, RFC-072 Slice D",
     },
     LocalizationException {
         path: "handlers/relink.rs",
         ja_count: 10,
-        calls_bare_page: true,
+        bare_helper_calls: 1,
         reason: "anonymous route, no membership/session yet, RFC-072 Slice D",
     },
     LocalizationException {
         path: "handlers/templates.rs",
         ja_count: 15,
-        calls_bare_page: true,
+        bare_helper_calls: 3,
         reason: "admin-only surface, RFC-072 Slice D",
     },
     LocalizationException {
         path: "render/errors.rs",
         ja_count: 20,
-        calls_bare_page: false,
+        bare_helper_calls: 0,
         reason: "these functions take no arguments, so they have no membership and no locale to resolve (RFC-072 §6 non-change scope)",
     },
 ];
@@ -2852,15 +2854,20 @@ fn roadmap_english_default_tripwire_fires_when_slice_d_completes() {
         LOCALIZATION_EXCEPTIONS.iter().map(|e| e.path).collect();
     let trigger: std::collections::BTreeSet<&str> =
         STRUCTURALLY_UNRESOLVABLE.iter().copied().collect();
-    assert_ne!(
-        remaining, trigger,
-        "LOCALIZATION_EXCEPTIONS now holds only the three structurally-unresolvable \
-         entries ({STRUCTURALLY_UNRESOLVABLE:?}) — RFC-083 Slice D has reached completion. \
-         ROADMAP.md's \"The default language flips to English when Slice D completes\" \
-         (owner decision 2026-08-16, RFC-083 §8.2) is now due: flip Locale::default() to \
-         English and update migration 0011_membership_ui_language.sql's comment. This is \
-         not a gate to re-pin — resolve the ROADMAP decision, then delete or rewrite this \
-         test to reflect the new default."
+    // Handoff 073 §3.3 (F1 of the D1b review): subset, not equality. A
+    // future RFC threading render/errors.rs (RFC-083 §4.4 considered and
+    // rejected this, but did not forbid it) would shrink the table to a
+    // proper subset of the trigger set — two of the three, not all three —
+    // and an equality check would stay silent with the decision overdue.
+    assert!(
+        !remaining.is_subset(&trigger),
+        "LOCALIZATION_EXCEPTIONS now holds only entries within the three \
+         structurally-unresolvable paths ({STRUCTURALLY_UNRESOLVABLE:?}) — RFC-083 Slice D \
+         has reached completion. ROADMAP.md's \"The default language flips to English when \
+         Slice D completes\" (owner decision 2026-08-16, RFC-083 §8.2) is now due: flip \
+         Locale::default() to English and update migration 0011_membership_ui_language.sql's \
+         comment. This is not a gate to re-pin — resolve the ROADMAP decision, then delete or \
+         rewrite this test to reflect the new default."
     );
 }
 
@@ -2874,6 +2881,71 @@ fn handlers_and_render_files() -> Vec<std::path::PathBuf> {
         .collect()
 }
 
+/// The render helpers a converted file must never call directly (Handoff
+/// 073, F1 of the RFC-083 Slice D1b review): every `pub fn <name>_localized`
+/// under `workers/ssr/src/render.rs`/`render/*.rs` that also has a bare
+/// `pub fn <name>` sibling. Derived, not hard-coded — a future helper
+/// gaining a `_localized` sibling is covered by existing rather than by
+/// anyone remembering, the same rule as `LOCALIZATION_EXCEPTIONS` itself,
+/// the smoke run set, EN/JA parity, and the leakage baseline. Comments
+/// stripped first: five gates in this project have now matched their own
+/// explanatory prose, one of them in D1b.
+///
+/// Deliberately narrow: only a literal `pub fn ` prefix counts (not
+/// `pub(crate) fn`/`pub(super) fn`), matching every helper this project has
+/// actually written this way; `header` (bare, no `_localized` sibling of
+/// its own) and `header_with_switcher_localized` (no bare sibling) are
+/// correctly excluded by the intersection, not by name.
+fn locale_blind_helpers_with_localized_sibling() -> Vec<String> {
+    let src_dir = workers_ssr_src_dir();
+    let mut render_files = vec![src_dir.join("render.rs")];
+    walk_rs_files(&src_dir.join("render"), &mut render_files);
+    render_files.retain(|p| p.file_name().and_then(|n| n.to_str()) != Some("tests.rs"));
+
+    let mut localized_names = std::collections::BTreeSet::new();
+    let mut bare_names = std::collections::BTreeSet::new();
+    for path in &render_files {
+        let raw = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let stripped = strip_line_comments(&raw);
+        for line in stripped.lines() {
+            let Some(rest) = line.trim_start().strip_prefix("pub fn ") else {
+                continue;
+            };
+            let Some(paren) = rest.find('(') else {
+                continue;
+            };
+            let name = rest[..paren].trim();
+            match name.strip_suffix("_localized") {
+                Some(base) => {
+                    localized_names.insert(base.to_string());
+                }
+                None => {
+                    bare_names.insert(name.to_string());
+                }
+            }
+        }
+    }
+    localized_names.intersection(&bare_names).cloned().collect()
+}
+
+/// Per-helper bare-call counts for `content` against the derived `helpers`
+/// set, comments stripped first. Kept per-helper (not pre-summed) so a
+/// failing assertion can name exactly which helper was called bare, not
+/// just how many times something in the set matched.
+fn bare_locale_blind_helper_call_counts(content: &str, helpers: &[String]) -> Vec<(String, usize)> {
+    let stripped = strip_line_comments(content);
+    helpers
+        .iter()
+        .map(|name| {
+            (
+                name.clone(),
+                stripped.matches(&format!("render::{name}(")).count(),
+            )
+        })
+        .collect()
+}
+
 #[test]
 fn rfc072_every_handler_and_render_file_is_localized_or_documented_exception() {
     // RFC-072 criterion 9: every page reachable from My Page honours the
@@ -2883,15 +2955,42 @@ fn rfc072_every_handler_and_render_file_is_localized_or_documented_exception() {
     // someone remembered to add it, and missed `calendar.rs` through three
     // RFC-072 slices as a result. This version is default-fail: it walks
     // every non-test file under `handlers/` and `render/`, and anything
-    // that calls the bare `render::page(` shell or contains a bare
+    // that calls a locale-blind render helper (derived — see
+    // `locale_blind_helpers_with_localized_sibling`) or contains a bare
     // `i18n::JA_` reference must be named in `LOCALIZATION_EXCEPTIONS` with
     // an exact pinned count and a written reason — otherwise it fails.
+    //
+    // Handoff 073 (F1 of the D1b review): originally checked one named
+    // helper, `render::page(`, via `calls_bare_page: bool`. A converted
+    // file calling `render::bottom_nav(` or `render::header_with_switcher_next(`
+    // directly produces a page with the correct `html lang` and an English
+    // body over a Japanese navigation bar — and every gate, including this
+    // one's prior form, passed. Generalized to every render helper with a
+    // `_localized` sibling, derived by scanning the render layer rather
+    // than naming helpers by hand.
     let files = handlers_and_render_files();
     assert!(
         files.len() > 30,
         "expected many .rs files under handlers/ and render/, found only {} — \
          directory walk is probably broken, not the codebase actually shrinking",
         files.len()
+    );
+
+    let helpers = locale_blind_helpers_with_localized_sibling();
+    assert!(
+        !helpers.is_empty() && helpers.len() < 10,
+        "expected a small derived set of render helpers with a _localized sibling, found {} \
+         ({helpers:?}) — the render-layer scan is probably broken, not the codebase having \
+         none or dozens",
+        helpers.len()
+    );
+    // §9: this check replaces (not extends) the one that always caught bare
+    // render::page( — confirm the derived set still contains it, since a
+    // scan regression here would silently stop catching the original case.
+    assert!(
+        helpers.iter().any(|h| h == "page"),
+        "derived helper set {helpers:?} lost \"page\" — the rewritten check must still catch \
+         bare render::page( in a non-excepted file, exactly as the check it replaces did"
     );
 
     let src_dir = workers_ssr_src_dir();
@@ -2901,7 +3000,13 @@ fn rfc072_every_handler_and_render_file_is_localized_or_documented_exception() {
         let content = std::fs::read_to_string(path)
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
         let ja_count = content.matches("i18n::JA_").count();
-        let calls_bare_page = content.contains("render::page(");
+        let helper_counts = bare_locale_blind_helper_call_counts(&content, &helpers);
+        let bare_helper_calls: usize = helper_counts.iter().map(|(_, c)| c).sum();
+        let helper_breakdown: Vec<String> = helper_counts
+            .iter()
+            .filter(|(_, c)| *c > 0)
+            .map(|(name, c)| format!("render::{name}( x{c}"))
+            .collect();
         let rel = path
             .strip_prefix(&src_dir)
             .unwrap_or(path)
@@ -2919,10 +3024,13 @@ fn rfc072_every_handler_and_render_file_is_localized_or_documented_exception() {
                     exc.ja_count, exc.reason
                 );
                 assert_eq!(
-                    calls_bare_page, exc.calls_bare_page,
-                    "{rel}: whether it calls the bare render::page( shell changed from its \
+                    bare_helper_calls,
+                    exc.bare_helper_calls,
+                    "{rel}: bare calls to a locale-blind render helper ({}) changed from its \
                      pinned exception value ({}) — re-pin only if deliberate ({})",
-                    exc.calls_bare_page, exc.reason
+                    helper_breakdown.join(", "),
+                    exc.bare_helper_calls,
+                    exc.reason
                 );
             }
             None => {
@@ -2933,11 +3041,15 @@ fn rfc072_every_handler_and_render_file_is_localized_or_documented_exception() {
                      page to honour locale unless excluded for a written reason — either \
                      localize this file, or add a table entry with the exact count and why."
                 );
-                assert!(
-                    !calls_bare_page,
-                    "{rel} calls the non-locale-aware render::page( shell and is not in \
-                     LOCALIZATION_EXCEPTIONS — use render::page_localized instead, or add a \
-                     table entry with a written reason."
+                assert_eq!(
+                    bare_helper_calls,
+                    0,
+                    "{rel} calls a locale-blind render helper {bare_helper_calls} time(s) ({}) \
+                     and is not in LOCALIZATION_EXCEPTIONS — use its _localized sibling \
+                     instead, or add a table entry with a written reason. This is the exact \
+                     defect that produces a correct html lang over a wrong-language \
+                     navigation bar, with a source scan for i18n::JA_ alone seeing nothing.",
+                    helper_breakdown.join(", ")
                 );
             }
         }
