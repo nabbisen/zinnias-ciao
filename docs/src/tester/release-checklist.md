@@ -2182,3 +2182,48 @@ throw-on-first behavior, unchanged, for every existing caller.
       unchanged** — this package touches no Rust.
 - [x] clippy, fmt, wasm check, `mdbook build docs`, `git diff --check`,
       `bun run build` (`index.js` unchanged at 28.6kb): all clean.
+
+## The remaining four smokes stop recording form values (Handoff 066)
+
+**The rule, plainly: a smoke may read a form value for an assertion; it may
+never record one.** Handoff 065 fixed three scripts where nothing read the
+captured values, so deleting the capture was free. Four more scripts
+(`event-copy.mjs`, `self-display-name-editing.mjs`, `recurrence-v2.mjs`,
+`language-preference.mjs`) do the same blanket capture, but three of them
+*do* read values for real assertions — including `self-display-name-editing.mjs`'s
+AD-4 single-use-form-token replay coverage. Deleting the capture outright
+would have broken those.
+
+- [x] `collect()` no longer returns `values` in any of the four. Where an
+      assertion needs a field, it's read explicitly and separately —
+      `readFormValue`/`readFormValues` helpers that query only the named
+      field(s), never touch `observed`, and are called out by name at each
+      call site so a reader can see exactly what the test depends on. The
+      evidence path and the assertion path are now different code paths, not
+      a shared object filtered after the fact.
+- [x] **`self-display-name-editing.mjs`'s four token-replay tests preserved
+      exactly** — same reads, same assertions, same `checks:` results, just
+      via the explicit read instead of a captured map. Confirmed by re-running
+      the smoke and reading its full `checks:` output, not just a green exit
+      code.
+- [x] Five raw field-map recordings deleted from `observed` entirely
+      (`event-copy.mjs` ×4, `recurrence-v2.mjs` ×1) — the booleans in
+      `checks:` were already the diagnosable evidence; the raw values added
+      nothing but risk.
+- [x] All four smokes re-run in full and pass (`smoke:recurrence` still
+      exits non-zero only on the separate, already-decided
+      `calendarShowsSeededTitle` finding). Re-scanned all four evidence
+      directories: **rfc065 2→0, rfc066 11→0, rfc072 25→0**. **rfc070 9→1** —
+      the one remaining finding is unrelated to this package (a
+      `hosted-staging-smoke-checklist.md` file containing an example
+      `wrangler d1 execute` command for a human tester, not anything this
+      smoke's JSON output writes) and untouched, per this package's scope.
+- [x] **Whole-tree total: 1097 → 1051**, not the handoff's predicted ~200.
+      Investigated rather than accepted or silently corrected: most of the
+      `_token`/resource-id findings the handoff was counting live in frozen
+      historical evidence bundles (`review-040` through `review-060` and
+      similar) that already contain old, pre-fix copies of these same
+      scripts' output — fixing the scripts stops *future* captures, it
+      cannot retroactively clean snapshots already on disk, and this package
+      is explicitly not authorized to touch them. See the review request for
+      the full reconciliation.

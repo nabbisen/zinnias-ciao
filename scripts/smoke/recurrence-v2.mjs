@@ -370,7 +370,6 @@ async function collect(cdp) {
   return await evalExpr(
     cdp,
     `(() => {
-      const fields = [...document.querySelectorAll('input[name], textarea[name], select[name]')];
       const links = [...document.querySelectorAll('a[href]')].map((a) => ({
         href: a.getAttribute('href'),
         text: a.innerText,
@@ -380,9 +379,21 @@ async function collect(cdp) {
         text: document.body.innerText,
         hrefs: links.map((link) => link.href),
         links,
-        values: Object.fromEntries(fields.map((el) => [el.getAttribute('name'), el.value])),
         noHorizontalScroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
       };
+    })()`,
+  );
+}
+
+// Handoff 066 §3.1: an explicit, named read of one field's value, used only
+// where an assertion genuinely needs it — never folded into `collect()`,
+// whose return value is what reaches `observed` and therefore evidence.
+async function readFormValue(cdp, name) {
+  return await evalExpr(
+    cdp,
+    `(() => {
+      const el = document.querySelector('[name="' + ${JSON.stringify(name)} + '"]');
+      return el ? el.value : null;
     })()`,
   );
 }
@@ -509,8 +520,8 @@ try {
   logStep('creating open-ended weekly recurrence through admin UI');
   await navigate(page, `/c/${communityId}/admin/events/new`, { textScale: 2 });
   const createForm = await collect(page);
+  const createFormRepeatCount = await readFormValue(page, 'repeat_count');
   await fillCreateRecurrenceForm(page);
-  const filledCreateForm = await collect(page);
   await submitFormByAction(page, `/c/${communityId}/admin/events`, 'submit create recurrence');
   const createdDetail = await collect(page);
   const createdEvent = queryUiCreatedEvent();
@@ -520,15 +531,13 @@ try {
     screenshotPath: await screenshot(page, 'admin-ui-creates-open-ended-weekly-recurrence'),
     observed: {
       createFormPath: createForm.path,
-      filledCreateFormValues: filledCreateForm.values,
       detailPath: createdDetail.path,
       createdEvent,
       createdSummary,
     },
     checks: {
       noHorizontalScroll: createdDetail.noHorizontalScroll,
-      formHasNoDefaultEight:
-        createForm.values.repeat_count === '' || createForm.values.repeat_count === undefined,
+      formHasNoDefaultEight: createFormRepeatCount === '' || createFormRepeatCount == null,
       redirectedToEventDetail:
         Boolean(createdEvent?.id) && createdDetail.path === `/c/${communityId}/events/${createdEvent.id}`,
       storedOpenEndedSummary:

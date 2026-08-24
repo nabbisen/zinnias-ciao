@@ -340,7 +340,6 @@ async function collect(cdp) {
   return await evalExpr(
     cdp,
     `(() => {
-      const fields = [...document.querySelectorAll('input[name], textarea[name], select[name]')];
       const links = [...document.querySelectorAll('a[href]')].map((a) => ({
         href: a.getAttribute('href'),
         text: a.innerText,
@@ -355,9 +354,26 @@ async function collect(cdp) {
         hrefs: links.map((link) => link.href),
         links,
         buttons,
-        values: Object.fromEntries(fields.map((el) => [el.getAttribute('name'), el.value])),
         noHorizontalScroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
       };
+    })()`,
+  );
+}
+
+// Handoff 066 §3.1: an explicit, named read of exactly the fields an
+// assertion needs, in one round trip — never folded into `collect()`, whose
+// return value is what reaches `observed` and therefore evidence. Naming the
+// fields at the call site (an array literal, not a blanket selector) is what
+// makes this an allow-list rather than a narrower blanket capture.
+async function readFormValues(cdp, names) {
+  return await evalExpr(
+    cdp,
+    `(() => {
+      const names = ${JSON.stringify(names)};
+      return Object.fromEntries(names.map((name) => {
+        const el = document.querySelector('[name="' + name + '"]');
+        return [name, el ? el.value : null];
+      }));
     })()`,
   );
 }
@@ -495,6 +511,11 @@ try {
     textScale: 2,
   });
   const memberDirectCopy = await collect(memberPage);
+  // Only ever tested for falsiness (§2.2 of the handoff) — the value itself
+  // is never needed, and `copy_source_event_id`'s value is `event_`-prefixed
+  // (a prohibited resource-id shape), so it must never reach `observed`
+  // regardless.
+  const memberDirectCopySource = await readFormValues(memberPage, ['copy_source_event_id']);
   results.push({
     name: 'non-admin-copy-action-and-direct-url-are-denied',
     screenshotPath: await screenshot(memberPage, 'non-admin-copy-direct-url-denied'),
@@ -505,7 +526,7 @@ try {
     },
     checks: {
       detailHidesCopy: !memberDetail.hrefs.includes(`/c/${communityId}/admin/events/${singleEventId}/copy`),
-      directDoesNotShowCopyForm: !memberDirectCopy.values.copy_source_event_id && !memberDirectCopy.text.includes(singleTitle),
+      directDoesNotShowCopyForm: !memberDirectCopySource.copy_source_event_id && !memberDirectCopy.text.includes(singleTitle),
       noHorizontalScroll: memberDirectCopy.noHorizontalScroll,
     },
   });
@@ -516,6 +537,9 @@ try {
     textScale: 2,
   });
   const singleCopyForm = await collect(adminPage);
+  const singleCopyValues = await readFormValues(adminPage, [
+    'copy_mode', 'title', 'location', 'description', 'day_date', 'starts_at', 'ends_at',
+  ]);
   await submitFormByAction(adminPage, `/c/${communityId}/admin/events`, 'submit single copy');
   const afterSingleCopy = await collect(adminPage);
   const copied = copiedSingleEvent();
@@ -539,7 +563,6 @@ try {
     screenshotPath: await screenshot(adminPage, 'single-day-copy-created-event'),
     observed: {
       formPath: singleCopyForm.path,
-      values: singleCopyForm.values,
       afterPath: afterSingleCopy.path,
       copied,
       copiedDayIds,
@@ -549,15 +572,15 @@ try {
       auditMetadata,
     },
     checks: {
-      formHasCopyMode: singleCopyForm.values.copy_mode === 'event_copy',
+      formHasCopyMode: singleCopyValues.copy_mode === 'event_copy',
       prefilledDetails:
-        singleCopyForm.values.title === singleTitle &&
-        singleCopyForm.values.location === 'Main room' &&
-        singleCopyForm.values.description === 'Single source description',
+        singleCopyValues.title === singleTitle &&
+        singleCopyValues.location === 'Main room' &&
+        singleCopyValues.description === 'Single source description',
       prefilledSchedule:
-        singleCopyForm.values.day_date === '2026-07-20' &&
-        singleCopyForm.values.starts_at === '10:00' &&
-        singleCopyForm.values.ends_at === '11:00',
+        singleCopyValues.day_date === '2026-07-20' &&
+        singleCopyValues.starts_at === '10:00' &&
+        singleCopyValues.ends_at === '11:00',
       redirectedToCopiedEvent: Boolean(copied?.id) && afterSingleCopy.path === `/c/${communityId}/events/${copied.id}`,
       newDayIds: copiedDayIds.length === 1 && copiedDayIds[0] !== singleDayId,
       noAttendanceCopied: copiedAttendanceCount === 0,
@@ -579,41 +602,43 @@ try {
     textScale: 2,
   });
   const multiCopyForm = await collect(adminPage);
+  const multiCopyValues = await readFormValues(adminPage, ['title', 'location', 'description', 'day_date', 'starts_at', 'ends_at']);
   await setSession(adminPage, adminSessionSecret);
   logStep('checking past-recurring copy form');
   await navigate(adminPage, `/c/${communityId}/admin/events/${recurringEventId}/copy`, {
     textScale: 2,
   });
   const recurringCopyForm = await collect(adminPage);
+  const recurringCopyValues = await readFormValues(adminPage, [
+    'title', 'repeat_rule', 'starts_at', 'ends_at', 'day_date', 'repeat_end_mode', 'repeat_count', 'repeat_until',
+  ]);
   results.push({
     name: 'multi-day-and-past-recurring-copy-prefill-rules',
     screenshotPath: await screenshot(adminPage, 'past-recurring-copy-form'),
     observed: {
-      multi: multiCopyForm.values,
       multiText: multiCopyForm.text,
-      recurring: recurringCopyForm.values,
       recurringText: recurringCopyForm.text,
     },
     checks: {
       multiCopiesDetails:
-        multiCopyForm.values.title === multiTitle &&
-        multiCopyForm.values.location === 'Multi room' &&
-        multiCopyForm.values.description === 'Multi source description',
+        multiCopyValues.title === multiTitle &&
+        multiCopyValues.location === 'Multi room' &&
+        multiCopyValues.description === 'Multi source description',
       multiScheduleBlank:
-        multiCopyForm.values.day_date === '' &&
-        multiCopyForm.values.starts_at === '' &&
-        multiCopyForm.values.ends_at === '',
+        multiCopyValues.day_date === '' &&
+        multiCopyValues.starts_at === '' &&
+        multiCopyValues.ends_at === '',
       multiShowsHelper: multiCopyForm.text.includes('複数日の予定です'),
       recurringCopiesTemplate:
-        recurringCopyForm.values.title === recurringTitle &&
-        recurringCopyForm.values.repeat_rule === 'weekly' &&
-        recurringCopyForm.values.starts_at === '10:00' &&
-        recurringCopyForm.values.ends_at === '11:00',
+        recurringCopyValues.title === recurringTitle &&
+        recurringCopyValues.repeat_rule === 'weekly' &&
+        recurringCopyValues.starts_at === '10:00' &&
+        recurringCopyValues.ends_at === '11:00',
       recurringResetsInvalidSchedule:
-        recurringCopyForm.values.day_date === '' &&
-        recurringCopyForm.values.repeat_end_mode === 'open_ended' &&
-        recurringCopyForm.values.repeat_count === '' &&
-        recurringCopyForm.values.repeat_until === '',
+        recurringCopyValues.day_date === '' &&
+        recurringCopyValues.repeat_end_mode === 'open_ended' &&
+        recurringCopyValues.repeat_count === '' &&
+        recurringCopyValues.repeat_until === '',
       recurringShowsPastHelper: recurringCopyForm.text.includes('繰り返しの開始日が過去'),
       noHorizontalScroll: multiCopyForm.noHorizontalScroll && recurringCopyForm.noHorizontalScroll,
     },
@@ -625,16 +650,20 @@ try {
     textScale: 2,
   });
   const switchedCreate = await collect(adminPage);
+  // Both tested only for falsiness (§2.2), same as memberDirectCopySource
+  // above — and `copy_source_event_id`'s value is `event_`-prefixed, a
+  // prohibited resource-id shape, so it must never reach `observed` either
+  // way.
+  const switchedCreateValues = await readFormValues(adminPage, ['copy_source_event_id', 'copy_mode']);
   results.push({
     name: 'community-switcher-drops-copy-state',
     screenshotPath: await screenshot(adminPage, 'switcher-drops-copy-state'),
     observed: {
       path: switchedCreate.path,
-      values: switchedCreate.values,
     },
     checks: {
       landsOnNormalCreate: switchedCreate.path === `/c/${secondCommunityId}/admin/events/new`,
-      noCopySource: !switchedCreate.values.copy_source_event_id && !switchedCreate.values.copy_mode,
+      noCopySource: !switchedCreateValues.copy_source_event_id && !switchedCreateValues.copy_mode,
       noHorizontalScroll: switchedCreate.noHorizontalScroll,
     },
   });

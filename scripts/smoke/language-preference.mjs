@@ -372,7 +372,6 @@ async function collect(cdp) {
   return await evalExpr(
     cdp,
     `(() => {
-      const fields = [...document.querySelectorAll('input[name], textarea[name], select[name]')];
       const links = [...document.querySelectorAll('a[href]')].map((a) => ({
         href: a.getAttribute('href'),
         text: a.innerText,
@@ -396,7 +395,6 @@ async function collect(cdp) {
         text: document.body.innerText,
         hrefs: links.map((link) => link.href),
         links,
-        values: Object.fromEntries(fields.map((el) => [el.getAttribute('name'), el.value])),
         dayCellAriaLabel: dayCell ? dayCell.getAttribute('aria-label') : null,
         bottomNavAriaLabel,
         // Handoff 037: the rendered flash text after saving a note on Event

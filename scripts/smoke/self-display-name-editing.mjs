@@ -320,7 +320,6 @@ async function collect(cdp) {
   return await evalExpr(
     cdp,
     `(() => {
-      const fields = [...document.querySelectorAll('input[name], textarea[name], select[name]')];
       const links = [...document.querySelectorAll('a[href]')].map((a) => ({
         href: a.getAttribute('href'),
         text: a.innerText,
@@ -330,9 +329,22 @@ async function collect(cdp) {
         text: document.body.innerText,
         hrefs: links.map((link) => link.href),
         links,
-        values: Object.fromEntries(fields.map((el) => [el.getAttribute('name'), el.value])),
         noHorizontalScroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
       };
+    })()`,
+  );
+}
+
+// Handoff 066 §3.1/§3.3: an explicit, named read of one field's value, used
+// only where an assertion genuinely needs it — the AD-4 replay tests below
+// depend on reading `_token`, but that value must never reach `observed`
+// (and therefore evidence) the way `collect()`'s old blanket capture did.
+async function readFormValue(cdp, name) {
+  return await evalExpr(
+    cdp,
+    `(() => {
+      const el = document.querySelector('[name="' + ${JSON.stringify(name)} + '"]');
+      return el ? el.value : null;
     })()`,
   );
 }
@@ -481,8 +493,7 @@ try {
 
   logStep('checking edit form and browser submit');
   await navigate(page, `/c/${communityId}/me/display-name`, { textScale: 2 });
-  const editForm = await collect(page);
-  const firstToken = editForm.values._token;
+  const firstToken = await readFormValue(page, '_token');
   await setInputValue(page, 'display_name', updatedDisplayName);
   await submitFormByAction(page, `/c/${communityId}/me/display-name`);
   const meAfterEdit = await collect(page);
@@ -522,8 +533,7 @@ try {
 
   logStep('checking same-value no-op and altered replay');
   await navigate(page, `/c/${communityId}/me/display-name`, { textScale: 2 });
-  const sameValueForm = await collect(page);
-  const sameValueToken = sameValueForm.values._token;
+  const sameValueToken = await readFormValue(page, '_token');
   await submitFormByAction(page, `/c/${communityId}/me/display-name`);
   const afterSameValue = await collect(page);
   await postDisplayName(sameValueToken, 'RFC070 Same Token Altered Replay');
@@ -546,8 +556,7 @@ try {
 
   logStep('checking invalid input does not consume original token');
   await navigate(page, `/c/${communityId}/me/display-name`, { textScale: 2 });
-  const invalidForm = await collect(page);
-  const invalidToken = invalidForm.values._token;
+  const invalidToken = await readFormValue(page, '_token');
   const invalidResponse = await postDisplayName(invalidToken, 'bad\u0001name');
   const invalidRow = tokenRow(invalidToken);
   await postDisplayName(invalidToken, afterInvalidDisplayName);
@@ -571,8 +580,7 @@ try {
 
   logStep('checking cross-community direct URL cannot edit another community');
   await navigate(page, `/c/${communityId}/me/display-name`, { textScale: 2 });
-  const crossForm = await collect(page);
-  const crossToken = crossForm.values._token;
+  const crossToken = await readFormValue(page, '_token');
   const otherBefore = membershipName(otherMembershipId);
   const crossResponse = await postDisplayName(crossToken, 'RFC070 Cross Changed', otherCommunityId);
   const otherAfter = membershipName(otherMembershipId);
