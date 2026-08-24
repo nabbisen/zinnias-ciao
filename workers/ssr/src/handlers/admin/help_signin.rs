@@ -38,7 +38,8 @@ pub async fn get_help_signin(
     target_membership_id: &str,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
     let target =
         match membership_db::find_active_summary(&db, target_membership_id, community_id).await? {
@@ -54,8 +55,9 @@ pub async fn get_help_signin(
     .await?;
     let community_pairs =
         community_pairs_for_user(&db, &auth.user_id, auth.scope_community_id.as_deref()).await;
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
 
+    let title = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_TITLE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -74,23 +76,24 @@ pub async fn get_help_signin(
                {confirm}</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_ADMIN_HELP_SIGNIN_TITLE,
+        header = render::header_with_switcher_next_localized(
+            title,
             community_id,
             &community_pairs,
-            "admin_members"
+            "admin_members",
+            locale,
         ),
-        title = i18n::JA_ADMIN_HELP_SIGNIN_TITLE,
+        title = title,
         name = render::escape_html(&target.display_name),
-        consequence = i18n::JA_ADMIN_HELP_SIGNIN_CONSEQUENCE,
+        consequence = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_CONSEQUENCE),
         cid = render::escape_html(community_id),
         mid = render::escape_html(target_membership_id),
         tok = render::escape_html(&token),
-        keep = i18n::JA_ADMIN_REMOVE_KEEP,
-        confirm = i18n::JA_ADMIN_HELP_SIGNIN_CREATE,
+        keep = i18n::t(locale, i18n::ADMIN_REMOVE_KEEP),
+        confirm = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_CREATE),
         nav = nav,
     );
-    render::page(i18n::JA_ADMIN_HELP_SIGNIN_TITLE, &body)
+    render::page_localized(locale, title, &body)
 }
 
 // ── POST /c/:cid/admin/members/:mid/help-signin ──────────────────────────
@@ -104,6 +107,7 @@ pub async fn post_help_signin(
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
 
     let target =
@@ -149,7 +153,8 @@ pub async fn post_help_signin(
         return render::not_found();
     }
 
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
+    let title = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_TITLE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -170,25 +175,99 @@ pub async fn post_help_signin(
          <p><a href=\"/c/{cid}/admin/members\" \
            class=\"cz-plain-link\">{back}</a></p>\
          </main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_ADMIN_HELP_SIGNIN_TITLE,
+        header = render::header_with_switcher_next_localized(
+            title,
             community_id,
             &community_pairs_for_user(&db, &auth.user_id, auth.scope_community_id.as_deref()).await,
-            "admin_members"
+            "admin_members",
+            locale,
         ),
-        title = i18n::JA_ADMIN_HELP_SIGNIN_TITLE,
+        title = title,
         name = render::escape_html(&target.display_name),
-        hint = i18n::JA_ADMIN_HELP_SIGNIN_CODE_HINT,
-        code_label = i18n::JA_RELINK_CODE_LABEL,
+        hint = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_CODE_HINT),
+        code_label = i18n::t(locale, i18n::RELINK_CODE_LABEL),
         code = render::escape_html(&code),
-        copy_code = i18n::JA_ADMIN_HELP_SIGNIN_COPY_CODE,
-        copy_done = i18n::JA_ADMIN_HELP_SIGNIN_COPY_DONE,
-        copy_failed = i18n::JA_ADMIN_HELP_SIGNIN_COPY_FAILED,
-        relink_hint = i18n::JA_ADMIN_HELP_SIGNIN_RELINK_HINT,
-        relink_link = i18n::JA_ADMIN_HELP_SIGNIN_RELINK_LINK,
+        copy_code = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_COPY_CODE),
+        copy_done = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_COPY_DONE),
+        copy_failed = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_COPY_FAILED),
+        relink_hint = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_RELINK_HINT),
+        relink_link = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_RELINK_LINK),
         cid = render::escape_html(community_id),
-        back = i18n::JA_ADMIN_INVITES_BACK_TO_MEMBERS,
+        back = i18n::t(locale, i18n::ADMIN_INVITES_BACK_TO_MEMBERS),
         nav = nav,
     );
-    render::page(i18n::JA_ADMIN_HELP_SIGNIN_TITLE, &body)
+    render::page_localized(locale, title, &body)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zinnias_ciao_contracts::Locale;
+
+    /// Duplicated locally per `admin/members.rs`'s own precedent (Handoff
+    /// 072) rather than shared/exported.
+    fn contains_japanese_codepoint(s: &str) -> bool {
+        s.chars().any(|c| {
+            let cp = c as u32;
+            (0x3040..=0x30FF).contains(&cp)
+                || (0x4E00..=0x9FFF).contains(&cp)
+                || (0x3000..=0x303F).contains(&cp)
+                || (0xFF00..=0xFFEF).contains(&cp)
+        })
+    }
+
+    /// Handoff 072 §4.4: second of the required ≥2 pages, covering the
+    /// nav/header leak class §3 warns about (`bottom_nav`/
+    /// `header_with_switcher_next` are locale-blind and invisible to a
+    /// source scan) on a different page than `members.rs`'s own test.
+    #[test]
+    fn admin_help_signin_page_renders_with_no_japanese_codepoint_in_english_locale() {
+        let header = render::header_with_switcher_next_localized(
+            i18n::t(Locale::En, i18n::ADMIN_HELP_SIGNIN_TITLE),
+            "community-a",
+            &[("community-a".to_string(), "Community A".to_string())],
+            "admin_members",
+            Locale::En,
+        );
+        let nav = render::bottom_nav_localized("community-a", "home", Locale::En);
+        let body = format!(
+            "{consequence}{keep}{confirm}{hint}{code_label}{copy_code}{copy_done}{copy_failed}{relink_hint}{relink_link}{back}",
+            consequence = i18n::t(Locale::En, i18n::ADMIN_HELP_SIGNIN_CONSEQUENCE),
+            keep = i18n::t(Locale::En, i18n::ADMIN_REMOVE_KEEP),
+            confirm = i18n::t(Locale::En, i18n::ADMIN_HELP_SIGNIN_CREATE),
+            hint = i18n::t(Locale::En, i18n::ADMIN_HELP_SIGNIN_CODE_HINT),
+            code_label = i18n::t(Locale::En, i18n::RELINK_CODE_LABEL),
+            copy_code = i18n::t(Locale::En, i18n::ADMIN_HELP_SIGNIN_COPY_CODE),
+            copy_done = i18n::t(Locale::En, i18n::ADMIN_HELP_SIGNIN_COPY_DONE),
+            copy_failed = i18n::t(Locale::En, i18n::ADMIN_HELP_SIGNIN_COPY_FAILED),
+            relink_hint = i18n::t(Locale::En, i18n::ADMIN_HELP_SIGNIN_RELINK_HINT),
+            relink_link = i18n::t(Locale::En, i18n::ADMIN_HELP_SIGNIN_RELINK_LINK),
+            back = i18n::t(Locale::En, i18n::ADMIN_INVITES_BACK_TO_MEMBERS),
+        );
+        let en_page = format!("{header}<main>{body}</main>{nav}");
+
+        assert!(
+            !contains_japanese_codepoint(&en_page),
+            "English-locale admin help-signin page must contain no Japanese codepoint, found some in: {en_page}"
+        );
+
+        // Sanity: the same nav/header composition at Locale::Ja must
+        // contain Japanese.
+        let ja_header = render::header_with_switcher_next_localized(
+            i18n::t(Locale::Ja, i18n::ADMIN_HELP_SIGNIN_TITLE),
+            "community-a",
+            &[("community-a".to_string(), "Community A".to_string())],
+            "admin_members",
+            Locale::Ja,
+        );
+        let ja_nav = render::bottom_nav_localized("community-a", "home", Locale::Ja);
+        assert!(
+            contains_japanese_codepoint(&ja_header),
+            "Japanese-locale header render must contain Japanese text"
+        );
+        assert!(
+            contains_japanese_codepoint(&ja_nav),
+            "Japanese-locale nav render must contain Japanese text"
+        );
+    }
 }

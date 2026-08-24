@@ -1479,11 +1479,11 @@ fn rfc061_member_management_is_discoverable_from_admin_workflows() {
         "RFC-061 Me page must expose admin tools with member management and export"
     );
     assert!(
-        MEMBERS_HANDLER_SRC.contains("JA_ADMIN_INVITES_BACK_TO_MEMBERS")
-            && MEMBERS_HANDLER_SRC.contains("JA_ADMIN_MEMBERS_GENERATE_INVITE")
-            && MEMBERS_HANDLER_SRC.contains("JA_ADMIN_MEMBERS_CURRENT_USER")
+        MEMBERS_HANDLER_SRC.contains("i18n::ADMIN_INVITES_BACK_TO_MEMBERS") // RFC-072/Handoff 072 locale-aware accessor
+            && MEMBERS_HANDLER_SRC.contains("i18n::ADMIN_MEMBERS_GENERATE_INVITE") // RFC-072/Handoff 072 locale-aware accessor
+            && MEMBERS_HANDLER_SRC.contains("i18n::ADMIN_MEMBERS_CURRENT_USER") // RFC-072/Handoff 072 locale-aware accessor
             && !MEMBERS_HANDLER_SRC.contains("Generate invite code</a>"),
-        "RFC-061 members/invites pages must use reviewed JA copy and link invites back to members"
+        "RFC-061 members/invites pages must use reviewed copy and link invites back to members"
     );
 }
 
@@ -1515,8 +1515,8 @@ fn rfc062_role_transfer_uses_guarded_member_management_flow() {
     assert!(
         ROLE_TRANSFER_HANDLER_SRC.contains("token_purpose::PROMOTE_MEMBER")
             && ROLE_TRANSFER_HANDLER_SRC.contains("token_purpose::DEMOTE_MEMBER")
-            && ROLE_TRANSFER_HANDLER_SRC.contains("JA_ADMIN_PROMOTE_ACTION")
-            && ROLE_TRANSFER_HANDLER_SRC.contains("JA_ADMIN_DEMOTE_ACTION")
+            && ROLE_TRANSFER_HANDLER_SRC.contains("i18n::ADMIN_PROMOTE_ACTION") // RFC-072/Handoff 072 locale-aware accessor
+            && ROLE_TRANSFER_HANDLER_SRC.contains("i18n::ADMIN_DEMOTE_ACTION") // RFC-072/Handoff 072 locale-aware accessor
             && ROLE_TRANSFER_HANDLER_SRC
                 .contains("target_membership_id == membership.membership_id"),
         "RFC-062 handlers must use dedicated token purposes, reviewed copy, and server-side self-target denial"
@@ -2722,36 +2722,6 @@ struct LocalizationException {
 // silently added to make a prior list "complete."
 const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
     LocalizationException {
-        path: "handlers/admin/help_signin.rs",
-        ja_count: 17,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/member_remove.rs",
-        ja_count: 8,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/members.rs",
-        ja_count: 30,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/role_transfer.rs",
-        ja_count: 10,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/admin/suspension.rs",
-        ja_count: 10,
-        calls_bare_page: true,
-        reason: "admin-only surface, RFC-072 Slice D — RFC-082, structurally the same shape as role_transfer.rs",
-    },
-    LocalizationException {
         path: "handlers/calendar.rs",
         ja_count: 2,
         calls_bare_page: false,
@@ -2829,16 +2799,16 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
 /// (RFC-083 Slice D1a), which converted 9 of the table's 10 D1a files
 /// (27→18 entries, 308→203 sites — `create.rs` stayed pending an architect
 /// decision). Handoff 071 (RFC-083 F1) resolved that decision and converted
-/// the tenth: 18→17 entries, 203→196 sites — the table now holds **no
-/// `handlers/admin/events/` entry**, closing Slice D1a. A future addition to
-/// the table must lower this pinned value deliberately, not raise it:
-/// growth here means a page stopped being localized, not a documented
-/// decision to leave one alone.
+/// the tenth: 18→17 entries, 203→196 sites, closing Slice D1a. Handoff 072
+/// (RFC-083 Slice D1b) converted the five member-administration files:
+/// 17→12 entries, 196→121 sites. A future addition to the table must lower
+/// this pinned value deliberately, not raise it: growth here means a page
+/// stopped being localized, not a documented decision to leave one alone.
 #[test]
 fn rfc083_localization_exceptions_table_only_shrinks() {
     assert_eq!(
         LOCALIZATION_EXCEPTIONS.len(),
-        17,
+        12,
         "LOCALIZATION_EXCEPTIONS grew to {} entries. This table is shrink-only \
          (RFC-083 §6.1) — re-pin this value only alongside a deliberate, reviewed \
          decision to leave a newly-discovered file unlocalized, never to make a \
@@ -2847,9 +2817,50 @@ fn rfc083_localization_exceptions_table_only_shrinks() {
     );
     let total_sites: usize = LOCALIZATION_EXCEPTIONS.iter().map(|e| e.ja_count).sum();
     assert_eq!(
-        total_sites, 196,
+        total_sites, 121,
         "LOCALIZATION_EXCEPTIONS site total grew to {total_sites}. Re-pin only \
          alongside a reviewed, deliberate change to an individual entry's ja_count."
+    );
+}
+
+/// The tripwire ROADMAP.md's "The default language flips to English when
+/// Slice D completes" (owner decision 2026-08-16) says is owed, so that
+/// decision surfaces when its trigger fires rather than depending on
+/// anyone remembering. Handoff 072 (RFC-083 Slice D1b) adds it while
+/// already touching this table.
+///
+/// The trigger, verbatim from ROADMAP.md: `LOCALIZATION_EXCEPTIONS`
+/// containing *only* the three structurally-unresolvable entries
+/// (`render/errors.rs`, `handlers/calendar.rs`, `handlers/communities.rs`
+/// — routes with no membership lookup at all, not merely "not yet
+/// converted"). Deliberately a set-equality check against fixed path
+/// strings, not a count: a numeric assertion here would be satisfiable by
+/// re-pinning a magic number without anyone confronting the actual
+/// decision, exactly the shortcut this test exists to close off. It fires
+/// only when the table narrows to precisely that set — not early (12
+/// entries remain today, nine more than the trigger) and not by shrinking
+/// the wrong subset (the other nine must be D1c/D2/D3 conversions, not a
+/// coincidental drop to three of the wrong three).
+#[test]
+fn roadmap_english_default_tripwire_fires_when_slice_d_completes() {
+    const STRUCTURALLY_UNRESOLVABLE: &[&str] = &[
+        "render/errors.rs",
+        "handlers/calendar.rs",
+        "handlers/communities.rs",
+    ];
+    let remaining: std::collections::BTreeSet<&str> =
+        LOCALIZATION_EXCEPTIONS.iter().map(|e| e.path).collect();
+    let trigger: std::collections::BTreeSet<&str> =
+        STRUCTURALLY_UNRESOLVABLE.iter().copied().collect();
+    assert_ne!(
+        remaining, trigger,
+        "LOCALIZATION_EXCEPTIONS now holds only the three structurally-unresolvable \
+         entries ({STRUCTURALLY_UNRESOLVABLE:?}) — RFC-083 Slice D has reached completion. \
+         ROADMAP.md's \"The default language flips to English when Slice D completes\" \
+         (owner decision 2026-08-16, RFC-083 §8.2) is now due: flip Locale::default() to \
+         English and update migration 0011_membership_ui_language.sql's comment. This is \
+         not a gate to re-pin — resolve the ROADMAP decision, then delete or rewrite this \
+         test to reflect the new default."
     );
 }
 
@@ -2967,17 +2978,15 @@ struct EnJaParityException {
     reason: &'static str,
 }
 
-/// RFC-083 Slice D's six not-yet-converted stems (Handoff 064 §2.1,
+/// RFC-083 Slice D's not-yet-converted stems (Handoff 064 §2.1,
 /// independently re-derived, not copied from the finding that reported
-/// them). Each is expected to be deleted from this table as its own
-/// sub-slice lands — the table shrinking as designed, not a permanent
-/// carve-out. No entry here may be added to make the six unpaired
-/// constants themselves change; that is RFC-054/RFC-083's business.
+/// them; originally six — Handoff 071 removed `ADMIN_USE_TEMPLATE_LINK`
+/// closing D1a, Handoff 072 removed `ADMIN_INVITE_REVOKED_FLASH` closing
+/// D1b, leaving D1c's four). Each is expected to be deleted from this table
+/// as its own sub-slice lands — the table shrinking as designed, not a
+/// permanent carve-out. No entry here may be added to make an unpaired
+/// constant itself change; that is RFC-054/RFC-083's business.
 const EN_JA_PARITY_EXCEPTIONS: &[EnJaParityException] = &[
-    EnJaParityException {
-        stem: "ADMIN_INVITE_REVOKED_FLASH",
-        reason: "RFC-083 Slice D1b (handlers/admin/members.rs) — not yet converted",
-    },
     EnJaParityException {
         stem: "ADMIN_EXPORT_SUMMARY_COUNTS",
         reason: "RFC-083 Slice D1c (handlers/export.rs) — not yet converted",
@@ -3807,7 +3816,7 @@ fn rfc076_one_time_invite_response_isolation_is_pinned() {
         get.contains("leturl=req.url()?")
             && get.contains("run_invite_get_preflight(invite_get_preflight(")
             && get.contains("ControlFlow::Break(location)=>legacy_query_redirect(&location)")
-            && get.contains("get_invites_authenticated(req,env,rid,community_id,flash)")
+            && get.contains("get_invites_authenticated(req,env,rid,community_id,flash_code)")
             && !get.contains("require_auth")
             && !get.contains("require_admin")
             && !get.contains("env.d1")
@@ -3857,7 +3866,7 @@ fn rfc076_one_time_invite_response_isolation_is_pinned() {
     let reveal = compact_brace_block(production, "fn invite_reveal_html");
     assert!(
         reveal.contains("render::escape_html(reveal.as_str())")
-            && reveal.contains("JA_ADMIN_INVITES_REVEAL_WARNING")
+            && reveal.contains("i18n::ADMIN_INVITES_REVEAL_WARNING") // RFC-072/Handoff 072 locale-aware accessor
             && !reveal.contains("data-")
             && !reveal.contains("<script"),
         "reveal renderer must place escaped plaintext only in the dedicated text panel"
@@ -6476,7 +6485,7 @@ fn rfc082_suspension_handlers_are_registered_and_self_target_denied() {
     );
     assert!(
         MEMBERS_HANDLER_SRC.contains("membership_db::list_present_for_admin")
-            && MEMBERS_HANDLER_SRC.contains("JA_ADMIN_SUSPENDED_BADGE")
+            && MEMBERS_HANDLER_SRC.contains("i18n::ADMIN_SUSPENDED_BADGE") // RFC-072/Handoff 072 locale-aware accessor
             && MEMBERS_HANDLER_SRC.contains("/suspend\\\"")
             && MEMBERS_HANDLER_SRC.contains("/unsuspend\\\""),
         "the admin member list must use the PRESENT-based listing (RFC-082 §5), render the \

@@ -61,3 +61,11 @@ pub const JA_IDENTITY_SIGN_IN_FAILED_BODY: &str =
     "サインインを完了できませんでした。もう一度お試しいただくか、やめてお戻りください。";
 pub const JA_IDENTITY_SIGN_IN_RETRY: &str = "もう一度試す";
 pub const JA_IDENTITY_SIGN_IN_CANCEL: &str = "やめる";
+
+// Handoff 072 (RFC-083 Slice D1b): the admin-facing help-signin page
+// resolves locale now; this is the only constant in this file with an
+// admin (not anonymous-route) caller.
+pub const RELINK_CODE_LABEL: super::Localized = super::Localized {
+    ja: JA_RELINK_CODE_LABEL,
+    en: EN_RELINK_CODE_LABEL,
+};

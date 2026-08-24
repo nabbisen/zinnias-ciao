@@ -1,6 +1,7 @@
 //! Admin member suspend/unsuspend handlers — RFC-082.
 
 use worker::{Env, Request, Response, Result};
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
@@ -27,24 +28,25 @@ async fn community_pairs_for_user(
         .collect()
 }
 
-fn last_admin_suspend_page(community_id: &str) -> Result<Response> {
-    render::page(
-        i18n::JA_GENERAL_ERROR,
+fn last_admin_suspend_page(community_id: &str, locale: Locale) -> Result<Response> {
+    render::page_localized(
+        locale,
+        i18n::t(locale, i18n::GENERAL_ERROR),
         &format!(
             "<main class=\"cz-admin-error-main\"><p>{}</p>\
              <p><a href=\"/c/{cid}/admin/members\" \
              class=\"cz-plain-link\">{back}</a></p></main>",
-            i18n::JA_ADMIN_LAST_ADMIN_SUSPEND,
+            i18n::t(locale, i18n::ADMIN_LAST_ADMIN_SUSPEND),
             cid = render::escape_html(community_id),
-            back = i18n::JA_ADMIN_INVITES_BACK_TO_MEMBERS,
+            back = i18n::t(locale, i18n::ADMIN_INVITES_BACK_TO_MEMBERS),
         ),
     )
 }
 
 struct SuspensionConfirm<'a> {
-    title: &'a str,
-    consequence: &'a str,
-    confirm: &'a str,
+    title: i18n::Localized,
+    consequence: i18n::Localized,
+    confirm: i18n::Localized,
     action: &'a str,
     token_purpose: &'a str,
     /// The target must currently be suspended (unsuspend) or not (suspend)
@@ -69,6 +71,7 @@ async fn get_suspension_confirm(
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
 
     if target_membership_id == membership.membership_id {
         return render::not_found();
@@ -86,7 +89,7 @@ async fn get_suspension_confirm(
         && target.role == "admin"
         && membership_db::count_admins(&db, community_id).await? <= 1
     {
-        return last_admin_suspend_page(community_id);
+        return last_admin_suspend_page(community_id, locale);
     }
 
     let token = crate::codlet::issue_token(
@@ -98,8 +101,9 @@ async fn get_suspension_confirm(
     .await?;
     let community_pairs =
         community_pairs_for_user(&db, &auth.user_id, auth.scope_community_id.as_deref()).await;
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
 
+    let title = i18n::t(locale, cfg.title);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -118,23 +122,24 @@ async fn get_suspension_confirm(
                {confirm}</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher_next(
-            cfg.title,
+        header = render::header_with_switcher_next_localized(
+            title,
             community_id,
             &community_pairs,
-            "admin_members"
+            "admin_members",
+            locale,
         ),
-        title = cfg.title,
+        title = title,
         name = render::escape_html(&target.display_name),
-        consequence = cfg.consequence,
+        consequence = i18n::t(locale, cfg.consequence),
         cid = render::escape_html(community_id),
         action = render::escape_html(cfg.action),
         tok = render::escape_html(&token),
-        keep = i18n::JA_ADMIN_REMOVE_KEEP,
-        confirm = cfg.confirm,
+        keep = i18n::t(locale, i18n::ADMIN_REMOVE_KEEP),
+        confirm = i18n::t(locale, cfg.confirm),
         nav = nav,
     );
-    render::page(cfg.title, &body)
+    render::page_localized(locale, title, &body)
 }
 
 pub async fn get_suspend_member(
@@ -155,9 +160,9 @@ pub async fn get_suspend_member(
         community_id,
         target_membership_id,
         SuspensionConfirm {
-            title: i18n::JA_ADMIN_SUSPEND_TITLE,
-            consequence: i18n::JA_ADMIN_SUSPEND_CONSEQUENCE,
-            confirm: i18n::JA_ADMIN_SUSPEND_ACTION,
+            title: i18n::ADMIN_SUSPEND_TITLE,
+            consequence: i18n::ADMIN_SUSPEND_CONSEQUENCE,
+            confirm: i18n::ADMIN_SUSPEND_ACTION,
             action: &action,
             token_purpose: token_purpose::SUSPEND_MEMBER,
             expect_suspended: false,
@@ -184,9 +189,9 @@ pub async fn get_unsuspend_member(
         community_id,
         target_membership_id,
         SuspensionConfirm {
-            title: i18n::JA_ADMIN_UNSUSPEND_TITLE,
-            consequence: i18n::JA_ADMIN_UNSUSPEND_CONSEQUENCE,
-            confirm: i18n::JA_ADMIN_UNSUSPEND_ACTION,
+            title: i18n::ADMIN_UNSUSPEND_TITLE,
+            consequence: i18n::ADMIN_UNSUSPEND_CONSEQUENCE,
+            confirm: i18n::ADMIN_UNSUSPEND_ACTION,
             action: &action,
             token_purpose: token_purpose::UNSUSPEND_MEMBER,
             expect_suspended: true,
@@ -247,7 +252,7 @@ async fn post_suspension(
                     redirect(&format!("/c/{community_id}/admin/members"))
                 }
                 membership_db::SuspendResult::LastAdminBlocked => {
-                    last_admin_suspend_page(community_id)
+                    last_admin_suspend_page(community_id, membership.locale)
                 }
                 membership_db::SuspendResult::InvalidTarget => render::not_found(),
             }

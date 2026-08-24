@@ -25,6 +25,7 @@ pub async fn get_remove_member(
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
 
     // Cannot remove yourself.
     if target_membership_id == membership.membership_id {
@@ -62,8 +63,9 @@ pub async fn get_remove_member(
         .iter()
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
 
+    let rmt = i18n::t(locale, i18n::ADMIN_REMOVE_TITLE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -83,23 +85,24 @@ pub async fn get_remove_member(
                {confirm}</button>\
            </form>\
          </div></main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_ADMIN_REMOVE_TITLE,
+        header = render::header_with_switcher_next_localized(
+            rmt,
             community_id,
             &_community_pairs,
-            "admin_members"
+            "admin_members",
+            locale,
         ),
         name = render::escape_html(&target.display_name),
         cid = render::escape_html(community_id),
         mid = render::escape_html(target_membership_id),
         tok = render::escape_html(&token),
         nav = nav,
-        rmt = i18n::JA_ADMIN_REMOVE_TITLE,
-        consequence = i18n::JA_ADMIN_REMOVE_CONSEQUENCE,
-        keep = i18n::JA_ADMIN_REMOVE_KEEP,
-        confirm = i18n::JA_ADMIN_REMOVE_CONFIRM,
+        rmt = rmt,
+        consequence = i18n::t(locale, i18n::ADMIN_REMOVE_CONSEQUENCE),
+        keep = i18n::t(locale, i18n::ADMIN_REMOVE_KEEP),
+        confirm = i18n::t(locale, i18n::ADMIN_REMOVE_CONFIRM),
     );
-    render::page(i18n::JA_ADMIN_REMOVE_TITLE, &body)
+    render::page_localized(locale, rmt, &body)
 }
 
 // ── POST /c/:cid/admin/members/:mid/remove ───────────────────────────────
@@ -146,11 +149,12 @@ pub async fn post_remove_member(
         membership_db::RemoveMemberResult::Removed => {
             redirect(&format!("/c/{community_id}/admin/members"))
         }
-        membership_db::RemoveMemberResult::LastAdminBlocked => render::page(
-            i18n::JA_GENERAL_ERROR,
+        membership_db::RemoveMemberResult::LastAdminBlocked => render::page_localized(
+            membership.locale,
+            i18n::t(membership.locale, i18n::GENERAL_ERROR),
             &format!(
                 "<main class=\"cz-admin-error-main\"><p>{}</p></main>",
-                i18n::JA_ADMIN_LAST_ADMIN
+                i18n::t(membership.locale, i18n::ADMIN_LAST_ADMIN)
             ),
         ),
         membership_db::RemoveMemberResult::InvalidTarget => render::not_found(),

@@ -3,6 +3,7 @@
 use std::ops::ControlFlow;
 
 use worker::{Env, Request, Response, Result};
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 
 use crate::authz::require_admin;
@@ -22,9 +23,9 @@ use zinnias_ciao_contracts::i18n;
 /// which `query_pairs()` decodes back to a space) — that arm's constant,
 /// `JA_ADMIN_INVITES_REVOKED`, was orphaned by this change and deleted in
 /// Handoff 038 (RFC-075 terminal slice).
-fn invites_flash_message(code: Option<&str>) -> Option<&'static str> {
+fn invites_flash_message(code: Option<&str>, locale: Locale) -> Option<&'static str> {
     match code {
-        Some("invite_revoked") => Some(i18n::JA_ADMIN_INVITE_REVOKED_FLASH),
+        Some("invite_revoked") => Some(i18n::t(locale, i18n::ADMIN_INVITE_REVOKED_FLASH)),
         _ => None,
     }
 }
@@ -141,8 +142,7 @@ pub async fn get_invites(
             .query_pairs()
             .find(|(key, _)| key == "flash")
             .map(|(_, value)| value.into_owned());
-        let flash = invites_flash_message(flash_code.as_deref());
-        get_invites_authenticated(req, env, rid, community_id, flash)
+        get_invites_authenticated(req, env, rid, community_id, flash_code)
     }) {
         ControlFlow::Break(location) => legacy_query_redirect(&location),
         ControlFlow::Continue(response) => response.await,
@@ -154,15 +154,18 @@ async fn get_invites_authenticated(
     env: &Env,
     rid: &str,
     community_id: &str,
-    flash: Option<&'static str>,
+    flash_code: Option<String>,
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
-    let _membership = require_admin(env, &auth, community_id, rid).await?;
+    let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
+    let flash = invites_flash_message(flash_code.as_deref(), locale);
     render_invites_page(
         env,
         community_id,
         &auth.user_id,
         auth.scope_community_id.as_deref(),
+        locale,
         flash,
         None,
     )
@@ -174,6 +177,7 @@ async fn render_invites_page(
     community_id: &str,
     user_id: &str,
     scope_community_id: Option<&str>,
+    locale: Locale,
     flash: Option<&'static str>,
     reveal: Option<&InviteCodeReveal>,
 ) -> Result<Response> {
@@ -190,7 +194,9 @@ async fn render_invites_page(
         .map(|c| (c.community_id.clone(), c.community_name.clone()))
         .collect();
 
-    let reveal_html = reveal.map(invite_reveal_html).unwrap_or_default();
+    let reveal_html = reveal
+        .map(|r| invite_reveal_html(r, locale))
+        .unwrap_or_default();
 
     let flash_html = flash
         .map(|message| {
@@ -210,11 +216,11 @@ async fn render_invites_page(
             crate::codlet::issue_token(env, user_id, token_purpose::REVOKE_INVITE, Some(&inv.id))
                 .await?;
         let role_label = if inv.grants_role == "admin" {
-            i18n::JA_ROLE_ADMIN
+            i18n::t(locale, i18n::ROLE_ADMIN)
         } else {
             ""
         };
-        let rev = i18n::JA_ADMIN_INVITES_REVOKE;
+        let rev = i18n::t(locale, i18n::ADMIN_INVITES_REVOKE);
         let exp_display = inv.expires_at.get(..16).unwrap_or(&inv.expires_at);
         code_rows.push_str(&format!(
             "<li class=\"cz-admin-invite-row\">\
@@ -235,13 +241,14 @@ async fn render_invites_page(
     let codes_html = if active_codes.is_empty() {
         format!(
             "<p class=\"cz-admin-invites-body\">{}</p>",
-            i18n::JA_ADMIN_INVITES_NONE
+            i18n::t(locale, i18n::ADMIN_INVITES_NONE)
         )
     } else {
         format!("<ul class=\"cz-admin-invite-list\">{code_rows}</ul>")
     };
 
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
+    let title = i18n::t(locale, i18n::ADMIN_INVITES_TITLE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -261,11 +268,12 @@ async fn render_invites_page(
            {codes}\
          </section>\
          </main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_ADMIN_INVITES_TITLE,
+        header = render::header_with_switcher_next_localized(
+            title,
             community_id,
             &community_pairs,
-            "admin_invites"
+            "admin_invites",
+            locale,
         ),
         cid = render::escape_html(community_id),
         tok = render::escape_html(&gen_token),
@@ -273,16 +281,16 @@ async fn render_invites_page(
         flash = flash_html,
         codes = codes_html,
         nav = nav,
-        title = i18n::JA_ADMIN_INVITES_TITLE,
-        ib = i18n::JA_ADMIN_INVITES_BODY,
-        ig = i18n::JA_ADMIN_INVITES_GENERATE,
-        active_lbl = i18n::JA_ADMIN_INVITES_ACTIVE,
-        back_to_members = i18n::JA_ADMIN_INVITES_BACK_TO_MEMBERS,
+        title = title,
+        ib = i18n::t(locale, i18n::ADMIN_INVITES_BODY),
+        ig = i18n::t(locale, i18n::ADMIN_INVITES_GENERATE),
+        active_lbl = i18n::t(locale, i18n::ADMIN_INVITES_ACTIVE),
+        back_to_members = i18n::t(locale, i18n::ADMIN_INVITES_BACK_TO_MEMBERS),
     );
-    render::page(i18n::JA_ADMIN_INVITES_TITLE, &body)
+    render::page_localized(locale, title, &body)
 }
 
-fn invite_reveal_html(reveal: &InviteCodeReveal) -> String {
+fn invite_reveal_html(reveal: &InviteCodeReveal, locale: Locale) -> String {
     format!(
         "<section id=\"invite-code-reveal\" \
            class=\"cz-admin-reveal-box\">\
@@ -291,9 +299,9 @@ fn invite_reveal_html(reveal: &InviteCodeReveal) -> String {
            <div class=\"cz-admin-invite-code-display\" \
              aria-label=\"{label}\">{code}</div>\
          </section>",
-        warning = i18n::JA_ADMIN_INVITES_REVEAL_WARNING,
-        hint = i18n::JA_ADMIN_INVITES_NEW_CODE_HINT,
-        label = i18n::JA_ADMIN_INVITES_TITLE,
+        warning = i18n::t(locale, i18n::ADMIN_INVITES_REVEAL_WARNING),
+        hint = i18n::t(locale, i18n::ADMIN_INVITES_NEW_CODE_HINT),
+        label = i18n::t(locale, i18n::ADMIN_INVITES_TITLE),
         code = render::escape_html(reveal.as_str()),
     )
 }
@@ -367,6 +375,7 @@ pub async fn post_generate_invite(
         community_id,
         &auth.user_id,
         auth.scope_community_id.as_deref(),
+        membership.locale,
         None,
         Some(&reveal),
     )
@@ -429,6 +438,7 @@ pub async fn get_members(
 ) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     let membership = require_admin(env, &auth, community_id, rid).await?;
+    let locale = membership.locale;
     let db = env.d1("DB")?;
     let community = db::community::find_active(&db, community_id).await?;
     let _community_name = community.map(|c| c.name).unwrap_or_default();
@@ -460,7 +470,7 @@ pub async fn get_members(
                  class=\"cz-admin-member-row-action\">{label}</a>",
                     cid = render::escape_html(community_id),
                     mid = render::escape_html(&m.id),
-                    label = i18n::JA_ADMIN_DEMOTE_ACTION,
+                    label = i18n::t(locale, i18n::ADMIN_DEMOTE_ACTION),
                 )
             } else {
                 format!(
@@ -468,7 +478,7 @@ pub async fn get_members(
                  class=\"cz-admin-member-row-action\">{label}</a>",
                     cid = render::escape_html(community_id),
                     mid = render::escape_html(&m.id),
-                    label = i18n::JA_ADMIN_PROMOTE_ACTION,
+                    label = i18n::t(locale, i18n::ADMIN_PROMOTE_ACTION),
                 )
             };
             let help_action = if is_suspended {
@@ -479,7 +489,7 @@ pub async fn get_members(
                  class=\"cz-admin-member-row-action\">{label}</a>",
                     cid = render::escape_html(community_id),
                     mid = render::escape_html(&m.id),
-                    label = i18n::JA_ADMIN_HELP_SIGNIN_ACTION,
+                    label = i18n::t(locale, i18n::ADMIN_HELP_SIGNIN_ACTION),
                 )
             };
             let suspend_action = if is_self {
@@ -490,7 +500,7 @@ pub async fn get_members(
                  class=\"cz-admin-member-row-action\">{label}</a>",
                     cid = render::escape_html(community_id),
                     mid = render::escape_html(&m.id),
-                    label = i18n::JA_ADMIN_UNSUSPEND_ACTION,
+                    label = i18n::t(locale, i18n::ADMIN_UNSUSPEND_ACTION),
                 )
             } else {
                 format!(
@@ -498,7 +508,7 @@ pub async fn get_members(
                  class=\"cz-admin-member-row-action\">{label}</a>",
                     cid = render::escape_html(community_id),
                     mid = render::escape_html(&m.id),
-                    label = i18n::JA_ADMIN_SUSPEND_ACTION,
+                    label = i18n::t(locale, i18n::ADMIN_SUSPEND_ACTION),
                 )
             };
             let remove_action = if is_self {
@@ -509,23 +519,23 @@ pub async fn get_members(
                  class=\"cz-admin-member-row-action cz-admin-member-row-action--danger\">{rc}</a>",
                     cid = render::escape_html(community_id),
                     mid = render::escape_html(&m.id),
-                    rc = i18n::JA_ADMIN_REMOVE_CONFIRM,
+                    rc = i18n::t(locale, i18n::ADMIN_REMOVE_CONFIRM),
                 )
             };
             let role_label = if m.role == "admin" {
-                i18n::JA_ROLE_ADMIN
+                i18n::t(locale, i18n::ROLE_ADMIN)
             } else {
-                i18n::JA_ROLE_MEMBER
+                i18n::t(locale, i18n::ROLE_MEMBER)
             };
             let self_label = if is_self {
-                format!(" · {}", i18n::JA_ADMIN_MEMBERS_CURRENT_USER)
+                format!(" · {}", i18n::t(locale, i18n::ADMIN_MEMBERS_CURRENT_USER))
             } else {
                 String::new()
             };
             let suspended_label = if is_suspended {
                 format!(
                     " · <span class=\"cz-admin-member-suspended-badge\">{}</span>",
-                    i18n::JA_ADMIN_SUSPENDED_BADGE
+                    i18n::t(locale, i18n::ADMIN_SUSPENDED_BADGE)
                 )
             } else {
                 String::new()
@@ -550,7 +560,8 @@ pub async fn get_members(
         })
         .collect();
 
-    let nav = render::bottom_nav(community_id, "home");
+    let nav = render::bottom_nav_localized(community_id, "home", locale);
+    let members_h1 = i18n::t(locale, i18n::ADMIN_MEMBERS_TITLE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
@@ -560,19 +571,20 @@ pub async fn get_members(
             class=\"cz-admin-invite-link\">\
             {invite_label}</a>\
          </main>{nav}",
-        header = render::header_with_switcher_next(
-            i18n::JA_ADMIN_MEMBERS_TITLE,
+        header = render::header_with_switcher_next_localized(
+            members_h1,
             community_id,
             &_community_pairs,
-            "admin_members"
+            "admin_members",
+            locale,
         ),
         rows = member_rows,
         cid = render::escape_html(community_id),
         nav = nav,
-        members_h1 = i18n::JA_ADMIN_MEMBERS_TITLE,
-        invite_label = i18n::JA_ADMIN_MEMBERS_GENERATE_INVITE,
+        members_h1 = members_h1,
+        invite_label = i18n::t(locale, i18n::ADMIN_MEMBERS_GENERATE_INVITE),
     );
-    render::page(i18n::JA_ADMIN_MEMBERS_TITLE, &body)
+    render::page_localized(locale, members_h1, &body)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -581,22 +593,99 @@ pub async fn get_members(
 mod tests {
     use super::*;
 
+    /// Handoff 072 §3: a source scan cannot see a locale-blind helper call
+    /// site — `bottom_nav`/`header_with_switcher_next` reference no bare
+    /// Japanese-only i18n constant even when hard-coded to Japanese. Same
+    /// rendered-output contract as RFC-083 §6.3 / Handoff 071's
+    /// `contains_japanese_codepoint`, duplicated locally rather than
+    /// exported, matching that file's own precedent.
+    fn contains_japanese_codepoint(s: &str) -> bool {
+        s.chars().any(|c| {
+            let cp = c as u32;
+            (0x3040..=0x30FF).contains(&cp)
+                || (0x4E00..=0x9FFF).contains(&cp)
+                || (0x3000..=0x303F).contains(&cp)
+                || (0xFF00..=0xFFEF).contains(&cp)
+        })
+    }
+
+    /// Covers the navigation and header specifically — §3's leak class,
+    /// where `bottom_nav`/`header_with_switcher_next` (locale-blind) would
+    /// hide a leftover Japanese nav bar behind an otherwise-clean source
+    /// scan. Also covers the member-row action/role labels `get_members`
+    /// assembles per row.
+    #[test]
+    fn admin_members_page_renders_with_no_japanese_codepoint_in_english_locale() {
+        let header = render::header_with_switcher_next_localized(
+            i18n::t(Locale::En, i18n::ADMIN_MEMBERS_TITLE),
+            "community-a",
+            &[("community-a".to_string(), "Community A".to_string())],
+            "admin_members",
+            Locale::En,
+        );
+        let nav = render::bottom_nav_localized("community-a", "home", Locale::En);
+        let row = format!(
+            "{role}{self_label}{suspended}{promote}{help}{suspend}{remove}",
+            role = i18n::t(Locale::En, i18n::ROLE_ADMIN),
+            self_label = i18n::t(Locale::En, i18n::ADMIN_MEMBERS_CURRENT_USER),
+            suspended = i18n::t(Locale::En, i18n::ADMIN_SUSPENDED_BADGE),
+            promote = i18n::t(Locale::En, i18n::ADMIN_PROMOTE_ACTION),
+            help = i18n::t(Locale::En, i18n::ADMIN_HELP_SIGNIN_ACTION),
+            suspend = i18n::t(Locale::En, i18n::ADMIN_SUSPEND_ACTION),
+            remove = i18n::t(Locale::En, i18n::ADMIN_REMOVE_CONFIRM),
+        );
+        let invite_label = i18n::t(Locale::En, i18n::ADMIN_MEMBERS_GENERATE_INVITE);
+        let en_page = format!("{header}<main>{row}<a>{invite_label}</a></main>{nav}");
+
+        assert!(
+            !contains_japanese_codepoint(&en_page),
+            "English-locale admin members page must contain no Japanese codepoint, found some in: {en_page}"
+        );
+
+        // Sanity: the same composition at Locale::Ja must contain Japanese
+        // — proves the assertion above is discriminating, not vacuously
+        // true, and specifically exercises the nav/header §3 warns about.
+        let ja_header = render::header_with_switcher_next_localized(
+            i18n::t(Locale::Ja, i18n::ADMIN_MEMBERS_TITLE),
+            "community-a",
+            &[("community-a".to_string(), "Community A".to_string())],
+            "admin_members",
+            Locale::Ja,
+        );
+        let ja_nav = render::bottom_nav_localized("community-a", "home", Locale::Ja);
+        assert!(
+            contains_japanese_codepoint(&ja_header),
+            "Japanese-locale header render must contain Japanese text"
+        );
+        assert!(
+            contains_japanese_codepoint(&ja_nav),
+            "Japanese-locale nav render must contain Japanese text"
+        );
+    }
+
     #[test]
     fn invites_flash_message_matches_known_code() {
         assert_eq!(
-            invites_flash_message(Some("invite_revoked")),
-            Some(i18n::JA_ADMIN_INVITE_REVOKED_FLASH)
+            invites_flash_message(Some("invite_revoked"), Locale::Ja),
+            Some(i18n::t(Locale::Ja, i18n::ADMIN_INVITE_REVOKED_FLASH))
+        );
+        assert_eq!(
+            invites_flash_message(Some("invite_revoked"), Locale::En),
+            Some(i18n::EN_ADMIN_INVITE_REVOKED_FLASH)
         );
     }
 
     #[test]
     fn invites_flash_message_ignores_unknown_query_text() {
-        assert_eq!(invites_flash_message(Some("Code revoked")), None);
         assert_eq!(
-            invites_flash_message(Some("<script>alert(1)</script>")),
+            invites_flash_message(Some("Code revoked"), Locale::Ja),
             None
         );
-        assert_eq!(invites_flash_message(None), None);
+        assert_eq!(
+            invites_flash_message(Some("<script>alert(1)</script>"), Locale::Ja),
+            None
+        );
+        assert_eq!(invites_flash_message(None, Locale::Ja), None);
     }
 
     #[test]
@@ -696,12 +785,12 @@ mod tests {
     #[test]
     fn reveal_html_contains_code_once_and_only_as_text() {
         let code = "ACDEFG";
-        let html = invite_reveal_html(&InviteCodeReveal::new(code.to_owned()));
+        let html = invite_reveal_html(&InviteCodeReveal::new(code.to_owned()), Locale::Ja);
         assert_eq!(html.matches(code).count(), 1);
         assert!(html.contains(&format!(">{code}</div>")));
         assert!(!html.contains(&format!("=\"{code}\"")));
         assert!(!html.contains("data-"));
         assert!(!html.contains("<script"));
-        assert!(html.contains(i18n::JA_ADMIN_INVITES_REVEAL_WARNING));
+        assert!(html.contains(i18n::t(Locale::Ja, i18n::ADMIN_INVITES_REVEAL_WARNING)));
     }
 }

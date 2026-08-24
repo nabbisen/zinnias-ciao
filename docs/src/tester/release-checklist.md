@@ -2441,3 +2441,64 @@ Japanese body text — RFC-083 §12's stop condition verbatim.
       new wording, as a direct, unavoidable consequence of the work §3.1
       explicitly required. The entry was removed; see the review request
       for the full disclosure.
+
+## RFC-083 Slice D1b: member-administration surfaces resolve locale (Handoff 072)
+
+Five files converted: `handlers/admin/members.rs` (invite generation/revocation,
+member list — 30 sites), `help_signin.rs` (17), `role_transfer.rs`
+(promote/demote — 10), `suspension.rs` (RFC-082 suspend/unsuspend — 10),
+`member_remove.rs` (8). `handlers/templates.rs` and `handlers/export.rs`
+(D1c) deliberately untouched.
+
+- [x] **All five files resolve locale** from `require_admin`'s
+      `MembershipContext`; no `_membership` remains in any of them.
+      `role_transfer.rs`/`suspension.rs` thread it through a `Localized`
+      pair carried in their confirm-page config structs (`RoleChangeConfirm`,
+      `SuspensionConfirm`), resolved once the locale is known — the
+      title/consequence/confirm strings can't be resolved at the call site,
+      since `require_admin` hasn't run yet there.
+- [x] **The locale-blind-helper trap (§3) was checked explicitly, not just
+      the obvious `i18n::JA_` sites**: every `render::bottom_nav(` and
+      `render::header_with_switcher_next(` call (both present in all five
+      files) converted to its `_localized` sibling. Neither helper was
+      deleted — both still have D1c callers (`templates.rs`, `export.rs`);
+      clippy confirms no dead-code warning.
+- [x] `render::not_found` / `service_unavailable` / `session_expired`
+      untouched — no locale threaded into any of them.
+- [x] `EN_ADMIN_INVITE_REVOKED_FLASH` added ("Invite code revoked.",
+      proposed wording flagged for owner review); `invites_flash_message`
+      takes a **required** `Locale`, not `Option<Locale>` — a missed call
+      site is a compile error. No other constant added.
+- [x] **`LOCALIZATION_EXCEPTIONS` now 12 entries / 121 sites** (was 17/196)
+      — the table holds no D1b file. **`EN_JA_PARITY_EXCEPTIONS` now 4**
+      (was 5) — `ADMIN_INVITE_REVOKED_FLASH` removed now that it's paired,
+      leaving D1c's four stems.
+      `rfc072_every_handler_and_render_file_is_localized_or_documented_exception`
+      passes with all five files genuinely removed.
+- [x] Two rendered-output tests added (`admin_members_page_...`,
+      `admin_help_signin_page_...`), each composing the **header and nav**
+      specifically — the exact leak class §3 warns about — plus row/body
+      labels, asserting no Japanese codepoint at `Locale::En` with a
+      `Locale::Ja` discriminating half. Demonstrated failing **via a
+      helper** (temporarily swapped `bottom_nav_localized` for the
+      locale-blind `bottom_nav` in the test), catching the leaked Japanese
+      nav bar; restored byte-identical.
+- [x] **The ROADMAP English-default tripwire gate added**
+      (`roadmap_english_default_tripwire_fires_when_slice_d_completes`):
+      fails when `LOCALIZATION_EXCEPTIONS` narrows to exactly the three
+      structurally-unresolvable entries ROADMAP.md names. A set-equality
+      check against fixed path strings, not a count — not satisfiable by
+      re-pinning a number. Demonstrated both ways: passes today (12
+      entries, nine more than the trigger), and fires when the table is
+      temporarily reduced to exactly the trigger set; restored
+      byte-identical.
+- [x] Per-function `.await` counts unchanged across all eleven converted
+      routes (verified against the checkpoint, function by function) — no
+      new query anywhere.
+- [x] `smoke:admin-member-management`, `smoke:admin-tools-onboarding`, and
+      `bun run smoke:all` all green — **25/25**, the standing figure.
+- [x] `cargo test --workspace`: 635 (was 632, +3 — two render-assertion
+      tests plus the tripwire gate). `--features dev_fake_issuer`: 638 (was
+      635, +3).
+- [x] No Japanese wording changed; `node scripts/test-evidence-leakage-baseline.mjs`
+      stays green at 996.
