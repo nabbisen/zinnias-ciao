@@ -11,6 +11,12 @@
 // though its own package.json name doesn't start with `smoke:` — leaving it
 // out on a naming technicality would silently recreate the exact defect
 // this script exists to fix.
+//
+// Handoff 068: `test:evidence-leakage-baseline` is included the same way.
+// It isn't a browser smoke either, but it's exactly the kind of routine
+// check this script exists to make automatic — a shrink-only gate on the
+// evidence tree's known leakage backlog, previously run by nobody unless a
+// handoff happened to ask for it by hand.
 
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -21,7 +27,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
 
 const EXCLUDED = new Set(['smoke:runtime', 'smoke:all']);
-const EXTRA_INCLUDED = ['test:abuse-controls'];
+const EXTRA_INCLUDED = ['test:abuse-controls', 'test:evidence-leakage-baseline'];
 
 const names = [
   ...Object.keys(pkg.scripts).filter((name) => name.startsWith('smoke:') && !EXCLUDED.has(name)),

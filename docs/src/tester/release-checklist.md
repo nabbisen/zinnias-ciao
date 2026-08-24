@@ -2227,3 +2227,70 @@ would have broken those.
       cannot retroactively clean snapshots already on disk, and this package
       is explicitly not authorized to touch them. See the review request for
       the full reconciliation.
+
+## `forbidden_key` only fires when the value could carry a string (Handoff 067)
+
+**A forbidden field name is a violation only when its value could contain a
+string.** A boolean or number can never carry a secret, no matter what the
+field is named — `sessionCookieIssued: true` is an assertion result, not a
+cookie. `FORBIDDEN_KEY_PATTERN` itself is unchanged; only *when* it's
+consulted changed, identically at both call sites
+(`collectRedactionViolations` and `assertRedacted`) via a shared
+`valueCanCarryString` gate. `null`/`undefined` are exempted for the same
+reason; arrays and plain objects are deliberately **not** exempted — a list
+literally named `credentials` could hold real ones.
+
+- [x] **110 → 5.** All 105 boolean/number findings clear. The five
+      `validCredentialRow` array findings remain, correctly — a real signal
+      about a field name, carried rather than chased (renaming it is a smoke
+      change for whoever next touches that script).
+- [x] Four permanent tests added to `test-evidence-manifest.mjs`, each
+      checking `assertRedacted` and `scanJsonValueForLeakage` agree: a
+      string-valued forbidden key still fires (the proof the narrowing isn't
+      a hole), an array-valued one still fires, a boolean-valued one and a
+      number-valued one no longer do.
+- [x] Whole-tree total: **1051 → 946**, exactly matching the handoff's
+      predicted figure.
+- [x] `cargo test --workspace` / `--features dev_fake_issuer`: **633 / 636,
+      unchanged** — no Rust touched. clippy, fmt, wasm check,
+      `mdbook build docs`, `git diff --check`, `bun run build` (`index.js`
+      unchanged at 28.6kb): all clean.
+
+## The leakage scanner is now a gate, with a shrink-only baseline (Handoff 068)
+
+**`bun run test:evidence-leakage-baseline` now runs automatically as part of
+`bun run smoke:all`.** Before this, `scan-evidence-leakage` was invoked by
+nothing — not CI, not a release gate, not `smoke:all` — only a manual `bun
+run evidence:scan-leakage`, which is exactly how 1051 findings accumulated
+without anyone noticing until Handoff 065 happened to run it by hand. The
+same "control nobody runs" shape this project has now fixed four times
+(`LOCALIZATION_EXCEPTIONS`, the smoke run set, EN/JA parity, and now this).
+
+- [x] **The backlog is pinned, not fixed — and it is local test fixtures, not
+      business data.** The service has never been deployed; there is no real
+      community, no real member, no real session. A consumed single-use
+      form token from a finished local test run, or a `com_…` id a smoke
+      script created in its own local D1, has never had authority anywhere.
+      The scanner's uniform rule (no "it's only local" exception, so nobody
+      has to adjudicate a value one at a time) is correct and unchanged —
+      this package makes the existing backlog visible and frozen, not
+      acceptable.
+- [x] **Baseline pinned as exact totals — total 946, and every category
+      individually** (`raw_resource_id` 484, `raw_or_hashed_secret` 450,
+      `forbidden_key` 5, `sql` 7, plus every currently-zero category pinned
+      at 0 too, so a category going from absent to nonzero is caught the
+      same as an existing one rising). **The gate fails in both
+      directions** — a rise means a new, unreviewed violation; a fall means
+      the backlog shrank and the pin is stale and must come down. Both
+      directions demonstrated, plus a same-total category swap (proving the
+      per-category pins do real work beyond the total alone).
+- [x] **The pin comes down as evidence is naturally replaced** — nothing
+      about this gate prevents the baseline shrinking; it only requires that
+      a shrink be a deliberate re-pin, not a silent one.
+- [x] Skipped-extension inventory reported: `.png` (screenshots, hashed not
+      content-scanned by design) and `.log` (not yet in the scanned
+      extension set — carried, not added here, since adding an extension
+      would move the baseline in the same change that pins it).
+- [x] No evidence file touched, moved, deleted, or regenerated. No detection
+      logic changed (`FORBIDDEN_KEY_PATTERN` and every other rule are
+      Handoff 067's territory, untouched here).

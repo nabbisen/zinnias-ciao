@@ -189,7 +189,7 @@ function collectRedactionViolations(value, path, violations) {
       return;
     }
     for (const [key, nested] of Object.entries(value)) {
-      if (FORBIDDEN_KEY_PATTERN.test(key)) {
+      if (FORBIDDEN_KEY_PATTERN.test(key) && valueCanCarryString(nested)) {
         violations.push(new EvidenceRedactionError('forbidden_key', `${path}.${key}`, `forbidden field name "${key}" at ${path}.${key}`));
       }
       // Recurse regardless of whether the key itself was just flagged — a
@@ -202,6 +202,21 @@ function collectRedactionViolations(value, path, violations) {
     return;
   }
   // numbers and booleans carry no redaction risk.
+}
+
+// Handoff 067: `FORBIDDEN_KEY_PATTERN` matches a field *name* — but a name
+// like `cookie` or `credential` is only a leak risk if the field's *value*
+// could actually hold string content. A boolean or number can never carry a
+// secret, no matter what the field is named (`sessionCookieIssued: true` is
+// an assertion result, not a cookie). `null`/`undefined` fall out of the same
+// principle for free. Arrays and plain objects are NOT exempted — a list
+// literally named `cookies` could hold real ones, and the structural
+// recursion that follows is a backstop, not a replacement for checking the
+// name where it's still a meaningful signal.
+function valueCanCarryString(value) {
+  if (value === null || value === undefined) return false;
+  const type = typeof value;
+  return type === 'string' || type === 'object';
 }
 
 function isHarShaped(value) {
@@ -236,7 +251,7 @@ export function assertRedacted(value, path = '$') {
       throw new EvidenceRedactionError('har_file', path, `HAR-shaped object at ${path}`);
     }
     for (const [key, nested] of Object.entries(value)) {
-      if (FORBIDDEN_KEY_PATTERN.test(key)) {
+      if (FORBIDDEN_KEY_PATTERN.test(key) && valueCanCarryString(nested)) {
         throw new EvidenceRedactionError('forbidden_key', `${path}.${key}`, `forbidden field name "${key}" at ${path}.${key}`);
       }
       assertRedacted(nested, `${path}.${key}`);

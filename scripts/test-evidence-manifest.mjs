@@ -152,6 +152,46 @@ assertRedactionCategory({ durableObjectId: 'x' }, 'forbidden_key', 'Durable Obje
 assertRedactionCategory({ subjectDigest: 'x' }, 'forbidden_key', 'subject identifier key');
 assertRedactionCategory({ dbBindings: 'x' }, 'forbidden_key', 'binding-shaped key');
 
+// Handoff 067: `forbidden_key` fires only when the value could actually carry
+// a string — a boolean or number can never hold a secret, no matter what the
+// field is named. Both `assertRedacted` (throws) and `scanJsonValueForLeakage`
+// (collects) must agree on all four cases, since they share the same
+// `valueCanCarryString` gate at both call sites.
+function assertForbiddenKeyBehavior(value, shouldFire, description) {
+  if (shouldFire) {
+    assertRedactionCategory(value, 'forbidden_key', `${description} (assertRedacted)`);
+    const violations = scanJsonValueForLeakage(value, '$');
+    assert.ok(
+      violations.some((v) => v instanceof EvidenceRedactionError && v.category === 'forbidden_key'),
+      `${description} (scanJsonValueForLeakage): expected a forbidden_key finding, got [${violations.map((v) => v.category).join(', ')}]`,
+    );
+  } else {
+    assert.doesNotThrow(() => assertRedacted(value), `${description} (assertRedacted): must not throw`);
+    const violations = scanJsonValueForLeakage(value, '$');
+    assert.ok(
+      !violations.some((v) => v.category === 'forbidden_key'),
+      `${description} (scanJsonValueForLeakage): must not report forbidden_key, got [${violations.map((v) => v.category).join(', ')}]`,
+    );
+  }
+}
+
+// 1. String-valued forbidden key still fires — the proof the narrowing did
+// not become a hole. This matters more than the three clearing
+// demonstrations below.
+assertForbiddenKeyBehavior({ formToken: 'present' }, true, 'string-valued forbidden key still fires');
+// 2. Array-valued forbidden key still fires — arrays are deliberately not
+// exempted (a list literally named `credentials` could hold real ones).
+assertForbiddenKeyBehavior(
+  { credentials: [{ consumed_at: '2026-01-01T00:00:00.000Z' }] },
+  true,
+  'array-valued forbidden key still fires',
+);
+// 3. Boolean-valued forbidden key no longer fires — an assertion-result field
+// like `sessionCookieIssued: true` is not a cookie.
+assertForbiddenKeyBehavior({ sessionCookieIssued: true }, false, 'boolean-valued forbidden key does not fire');
+// 4. Number-valued forbidden key no longer fires.
+assertForbiddenKeyBehavior({ credentialCount: 5 }, false, 'number-valued forbidden key does not fire');
+
 assertRedactionCategory({ note: 'ciao_sid=abc123def456' }, 'cookie', 'cookie-shaped value');
 assertRedactionCategory({ note: 'a'.repeat(64) }, 'raw_or_hashed_secret', 'bare 64-hex value (pepper/token/digest/DO-id shape)');
 assertRedactionCategory({ note: 'b'.repeat(40) }, 'raw_or_hashed_secret', 'bare 40-hex value');
