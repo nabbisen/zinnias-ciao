@@ -578,7 +578,32 @@ try {
       materializedThroughNearMonth: nearMonthRows.some(
         (row) => row.day_date === nearOccurrenceDayDate,
       ),
-      calendarShowsSeededTitle: nearMonthCalendar.text.includes(materializeTitle),
+    },
+  });
+
+  // Handoff 070 Part A: RFC-073 (ed549be, 2026-07-29) moved event titles out
+  // of the month grid into the day-detail panel and the list view — the
+  // month grid's only `title` is the page heading. Do not repoint the month
+  // navigation above to `&view=list`: that visit is what triggers
+  // materialization (rowCountIncreased depends on it), and it is RFC-011
+  // accessibility coverage for the hardest layout in the product to keep
+  // scroll-free. This is a second, separate visit, list-view-only.
+  logStep('checking Calendar list view shows the seeded title');
+  await navigate(
+    page,
+    `/c/${communityId}/communities?month=${nearMaterializeMonth}&view=list`,
+    { textScale: 2 },
+  );
+  const nearMonthList = await collect(page);
+  results.push({
+    name: 'calendar-list-view-shows-seeded-title',
+    screenshotPath: await screenshot(page, 'calendar-list-view-shows-seeded-title'),
+    observed: {
+      path: nearMonthList.path,
+    },
+    checks: {
+      listViewNoHorizontalScroll: nearMonthList.noHorizontalScroll,
+      listViewShowsSeededTitle: nearMonthList.text.includes(materializeTitle),
     },
   });
 

@@ -129,510 +129,6 @@ fn all_state_changing_routes_have_token_purpose() {
     }
 }
 
-// ── i18n parity gate ──────────────────────────────────────────────────────
-// Every EN_* constant must have a non-empty JA_* counterpart.
-// This test registers every member-facing string pair so a JA string going
-// empty or missing causes `cargo test` to fail immediately.
-// To add a new string: add EN_FOO and JA_FOO in the relevant i18n child module,
-// then add the pair below.
-
-#[test]
-fn i18n_en_ja_parity_count() {
-    use zinnias_ciao_contracts::i18n::*;
-    let pairs = [
-        (EN_JOIN_HEADING, JA_JOIN_HEADING),
-        (EN_JOIN_SUBHEADING, JA_JOIN_SUBHEADING),
-        (EN_JOIN_CODE_LABEL, JA_JOIN_CODE_LABEL),
-        (EN_JOIN_CODE_HINT, JA_JOIN_CODE_HINT),
-        (EN_JOIN_RELINK_HINT, JA_JOIN_RELINK_HINT),
-        (EN_JOIN_RELINK_LINK, JA_JOIN_RELINK_LINK),
-        (EN_JOIN_SUBMIT, JA_JOIN_SUBMIT),
-        (EN_JOIN_PROFILE_HEADING, JA_JOIN_PROFILE_HEADING),
-        (EN_JOIN_PROFILE_HINT, JA_JOIN_PROFILE_HINT),
-        (EN_JOIN_PROFILE_LABEL, JA_JOIN_PROFILE_LABEL),
-        (EN_JOIN_PROFILE_SUBMIT, JA_JOIN_PROFILE_SUBMIT),
-        (EN_STATUS_GOING, JA_STATUS_GOING),
-        (EN_STATUS_NOT_GOING, JA_STATUS_NOT_GOING),
-        (EN_STATUS_ATTENDED, JA_STATUS_ATTENDED),
-        (EN_STATUS_NO_ANSWER, JA_STATUS_NO_ANSWER),
-        (EN_STATUS_ATTENDED_DISABLED, JA_STATUS_ATTENDED_DISABLED),
-        (EN_NOTE_SAVE, JA_NOTE_SAVE),
-        (EN_NOTE_DELETE, JA_NOTE_DELETE),
-        (EN_NOTE_TOO_LONG, JA_NOTE_TOO_LONG),
-        (EN_SESSION_EXPIRED, JA_SESSION_EXPIRED),
-        (EN_LOGOUT, JA_LOGOUT),
-        (EN_LOGOUT_CONFIRM, JA_LOGOUT_CONFIRM),
-        (EN_GENERAL_ERROR, JA_GENERAL_ERROR),
-        (EN_CONFIGURATION_UNAVAILABLE, JA_CONFIGURATION_UNAVAILABLE),
-        (EN_OFFLINE_BANNER, JA_OFFLINE_BANNER),
-        (EN_EMPTY_EVENTS, JA_EMPTY_EVENTS),
-        (EN_EMPTY_EVENTS_HINT, JA_EMPTY_EVENTS_HINT),
-        (EN_EMPTY_EVENTS_ADMIN, JA_EMPTY_EVENTS_ADMIN),
-        (EN_NAV_HOME, JA_NAV_HOME),
-        (EN_NAV_COMMUNITIES, JA_NAV_COMMUNITIES),
-        (EN_NAV_ME, JA_NAV_ME),
-        (EN_TODAY, JA_TODAY),
-        (EN_HOME_THIS_WEEK, JA_HOME_THIS_WEEK),
-        (EN_HOME_LATER, JA_HOME_LATER),
-        (EN_HOME_CREATE_EVENT, JA_HOME_CREATE_EVENT),
-        (EN_HOME_INVITE_MEMBERS, JA_HOME_INVITE_MEMBERS),
-        (EN_HOME_MANAGE_MEMBERS, JA_HOME_MANAGE_MEMBERS),
-        (EN_HOME_CALENDAR_TITLE, JA_HOME_CALENDAR_TITLE),
-        (EN_HOME_CALENDAR_HELPER, JA_HOME_CALENDAR_HELPER),
-        (EN_HOME_CALENDAR_EMPTY, JA_HOME_CALENDAR_EMPTY),
-        (EN_HOME_AGENDA_TITLE, JA_HOME_AGENDA_TITLE),
-        (EN_CALENDAR_MONTH_TITLE, JA_CALENDAR_MONTH_TITLE),
-        (EN_CALENDAR_PREV_MONTH, JA_CALENDAR_PREV_MONTH),
-        (EN_CALENDAR_NEXT_MONTH, JA_CALENDAR_NEXT_MONTH),
-        (EN_CALENDAR_THIS_MONTH, JA_CALENDAR_THIS_MONTH),
-        (EN_CALENDAR_ALL_DAYS, JA_CALENDAR_ALL_DAYS),
-        (EN_CALENDAR_EMPTY_MONTH, JA_CALENDAR_EMPTY_MONTH),
-        (EN_CALENDAR_EMPTY_DAY, JA_CALENDAR_EMPTY_DAY),
-        (EN_CALENDAR_CREATE_ON_DAY, JA_CALENDAR_CREATE_ON_DAY),
-        (EN_CALENDAR_VIEW_MONTH, JA_CALENDAR_VIEW_MONTH),
-        (EN_CALENDAR_VIEW_LIST, JA_CALENDAR_VIEW_LIST),
-        (EN_CALENDAR_VIEW_MATRIX, JA_CALENDAR_VIEW_MATRIX),
-        (EN_CALENDAR_DAY_DETAIL_PROMPT, JA_CALENDAR_DAY_DETAIL_PROMPT),
-        (EN_CALENDAR_MATRIX_TITLE, JA_CALENDAR_MATRIX_TITLE),
-        (EN_CALENDAR_MATRIX_TOO_LARGE, JA_CALENDAR_MATRIX_TOO_LARGE),
-        (EN_CALENDAR_MATRIX_NO_MEMBERS, JA_CALENDAR_MATRIX_NO_MEMBERS),
-        (EN_CALENDAR_MATRIX_CSV_EXPORT, JA_CALENDAR_MATRIX_CSV_EXPORT),
-        (EN_CALENDAR_MATRIX_CSV_ERROR, JA_CALENDAR_MATRIX_CSV_ERROR),
-        (EN_STATUS_CLEAR, JA_STATUS_CLEAR),
-        (EN_STATUS_CLEAR_LABEL, JA_STATUS_CLEAR_LABEL),
-        (EN_NOTE_SECTION_LABEL, JA_NOTE_SECTION_LABEL),
-        (EN_NOTE_PLACEHOLDER_LABEL, JA_NOTE_PLACEHOLDER_LABEL),
-        (EN_NOTE_CHAR_HINT, JA_NOTE_CHAR_HINT),
-        (EN_NOTE_VISIBILITY, JA_NOTE_VISIBILITY),
-        (EN_ME_SECTION_NAME, JA_ME_SECTION_NAME),
-        (EN_ME_CHANGE_DISPLAY_NAME, JA_ME_CHANGE_DISPLAY_NAME),
-        (EN_ME_DISPLAY_NAME_EDIT_TITLE, JA_ME_DISPLAY_NAME_EDIT_TITLE),
-        (
-            EN_ME_DISPLAY_NAME_EDIT_SUBMIT,
-            JA_ME_DISPLAY_NAME_EDIT_SUBMIT,
-        ),
-        (
-            EN_ME_DISPLAY_NAME_EDIT_CANCEL,
-            JA_ME_DISPLAY_NAME_EDIT_CANCEL,
-        ),
-        (EN_ME_DISPLAY_NAME_UPDATED, JA_ME_DISPLAY_NAME_UPDATED),
-        (EN_ME_DISPLAY_NAME_ERROR, JA_ME_DISPLAY_NAME_ERROR),
-        (EN_ME_SECTION_COMMUNITY, JA_ME_SECTION_COMMUNITY),
-        (EN_ME_SECTION_HELP, JA_ME_SECTION_HELP),
-        (EN_ME_HELP_BODY, JA_ME_HELP_BODY),
-        (EN_ADMIN_CREATE_EVENT_TITLE, JA_ADMIN_CREATE_EVENT_TITLE),
-        (EN_ADMIN_CREATE_EVENT_SUBMIT, JA_ADMIN_CREATE_EVENT_SUBMIT),
-        (EN_REPEAT_END_OPEN, JA_REPEAT_END_OPEN),
-        (EN_REPEAT_END_UNTIL, JA_REPEAT_END_UNTIL),
-        (EN_REPEAT_END_COUNT, JA_REPEAT_END_COUNT),
-        (EN_REPEAT_COUNT_LABEL, JA_REPEAT_COUNT_LABEL),
-        (EN_REPEAT_UNTIL_LABEL, JA_REPEAT_UNTIL_LABEL),
-        (EN_OCCURRENCE_CANCEL_ACTION, JA_OCCURRENCE_CANCEL_ACTION),
-        (EN_OCCURRENCE_CANCEL_TITLE, JA_OCCURRENCE_CANCEL_TITLE),
-        (EN_OCCURRENCE_CANCEL_HELPER, JA_OCCURRENCE_CANCEL_HELPER),
-        (EN_OCCURRENCE_CANCEL_SUBMIT, JA_OCCURRENCE_CANCEL_SUBMIT),
-        (EN_OCCURRENCE_CANCELLED_BADGE, JA_OCCURRENCE_CANCELLED_BADGE),
-        (EN_CALENDAR_OUT_OF_RANGE, JA_CALENDAR_OUT_OF_RANGE),
-        (
-            EN_CALENDAR_MATERIALIZATION_LIMIT,
-            JA_CALENDAR_MATERIALIZATION_LIMIT,
-        ),
-        (
-            EN_ADMIN_RECREATE_EVENT_ACTION,
-            JA_ADMIN_RECREATE_EVENT_ACTION,
-        ),
-        (
-            EN_ADMIN_RECREATE_EVENT_HELPER,
-            JA_ADMIN_RECREATE_EVENT_HELPER,
-        ),
-        (EN_ADMIN_COPY_EVENT_ACTION, JA_ADMIN_COPY_EVENT_ACTION),
-        (EN_ADMIN_COPY_EVENT_TITLE, JA_ADMIN_COPY_EVENT_TITLE),
-        (EN_ADMIN_COPY_EVENT_HELPER, JA_ADMIN_COPY_EVENT_HELPER),
-        (
-            EN_ADMIN_COPY_EVENT_DATE_WARNING,
-            JA_ADMIN_COPY_EVENT_DATE_WARNING,
-        ),
-        (
-            EN_ADMIN_COPY_EVENT_MULTI_DAY_HELPER,
-            JA_ADMIN_COPY_EVENT_MULTI_DAY_HELPER,
-        ),
-        (
-            EN_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE,
-            JA_ADMIN_COPY_EVENT_SCHEDULE_UNAVAILABLE,
-        ),
-        (
-            EN_ADMIN_COPY_EVENT_RECURRING_PAST,
-            JA_ADMIN_COPY_EVENT_RECURRING_PAST,
-        ),
-        (
-            EN_ADMIN_COPY_EVENT_RECURRING_WINDOW,
-            JA_ADMIN_COPY_EVENT_RECURRING_WINDOW,
-        ),
-        (EN_ADMIN_EDIT_EVENT_TITLE, JA_ADMIN_EDIT_EVENT_TITLE),
-        (EN_ADMIN_EDIT_EVENT_SUBMIT, JA_ADMIN_EDIT_EVENT_SUBMIT),
-        (EN_ADMIN_EDIT_EVENT_HINT, JA_ADMIN_EDIT_EVENT_HINT),
-        (
-            EN_ADMIN_EDIT_DETAILS_ONLY_HEADING,
-            JA_ADMIN_EDIT_DETAILS_ONLY_HEADING,
-        ),
-        (
-            EN_ADMIN_EDIT_SCHEDULE_HEADING,
-            JA_ADMIN_EDIT_SCHEDULE_HEADING,
-        ),
-        (
-            EN_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX,
-            JA_ADMIN_EDIT_SCHEDULE_TOTAL_PREFIX,
-        ),
-        (
-            EN_ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX,
-            JA_ADMIN_EDIT_SCHEDULE_TOTAL_SUFFIX,
-        ),
-        (EN_ADMIN_EDIT_SCHEDULE_FIRST, JA_ADMIN_EDIT_SCHEDULE_FIRST),
-        (EN_ADMIN_EDIT_SCHEDULE_LAST, JA_ADMIN_EDIT_SCHEDULE_LAST),
-        (
-            EN_ADMIN_EDIT_MULTI_DAY_HELPER,
-            JA_ADMIN_EDIT_MULTI_DAY_HELPER,
-        ),
-        (
-            EN_ADMIN_EDIT_RECURRING_HELPER,
-            JA_ADMIN_EDIT_RECURRING_HELPER,
-        ),
-        (
-            EN_ADMIN_EDIT_RESPONSES_PRESERVED,
-            JA_ADMIN_EDIT_RESPONSES_PRESERVED,
-        ),
-        (
-            EN_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE,
-            JA_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE,
-        ),
-        (EN_ADMIN_CANCEL_EVENT_TITLE, JA_ADMIN_CANCEL_EVENT_TITLE),
-        (EN_ADMIN_CANCEL_EVENT_BODY, JA_ADMIN_CANCEL_EVENT_BODY),
-        (
-            EN_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS,
-            JA_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS,
-        ),
-        (EN_ADMIN_CANCEL_EVENT_KEEP, JA_ADMIN_CANCEL_EVENT_KEEP),
-        (EN_ADMIN_CANCEL_EVENT_CONFIRM, JA_ADMIN_CANCEL_EVENT_CONFIRM),
-        (
-            EN_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS,
-            JA_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS,
-        ),
-        (
-            EN_ADMIN_CANNOT_EDIT_CANCELLED,
-            JA_ADMIN_CANNOT_EDIT_CANCELLED,
-        ),
-        (EN_ADMIN_CANNOT_EDIT_STARTED, JA_ADMIN_CANNOT_EDIT_STARTED),
-        (
-            EN_ADMIN_CANNOT_ATTEND_CANCELLED,
-            JA_ADMIN_CANNOT_ATTEND_CANCELLED,
-        ),
-        (EN_ADMIN_ATTEND_TITLE, JA_ADMIN_ATTEND_TITLE),
-        (EN_ADMIN_ATTEND_SUBMIT, JA_ADMIN_ATTEND_SUBMIT),
-        (EN_ADMIN_INVITES_TITLE, JA_ADMIN_INVITES_TITLE),
-        (EN_ADMIN_INVITES_BODY, JA_ADMIN_INVITES_BODY),
-        (EN_ADMIN_INVITES_GENERATE, JA_ADMIN_INVITES_GENERATE),
-        (EN_ADMIN_INVITES_ACTIVE, JA_ADMIN_INVITES_ACTIVE),
-        (EN_ADMIN_INVITES_NONE, JA_ADMIN_INVITES_NONE),
-        (
-            EN_ADMIN_INVITES_NEW_CODE_HINT,
-            JA_ADMIN_INVITES_NEW_CODE_HINT,
-        ),
-        (
-            EN_ADMIN_INVITES_REVEAL_WARNING,
-            JA_ADMIN_INVITES_REVEAL_WARNING,
-        ),
-        (EN_ADMIN_INVITES_REVOKE, JA_ADMIN_INVITES_REVOKE),
-        (
-            EN_ADMIN_INVITES_BACK_TO_MEMBERS,
-            JA_ADMIN_INVITES_BACK_TO_MEMBERS,
-        ),
-        (EN_ADMIN_MEMBERS_TITLE, JA_ADMIN_MEMBERS_TITLE),
-        (
-            EN_ADMIN_MEMBERS_GENERATE_INVITE,
-            JA_ADMIN_MEMBERS_GENERATE_INVITE,
-        ),
-        (EN_ADMIN_MEMBERS_CURRENT_USER, JA_ADMIN_MEMBERS_CURRENT_USER),
-        (EN_ADMIN_PROMOTE_ACTION, JA_ADMIN_PROMOTE_ACTION),
-        (EN_ADMIN_DEMOTE_ACTION, JA_ADMIN_DEMOTE_ACTION),
-        (EN_ADMIN_PROMOTE_TITLE, JA_ADMIN_PROMOTE_TITLE),
-        (EN_ADMIN_PROMOTE_CONSEQUENCE, JA_ADMIN_PROMOTE_CONSEQUENCE),
-        (EN_ADMIN_DEMOTE_TITLE, JA_ADMIN_DEMOTE_TITLE),
-        (EN_ADMIN_DEMOTE_CONSEQUENCE, JA_ADMIN_DEMOTE_CONSEQUENCE),
-        (EN_ADMIN_LAST_ADMIN_DEMOTE, JA_ADMIN_LAST_ADMIN_DEMOTE),
-        (EN_ADMIN_REMOVE_TITLE, JA_ADMIN_REMOVE_TITLE),
-        (EN_ADMIN_REMOVE_KEEP, JA_ADMIN_REMOVE_KEEP),
-        (EN_ADMIN_REMOVE_CONFIRM, JA_ADMIN_REMOVE_CONFIRM),
-        (EN_ADMIN_REMOVE_CONSEQUENCE, JA_ADMIN_REMOVE_CONSEQUENCE),
-        (EN_ADMIN_LAST_ADMIN, JA_ADMIN_LAST_ADMIN),
-        (EN_ADMIN_HELP_SIGNIN_ACTION, JA_ADMIN_HELP_SIGNIN_ACTION),
-        (EN_ADMIN_HELP_SIGNIN_TITLE, JA_ADMIN_HELP_SIGNIN_TITLE),
-        (
-            EN_ADMIN_HELP_SIGNIN_CONSEQUENCE,
-            JA_ADMIN_HELP_SIGNIN_CONSEQUENCE,
-        ),
-        (EN_ADMIN_HELP_SIGNIN_CREATE, JA_ADMIN_HELP_SIGNIN_CREATE),
-        (
-            EN_ADMIN_HELP_SIGNIN_CODE_HINT,
-            JA_ADMIN_HELP_SIGNIN_CODE_HINT,
-        ),
-        (
-            EN_ADMIN_HELP_SIGNIN_RELINK_HINT,
-            JA_ADMIN_HELP_SIGNIN_RELINK_HINT,
-        ),
-        (
-            EN_ADMIN_HELP_SIGNIN_RELINK_LINK,
-            JA_ADMIN_HELP_SIGNIN_RELINK_LINK,
-        ),
-        (
-            EN_ADMIN_HELP_SIGNIN_COPY_CODE,
-            JA_ADMIN_HELP_SIGNIN_COPY_CODE,
-        ),
-        (
-            EN_ADMIN_HELP_SIGNIN_COPY_DONE,
-            JA_ADMIN_HELP_SIGNIN_COPY_DONE,
-        ),
-        (
-            EN_ADMIN_HELP_SIGNIN_COPY_FAILED,
-            JA_ADMIN_HELP_SIGNIN_COPY_FAILED,
-        ),
-        (EN_ADMIN_SUSPENDED_BADGE, JA_ADMIN_SUSPENDED_BADGE),
-        (EN_ADMIN_SUSPEND_ACTION, JA_ADMIN_SUSPEND_ACTION),
-        (EN_ADMIN_UNSUSPEND_ACTION, JA_ADMIN_UNSUSPEND_ACTION),
-        (EN_ADMIN_SUSPEND_TITLE, JA_ADMIN_SUSPEND_TITLE),
-        (EN_ADMIN_SUSPEND_CONSEQUENCE, JA_ADMIN_SUSPEND_CONSEQUENCE),
-        (EN_ADMIN_UNSUSPEND_TITLE, JA_ADMIN_UNSUSPEND_TITLE),
-        (
-            EN_ADMIN_UNSUSPEND_CONSEQUENCE,
-            JA_ADMIN_UNSUSPEND_CONSEQUENCE,
-        ),
-        (EN_ADMIN_LAST_ADMIN_SUSPEND, JA_ADMIN_LAST_ADMIN_SUSPEND),
-        (EN_MEMBERSHIP_SUSPENDED, JA_MEMBERSHIP_SUSPENDED),
-        (EN_RELINK_TITLE, JA_RELINK_TITLE),
-        (EN_RELINK_BODY, JA_RELINK_BODY),
-        (EN_RELINK_CODE_LABEL, JA_RELINK_CODE_LABEL),
-        (EN_RELINK_SUBMIT, JA_RELINK_SUBMIT),
-        (EN_RELINK_INVALID, JA_RELINK_INVALID),
-        (EN_COMMUNITIES_JOIN_ANOTHER, JA_COMMUNITIES_JOIN_ANOTHER),
-        (EN_COMMUNITY_CREATE_LINK, JA_COMMUNITY_CREATE_LINK),
-        (EN_COMMUNITY_CREATE_TITLE, JA_COMMUNITY_CREATE_TITLE),
-        (EN_COMMUNITY_CREATE_BODY, JA_COMMUNITY_CREATE_BODY),
-        (
-            EN_COMMUNITY_CREATE_NAME_LABEL,
-            JA_COMMUNITY_CREATE_NAME_LABEL,
-        ),
-        (
-            EN_COMMUNITY_CREATE_DISPLAY_NAME_LABEL,
-            JA_COMMUNITY_CREATE_DISPLAY_NAME_LABEL,
-        ),
-        (
-            EN_COMMUNITY_CREATE_TIMEZONE_LABEL,
-            JA_COMMUNITY_CREATE_TIMEZONE_LABEL,
-        ),
-        (
-            EN_COMMUNITY_CREATE_TIMEZONE_JAPAN,
-            JA_COMMUNITY_CREATE_TIMEZONE_JAPAN,
-        ),
-        (EN_COMMUNITY_CREATE_SUBMIT, JA_COMMUNITY_CREATE_SUBMIT),
-        (EN_COMMUNITY_CREATE_CANCEL, JA_COMMUNITY_CREATE_CANCEL),
-        (EN_COMMUNITY_CREATE_DISABLED, JA_COMMUNITY_CREATE_DISABLED),
-        (
-            EN_COMMUNITY_CREATE_RATE_LIMITED,
-            JA_COMMUNITY_CREATE_RATE_LIMITED,
-        ),
-        (
-            EN_COMMUNITY_CREATE_NAME_ERROR,
-            JA_COMMUNITY_CREATE_NAME_ERROR,
-        ),
-        (
-            EN_COMMUNITY_CREATE_NAME_TOO_LONG,
-            JA_COMMUNITY_CREATE_NAME_TOO_LONG,
-        ),
-        (
-            EN_COMMUNITY_CREATE_NAME_INVALID,
-            JA_COMMUNITY_CREATE_NAME_INVALID,
-        ),
-        (
-            EN_COMMUNITY_CREATE_DISPLAY_NAME_ERROR,
-            JA_COMMUNITY_CREATE_DISPLAY_NAME_ERROR,
-        ),
-        (
-            EN_COMMUNITY_CREATE_TIMEZONE_ERROR,
-            JA_COMMUNITY_CREATE_TIMEZONE_ERROR,
-        ),
-        (EN_ROLE_ADMIN, JA_ROLE_ADMIN),
-        (EN_ROLE_MEMBER, JA_ROLE_MEMBER),
-        (EN_HOME_FIRST_RUN_WELCOME, JA_HOME_FIRST_RUN_WELCOME),
-        (EN_HOME_FIRST_RUN_NO_EVENTS, JA_HOME_FIRST_RUN_NO_EVENTS),
-        (EN_HOME_FIRST_RUN_CREATE, JA_HOME_FIRST_RUN_CREATE),
-        (EN_HOME_FIRST_RUN_INVITE_HINT, JA_HOME_FIRST_RUN_INVITE_HINT),
-        (EN_REPEAT_LABEL, JA_REPEAT_LABEL),
-        (EN_REPEAT_NONE, JA_REPEAT_NONE),
-        (EN_REPEAT_WEEKLY, JA_REPEAT_WEEKLY),
-        (EN_REPEAT_BIWEEKLY, JA_REPEAT_BIWEEKLY),
-        (EN_REPEAT_MONTHLY, JA_REPEAT_MONTHLY),
-        (EN_REPEAT_COUNT_UNIT, JA_REPEAT_COUNT_UNIT),
-        (EN_REPEAT_COUNT_HINT, JA_REPEAT_COUNT_HINT),
-        (EN_TEMPLATES_TITLE, JA_TEMPLATES_TITLE),
-        (EN_TEMPLATES_DESCRIPTION, JA_TEMPLATES_DESCRIPTION),
-        (EN_TEMPLATES_EMPTY, JA_TEMPLATES_EMPTY),
-        (EN_TEMPLATES_SAVE_SECTION, JA_TEMPLATES_SAVE_SECTION),
-        (EN_TEMPLATES_TITLE_LABEL, JA_TEMPLATES_TITLE_LABEL),
-        (EN_TEMPLATES_LOC_LABEL, JA_TEMPLATES_LOC_LABEL),
-        (EN_TEMPLATES_DUR_LABEL, JA_TEMPLATES_DUR_LABEL),
-        (EN_TEMPLATES_SAVE_BTN, JA_TEMPLATES_SAVE_BTN),
-        (EN_TEMPLATES_USE_BTN, JA_TEMPLATES_USE_BTN),
-        (EN_TEMPLATES_DELETE_BTN, JA_TEMPLATES_DELETE_BTN),
-        (EN_EXPORT_TITLE, JA_EXPORT_TITLE),
-        (EN_EXPORT_DESCRIPTION, JA_EXPORT_DESCRIPTION),
-        (EN_EXPORT_PRIVACY_NOTE, JA_EXPORT_PRIVACY_NOTE),
-        (EN_EXPORT_DOWNLOAD_BTN, JA_EXPORT_DOWNLOAD_BTN),
-        (EN_EXPORT_SINGLE_USE, JA_EXPORT_SINGLE_USE),
-        (EN_ME_SECTION_ABOUT, JA_ME_SECTION_ABOUT),
-        (EN_ME_VERSION_LABEL, JA_ME_VERSION_LABEL),
-        (EN_ME_REF_LABEL, JA_ME_REF_LABEL),
-        (EN_ME_SECTION_DATA, JA_ME_SECTION_DATA),
-        (EN_ME_EXPORT_LINK, JA_ME_EXPORT_LINK),
-        (EN_ME_SECTION_ADMIN, JA_ME_SECTION_ADMIN),
-        (EN_ME_MANAGE_MEMBERS, JA_ME_MANAGE_MEMBERS),
-        (EN_CALENDAR_TITLE, JA_CALENDAR_TITLE),
-        (EN_CALENDAR_DESCRIPTION, JA_CALENDAR_DESCRIPTION),
-        (EN_CALENDAR_GENERATE, JA_CALENDAR_GENERATE),
-        (EN_CALENDAR_DISABLE, JA_CALENDAR_DISABLE),
-        (EN_CALENDAR_REGENERATE, JA_CALENDAR_REGENERATE),
-        (EN_CALENDAR_PRIVACY_NOTE, JA_CALENDAR_PRIVACY_NOTE),
-        (EN_CALENDAR_GENERATED_FLASH, JA_CALENDAR_GENERATED_FLASH),
-        (EN_CALENDAR_REVOKED_FLASH, JA_CALENDAR_REVOKED_FLASH),
-        (EN_EVENT_TITLE_HEADER, JA_EVENT_TITLE_HEADER),
-        (EN_EVENT_ATTENDED_UNAVAILABLE, JA_EVENT_ATTENDED_UNAVAILABLE),
-        (EN_EVENT_ATTENDED_ADMIN_ONLY, JA_EVENT_ATTENDED_ADMIN_ONLY),
-        (EN_EVENT_MEMBER_FALLBACK, JA_EVENT_MEMBER_FALLBACK),
-        (EN_JOIN_PAGE_TITLE, JA_JOIN_PAGE_TITLE),
-        (EN_JOIN_PROFILE_PAGE_TITLE, JA_JOIN_PROFILE_PAGE_TITLE),
-        // Added in v0.33.x — EN→JA inline string sweep
-        (EN_NOT_FOUND, JA_NOT_FOUND),
-        (EN_INTERNAL_ERROR, JA_INTERNAL_ERROR),
-        (EN_ADMIN_ATTEND_CANCELLED, JA_ADMIN_ATTEND_CANCELLED),
-        (EN_GENERAL_BACK, JA_GENERAL_BACK),
-        (EN_ADMIN_EDIT_CANCELLED, JA_ADMIN_EDIT_CANCELLED),
-        (EN_ADMIN_EDIT_STARTED, JA_ADMIN_EDIT_STARTED),
-        (EN_NAV_BACK, JA_NAV_BACK),
-        (EN_NAV_SWITCH_GO, JA_NAV_SWITCH_GO),
-        (EN_NAV_SWITCH_ARIA_LABEL, JA_NAV_SWITCH_ARIA_LABEL),
-        (EN_CALENDAR_DAY_EVENTS_COUNT, JA_CALENDAR_DAY_EVENTS_COUNT),
-        (
-            EN_CALENDAR_MATRIX_MEMBER_COLUMN,
-            JA_CALENDAR_MATRIX_MEMBER_COLUMN,
-        ),
-        (
-            EN_CALENDAR_MATRIX_CELL_NO_EVENTS,
-            JA_CALENDAR_MATRIX_CELL_NO_EVENTS,
-        ),
-        (
-            EN_CALENDAR_MATRIX_CELL_CANCELLED,
-            JA_CALENDAR_MATRIX_CELL_CANCELLED,
-        ),
-        (
-            EN_CALENDAR_MATRIX_CELL_SINGLE_STATUS,
-            JA_CALENDAR_MATRIX_CELL_SINGLE_STATUS,
-        ),
-        (
-            EN_CALENDAR_MATRIX_CELL_BREAKDOWN,
-            JA_CALENDAR_MATRIX_CELL_BREAKDOWN,
-        ),
-        (EN_NOTE_DELETE_BODY, JA_NOTE_DELETE_BODY),
-        (EN_NOTE_KEEP_ACTION, JA_NOTE_KEEP_ACTION),
-        (EN_FORM_FIELD_TITLE, JA_FORM_FIELD_TITLE),
-        (EN_FORM_FIELD_DATE, JA_FORM_FIELD_DATE),
-        (EN_FORM_FIELD_START, JA_FORM_FIELD_START),
-        (EN_FORM_FIELD_END, JA_FORM_FIELD_END),
-        (EN_FORM_FIELD_LOCATION, JA_FORM_FIELD_LOCATION),
-        (EN_FORM_FIELD_DESC, JA_FORM_FIELD_DESC),
-        (EN_EVENT_CANCELLED_BADGE, JA_EVENT_CANCELLED_BADGE),
-        (EN_EVENT_WHOS_GOING, JA_EVENT_WHOS_GOING),
-        (EN_EVENT_NOTES_SECTION, JA_EVENT_NOTES_SECTION),
-        (EN_TZ_ERROR, JA_TZ_ERROR),
-        (EN_CURRENT_BADGE, JA_CURRENT_BADGE),
-        (EN_ME_CALENDAR_LABEL, JA_ME_CALENDAR_LABEL),
-        (EN_ME_DATA_EXPORT, JA_ME_DATA_EXPORT),
-        (EN_ME_LANGUAGE_TITLE, JA_ME_LANGUAGE_TITLE),
-        (EN_ME_LANGUAGE_SUBMIT, JA_ME_LANGUAGE_SUBMIT),
-        (EN_ME_LANGUAGE_UPDATED, JA_ME_LANGUAGE_UPDATED),
-        (EN_ME_LANGUAGE_CANCEL, JA_ME_LANGUAGE_CANCEL),
-        (EN_ACCOUNT_PAGE_TITLE, JA_ACCOUNT_PAGE_TITLE),
-        (
-            EN_ACCOUNT_LINKED_IDENTITIES_HEADING,
-            JA_ACCOUNT_LINKED_IDENTITIES_HEADING,
-        ),
-        (
-            EN_ACCOUNT_NO_LINKED_IDENTITIES,
-            JA_ACCOUNT_NO_LINKED_IDENTITIES,
-        ),
-        (EN_ACCOUNT_LINKED_AT_PREFIX, JA_ACCOUNT_LINKED_AT_PREFIX),
-        (
-            EN_ACCOUNT_RECOVERY_CREDENTIAL_HEADING,
-            JA_ACCOUNT_RECOVERY_CREDENTIAL_HEADING,
-        ),
-        (
-            EN_ACCOUNT_RECOVERY_CREDENTIAL_NONE,
-            JA_ACCOUNT_RECOVERY_CREDENTIAL_NONE,
-        ),
-        (
-            EN_ACCOUNT_COMMUNITIES_HEADING,
-            JA_ACCOUNT_COMMUNITIES_HEADING,
-        ),
-        (EN_ACCOUNT_NO_COMMUNITIES, JA_ACCOUNT_NO_COMMUNITIES),
-        (EN_ACCOUNT_FRESH_CAN_MANAGE, JA_ACCOUNT_FRESH_CAN_MANAGE),
-        (
-            EN_ACCOUNT_STALE_SIGN_IN_AGAIN,
-            JA_ACCOUNT_STALE_SIGN_IN_AGAIN,
-        ),
-        (EN_ACCOUNT_LINK_ENTRY_LABEL, JA_ACCOUNT_LINK_ENTRY_LABEL),
-        (EN_ACCOUNT_LINK_TITLE, JA_ACCOUNT_LINK_TITLE),
-        (EN_ACCOUNT_LINK_BODY, JA_ACCOUNT_LINK_BODY),
-        (EN_ACCOUNT_LINK_SUBMIT, JA_ACCOUNT_LINK_SUBMIT),
-        (EN_ACCOUNT_LINK_CANCEL, JA_ACCOUNT_LINK_CANCEL),
-        (
-            EN_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS,
-            JA_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS,
-        ),
-        (
-            EN_ACCOUNT_RECOVERY_REGENERATE_LABEL,
-            JA_ACCOUNT_RECOVERY_REGENERATE_LABEL,
-        ),
-        (
-            EN_ACCOUNT_RECOVERY_REVEAL_WARNING,
-            JA_ACCOUNT_RECOVERY_REVEAL_WARNING,
-        ),
-        (
-            EN_ACCOUNT_RECOVERY_REVEAL_HINT,
-            JA_ACCOUNT_RECOVERY_REVEAL_HINT,
-        ),
-        (EN_ACCOUNT_RECOVERY_CONTINUE, JA_ACCOUNT_RECOVERY_CONTINUE),
-        (EN_ACCOUNT_UNLINK_LABEL, JA_ACCOUNT_UNLINK_LABEL),
-        (EN_ACCOUNT_UNLINK_TITLE, JA_ACCOUNT_UNLINK_TITLE),
-        (EN_ACCOUNT_UNLINK_BODY, JA_ACCOUNT_UNLINK_BODY),
-        (EN_ACCOUNT_UNLINK_SUBMIT, JA_ACCOUNT_UNLINK_SUBMIT),
-        (EN_ACCOUNT_UNLINK_CANCEL, JA_ACCOUNT_UNLINK_CANCEL),
-        (EN_ACCOUNT_UNLINK_REFUSED, JA_ACCOUNT_UNLINK_REFUSED),
-        (EN_RECOVERY_TITLE, JA_RECOVERY_TITLE),
-        (EN_RECOVERY_BODY, JA_RECOVERY_BODY),
-        (EN_RECOVERY_CODE_LABEL, JA_RECOVERY_CODE_LABEL),
-        (EN_RECOVERY_SUBMIT, JA_RECOVERY_SUBMIT),
-        (EN_RECOVERY_INVALID, JA_RECOVERY_INVALID),
-    ];
-    // Strings that are intentionally identical across languages (product name,
-    // numeric units, etc.) are exempted from the identity check.
-    const INTENTIONALLY_IDENTICAL: &[&str] = &["ciao.zinnias"];
-
-    for (en, ja) in pairs {
-        assert!(!en.is_empty(), "EN string empty");
-        assert!(!ja.is_empty(), "JA string empty for EN: {en}");
-        if !INTENTIONALLY_IDENTICAL.contains(&en) {
-            assert_ne!(en, ja, "EN and JA are identical (likely copy-paste): {en}");
-        }
-    }
-}
-
 #[test]
 fn rfc054_member_facing_japanese_copy_avoids_technical_jargon() {
     use zinnias_ciao_contracts::i18n::*;
@@ -3507,6 +3003,25 @@ const EN_JA_PARITY_EXCEPTIONS: &[EnJaParityException] = &[
     },
 ];
 
+/// Handoff 070 Part B: folds the `EN != JA` check that `i18n_en_ja_parity_count`
+/// used to perform (via a one-entry `INTENTIONALLY_IDENTICAL` list) into this
+/// derived gate, replacing that hand-maintained test entirely. Separate table
+/// from `EN_JA_PARITY_EXCEPTIONS` above — that one names stems with no
+/// counterpart at all; this one names stems whose EN and JA halves are the
+/// same text on purpose. A second entry appearing here is a stop condition
+/// (Handoff 070 §12), not a second row to add without escalating — two
+/// constants sharing text across languages is far more likely a copy-paste
+/// than a second legitimate product name.
+struct EnJaIdenticalException {
+    stem: &'static str,
+    reason: &'static str,
+}
+
+const EN_JA_IDENTICAL_EXCEPTIONS: &[EnJaIdenticalException] = &[EnJaIdenticalException {
+    stem: "JOIN_HEADING",
+    reason: "the product name \"ciao.zinnias\" reads identically in both languages",
+}];
+
 fn i18n_module_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/i18n")
 }
@@ -3767,6 +3282,48 @@ fn en_ja_parity_is_derived_from_the_constants_themselves() {
          rendering-argument-mismatch bug, not a gate gap:\n{}",
         placeholder_mismatches.join("\n")
     );
+
+    // Handoff 070 Part B: what `i18n_en_ja_parity_count`'s `assert_ne!(en,
+    // ja, ...)` used to check, folded in here. Structural equality of the
+    // two string values only — this must never grow into asserting anything
+    // about what a string *says* (RFC-054 owns wording; RFC-081 §3.2's
+    // generic recovery message and RFC-082 §4's suspension page carry
+    // deliberate non-disclosure properties this gate must not touch).
+    let mut seen_identical_exceptions = std::collections::HashSet::new();
+    let mut unexpected_identical: Vec<String> = Vec::new();
+    for (stem, en_constant) in &en_map {
+        let Some(ja_constant) = ja_map.get(stem) else {
+            continue;
+        };
+        if en_constant.value == ja_constant.value {
+            match EN_JA_IDENTICAL_EXCEPTIONS.iter().find(|e| e.stem == stem) {
+                Some(exc) => {
+                    seen_identical_exceptions.insert(exc.stem);
+                }
+                None => unexpected_identical.push(format!(
+                    "{stem}: EN and JA are identical (likely copy-paste): {:?}",
+                    en_constant.value
+                )),
+            }
+        }
+    }
+    assert!(
+        unexpected_identical.is_empty(),
+        "these pairs are unexpectedly identical between EN and JA and not in \
+         EN_JA_IDENTICAL_EXCEPTIONS:\n{}\n\nA second identical pair is a stop condition \
+         (Handoff 070 §12), not a second table row — escalate rather than adding an entry.",
+        unexpected_identical.join("\n")
+    );
+    for exc in EN_JA_IDENTICAL_EXCEPTIONS {
+        assert!(
+            seen_identical_exceptions.contains(exc.stem),
+            "EN_JA_IDENTICAL_EXCEPTIONS names {} ({}) but that stem's EN and JA values are not \
+             currently identical — either they diverged (delete the entry) or the stem no \
+             longer exists (stale entry, delete it)",
+            exc.stem,
+            exc.reason
+        );
+    }
 }
 
 /// Handoff 041 §7.4: same shape as `LOCALIZATION_EXCEPTIONS` (explicit key,

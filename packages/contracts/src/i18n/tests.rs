@@ -13,48 +13,6 @@ fn t_resolves_locale_aware_pairs() {
     assert_eq!(t(Locale::En, ROLE_ADMIN), super::EN_ROLE_ADMIN);
 }
 
-// RFC-072 Slice C: matrix/cells.rs substitutes these templates' `{}`
-// placeholders positionally, not through `format!`. A mismatched
-// placeholder count between `ja` and `en` would be a silent rendering bug
-// (an English label missing a count, or a stray literal "{}" in output) —
-// this test is the guard the handoff's §8 requires.
-#[test]
-fn cell_label_templates_have_matching_placeholder_counts() {
-    use super::{
-        CALENDAR_MATRIX_CELL_BREAKDOWN, CALENDAR_MATRIX_CELL_CANCELLED,
-        CALENDAR_MATRIX_CELL_NO_EVENTS, CALENDAR_MATRIX_CELL_SINGLE_STATUS,
-    };
-
-    fn placeholder_count(s: &str) -> usize {
-        s.matches("{}").count()
-    }
-
-    for (name, pair) in [
-        (
-            "CALENDAR_MATRIX_CELL_NO_EVENTS",
-            CALENDAR_MATRIX_CELL_NO_EVENTS,
-        ),
-        (
-            "CALENDAR_MATRIX_CELL_CANCELLED",
-            CALENDAR_MATRIX_CELL_CANCELLED,
-        ),
-        (
-            "CALENDAR_MATRIX_CELL_SINGLE_STATUS",
-            CALENDAR_MATRIX_CELL_SINGLE_STATUS,
-        ),
-        (
-            "CALENDAR_MATRIX_CELL_BREAKDOWN",
-            CALENDAR_MATRIX_CELL_BREAKDOWN,
-        ),
-    ] {
-        assert_eq!(
-            placeholder_count(pair.ja),
-            placeholder_count(pair.en),
-            "{name}: ja and en must consume the same number of positional substitutions"
-        );
-    }
-}
-
 // Handoff 036 §4.2: JA_ADMIN_ATTEND_MEMBER_ARIA_LABEL is a bare constant (not
 // a Localized pair — this admin page is Japanese-only by RFC-072 Slice D
 // decision, so there is no `en` counterpart to compare against). The stable

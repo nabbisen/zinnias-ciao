@@ -2326,3 +2326,67 @@ path as `.md`/`.txt`/`.csv`. `.png` stays out, by design, unchanged.
 - [x] No evidence file touched, moved, deleted, or regenerated; every
       demonstration mutation reverted and independently verified reverted.
       No detection-rule change; no extension other than `.log` added.
+
+## The recurrence smoke reads the list view for the seeded title (Handoff 070 Part A)
+
+**RFC-073 (`ed549be`, 2026-07-29) moved event titles out of the month grid**
+into the day-detail panel and the list view; the month grid's only `title`
+is the page heading. `calendarShowsSeededTitle` asserted against the month
+view was checking a layout that has not shown a title since — the product
+was correct, the smoke was stale.
+
+- [x] **The month-view navigation and its three checks (`noHorizontalScroll`,
+      `rowCountIncreased`, `materializedThroughNearMonth`) are unchanged** —
+      that visit is what triggers materialization, and it is RFC-011
+      accessibility coverage for the hardest layout in the product to keep
+      scroll-free at 200% text. It was **not** repointed to `&view=list`.
+- [x] **A second, separate navigation** to
+      `?month=<nearMaterializeMonth>&view=list` was added, with two
+      view-named checks: `listViewShowsSeededTitle` (replaces
+      `calendarShowsSeededTitle` — not reused for a different page) and
+      `listViewNoHorizontalScroll` (new list-view accessibility coverage,
+      free once the page is collected).
+- [x] `smoke:recurrence` green, including both new list-view checks.
+      `bun run smoke:all` — **25 run, 25 passed**, the first fully green run
+      in this series.
+
+## `EN != JA` is now part of the derived gate, and the hand-maintained list is gone (Handoff 070 Part B)
+
+`i18n_en_ja_parity_count` was the last hand-maintained i18n list — a
+~301-pair array checking non-emptiness and `EN != JA` via a one-entry
+`INTENTIONALLY_IDENTICAL` exemption, covering 301 of 313 EN constants
+because a new pair only got checked if someone remembered to add it. Same
+shape this project has now derived away four times.
+
+- [x] **`EN != JA` folded into
+      `en_ja_parity_is_derived_from_the_constants_themselves`**, with its own
+      pinned `EN_JA_IDENTICAL_EXCEPTIONS` table (separate from
+      `EN_JA_PARITY_EXCEPTIONS`, which names *unpaired* stems, not identical
+      ones), a stale-entry assertion, and structural equality only — no
+      assertion on what any string *says* (RFC-054 owns wording; RFC-081
+      §3.2 and RFC-082 §4 carry deliberate non-disclosure text this gate
+      must not touch).
+- [x] Measured independently across the whole corpus: **exactly one pair has
+      identical halves**, `JOIN_HEADING` (`"ciao.zinnias"` both sides) — the
+      product name, seeded as the sole exception with the same reason the
+      old list's one-entry exemption carried. A second identical pair is a
+      named stop condition, not a second table row.
+- [x] `i18n_en_ja_parity_count` (~301-pair hand-maintained array) and
+      `cell_label_templates_have_matching_placeholder_counts` (subsumed —
+      independently re-verified that all four `CALENDAR_MATRIX_CELL_*`
+      constants use `{}`-only placeholders on both sides, so the derived
+      gate's multiset placeholder check already covers them) both deleted.
+- [x] `EN != JA` now enforced across all **313** EN constants instead of
+      301. `cargo test --workspace`: 631 (was 633; −2 exactly matches the
+      two deleted tests, no new `#[test]` fn added). `--features
+      dev_fake_issuer`: 634 (was 636).
+- [x] Six failure demonstrations run against the derived gate, each verified
+      to land, captured, then restored byte-identical: the new identical-pair
+      check firing, its stale-entry assertion firing, and all four of
+      Handoff 064's original cases (unpaired stem, its stale-entry assertion,
+      empty value, placeholder mismatch) confirmed still firing — deleting
+      the neighbouring hand-maintained test and cell-label test did not
+      disturb them.
+- [x] No product code touched; no constant added, removed, renamed, or
+      reworded. `node scripts/test-evidence-leakage-baseline.mjs` stays
+      green at 996 — this package writes no evidence.
