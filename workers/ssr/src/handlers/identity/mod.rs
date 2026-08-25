@@ -483,9 +483,19 @@ pub async fn get_callback(req: Request, env: &Env, rid: &str) -> Result<Response
         } => {
             let session_cookie =
                 crate::session::build_session_cookie(&session_secret, cookie_domain.as_deref());
-            let mut resp =
-                crate::handlers::account::render_account_page(env, &user_id, true, Some(&code))
-                    .await?;
+            // RFC-084: `render_account_page` resolves its own account-tier
+            // locale (membership agreement first, this callback's own
+            // header-only `locale` above is deliberately not reused here —
+            // a member's stored preference must win here too, not just on
+            // `get_account`/`post_regenerate`).
+            let mut resp = crate::handlers::account::render_account_page(
+                env,
+                &req,
+                &user_id,
+                true,
+                Some(&code),
+            )
+            .await?;
             resp.headers_mut().set("Set-Cookie", &session_cookie)?;
             resp.headers_mut().set("Referrer-Policy", "no-referrer")?;
             Ok(resp)

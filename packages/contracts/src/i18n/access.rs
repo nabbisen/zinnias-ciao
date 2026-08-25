@@ -157,3 +157,10 @@ pub const IDENTITY_SIGN_IN_CANCEL: super::Localized = super::Localized {
     ja: JA_IDENTITY_SIGN_IN_CANCEL,
     en: EN_IDENTITY_SIGN_IN_CANCEL,
 };
+/// RFC-084 (Handoff 084): paired for `account/mod.rs::render_freshness`'s
+/// stale-session re-sign-in link — the only remaining bare reference to
+/// this pair in the corpus.
+pub const IDENTITY_SIGN_IN_LINK: super::Localized = super::Localized {
+    ja: JA_IDENTITY_SIGN_IN_LINK,
+    en: EN_IDENTITY_SIGN_IN_LINK,
+};

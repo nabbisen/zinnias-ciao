@@ -114,9 +114,41 @@ pub fn negotiate_accept_language(header: &str) -> Option<Locale> {
     })
 }
 
+/// RFC-084 §3/§3.1 (Handoff 084): the account tier's rung 1. The RFC's own
+/// wording — rung 1 resolves when *"every present membership carries the
+/// same non-NULL `ui_language`"* — read strictly would let a member with
+/// `en` in one community and no preference in another fall through to the
+/// browser header, ignoring the one explicit choice they did make. This
+/// implements the **distinct-set** rule instead: collect every value that
+/// parses to a [`Locale`] (a `None`/malformed stored value is treated as no
+/// expressed preference — consistent with [`Locale::parse`]'s own
+/// fail-closed contract, and with `db::membership::resolve_locale`'s
+/// single-membership precedent), then resolve only if that set has exactly
+/// one member. Both an empty set (nothing expressed — no memberships, or
+/// every one is `NULL`) and a set with more than one member (a genuine
+/// disagreement) return `None`; the caller falls through to rung 2
+/// (`negotiate_accept_language`), then rung 3 (Japanese).
+pub fn resolve_account_locale_from_memberships<'a>(
+    stored_ui_languages: impl IntoIterator<Item = Option<&'a str>>,
+) -> Option<Locale> {
+    let mut distinct: Vec<Locale> = Vec::new();
+    for raw in stored_ui_languages {
+        let Some(locale) = raw.and_then(Locale::parse) else {
+            continue;
+        };
+        if !distinct.contains(&locale) {
+            distinct.push(locale);
+        }
+        if distinct.len() > 1 {
+            return None;
+        }
+    }
+    distinct.into_iter().next()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Locale, negotiate_accept_language};
+    use super::{Locale, negotiate_accept_language, resolve_account_locale_from_memberships};
 
     #[test]
     fn parse_accepts_exactly_the_reviewed_codes() {
@@ -242,6 +274,66 @@ mod tests {
         assert_eq!(
             negotiate_accept_language("ja;q=0.8,en;q=0.8"),
             Some(Locale::Ja)
+        );
+    }
+
+    // ── resolve_account_locale_from_memberships (RFC-084 §3.1, Handoff 084) ─
+
+    #[test]
+    fn no_memberships_does_not_resolve() {
+        assert_eq!(resolve_account_locale_from_memberships([]), None);
+    }
+
+    #[test]
+    fn all_null_memberships_do_not_resolve() {
+        assert_eq!(resolve_account_locale_from_memberships([None, None]), None);
+    }
+
+    #[test]
+    fn one_expressed_preference_and_one_silence_resolves() {
+        // §3.1's table: `en`, NULL → `en` — one expressed choice is
+        // unambiguous even though it is not universal.
+        assert_eq!(
+            resolve_account_locale_from_memberships([Some("en"), None]),
+            Some(Locale::En)
+        );
+        // Order must not matter.
+        assert_eq!(
+            resolve_account_locale_from_memberships([None, Some("en")]),
+            Some(Locale::En)
+        );
+    }
+
+    #[test]
+    fn repeated_agreement_resolves() {
+        assert_eq!(
+            resolve_account_locale_from_memberships([Some("en"), Some("en")]),
+            Some(Locale::En)
+        );
+    }
+
+    #[test]
+    fn disagreeing_memberships_do_not_resolve() {
+        // §3.1's table: `en`, `ja` → rung 2 — two choices, neither about
+        // this page.
+        assert_eq!(
+            resolve_account_locale_from_memberships([Some("en"), Some("ja")]),
+            None
+        );
+    }
+
+    #[test]
+    fn a_malformed_stored_value_is_treated_as_no_preference() {
+        // Never expected in practice (the column is CHECK-constrained), but
+        // a manually-repaired row must fail the same safe way `Locale::parse`
+        // itself does — never trusted, never merged into the distinct set.
+        assert_eq!(
+            resolve_account_locale_from_memberships([Some("en"), Some("fr")]),
+            Some(Locale::En)
+        );
+        assert_eq!(
+            resolve_account_locale_from_memberships([Some("fr"), Some("fr")]),
+            None
         );
     }
 }

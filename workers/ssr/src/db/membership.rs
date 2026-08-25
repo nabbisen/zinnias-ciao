@@ -715,6 +715,70 @@ pub async fn list_communities_for_user(
         .collect())
 }
 
+/// One community entry alongside that membership's raw stored
+/// `ui_language` — RFC-084 §4 (Handoff 084). Wraps [`CommunitySummary`]
+/// rather than duplicating its fields, so the account tier's locale ladder
+/// (which needs every present membership's preference) and its community
+/// listing (which needs [`CommunitySummary`]) are served by the one query
+/// [`list_communities_with_locale_for_user`] runs — required so that
+/// `CommunitySummary` itself, read by 23 other call sites through
+/// [`list_communities_for_user`], never widens to carry a language value
+/// none of them want (RFC-084 §7).
+pub struct CommunityLocaleRow {
+    pub summary: CommunitySummary,
+    pub ui_language: Option<String>,
+}
+
+/// The account tier's sibling to [`list_communities_for_user`] (RFC-084 §4,
+/// Handoff 084): the same unscoped SELECT — the account tier is never
+/// community-scoped, so there is no `scope_community_id` parameter to take
+/// — plus `m.ui_language`. `account/mod.rs` calls this **instead of**
+/// [`list_communities_for_user`] (one query, swapped, not added);
+/// `account/link.rs` and `account/unlink.rs`, which make no membership
+/// query today, each pay one new query to reach the same resolution
+/// (RFC-084 §10 decision 2).
+pub async fn list_communities_with_locale_for_user(
+    db: &D1Database,
+    user_id: &str,
+) -> Result<Vec<CommunityLocaleRow>> {
+    let rows = db
+        .prepare(format!(
+            "SELECT m.community_id, c.name AS community_name, c.timezone, m.role, m.ui_language \
+             FROM community_memberships m \
+             JOIN communities c ON c.id = m.community_id \
+             WHERE m.user_id = ?1 AND {MEMBERSHIP_PRESENT} \
+             ORDER BY m.joined_at ASC"
+        ))
+        .bind(&[user_id.into()])?
+        .all()
+        .await?
+        .results::<serde_json::Value>()?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|v| {
+            let summary = CommunitySummary {
+                community_id: v.get("community_id")?.as_str()?.to_owned(),
+                community_name: v.get("community_name")?.as_str()?.to_owned(),
+                timezone: v
+                    .get("timezone")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("UTC")
+                    .to_owned(),
+                role: v.get("role")?.as_str()?.to_owned(),
+            };
+            let ui_language = v
+                .get("ui_language")
+                .and_then(|value| value.as_str())
+                .map(str::to_owned);
+            Some(CommunityLocaleRow {
+                summary,
+                ui_language,
+            })
+        })
+        .collect())
+}
+
 /// Suspend a member while preserving the at-least-one-admin invariant —
 /// RFC-082 §1: active → suspended, community admin only. No role change
 /// (RFC-082 §8.10).

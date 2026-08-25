@@ -9,9 +9,12 @@
 //! §6: a principal with no active membership reaches this page and nothing
 //! else, discloses no community it does not belong to.
 //!
-//! Japanese-only (matching `handlers/identity/mod.rs`'s own RFC-072 Slice D
-//! convention): the account tier has no single community-scoped
-//! `ui_language` to resolve a locale from.
+//! RFC-084 (Handoff 084): resolves a real locale via the account tier's own
+//! ladder (`authz::resolve_account_locale`) — rung 1 from every present
+//! membership's `ui_language` if they agree, else `Accept-Language`, else
+//! Japanese. Unlike a community-scoped page, this tier holds zero, one, or
+//! several such preferences, possibly disagreeing (RFC-083 §4.2's D2b,
+//! discharged by RFC-084).
 //!
 //! Discloses nothing about identity internals (Handoff 055 §10): a linked
 //! identity's row (`db::identity::LinkedIdentitySummary`) structurally
@@ -20,6 +23,7 @@
 //! disclosed (RFC-081 §3.1 requires this), never the code or its HMAC.
 
 use worker::{Env, Request, Response, Result};
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
@@ -38,18 +42,28 @@ pub mod unlink;
 /// page a member would otherwise land on, never a bespoke one-off page.
 pub(crate) async fn render_account_page(
     env: &Env,
+    req: &Request,
     user_id: &str,
     is_fresh: bool,
     reveal: Option<&str>,
 ) -> Result<Response> {
     let db = env.d1("DB")?;
     let identities = db::identity::list_active_for_user(&db, user_id).await?;
-    // `render_account_page` is only ever reached through an already-scope-
-    // checked path (an account-tier session via `require_account_surface`,
-    // or the identity callback minting one) — every caller's session is
-    // unscoped, so `None` is passed explicitly here rather than threading
-    // a `scope_community_id` through, keeping that invariant visible.
-    let communities = db::membership::list_communities_for_user(&db, user_id, None).await?;
+    // RFC-084 §4: this single query replaces `list_communities_for_user`
+    // (`render_account_page` is only ever reached through an already-
+    // scope-checked path — an account-tier session via
+    // `require_account_surface`, or the identity callback minting one — so
+    // every caller's session is unscoped, matching this sibling's own
+    // unscoped-only shape) — it serves both the community list below and
+    // rung 1 of the locale ladder, at no additional query cost.
+    let community_rows =
+        db::membership::list_communities_with_locale_for_user(&db, user_id).await?;
+    let locale = authz::resolve_account_locale(
+        req,
+        community_rows.iter().map(|row| row.ui_language.as_deref()),
+    );
+    let communities: Vec<db::membership::CommunitySummary> =
+        community_rows.into_iter().map(|row| row.summary).collect();
     let has_recovery_credential = db::recovery::exists_for_user(&db, user_id).await?;
     let regenerate_token =
         crate::codlet::issue_token(env, user_id, token_purpose::REGENERATE_RECOVERY, None).await?;
@@ -61,8 +75,10 @@ pub(crate) async fn render_account_page(
         has_recovery_credential,
         &regenerate_token,
         reveal,
+        locale,
     );
-    let mut resp = render::page(i18n::JA_ACCOUNT_PAGE_TITLE, &body)?;
+    let mut resp =
+        render::page_localized(locale, i18n::t(locale, i18n::ACCOUNT_PAGE_TITLE), &body)?;
     if reveal.is_some() {
         // Handoff 057 §5.1 / §10: the plaintext code appears in this one
         // response only — same discipline as the admin invite-code reveal
@@ -82,14 +98,14 @@ pub async fn get_account(req: Request, env: &Env, rid: &str) -> Result<Response>
         db::subtract_seconds_from_now(authz::ACCOUNT_OPERATION_FRESHNESS_SECONDS);
     let is_fresh = authz::is_fresh_for_account_operations(&auth, &freshness_window_start);
 
-    render_account_page(env, &auth.user_id, is_fresh, None).await
+    render_account_page(env, &req, &auth.user_id, is_fresh, None).await
 }
 
-fn render_identities(identities: &[db::identity::LinkedIdentitySummary]) -> String {
+fn render_identities(identities: &[db::identity::LinkedIdentitySummary], locale: Locale) -> String {
     if identities.is_empty() {
         return format!(
             "<p class=\"cz-account-empty\">{}</p>",
-            i18n::JA_ACCOUNT_NO_LINKED_IDENTITIES
+            i18n::t(locale, i18n::ACCOUNT_NO_LINKED_IDENTITIES)
         );
     }
     let items: String = identities
@@ -102,21 +118,21 @@ fn render_identities(identities: &[db::identity::LinkedIdentitySummary]) -> Stri
                    <a href=\"/account/unlink/{id}\" class=\"cz-account-unlink-link\">{unlink}</a>\
                  </li>",
                 namespace = escape_html(&identity.identity_namespace_id),
-                prefix = i18n::JA_ACCOUNT_LINKED_AT_PREFIX,
+                prefix = i18n::t(locale, i18n::ACCOUNT_LINKED_AT_PREFIX),
                 linked_at = escape_html(&identity.linked_at),
                 id = escape_html(&identity.id),
-                unlink = i18n::JA_ACCOUNT_UNLINK_LABEL,
+                unlink = i18n::t(locale, i18n::ACCOUNT_UNLINK_LABEL),
             )
         })
         .collect();
     format!("<ul class=\"cz-account-identity-list\">{items}</ul>")
 }
 
-fn render_communities(communities: &[db::membership::CommunitySummary]) -> String {
+fn render_communities(communities: &[db::membership::CommunitySummary], locale: Locale) -> String {
     if communities.is_empty() {
         return format!(
             "<p class=\"cz-account-empty\">{}</p>",
-            i18n::JA_ACCOUNT_NO_COMMUNITIES
+            i18n::t(locale, i18n::ACCOUNT_NO_COMMUNITIES)
         );
     }
     let items: String = communities
@@ -131,18 +147,18 @@ fn render_communities(communities: &[db::membership::CommunitySummary]) -> Strin
     format!("<ul class=\"cz-account-community-list\">{items}</ul>")
 }
 
-fn render_freshness(is_fresh: bool) -> String {
+fn render_freshness(is_fresh: bool, locale: Locale) -> String {
     if is_fresh {
         format!(
             "<p class=\"cz-account-freshness cz-account-freshness--fresh\">{}</p>",
-            i18n::JA_ACCOUNT_FRESH_CAN_MANAGE
+            i18n::t(locale, i18n::ACCOUNT_FRESH_CAN_MANAGE)
         )
     } else {
         format!(
             "<p class=\"cz-account-freshness cz-account-freshness--stale\">{msg} \
              <a href=\"/identity/start?action=sign_in\" class=\"cz-account-sign-in-again-link\">{link}</a></p>",
-            msg = i18n::JA_ACCOUNT_STALE_SIGN_IN_AGAIN,
-            link = i18n::JA_IDENTITY_SIGN_IN_LINK,
+            msg = i18n::t(locale, i18n::ACCOUNT_STALE_SIGN_IN_AGAIN),
+            link = i18n::t(locale, i18n::IDENTITY_SIGN_IN_LINK),
         )
     }
 }
@@ -150,7 +166,7 @@ fn render_freshness(is_fresh: bool) -> String {
 /// The one-time plaintext reveal, shown only in the response that just
 /// generated or regenerated a code — same shape as
 /// `handlers/admin/members.rs::invite_reveal_html`.
-fn render_recovery_reveal(code: &str) -> String {
+fn render_recovery_reveal(code: &str, locale: Locale) -> String {
     format!(
         "<section id=\"recovery-code-reveal\" class=\"cz-account-reveal-box\">\
            <p class=\"cz-account-reveal-text\">{warning}</p>\
@@ -158,9 +174,9 @@ fn render_recovery_reveal(code: &str) -> String {
            <div class=\"cz-account-recovery-code-display\" \
              aria-label=\"{label}\">{code}</div>\
          </section>",
-        warning = i18n::JA_ACCOUNT_RECOVERY_REVEAL_WARNING,
-        hint = i18n::JA_ACCOUNT_RECOVERY_REVEAL_HINT,
-        label = i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_HEADING,
+        warning = i18n::t(locale, i18n::ACCOUNT_RECOVERY_REVEAL_WARNING),
+        hint = i18n::t(locale, i18n::ACCOUNT_RECOVERY_REVEAL_HINT),
+        label = i18n::t(locale, i18n::ACCOUNT_RECOVERY_CREDENTIAL_HEADING),
         code = escape_html(code),
     )
 }
@@ -169,13 +185,16 @@ fn render_recovery(
     has_recovery_credential: bool,
     regenerate_token: &str,
     reveal: Option<&str>,
+    locale: Locale,
 ) -> String {
     let status = if has_recovery_credential {
-        i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS
+        i18n::t(locale, i18n::ACCOUNT_RECOVERY_CREDENTIAL_EXISTS)
     } else {
-        i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_NONE
+        i18n::t(locale, i18n::ACCOUNT_RECOVERY_CREDENTIAL_NONE)
     };
-    let reveal_html = reveal.map(render_recovery_reveal).unwrap_or_default();
+    let reveal_html = reveal
+        .map(|code| render_recovery_reveal(code, locale))
+        .unwrap_or_default();
     format!(
         "<p class=\"cz-account-empty\">{status}</p>\
          {reveal_html}\
@@ -184,7 +203,7 @@ fn render_recovery(
            <button type=\"submit\" class=\"cz-account-recovery-regenerate-button\">{label}</button>\
          </form>",
         tok = escape_html(regenerate_token),
-        label = i18n::JA_ACCOUNT_RECOVERY_REGENERATE_LABEL,
+        label = i18n::t(locale, i18n::ACCOUNT_RECOVERY_REGENERATE_LABEL),
     )
 }
 
@@ -196,6 +215,7 @@ fn render_body(
     has_recovery_credential: bool,
     regenerate_token: &str,
     reveal: Option<&str>,
+    locale: Locale,
 ) -> String {
     format!(
         "<main class=\"cz-page-main cz-account-main\">\
@@ -216,16 +236,16 @@ fn render_body(
            </section>\
            <a href=\"/\" class=\"cz-account-home-link\">{home}</a>\
          </main>",
-        title = i18n::JA_ACCOUNT_PAGE_TITLE,
-        freshness = render_freshness(is_fresh),
-        identities_heading = i18n::JA_ACCOUNT_LINKED_IDENTITIES_HEADING,
-        identities = render_identities(identities),
-        link_entry = i18n::JA_ACCOUNT_LINK_ENTRY_LABEL,
-        recovery_heading = i18n::JA_ACCOUNT_RECOVERY_CREDENTIAL_HEADING,
-        recovery = render_recovery(has_recovery_credential, regenerate_token, reveal),
-        communities_heading = i18n::JA_ACCOUNT_COMMUNITIES_HEADING,
-        communities = render_communities(communities),
-        home = i18n::JA_NAV_HOME,
+        title = i18n::t(locale, i18n::ACCOUNT_PAGE_TITLE),
+        freshness = render_freshness(is_fresh, locale),
+        identities_heading = i18n::t(locale, i18n::ACCOUNT_LINKED_IDENTITIES_HEADING),
+        identities = render_identities(identities, locale),
+        link_entry = i18n::t(locale, i18n::ACCOUNT_LINK_ENTRY_LABEL),
+        recovery_heading = i18n::t(locale, i18n::ACCOUNT_RECOVERY_CREDENTIAL_HEADING),
+        recovery = render_recovery(has_recovery_credential, regenerate_token, reveal, locale),
+        communities_heading = i18n::t(locale, i18n::ACCOUNT_COMMUNITIES_HEADING),
+        communities = render_communities(communities, locale),
+        home = i18n::t(locale, i18n::NAV_HOME),
     )
 }
 

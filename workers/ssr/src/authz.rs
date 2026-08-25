@@ -155,12 +155,14 @@ pub async fn require_membership(
 
 /// RFC-083 §8.1 rung 2 (Handoff 075): resolves a locale for a request that
 /// has **no membership to read one from** — the anonymous/redemption
-/// routes (`/join`, `/relink`, `/recovery`, the identity callback). Rung 1
-/// (a stored membership preference, via `MembershipContext.locale`)
-/// **always outranks this** — a caller on any path where a membership
-/// already exists must resolve from that instead and must never call this
-/// function, so a member who chose Japanese can never see English because
-/// their browser said so.
+/// routes (`/join`, `/relink`, `/recovery`, the identity callback), or a
+/// caller whose own rung 1 exists but did not resolve (RFC-084's account
+/// tier, via [`resolve_account_locale`] below). A community-scoped request
+/// with a single active membership must resolve from
+/// `MembershipContext.locale` instead and must never call this function
+/// directly, so a member who chose Japanese can never see English because
+/// their browser said so — rung 1 always outranks this **wherever it
+/// resolves**.
 ///
 /// Negotiates the `Accept-Language` header (`negotiate_accept_language`)
 /// and falls through to `Locale::default()` (rung 3, Japanese) when the
@@ -176,6 +178,24 @@ pub fn resolve_anonymous_locale(req: &Request) -> Locale {
         .flatten()
         .and_then(|header| negotiate_accept_language(&header))
         .unwrap_or_default()
+}
+
+/// RFC-084 §3 (Handoff 084): the account tier's own ladder — rung 1
+/// (§3.1's distinct-set rule over every present membership's stored
+/// `ui_language`), else rung 2/3 via [`resolve_anonymous_locale`]. The
+/// account tier is authenticated but never community-scoped
+/// (`require_account_surface` checks session provenance and eligibility,
+/// never a community), so unlike a community-scoped route there is no
+/// single membership row to read a locale from — `ui_languages` is every
+/// present membership's raw stored value, from whichever query the caller
+/// already ran (`db::membership::list_communities_with_locale_for_user`),
+/// never a second lookup this function performs itself.
+pub fn resolve_account_locale<'a>(
+    req: &Request,
+    ui_languages: impl IntoIterator<Item = Option<&'a str>>,
+) -> Locale {
+    zinnias_ciao_contracts::resolve_account_locale_from_memberships(ui_languages)
+        .unwrap_or_else(|| resolve_anonymous_locale(req))
 }
 
 /// Like `require_membership`, but also checks that the user is an admin.

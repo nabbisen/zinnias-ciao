@@ -15,7 +15,6 @@
 //! this depends on holding codebase-wide, not just here.
 
 use worker::{Env, Request, Response, Result};
-use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
@@ -27,8 +26,19 @@ pub async fn get_link(req: Request, env: &Env, rid: &str) -> Result<Response> {
     let auth = crate::require_auth_or!(&req, env, render::session_expired());
     authz::require_account_surface(env, &auth, rid).await?;
 
+    // RFC-084 §5: this file makes zero membership calls otherwise, so this
+    // is the one new D1 query per route the RFC's decision 2 authorized.
+    let db = env.d1("DB")?;
+    let community_rows =
+        crate::db::membership::list_communities_with_locale_for_user(&db, &auth.user_id).await?;
+    let locale = authz::resolve_account_locale(
+        &req,
+        community_rows.iter().map(|row| row.ui_language.as_deref()),
+    );
+
     let token =
         crate::codlet::issue_token(env, &auth.user_id, token_purpose::LINK_IDENTITY, None).await?;
+    let title = i18n::t(locale, i18n::ACCOUNT_LINK_TITLE);
     let body = format!(
         "<main class=\"cz-page-main cz-account-link-main\">\
            <h1 class=\"cz-account-link-title\">{title}</h1>\
@@ -39,13 +49,13 @@ pub async fn get_link(req: Request, env: &Env, rid: &str) -> Result<Response> {
            </form>\
            <a href=\"/account\" class=\"cz-account-link-cancel\">{cancel}</a>\
          </main>",
-        title = i18n::JA_ACCOUNT_LINK_TITLE,
-        body = i18n::JA_ACCOUNT_LINK_BODY,
+        title = title,
+        body = i18n::t(locale, i18n::ACCOUNT_LINK_BODY),
         token = escape_html(&token),
-        submit = i18n::JA_ACCOUNT_LINK_SUBMIT,
-        cancel = i18n::JA_ACCOUNT_LINK_CANCEL,
+        submit = i18n::t(locale, i18n::ACCOUNT_LINK_SUBMIT),
+        cancel = i18n::t(locale, i18n::ACCOUNT_LINK_CANCEL),
     );
-    render::page(i18n::JA_ACCOUNT_LINK_TITLE, &body)
+    render::page_localized(locale, title, &body)
 }
 
 pub async fn post_link(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
@@ -70,12 +80,17 @@ pub async fn post_link(mut req: Request, env: &Env, rid: &str) -> Result<Respons
         ConsumeResult::Proceed => {}
     }
 
-    // RFC-083 D2b (deferred to its own RFC, not this package): the account
-    // tier has a session but no single community-scoped ui_language to
-    // resolve a locale from — same reasoning as this file's own
-    // LOCALIZATION_EXCEPTIONS entry. The literal `Locale::Ja` below matches
-    // this call site's unchanged current behaviour exactly; it is not a
-    // new resolution decision.
+    // RFC-084 §5: this file's second, independent new query — `get_link`
+    // and `post_link` are separate routes, so a request never pays both;
+    // each pays exactly the one this decision authorized.
+    let db = env.d1("DB")?;
+    let community_rows =
+        crate::db::membership::list_communities_with_locale_for_user(&db, &auth.user_id).await?;
+    let locale = authz::resolve_account_locale(
+        &req,
+        community_rows.iter().map(|row| row.ui_language.as_deref()),
+    );
+
     let origin = crate::handlers::identity::request_origin(&req)?;
     crate::handlers::identity::start_oidc_transaction(
         env,
@@ -85,7 +100,7 @@ pub async fn post_link(mut req: Request, env: &Env, rid: &str) -> Result<Respons
         Some(&auth.user_id),
         "/account",
         true,
-        Locale::Ja,
+        locale,
     )
     .await
 }

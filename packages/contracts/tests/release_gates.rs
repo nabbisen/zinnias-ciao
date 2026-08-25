@@ -1021,7 +1021,7 @@ fn sw_cache_version_matches_workspace_version() {
 // (Handoff 040 §7.3 re-pinned this digest with no version bump, and that
 // was correct — the prior wording here said otherwise and was wrong).
 const RELEASE_CACHE_ASSET_CONTENT_HASH: &str =
-    "8eebb15d4bebd6fcfcd1e8dabae72bd4a1e217bbfb3e0c654f8b2b98efa1e8a9";
+    "0241132ce2ba3cef87f2c20b36ba032e105e9abd0e2ed1e6f4727814f5a7f606";
 
 fn cached_asset_content_hash() -> String {
     use sha2::{Digest, Sha256};
@@ -2736,24 +2736,6 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
         reason: "post_matrix_export_audit's pre-auth 401 branch rejects before any membership lookup exists, so no locale is resolvable yet — same rationale as render/errors.rs",
     },
     LocalizationException {
-        path: "handlers/account/mod.rs",
-        ja_count: 20,
-        bare_helper_calls: 1,
-        reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 055; +1 in Handoff 056 for the link entry-point label; +5 in Handoff 057 for recovery-credential status/regenerate and per-identity unlink labels)",
-    },
-    LocalizationException {
-        path: "handlers/account/link.rs",
-        ja_count: 5,
-        bare_helper_calls: 1,
-        reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 056)",
-    },
-    LocalizationException {
-        path: "handlers/account/unlink.rs",
-        ja_count: 6,
-        bare_helper_calls: 1,
-        reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 057)",
-    },
-    LocalizationException {
         path: "render/errors.rs",
         ja_count: 20,
         bare_helper_calls: 0,
@@ -2774,18 +2756,20 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
 /// then — 14→8 `bare_helper_calls` sites, closing RFC-083 Slice D1. Handoff
 /// 075 (RFC-083 Slice D2a) converted the four anonymous/redemption routes
 /// (`join.rs`, `relink.rs`, `recovery.rs`, `identity/mod.rs`): 10→6
-/// entries, 98→54 `ja_count` sites, 8→3 `bare_helper_calls`. The six
-/// entries remaining are the three structurally-unresolvable files
-/// (RFC-083 §4.4) and D2b's three account surfaces (deferred to their own
-/// RFC — `ui_language` is per-membership, not per-user). A future addition
-/// to the table must lower these pinned values deliberately, not raise
-/// them: growth here means a page stopped being localized, not a
-/// documented decision to leave one alone.
+/// entries, 98→54 `ja_count` sites, 8→3 `bare_helper_calls`. RFC-084
+/// (Handoff 084) discharged D2b and closed the localization programme's
+/// last convertible work — the account tier (`account/mod.rs`,
+/// `account/link.rs`, `account/unlink.rs`): 6→3 entries, 54→23 `ja_count`
+/// sites, 3→0 `bare_helper_calls`. The three entries remaining are exactly
+/// the structurally-unresolvable files (RFC-083 §4.4) — nothing left is a
+/// deferred decision. A future addition to the table must lower these
+/// pinned values deliberately, not raise them: growth here means a page
+/// stopped being localized, not a documented decision to leave one alone.
 #[test]
 fn rfc083_localization_exceptions_table_only_shrinks() {
     assert_eq!(
         LOCALIZATION_EXCEPTIONS.len(),
-        6,
+        3,
         "LOCALIZATION_EXCEPTIONS grew to {} entries. This table is shrink-only \
          (RFC-083 §6.1) — re-pin this value only alongside a deliberate, reviewed \
          decision to leave a newly-discovered file unlocalized, never to make a \
@@ -2794,7 +2778,7 @@ fn rfc083_localization_exceptions_table_only_shrinks() {
     );
     let total_sites: usize = LOCALIZATION_EXCEPTIONS.iter().map(|e| e.ja_count).sum();
     assert_eq!(
-        total_sites, 54,
+        total_sites, 23,
         "LOCALIZATION_EXCEPTIONS site total grew to {total_sites}. Re-pin only \
          alongside a reviewed, deliberate change to an individual entry's ja_count."
     );
@@ -2803,7 +2787,7 @@ fn rfc083_localization_exceptions_table_only_shrinks() {
         .map(|e| e.bare_helper_calls)
         .sum();
     assert_eq!(
-        total_bare_helper_calls, 3,
+        total_bare_helper_calls, 0,
         "LOCALIZATION_EXCEPTIONS bare_helper_calls total grew to {total_bare_helper_calls}. \
          Re-pin only alongside a reviewed, deliberate change to an individual entry's \
          bare_helper_calls."
@@ -6392,15 +6376,27 @@ fn prompt_login_is_sent_for_link_and_reauthentication() {
          link_always_sends_prompt_login_regardless_of_session_state), so a literal true here is \
          the correct, equivalent value, not a bypass of a different decision"
     );
-    // RFC-083 D2b (Handoff 075): account/link.rs stays a literal Japanese
-    // default pending its own RFC — the account tier has no single
-    // resolvable locale yet. A change here would be new D2b resolution
-    // logic, out of scope for this gate's own package.
-    assert_eq!(
+    // RFC-084 (Handoff 084) discharged D2b: account/link.rs now resolves a
+    // real account-tier locale (`authz::resolve_account_locale`) instead of
+    // the literal `Locale::Ja` placeholder Handoff 075 pinned here. The call
+    // site must pass a resolved value, never a literal — a literal here
+    // would mean the resolution call was removed or never wired to this
+    // argument, exactly the regression this assertion now exists to catch.
+    assert_ne!(
         last_argument, "Locale::Ja",
-        "post_link's start_oidc_transaction call must pass the literal Locale::Ja locale \
-         argument (found {last_argument:?}) — account/link.rs is D2b, deferred to its own RFC; \
-         anything else here would be new, unauthorized resolution logic"
+        "post_link's start_oidc_transaction call still passes the literal Locale::Ja — RFC-084 \
+         replaced this D2b placeholder with a real resolution; a literal here means the \
+         resolution call was removed or never wired to this call site"
+    );
+    assert_ne!(
+        last_argument, "Locale::En",
+        "post_link's start_oidc_transaction call passes a literal Locale::En — RFC-084 requires \
+         a resolved value from authz::resolve_account_locale, never a hardcoded one"
+    );
+    assert!(
+        link_source.contains("resolve_account_locale("),
+        "post_link must resolve its locale through authz::resolve_account_locale, not compute \
+         it ad hoc or hardcode one"
     );
 }
 

@@ -20,6 +20,10 @@ pub use nav::{
 };
 pub use notes::{admin_note_hide_form, note_form};
 pub use participants::{ParticipantEntry, participant_list};
+// RFC-084 (Handoff 084) converted `page`'s last caller — re-export kept,
+// not removed, per that package's scope; see `shell::page`'s own doc
+// comment.
+#[allow(unused_imports)]
 pub use shell::{escape_html, page, page_localized};
 pub use status::status_form;
 pub use time::{

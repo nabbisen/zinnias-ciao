@@ -83,7 +83,7 @@ pub async fn post_regenerate(mut req: Request, env: &Env, rid: &str) -> Result<R
 
     recovery_db::regenerate_required(&db, rid, &auth.user_id, &credential_id, &code_hmac).await?;
 
-    super::render_account_page(env, &auth.user_id, true, Some(&code)).await
+    super::render_account_page(env, &req, &auth.user_id, true, Some(&code)).await
 }
 
 #[cfg(test)]

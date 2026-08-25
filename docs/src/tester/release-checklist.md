@@ -2822,3 +2822,151 @@ Handoffs 063–070 spent five packages eliminating from the recurrence smoke.
 - [x] `cargo test --workspace`: 653 (was 652, +1 — the new derived gate).
       `--features dev_fake_issuer`: 656 (was 655, +1). Evidence baseline
       unchanged at 996. `bun run smoke:all`: **25 run, 25 passed.**
+
+## RFC-084: the account tier resolves a locale — the localization programme's last convertible work (Handoff 084)
+
+RFC-083 §4.2 deferred D2b — `account/mod.rs`, `account/link.rs`,
+`account/unlink.rs` — because the account tier is authenticated but never
+community-scoped: a signed-in member reaches it holding zero, one, or
+several `ui_language` values, possibly disagreeing. RFC-084 (accepted
+2026-08-16) resolved this: rung 1 (a stored preference) outranks rung 2
+only when it *resolves* — a member with no expressed preference, or
+disagreeing ones, has not made a choice for rung 2 to override.
+
+- [x] **The resolution rule (RFC-084 §3/§3.1)**: rung 1 resolves only when
+      every present membership's `ui_language` collapses to exactly one
+      distinct, valid [`Locale`] — collect the parseable values (`NULL` or
+      malformed treated as no expressed preference, same fail-closed
+      contract as `Locale::parse` and `db::membership::resolve_locale`'s
+      single-membership precedent), resolve if that set has exactly one
+      member, else fall through. Implements the **distinct-set** rule, not
+      RFC-084 §4A's literal "every membership agrees" wording — a member
+      with `en` in one community and no preference in another has made one
+      unambiguous choice, and a strict reading would ignore it:
+
+      | Memberships | Resolves to |
+      |---|---|
+      | none | rung 2 |
+      | all `NULL` | rung 2 |
+      | `en`, `NULL` | **`en`** |
+      | `en`, `en` | `en` |
+      | `en`, `ja` | rung 2 (disagreement) |
+
+      `resolve_account_locale_from_memberships` (`packages/contracts/src/locale.rs`)
+      implements this purely; `authz::resolve_account_locale` composes it
+      with rung 2/3 via the existing `resolve_anonymous_locale`. Six new
+      unit tests cover every row above plus a malformed-value case.
+      Demonstrated failing: removed the disagreement early-return, confirmed
+      the `en`/`ja` test caught it, restored byte-identical.
+- [x] **The query design (RFC-084 §4/§7)**: `CommunitySummary` — read by
+      23 other call sites through `list_communities_for_user` — is
+      **unchanged**, never widened to carry a language value none of them
+      want. A sibling, `db::membership::list_communities_with_locale_for_user`,
+      wraps it in a new `CommunityLocaleRow { summary, ui_language }`
+      instead of duplicating its fields. `account/mod.rs` calls the
+      sibling **instead of** `list_communities_for_user` — one query,
+      swapped, not added, serving both the community list and rung 1 at no
+      extra cost. `account/link.rs` and `account/unlink.rs`, which made
+      zero membership queries before, each pay one new query per route
+      (RFC-084 §10 decision 2 — internal consistency preferred over the
+      cheaper rung-2-only alternative).
+- [x] **Query counts, verified against the checkpoint**: `account/mod.rs`
+      **unchanged** (6→6 `.await`, whole file) — the sibling genuinely
+      replaced the old call. `account/link.rs` **+2** (6→8: `get_link` and
+      `post_link` each +1). `account/unlink.rs` **+2** (7→9: `get_unlink`
+      and `post_unlink` each +1). `account/recovery.rs` and
+      `handlers/identity/mod.rs` **unchanged** (5→5, 23→23) — both only
+      thread a `&Request` through to `render_account_page`'s own internal
+      resolution, no query of their own. No other file's count moved.
+- [x] `account/link.rs::post_link`'s `Locale::Ja` D2b placeholder (Handoff
+      075) replaced with the resolved value; `prompt_login_is_sent_for_link_and_reauthentication`
+      updated from asserting the literal to asserting a real resolution
+      call is present and neither literal survives.
+- [x] All `i18n::JA_ACCOUNT_*` bare sites in the three files converted to
+      `i18n::t(locale, i18n::ACCOUNT_*)`; every remaining `render::page`
+      call in the corpus converted to `render::page_localized`. No new
+      copy — every `EN_ACCOUNT_*` half already existed, unpaired, since the
+      original RFC-072 Slice D deferral; only `Localized` pairs were added
+      (plus one pre-existing unpaired stem outside `account.rs`,
+      `IDENTITY_SIGN_IN_LINK`, needed by the freshness banner's re-sign-in
+      link).
+- [x] **`LOCALIZATION_EXCEPTIONS` re-pinned on all three dimensions**:
+      6→**3** entries, 54→**23** `ja_count`, 3→**0** `bare_helper_calls` —
+      independently re-derived against the checkpoint before touching the
+      table, matching exactly. The three remaining entries are precisely
+      the structurally-unresolvable set (RFC-083 §4.4); nothing left is a
+      deferred decision. `EN_JA_PARITY_EXCEPTIONS` untouched — no new
+      constant was introduced.
+- [x] **Rendered-output test added for `account/mod.rs`** (the required
+      "at least two," satisfied per this and Handoff 075's join.rs/
+      relink.rs render tests) at `Locale::En` with a `Locale::Ja`
+      discriminating half — composes the real `render_body` function
+      directly (sync, no DB, unlike `render_account_page`), not a
+      hand-rolled copy. Both failure classes demonstrated: a bare
+      `i18n::JA_` site (temporarily reintroduced into `render_freshness`'s
+      production code, not just the test — this page has no nav/header
+      helper a unit test could swap, so a real production-code mutation is
+      the closer proof); a locale-blind helper — via the source-scanning
+      gate, temporarily reverting `render_account_page`'s final line to
+      bare `render::page` (same precedent as Handoff 075's `relink.rs`
+      demonstration, for the same no-nav/header page shape). Both restored,
+      confirmed byte-identical.
+- [x] **§10 security properties verified against the implementation**:
+      the last-credential guard's refusal (`identity_db::unlink_required`
+      returning `false` for *any* cause — not found, wrong user, or the
+      usable-method guard) funnels through the single call site rendering
+      `i18n::t(locale, i18n::ACCOUNT_UNLINK_REFUSED)` — the only refusal
+      message in the file, so no cause can produce a different one in
+      either language; both halves read directly, both pre-existing and
+      equally generic. The one-time reveal's condition
+      (`reveal.map(render_recovery_reveal)`, called only when
+      `Some(code)`, and the `Cache-Control: no-store, private —
+      Referrer-Policy: no-referrer` headers gated on `reveal.is_some()`)
+      is untouched — only a `locale` parameter was threaded through the
+      text it renders, never the condition governing whether or how long
+      it renders.
+- [x] **A genuine finding, not anticipated by the handoff**: this package
+      converted the *last* remaining caller of the bare `render::page`
+      helper anywhere in the codebase (confirmed by a repo-wide grep
+      finding none) — `render::page` and its private `shell` helper are
+      now dead code. Kept, not removed (`#[allow(dead_code)]`, with a
+      comment explaining why), since the handoff's own scope said "no
+      helper is removed by this package"; whether to delete them is left
+      for an explicit future decision. This also touched
+      `render/shell.rs`'s tracked content (comments only), tripping
+      `cached_asset_content_matches_pinned_hash` — re-pinned the hash
+      alone, per that gate's own documented precedent (Handoff 040 §7.3:
+      "re-pin whenever content changes; the cache key and version move at
+      release, not per package") — no version bump, cache-buster, or
+      `sw.js` `CACHE_VERSION` change, since none was warranted for a
+      comment-only, non-functional change mid-cycle.
+- [x] `smoke:account-surface`, `smoke:account-link-reauth`,
+      `smoke:account-recovery-unlink` each pass standalone; `bun run
+      smoke:all`: **25 run, 25 passed** — no pinned Japanese assertion
+      flipped language.
+- [x] `cargo test --workspace`: **660** (was 653, +7 — six
+      `resolve_account_locale_from_memberships` unit tests, one
+      `account/mod.rs` render test), of which **659 pass and 1 fails**.
+      `--features dev_fake_issuer`: **663** (was 656, +7), 662 pass / 1
+      fails. **The one failure in both is
+      `roadmap_english_default_tripwire_fires_when_slice_d_completes`,
+      firing exactly as this handoff's §6 requires** — reported as the
+      expected outcome below, not a defect.
+- [ ] **The tripwire has fired — ROADMAP.md's English-default decision is
+      now due.** `LOCALIZATION_EXCEPTIONS` reached exactly the three
+      structurally-unresolvable entries, and the tripwire's full message:
+
+      > LOCALIZATION_EXCEPTIONS now holds only entries within the three
+      > structurally-unresolvable paths (["render/errors.rs",
+      > "handlers/calendar.rs", "handlers/communities.rs"]) — RFC-083
+      > Slice D has reached completion. ROADMAP.md's "The default language
+      > flips to English when Slice D completes" (owner decision
+      > 2026-08-16, RFC-083 §8.2) is now due: flip `Locale::default()` to
+      > English and update migration 0011_membership_ui_language.sql's
+      > comment. This is not a gate to re-pin — resolve the ROADMAP
+      > decision, then delete or rewrite this test to reflect the new
+      > default.
+
+      Per §6/§15: **not re-pinned, not deleted, no exception added.** The
+      owner resolves the ROADMAP decision; that resolution — and deleting
+      or rewriting this test — is its own package, not this one.

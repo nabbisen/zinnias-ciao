@@ -71,3 +71,108 @@ pub const JA_ACCOUNT_UNLINK_SUBMIT: &str = "連携を解除する";
 pub const JA_ACCOUNT_UNLINK_CANCEL: &str = "やめる";
 pub const JA_ACCOUNT_UNLINK_REFUSED: &str =
     "連携を解除できませんでした。他にサインインする方法が少なくとも1つ必要です。";
+
+/// RFC-084 (Handoff 084) locale-aware pairs; see `i18n::Localized`. No new
+/// copy — every EN/JA half above already existed (RFC-072 Slice D deferral,
+/// Handoffs 055–057), added for `en_ja_parity` compliance but never paired
+/// since the account tier had no locale source until now.
+pub const ACCOUNT_PAGE_TITLE: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_PAGE_TITLE,
+    en: EN_ACCOUNT_PAGE_TITLE,
+};
+pub const ACCOUNT_LINKED_IDENTITIES_HEADING: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_LINKED_IDENTITIES_HEADING,
+    en: EN_ACCOUNT_LINKED_IDENTITIES_HEADING,
+};
+pub const ACCOUNT_NO_LINKED_IDENTITIES: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_NO_LINKED_IDENTITIES,
+    en: EN_ACCOUNT_NO_LINKED_IDENTITIES,
+};
+pub const ACCOUNT_LINKED_AT_PREFIX: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_LINKED_AT_PREFIX,
+    en: EN_ACCOUNT_LINKED_AT_PREFIX,
+};
+pub const ACCOUNT_RECOVERY_CREDENTIAL_HEADING: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_RECOVERY_CREDENTIAL_HEADING,
+    en: EN_ACCOUNT_RECOVERY_CREDENTIAL_HEADING,
+};
+pub const ACCOUNT_RECOVERY_CREDENTIAL_NONE: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_RECOVERY_CREDENTIAL_NONE,
+    en: EN_ACCOUNT_RECOVERY_CREDENTIAL_NONE,
+};
+pub const ACCOUNT_COMMUNITIES_HEADING: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_COMMUNITIES_HEADING,
+    en: EN_ACCOUNT_COMMUNITIES_HEADING,
+};
+pub const ACCOUNT_NO_COMMUNITIES: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_NO_COMMUNITIES,
+    en: EN_ACCOUNT_NO_COMMUNITIES,
+};
+pub const ACCOUNT_FRESH_CAN_MANAGE: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_FRESH_CAN_MANAGE,
+    en: EN_ACCOUNT_FRESH_CAN_MANAGE,
+};
+pub const ACCOUNT_STALE_SIGN_IN_AGAIN: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_STALE_SIGN_IN_AGAIN,
+    en: EN_ACCOUNT_STALE_SIGN_IN_AGAIN,
+};
+pub const ACCOUNT_LINK_ENTRY_LABEL: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_LINK_ENTRY_LABEL,
+    en: EN_ACCOUNT_LINK_ENTRY_LABEL,
+};
+pub const ACCOUNT_LINK_TITLE: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_LINK_TITLE,
+    en: EN_ACCOUNT_LINK_TITLE,
+};
+pub const ACCOUNT_LINK_BODY: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_LINK_BODY,
+    en: EN_ACCOUNT_LINK_BODY,
+};
+pub const ACCOUNT_LINK_SUBMIT: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_LINK_SUBMIT,
+    en: EN_ACCOUNT_LINK_SUBMIT,
+};
+pub const ACCOUNT_LINK_CANCEL: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_LINK_CANCEL,
+    en: EN_ACCOUNT_LINK_CANCEL,
+};
+pub const ACCOUNT_RECOVERY_CREDENTIAL_EXISTS: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS,
+    en: EN_ACCOUNT_RECOVERY_CREDENTIAL_EXISTS,
+};
+pub const ACCOUNT_RECOVERY_REGENERATE_LABEL: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_RECOVERY_REGENERATE_LABEL,
+    en: EN_ACCOUNT_RECOVERY_REGENERATE_LABEL,
+};
+pub const ACCOUNT_RECOVERY_REVEAL_WARNING: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_RECOVERY_REVEAL_WARNING,
+    en: EN_ACCOUNT_RECOVERY_REVEAL_WARNING,
+};
+pub const ACCOUNT_RECOVERY_REVEAL_HINT: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_RECOVERY_REVEAL_HINT,
+    en: EN_ACCOUNT_RECOVERY_REVEAL_HINT,
+};
+pub const ACCOUNT_UNLINK_LABEL: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_UNLINK_LABEL,
+    en: EN_ACCOUNT_UNLINK_LABEL,
+};
+pub const ACCOUNT_UNLINK_TITLE: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_UNLINK_TITLE,
+    en: EN_ACCOUNT_UNLINK_TITLE,
+};
+pub const ACCOUNT_UNLINK_BODY: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_UNLINK_BODY,
+    en: EN_ACCOUNT_UNLINK_BODY,
+};
+pub const ACCOUNT_UNLINK_SUBMIT: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_UNLINK_SUBMIT,
+    en: EN_ACCOUNT_UNLINK_SUBMIT,
+};
+pub const ACCOUNT_UNLINK_CANCEL: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_UNLINK_CANCEL,
+    en: EN_ACCOUNT_UNLINK_CANCEL,
+};
+pub const ACCOUNT_UNLINK_REFUSED: super::Localized = super::Localized {
+    ja: JA_ACCOUNT_UNLINK_REFUSED,
+    en: EN_ACCOUNT_UNLINK_REFUSED,
+};

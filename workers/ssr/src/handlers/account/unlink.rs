@@ -9,6 +9,7 @@
 //! concurrency requirement (RFC-081 §3.3) is actually met.
 
 use worker::{Env, Request, Response, Result};
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
@@ -45,6 +46,16 @@ pub async fn get_unlink(req: Request, env: &Env, rid: &str, identity_id: &str) -
         return reauthenticate_redirect();
     }
 
+    // RFC-084 §5: this file makes zero membership calls otherwise, so this
+    // is the one new D1 query per route the RFC's decision 2 authorized.
+    let db = env.d1("DB")?;
+    let community_rows =
+        crate::db::membership::list_communities_with_locale_for_user(&db, &auth.user_id).await?;
+    let locale = authz::resolve_account_locale(
+        &req,
+        community_rows.iter().map(|row| row.ui_language.as_deref()),
+    );
+
     let token = crate::codlet::issue_token(
         env,
         &auth.user_id,
@@ -52,7 +63,7 @@ pub async fn get_unlink(req: Request, env: &Env, rid: &str, identity_id: &str) -
         Some(identity_id),
     )
     .await?;
-    render_confirm(&token, identity_id, None)
+    render_confirm(&token, identity_id, None, locale)
 }
 
 pub async fn post_unlink(
@@ -70,6 +81,18 @@ pub async fn post_unlink(
         return reauthenticate_redirect();
     }
 
+    // RFC-084 §5: this file's second, independent new query — `get_unlink`
+    // and `post_unlink` are separate routes, so a request never pays both;
+    // each pays exactly the one this decision authorized. Resolved before
+    // body parsing so it is available on every response path below.
+    let db = env.d1("DB")?;
+    let community_rows =
+        crate::db::membership::list_communities_with_locale_for_user(&db, &auth.user_id).await?;
+    let locale = authz::resolve_account_locale(
+        &req,
+        community_rows.iter().map(|row| row.ui_language.as_deref()),
+    );
+
     let body = req.form_data().await?;
     let raw_token = body.get_field("_token").unwrap_or_default();
     let consumed = crate::codlet::consume_token(
@@ -85,7 +108,6 @@ pub async fn post_unlink(
         ConsumeResult::Proceed => {}
     }
 
-    let db = env.d1("DB")?;
     let unlinked =
         identity_db::unlink_required(&db, rid, &auth.user_id, identity_id, &auth.session_id)
             .await?;
@@ -102,10 +124,20 @@ pub async fn post_unlink(
         Some(identity_id),
     )
     .await?;
-    render_confirm(&token, identity_id, Some(i18n::JA_ACCOUNT_UNLINK_REFUSED))
+    render_confirm(
+        &token,
+        identity_id,
+        Some(i18n::t(locale, i18n::ACCOUNT_UNLINK_REFUSED)),
+        locale,
+    )
 }
 
-fn render_confirm(token: &str, identity_id: &str, error: Option<&str>) -> Result<Response> {
+fn render_confirm(
+    token: &str,
+    identity_id: &str,
+    error: Option<&str>,
+    locale: Locale,
+) -> Result<Response> {
     let error_html = error
         .map(|e| {
             format!(
@@ -114,6 +146,7 @@ fn render_confirm(token: &str, identity_id: &str, error: Option<&str>) -> Result
             )
         })
         .unwrap_or_default();
+    let title = i18n::t(locale, i18n::ACCOUNT_UNLINK_TITLE);
     let body = format!(
         "<main class=\"cz-page-main cz-account-unlink-main\">\
            <h1 class=\"cz-account-unlink-title\">{title}</h1>\
@@ -125,13 +158,13 @@ fn render_confirm(token: &str, identity_id: &str, error: Option<&str>) -> Result
            </form>\
            <a href=\"/account\" class=\"cz-account-unlink-cancel\">{cancel}</a>\
          </main>",
-        title = i18n::JA_ACCOUNT_UNLINK_TITLE,
-        body = i18n::JA_ACCOUNT_UNLINK_BODY,
+        title = title,
+        body = i18n::t(locale, i18n::ACCOUNT_UNLINK_BODY),
         error_html = error_html,
         id = escape_html(identity_id),
         token = escape_html(token),
-        submit = i18n::JA_ACCOUNT_UNLINK_SUBMIT,
-        cancel = i18n::JA_ACCOUNT_UNLINK_CANCEL,
+        submit = i18n::t(locale, i18n::ACCOUNT_UNLINK_SUBMIT),
+        cancel = i18n::t(locale, i18n::ACCOUNT_UNLINK_CANCEL),
     );
-    render::page(i18n::JA_ACCOUNT_UNLINK_TITLE, &body)
+    render::page_localized(locale, title, &body)
 }
