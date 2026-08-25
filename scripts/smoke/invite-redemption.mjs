@@ -2,6 +2,7 @@
 // Scenario smoke for admin-generated invite redemption. Local wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 
 import { createHmac } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
@@ -252,7 +253,7 @@ async function newPage(sessionSecret = null) {
     await setSession(cdp, sessionSecret);
   } else {
     await cdp.send('Network.clearBrowserCookies');
-    await cdp.send('Network.setExtraHTTPHeaders', { headers: {} });
+    await cdp.send('Network.setExtraHTTPHeaders', { headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE } });
   }
   return cdp;
 }
@@ -268,7 +269,7 @@ async function setSession(cdp, sessionSecret) {
     sameSite: 'Strict',
   });
   await cdp.send('Network.setExtraHTTPHeaders', {
-    headers: { Cookie: `ciao_sid=${sessionSecret}` },
+    headers: { Cookie: `ciao_sid=${sessionSecret}`, "Accept-Language": SMOKE_ACCEPT_LANGUAGE },
   });
 }
 
@@ -321,6 +322,7 @@ async function collect(cdp) {
         href: a.getAttribute('href'),
         text: a.innerText,
       }));
+      const form = document.querySelector('form');
       return {
         path: location.pathname + location.search,
         text: document.body.innerText,
@@ -328,9 +330,36 @@ async function collect(cdp) {
         links,
         hasFormToken: Boolean(document.querySelector('input[name="_token"][value]')),
         noHorizontalScroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+        htmlLang: document.documentElement.getAttribute('lang'),
+        formShape: form
+          ? {
+              action: form.getAttribute('action'),
+              method: form.getAttribute('method'),
+              fieldNames: [...form.querySelectorAll('[name]')].map((el) => el.getAttribute('name')).sort(),
+            }
+          : null,
       };
     })()`,
   );
+}
+
+// Handoff 076 §3.2: the JS mirror of `contains_japanese_codepoint` used
+// throughout the Rust render tests (e.g. `handlers/join.rs`'s own
+// `#[cfg(test)] mod tests`) — same codepoint ranges, so an English render
+// caught here is caught by the same definition the native tests use.
+function containsJapaneseCodepoint(text) {
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    if (
+      (cp >= 0x3040 && cp <= 0x30ff) ||
+      (cp >= 0x4e00 && cp <= 0x9fff) ||
+      (cp >= 0x3000 && cp <= 0x303f) ||
+      (cp >= 0xff00 && cp <= 0xffef)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function allChecksPass(checks) {
@@ -787,6 +816,29 @@ try {
       notProfileStep: reusedJoin.path !== '/join/profile',
     },
   });
+
+  logStep('proving rung 2 end to end: Accept-Language: en negotiates an English /join');
+  const englishPage = await newPage();
+  await englishPage.send('Network.setExtraHTTPHeaders', {
+    headers: { 'Accept-Language': 'en' },
+  });
+  await navigate(englishPage, '/join', { textScale: 2 });
+  const englishJoin = await collect(englishPage);
+  results.push({
+    name: 'join-negotiates-english-via-accept-language',
+    screenshotPath: await screenshot(englishPage, 'join-negotiates-english-via-accept-language'),
+    checks: {
+      noHorizontalScroll: englishJoin.noHorizontalScroll,
+      htmlLangEn: englishJoin.htmlLang === 'en',
+      noJapaneseCodepoint: !containsJapaneseCodepoint(englishJoin.text),
+      // RFC-083 §6.2's oracle property, made observable rather than argued:
+      // the same form (action, method, field names) renders regardless of
+      // negotiated language — only the labels populating it changed.
+      sameFormShapeAsJapanese:
+        JSON.stringify(englishJoin.formShape) === JSON.stringify(joinStart.formShape),
+    },
+  });
+  englishPage.close();
 
   adminPage.close();
   legacyPage.close();

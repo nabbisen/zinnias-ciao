@@ -69,3 +69,91 @@ pub const RELINK_CODE_LABEL: super::Localized = super::Localized {
     ja: JA_RELINK_CODE_LABEL,
     en: EN_RELINK_CODE_LABEL,
 };
+
+// RFC-083 Slice D2a (Handoff 075) locale-aware pairs — the four anonymous
+// routes now resolve a locale (RFC-083 §8.1 rung 2, Accept-Language, since
+// none of them have a membership to read rung 1 from).
+pub const JOIN_HEADING: super::Localized = super::Localized {
+    ja: JA_JOIN_HEADING,
+    en: EN_JOIN_HEADING,
+};
+pub const JOIN_SUBHEADING: super::Localized = super::Localized {
+    ja: JA_JOIN_SUBHEADING,
+    en: EN_JOIN_SUBHEADING,
+};
+pub const JOIN_CODE_LABEL: super::Localized = super::Localized {
+    ja: JA_JOIN_CODE_LABEL,
+    en: EN_JOIN_CODE_LABEL,
+};
+pub const JOIN_CODE_HINT: super::Localized = super::Localized {
+    ja: JA_JOIN_CODE_HINT,
+    en: EN_JOIN_CODE_HINT,
+};
+pub const JOIN_RELINK_HINT: super::Localized = super::Localized {
+    ja: JA_JOIN_RELINK_HINT,
+    en: EN_JOIN_RELINK_HINT,
+};
+pub const JOIN_RELINK_LINK: super::Localized = super::Localized {
+    ja: JA_JOIN_RELINK_LINK,
+    en: EN_JOIN_RELINK_LINK,
+};
+pub const JOIN_SUBMIT: super::Localized = super::Localized {
+    ja: JA_JOIN_SUBMIT,
+    en: EN_JOIN_SUBMIT,
+};
+pub const JOIN_PROFILE_HEADING: super::Localized = super::Localized {
+    ja: JA_JOIN_PROFILE_HEADING,
+    en: EN_JOIN_PROFILE_HEADING,
+};
+pub const JOIN_PROFILE_HINT: super::Localized = super::Localized {
+    ja: JA_JOIN_PROFILE_HINT,
+    en: EN_JOIN_PROFILE_HINT,
+};
+pub const JOIN_PROFILE_LABEL: super::Localized = super::Localized {
+    ja: JA_JOIN_PROFILE_LABEL,
+    en: EN_JOIN_PROFILE_LABEL,
+};
+pub const JOIN_PROFILE_SUBMIT: super::Localized = super::Localized {
+    ja: JA_JOIN_PROFILE_SUBMIT,
+    en: EN_JOIN_PROFILE_SUBMIT,
+};
+pub const JOIN_PAGE_TITLE: super::Localized = super::Localized {
+    ja: JA_JOIN_PAGE_TITLE,
+    en: EN_JOIN_PAGE_TITLE,
+};
+pub const JOIN_PROFILE_PAGE_TITLE: super::Localized = super::Localized {
+    ja: JA_JOIN_PROFILE_PAGE_TITLE,
+    en: EN_JOIN_PROFILE_PAGE_TITLE,
+};
+pub const RELINK_TITLE: super::Localized = super::Localized {
+    ja: JA_RELINK_TITLE,
+    en: EN_RELINK_TITLE,
+};
+pub const RELINK_BODY: super::Localized = super::Localized {
+    ja: JA_RELINK_BODY,
+    en: EN_RELINK_BODY,
+};
+pub const RELINK_SUBMIT: super::Localized = super::Localized {
+    ja: JA_RELINK_SUBMIT,
+    en: EN_RELINK_SUBMIT,
+};
+pub const RELINK_INVALID: super::Localized = super::Localized {
+    ja: JA_RELINK_INVALID,
+    en: EN_RELINK_INVALID,
+};
+pub const IDENTITY_SIGN_IN_FAILED_TITLE: super::Localized = super::Localized {
+    ja: JA_IDENTITY_SIGN_IN_FAILED_TITLE,
+    en: EN_IDENTITY_SIGN_IN_FAILED_TITLE,
+};
+pub const IDENTITY_SIGN_IN_FAILED_BODY: super::Localized = super::Localized {
+    ja: JA_IDENTITY_SIGN_IN_FAILED_BODY,
+    en: EN_IDENTITY_SIGN_IN_FAILED_BODY,
+};
+pub const IDENTITY_SIGN_IN_RETRY: super::Localized = super::Localized {
+    ja: JA_IDENTITY_SIGN_IN_RETRY,
+    en: EN_IDENTITY_SIGN_IN_RETRY,
+};
+pub const IDENTITY_SIGN_IN_CANCEL: super::Localized = super::Localized {
+    ja: JA_IDENTITY_SIGN_IN_CANCEL,
+    en: EN_IDENTITY_SIGN_IN_CANCEL,
+};

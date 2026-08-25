@@ -9,6 +9,7 @@
 //! nothing here changes it.
 
 use worker::{Env, Headers, Method, Request, RequestInit, Response, Result};
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::i18n;
 
 use crate::db;
@@ -137,7 +138,8 @@ fn resolve_token_endpoint(_namespace_id: &str, _origin: &str) -> Option<String> 
     None
 }
 
-fn sign_in_failed_page() -> Result<Response> {
+fn sign_in_failed_page(locale: Locale) -> Result<Response> {
+    let title = i18n::t(locale, i18n::IDENTITY_SIGN_IN_FAILED_TITLE);
     let body = format!(
         "<main class=\"cz-anon-main\">\
          <h1 class=\"cz-anon-title\">{title}</h1>\
@@ -146,12 +148,12 @@ fn sign_in_failed_page() -> Result<Response> {
            <a href=\"/identity/start?action=sign_in\" class=\"cz-error-recovery-link\">{retry}</a>\
            <a href=\"/join\" class=\"cz-error-recovery-link\">{cancel}</a>\
          </div></main>",
-        title = i18n::JA_IDENTITY_SIGN_IN_FAILED_TITLE,
-        body = i18n::JA_IDENTITY_SIGN_IN_FAILED_BODY,
-        retry = i18n::JA_IDENTITY_SIGN_IN_RETRY,
-        cancel = i18n::JA_IDENTITY_SIGN_IN_CANCEL,
+        title = title,
+        body = i18n::t(locale, i18n::IDENTITY_SIGN_IN_FAILED_BODY),
+        retry = i18n::t(locale, i18n::IDENTITY_SIGN_IN_RETRY),
+        cancel = i18n::t(locale, i18n::IDENTITY_SIGN_IN_CANCEL),
     );
-    Ok(render::page(i18n::JA_IDENTITY_SIGN_IN_FAILED_TITLE, &body)?.with_status(200))
+    Ok(render::page_localized(locale, title, &body)?.with_status(200))
 }
 
 /// RFC-080 §6 / Handoff 056 §3.3: `prompt=login` (asking the provider to
@@ -190,9 +192,10 @@ pub(crate) async fn start_oidc_transaction(
     initiating_user_id: Option<&str>,
     return_to: &str,
     send_prompt_login: bool,
+    locale: Locale,
 ) -> Result<Response> {
     let Some(authorize_endpoint) = resolve_authorize_endpoint(NAMESPACE_ID, origin) else {
-        return sign_in_failed_page();
+        return sign_in_failed_page(locale);
     };
 
     let pepper = crate::crypto::pepper(env)?;
@@ -248,6 +251,14 @@ pub(crate) async fn start_oidc_transaction(
 // ── GET /identity/start ───────────────────────────────────────────────────
 
 pub async fn get_start(req: Request, env: &Env, _rid: &str) -> Result<Response> {
+    // RFC-083 §8.1 / Handoff 075 §5: `current_auth` below is a raw session
+    // (`AuthContext`), never a `MembershipContext` — this handler has no
+    // `require_membership`/`require_admin` call anywhere, so rung 1 (a
+    // stored membership preference) never has anything to read regardless
+    // of whether a session exists. `current_auth`'s only role is deciding
+    // freshness/redirect behaviour below; locale always resolves from
+    // Accept-Language (rung 2), unconditionally.
+    let locale = crate::authz::resolve_anonymous_locale(&req);
     let current_auth = crate::session::require_auth(&req, env).await;
 
     let url = req.url()?;
@@ -303,6 +314,7 @@ pub async fn get_start(req: Request, env: &Env, _rid: &str) -> Result<Response> 
         None,
         return_to,
         send_prompt_login,
+        locale,
     )
     .await
 }
@@ -310,6 +322,15 @@ pub async fn get_start(req: Request, env: &Env, _rid: &str) -> Result<Response> 
 // ── GET /identity/callback ─────────────────────────────────────────────────
 
 pub async fn get_callback(req: Request, env: &Env, rid: &str) -> Result<Response> {
+    // RFC-083 §8.1 / Handoff 075 §5: this handler never resolves a
+    // `MembershipContext` anywhere (`sign_in_outcome`'s own `require_auth`
+    // check below, like `get_start`'s, is a raw session check for
+    // re-authentication logic, not a membership lookup) — rung 1 never
+    // applies here regardless of session state, so locale always resolves
+    // from Accept-Language (rung 2), unconditionally, before any of the
+    // nine callback steps run.
+    let locale = crate::authz::resolve_anonymous_locale(&req);
+
     let url = req.url()?;
     let code = url
         .query_pairs()
@@ -320,7 +341,7 @@ pub async fn get_callback(req: Request, env: &Env, rid: &str) -> Result<Response
         .find(|(k, _)| k == "state")
         .map(|(_, v)| v.into_owned());
     let (Some(code), Some(state)) = (code, state) else {
-        return sign_in_failed_page();
+        return sign_in_failed_page(locale);
     };
 
     let pepper = crate::crypto::pepper(env)?;
@@ -334,23 +355,23 @@ pub async fn get_callback(req: Request, env: &Env, rid: &str) -> Result<Response
     let Some(transaction) =
         db::auth_transaction::find_active_by_lookup_key_hmac(&db, &lookup_key_hmac, &now).await?
     else {
-        return sign_in_failed_page();
+        return sign_in_failed_page(locale);
     };
     if !db::auth_transaction::consume_required(&db, &transaction.id, &now).await? {
-        return sign_in_failed_page();
+        return sign_in_failed_page(locale);
     }
 
     // Step 1: select only the namespace the transaction itself expects.
     let Some(namespace) =
         crate::identity::resolve_namespace_verification(&transaction.identity_namespace_id)
     else {
-        return sign_in_failed_page();
+        return sign_in_failed_page(locale);
     };
 
     // Step 3: exchange the code server-to-server, exact redirect URI + PKCE.
     let origin = request_origin(&req)?;
     let Some(id_token) = exchange_code(&transaction, &code, &origin).await? else {
-        return sign_in_failed_page();
+        return sign_in_failed_page(locale);
     };
 
     // Steps 4-6: verify signature under the namespace-pinned algorithm and
@@ -366,7 +387,7 @@ pub async fn get_callback(req: Request, env: &Env, rid: &str) -> Result<Response
         pepper.as_str(),
         now_unix,
     ) else {
-        return sign_in_failed_page();
+        return sign_in_failed_page(locale);
     };
 
     // Step 7: only VerifiedExternalIdentity crosses into identity logic —
@@ -400,6 +421,7 @@ pub async fn get_callback(req: Request, env: &Env, rid: &str) -> Result<Response
             &namespace,
             &subject_lookup,
             transaction.invite_reference.as_deref(),
+            locale,
         )
         .await?
         .map(CallbackOutcome::Redirect),
@@ -426,7 +448,7 @@ pub async fn get_callback(req: Request, env: &Env, rid: &str) -> Result<Response
     };
 
     let Some(outcome) = outcome else {
-        return sign_in_failed_page();
+        return sign_in_failed_page(locale);
     };
 
     let cookie_domain = env
@@ -631,6 +653,7 @@ async fn join_outcome(
     namespace: &crate::identity::NamespaceVerification,
     subject_lookup: &str,
     invite_reference: Option<&str>,
+    locale: Locale,
 ) -> Result<Option<String>> {
     let _ = namespace;
     // A known identity has no business on the join path — RFC-080 §7 gives
@@ -658,7 +681,11 @@ async fn join_outcome(
     // A display name from an external identity is not collected by this
     // slice (no account surface) — use a fixed placeholder the member can
     // change afterward, the same field `/join/profile` lets them set.
-    let display_name = i18n::JA_JOIN_PROFILE_LABEL;
+    // Handoff 075: resolved through the visitor's own negotiated locale —
+    // this is stored as the member's initial display name, not merely
+    // rendered, but the invite's validity was already confirmed above, so
+    // varying it by locale reveals nothing about the invite or community.
+    let display_name = i18n::t(locale, i18n::JOIN_PROFILE_LABEL);
 
     db::auth_transaction::issue_join_required(
         db,

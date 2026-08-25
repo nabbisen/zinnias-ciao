@@ -14,6 +14,7 @@
 // evidence, numeric 200% margins, and the sticky-behavior proof.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
 import { createHmac } from 'node:crypto';
@@ -263,7 +264,13 @@ async function newPage(sessionSecret) {
   // meant to be anonymous would otherwise inherit a session cookie set
   // earlier on a different page in the same incognito profile.
   await cdp.send('Network.clearBrowserCookies');
-  if (sessionSecret) await setSession(cdp, sessionSecret);
+  if (sessionSecret) {
+    await setSession(cdp, sessionSecret);
+  } else {
+    await cdp.send("Network.setExtraHTTPHeaders", {
+      headers: { "Accept-Language": SMOKE_ACCEPT_LANGUAGE },
+    });
+  }
   return cdp;
 }
 
@@ -278,7 +285,7 @@ async function setSession(cdp, sessionSecret) {
     sameSite: 'Strict',
   });
   await cdp.send('Network.setExtraHTTPHeaders', {
-    headers: { Cookie: `ciao_sid=${sessionSecret}` },
+    headers: { Cookie: `ciao_sid=${sessionSecret}`, "Accept-Language": SMOKE_ACCEPT_LANGUAGE },
   });
 }
 

@@ -24,6 +24,7 @@
 // route too.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
 import { createHmac } from 'node:crypto';
@@ -271,7 +272,7 @@ async function newPage(sessionSecret = null) {
     await setSession(cdp, sessionSecret);
   } else {
     await cdp.send('Network.clearBrowserCookies');
-    await cdp.send('Network.setExtraHTTPHeaders', { headers: {} });
+    await cdp.send('Network.setExtraHTTPHeaders', { headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE } });
   }
   return cdp;
 }
@@ -287,7 +288,7 @@ async function setSession(cdp, sessionSecret) {
     sameSite: 'Strict',
   });
   await cdp.send('Network.setExtraHTTPHeaders', {
-    headers: { Cookie: `ciao_sid=${sessionSecret}` },
+    headers: { Cookie: `ciao_sid=${sessionSecret}`, "Accept-Language": SMOKE_ACCEPT_LANGUAGE },
   });
 }
 

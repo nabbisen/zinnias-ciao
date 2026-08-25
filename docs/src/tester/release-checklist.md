@@ -2620,3 +2620,205 @@ locale-blind-helper count had to reach zero independently.
       seven — every admin surface honours the member's language
       preference. Remaining convertible work: D2a (four anonymous routes)
       and D2b (account surfaces, its own RFC).
+
+## RFC-083 Slice D2a: anonymous routes gain a header-negotiated locale (Handoff 075)
+
+The four anonymous/redemption routes — `join.rs`, `relink.rs`,
+`recovery.rs`, `identity/mod.rs` — have no membership to read a stored
+preference from (rung 1 never applies here). RFC-083 §8.1's ladder's rung
+2, `Accept-Language` negotiation, is new to this package.
+
+- [x] **`negotiate_accept_language` added to `packages/contracts`**,
+      deliberately separate from `Locale::parse`: the parse function stays
+      a closed two-code allow-list for *stored* values (must fail closed);
+      the new function is a lenient RFC 7231/9110-shaped negotiator for a
+      *header*, where rejecting `en-US`/`ja-JP`/`en-GB` is the ordinary
+      case. Algorithm: split on `,`, examine at most **10** entries
+      (`ACCEPT_LANGUAGE_MAX_ENTRIES` — generous headroom against an
+      attacker-controlled unbounded header; real browsers send one to
+      three); missing `q` defaults to `1.0`; a malformed or out-of-range
+      weight discards only its own entry, never defaults it; `q<=0` is
+      never selected; stable descending-weight sort preserves header order
+      on ties; primary subtag (before the first `-`), lowercased, tried
+      against `Locale::parse`; first match wins; no match returns `None`
+      and the caller falls to the Japanese floor (rung 3).
+- [x] `authz::resolve_anonymous_locale(&req)` reads `Accept-Language`,
+      negotiates, and falls back to `Locale::default()` — never returns
+      unresolved. Called at the top of every handler in the four files
+      (`identity/mod.rs`'s `get_start`/`get_callback` resolve it
+      unconditionally: this file never calls `require_membership`, so a
+      raw `AuthContext` from `require_auth` never carries a resolvable
+      stored preference — rung 2 is unconditionally correct throughout).
+- [x] All `i18n::JA_*` bare sites in the four files converted to
+      `i18n::t(locale, i18n::*)`; every `render::page` call converted to
+      `render::page_localized`. `LOCALIZATION_EXCEPTIONS` re-pinned on all
+      three dimensions: 10→**6** entries, 98→**54** `ja_count`, 8→**3**
+      `bare_helper_calls`. The tripwire gate still passes (6 entries is
+      not a subset of the 3-element trigger).
+- [x] `account/link.rs` (D2b, out of scope) adapts to
+      `start_oidc_transaction`'s new trailing `locale: Locale` parameter
+      with a literal `Locale::Ja` — its unchanged current behaviour, not a
+      new D2b resolution decision; the explanatory comment sits above the
+      call, not inline within the argument list (an inline comment there
+      breaks `prompt_login_is_sent_for_link_and_reauthentication`'s raw
+      argument-list parsing).
+- [x] **§6.2 oracle re-verification, checked not assumed**: no `if
+      locale`/`match locale` branch exists anywhere in the four files —
+      locale only ever flows into rendering, never into a control-flow
+      decision, so the set of possible response shapes for a given
+      `Accept-Language` is identical regardless of a code's validity.
+      RFC-081 §3.2's generic-failure property holds in English too: every
+      failure branch in `relink.rs`/`recovery.rs`/`join.rs` (format,
+      form-replay, abuse-control block, no-valid-code, claim-lost) routes
+      through the *same* single generic constant
+      (`RELINK_INVALID`/`RECOVERY_INVALID`/`JOIN_CODE_HINT`), and each
+      constant's English half is a pre-existing, equally generic message
+      (never naming consumed/revoked/expired), not a new per-cause string.
+      RFC-076's `/join` response-isolation property (the same markup
+      renders on success and on every rejection reason) is unaffected —
+      only which language populates that markup changed, not its shape.
+- [x] **§6.1 verified**: the raw `Accept-Language` value is consumed
+      inline inside `resolve_anonymous_locale` and never escapes it —
+      confirmed by grep that no `console_log!`/`audit::*` call in any of
+      the four files references the header or the resolved locale.
+- [x] **§6.3 — new gate**:
+      `anonymous_routes_rely_on_the_default_no_store_cache_control` asserts
+      none of the four files ever writes its own `Cache-Control` header,
+      relying instead on `lib.rs:281`'s default `no-store`. Demonstrated
+      failing by adding `Cache-Control: public, max-age=60` to
+      `relink.rs`'s `redirect` helper; restored, byte-identical.
+- [x] Rendered-output tests added for two pages (`join.rs`: code form and
+      profile form; `relink.rs`: the form) at `Locale::En` with a
+      `Locale::Ja` discriminating half, following the established
+      Response-avoidance precedent (compose body pieces via direct
+      `i18n::t` calls, never invoke the `Result<Response>`-returning
+      function itself). Both failure classes demonstrated: a bare
+      `i18n::JA_` site (substituted into `join.rs`'s own test
+      composition); a locale-blind helper — since these four pages have no
+      nav/header helper to swap within a unit test (their only helper is
+      `render::page`/`render::page_localized`), demonstrated instead via
+      the source-scanning gate
+      `rfc072_every_handler_and_render_file_is_localized_or_documented_exception`
+      by temporarily reverting `relink.rs`'s final line to bare
+      `render::page`; both restorations confirmed byte-identical.
+- [x] `negotiate_accept_language`'s own tests (14 total: 4 pre-existing
+      `Locale::parse` tests plus 10 new) demonstrated failing: loosened the
+      `q<=0.0` rejection to `q<0.0`, confirmed
+      `q_zero_on_an_otherwise_matching_tag_is_never_selected` caught the
+      regression, restored byte-identical.
+- [x] Per-function `.await` counts unchanged across all five touched files
+      (`join.rs`, `relink.rs`, `recovery.rs`, `identity/mod.rs`,
+      `account/link.rs`), verified against the checkpoint.
+- [x] `cargo test --workspace`: 652 (was 638, +14 — 10 negotiation tests,
+      2 `join.rs` render tests, 1 `relink.rs` render test, 1 no-store gate
+      test). `--features dev_fake_issuer`: 655 (was 641, +14). Evidence
+      baseline unchanged at 996.
+- [x] **§13 stop condition triggered: `bun run smoke:all` was 21/25.**
+      `smoke:invite`, `smoke:help-signin`, and `smoke:account-link-reauth`
+      each failed one scenario that asserts a literal Japanese substring on
+      a generic-failure page; `smoke:admin-tools-onboarding` failed its
+      `htmlLangJa` check on `/join` and `/relink`. Root cause: the
+      sandboxed headless Chromium these smokes launch sent no explicit
+      `Accept-Language`, so Chromium's own en-US-derived default negotiated
+      these routes to English — rung 2 working as designed, but four smoke
+      assertions written before negotiation existed hardcoded the old
+      Japanese-always behavior. Correctly reported rather than resolved
+      unilaterally — see Handoff 076 immediately below, landed in the same
+      commit, which fixes the underlying ambient-state dependence.
+
+## Pin the smoke `Accept-Language`, and prove rung 2 end to end (Handoff 076)
+
+Handoff 075's stop condition (`smoke:all` 21/25, above) traced to a defect
+one level under the four failing assertions: **no smoke pinned
+`Accept-Language` anywhere**, so the suite's result depended on the
+developer machine's `LANG` — a developer with `LANG=ja_JP.UTF-8` would have
+seen 25/25 and never learned rung 2 existed. Fixing the four assertions
+without fixing that would have left the same ambient-state class of defect
+Handoffs 063–070 spent five packages eliminating from the recurrence smoke.
+
+- [x] **`scripts/lib/smoke-locale.mjs` added** — a single exported
+      constant, `SMOKE_ACCEPT_LANGUAGE = 'ja'`, the one source of truth for
+      every smoke's pinned header. Mechanism chosen: CDP
+      `Network.setExtraHTTPHeaders`, not a Chromium `--lang` flag —
+      empirically confirmed (`--lang=ja` against a local echo server) that
+      `--lang` does **not** change the `Accept-Language` header on this
+      headless Chromium build, while `setExtraHTTPHeaders` does and is
+      already how every smoke sets its session `Cookie` header, so the two
+      are merged into one call rather than added as a second one.
+- [x] **All 23 smoke scripts that launch Chromium updated** to send the
+      pinned header on every page they open — merged into an existing
+      `Cookie` header call where one existed (13 scripts), added to an
+      `if`/`else` anonymous-page branch (5 scripts: `help-signin.mjs`,
+      `invite-redemption.mjs`, `session-provenance-and-community-binding.mjs`,
+      `rfc075-slice6-admin-tools-and-onboarding.mjs`,
+      `rfc075-slice7-final-migration.mjs` — the latter two had no `else`
+      branch at all, so one was added), or added fresh where no header call
+      existed at all (5 no-JS single-page scripts:
+      `account-link-and-reauthentication.mjs`, `account-surface.mjs`,
+      `external-identity-callback.mjs`, `membership-suspension.mjs`,
+      `account-recovery-and-unlink.mjs`). Every smoke now depends on this
+      input, not just the four that failed.
+- [x] **F1 of this handoff's own review: the first sweep missed
+      `account-recovery-and-unlink.mjs`.** It launches Chromium and
+      navigates to `/recovery` (one of the four routes Handoff 075 just
+      localized) but was left unpinned — latent, not benign, since a stale
+      Japanese-literal assertion on that script's *account* surface
+      (`account/unlink`, still D2b/hardcoded-Japanese) only happens to hold
+      today; it would fail on an `en_US` machine the moment D2b makes that
+      surface locale-aware too. This is the sixth time in this series a
+      hand-executed sweep missed a member of its own population
+      (`LOCALIZATION_EXCEPTIONS`, the smoke run set, the parity stem list,
+      the identical-pair array, the locale-blind helper check, now this).
+      Fixed by adding the import/merge to the missed script, **and** by
+      deriving the population instead of sweeping it by hand: a new gate,
+      `every_chromium_smoke_pins_accept_language_or_documented_exception`
+      (mirroring Handoff 063's `every_smoke_script_is_reachable_by_name_or_documented_exception`
+      shape exactly — a directory walk plus a pinned, empty-by-design
+      exception table), fails on any `scripts/smoke/*.mjs` that launches
+      Chromium without importing `scripts/lib/smoke-locale.mjs`.
+      Demonstrated failing: removed the import from
+      `account-recovery-and-unlink.mjs`, confirmed the gate named that
+      exact file, restored byte-identical. Re-ran
+      `smoke:account-recovery-unlink` under both `LANG=en_US.UTF-8` and
+      `LANG=ja_JP.UTF-8` — identical passing result both times.
+- [x] **Ambient-independence demonstrated, not assumed**: ran
+      `smoke:invite`, `smoke:help-signin`, `smoke:account-link-reauth`, and
+      `smoke:admin-tools-onboarding` under both `LANG=en_US.UTF-8` (this
+      machine's default) and `LANG=ja_JP.UTF-8` — identical passing result
+      both times, for all four.
+- [x] **Rung 2 proven end to end** — nothing before this exercised header
+      → rendered page; the unit tests proved the negotiation function
+      alone, the render tests proved composition alone. Added
+      `join-negotiates-english-via-accept-language` to
+      `scripts/smoke/invite-redemption.mjs` (a scenario in an existing
+      script, not a new one — `smoke:all` stays 25/25): pins
+      `Accept-Language: en` on a fresh anonymous page, navigates to
+      `/join`, and asserts the body contains no Japanese codepoint,
+      `html lang="en"`, and — making RFC-083 §6.2's oracle property
+      observable rather than argued — the **same form shape** (action,
+      method, sorted field names) as the Japanese render captured earlier
+      in the same run. Demonstrated failing: temporarily pinned
+      `Accept-Language: ja` for this scenario instead (simulating rung 2
+      resolving to Japanese regardless of the header), confirmed
+      `htmlLangEn`/`noJapaneseCodepoint` both caught it, restored
+      byte-identical.
+- [x] **A trap found and avoided**: the new scenario's first draft included
+      an `observed: {...}` diagnostic field, which
+      `rfc076_one_time_invite_response_isolation_is_pinned` explicitly
+      forbids as a source-level marker in this file (a past incident
+      pattern for plaintext-sensitive leakage) — caught immediately by
+      `cargo test --workspace`, removed; the `checks` booleans and
+      screenshot already carry everything needed.
+- [x] `scripts/smoke/rfc075-slice6-admin-tools-and-onboarding.mjs`'s stale
+      comment and evidence `note:` (*"anonymous with no locale to
+      resolve"*) corrected to describe the pinned-header arrangement; the
+      other three affected scripts checked for the same claim — none
+      found.
+- [x] **No assertion weakened** — every fix pins the input the assertions
+      already depended on; none was changed to accept either language.
+      **No product code touched** — every change this handoff made is
+      under `scripts/`; Handoff 075's `workers/ssr/src/` and
+      `packages/contracts/src/` changes stand exactly as approved.
+- [x] `cargo test --workspace`: 653 (was 652, +1 — the new derived gate).
+      `--features dev_fake_issuer`: 656 (was 655, +1). Evidence baseline
+      unchanged at 996. `bun run smoke:all`: **25 run, 25 passed.**

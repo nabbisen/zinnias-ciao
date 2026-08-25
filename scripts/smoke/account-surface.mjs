@@ -15,6 +15,7 @@
 
 import { prepareIsolatedWorkerTest } from '../lib/isolated-worker-test.mjs';
 import { attachCspViolationCapture, readCspViolations } from '../lib/csp-violation-capture.mjs';
+import { SMOKE_ACCEPT_LANGUAGE } from '../lib/smoke-locale.mjs';
 
 import { createHmac } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -383,6 +384,9 @@ try {
   await cdp.send('Runtime.enable');
   await cdp.send('Network.enable');
   await cdp.send('Network.clearBrowserCookies');
+  await cdp.send('Network.setExtraHTTPHeaders', {
+    headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE },
+  });
   await cdp.send('Network.setCookie', {
     name: 'ciao_sid',
     value: freshSessionSecret,

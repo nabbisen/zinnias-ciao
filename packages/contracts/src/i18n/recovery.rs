@@ -16,3 +16,25 @@ pub const JA_RECOVERY_CODE_LABEL: &str = "復旧コード";
 pub const JA_RECOVERY_SUBMIT: &str = "サインイン";
 pub const JA_RECOVERY_INVALID: &str =
     "このコードは使用できません。すでに使われているか、正しくない可能性があります。";
+
+/// RFC-083 Slice D2a (Handoff 075) locale-aware pairs; see `i18n::Localized`.
+pub const RECOVERY_TITLE: super::Localized = super::Localized {
+    ja: JA_RECOVERY_TITLE,
+    en: EN_RECOVERY_TITLE,
+};
+pub const RECOVERY_BODY: super::Localized = super::Localized {
+    ja: JA_RECOVERY_BODY,
+    en: EN_RECOVERY_BODY,
+};
+pub const RECOVERY_CODE_LABEL: super::Localized = super::Localized {
+    ja: JA_RECOVERY_CODE_LABEL,
+    en: EN_RECOVERY_CODE_LABEL,
+};
+pub const RECOVERY_SUBMIT: super::Localized = super::Localized {
+    ja: JA_RECOVERY_SUBMIT,
+    en: EN_RECOVERY_SUBMIT,
+};
+pub const RECOVERY_INVALID: super::Localized = super::Localized {
+    ja: JA_RECOVERY_INVALID,
+    en: EN_RECOVERY_INVALID,
+};

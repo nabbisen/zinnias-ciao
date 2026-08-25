@@ -27,6 +27,7 @@
 
 import { prepareIsolatedWorkerTest } from '../lib/isolated-worker-test.mjs';
 import { attachCspViolationCapture, readCspViolations } from '../lib/csp-violation-capture.mjs';
+import { SMOKE_ACCEPT_LANGUAGE } from '../lib/smoke-locale.mjs';
 
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
@@ -489,6 +490,9 @@ try {
   await cdp.send('Runtime.enable');
   await cdp.send('Network.enable');
   await cdp.send('Network.clearBrowserCookies');
+  await cdp.send('Network.setExtraHTTPHeaders', {
+    headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE },
+  });
   // The proof: application JavaScript is fully disabled for the page before
   // the flow ever starts. `Runtime.evaluate` below still works — it runs
   // through the DevTools Protocol's own instrumentation, the same channel

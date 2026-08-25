@@ -15,6 +15,7 @@
 //! this depends on holding codebase-wide, not just here.
 
 use worker::{Env, Request, Response, Result};
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
@@ -69,6 +70,12 @@ pub async fn post_link(mut req: Request, env: &Env, rid: &str) -> Result<Respons
         ConsumeResult::Proceed => {}
     }
 
+    // RFC-083 D2b (deferred to its own RFC, not this package): the account
+    // tier has a session but no single community-scoped ui_language to
+    // resolve a locale from — same reasoning as this file's own
+    // LOCALIZATION_EXCEPTIONS entry. The literal `Locale::Ja` below matches
+    // this call site's unchanged current behaviour exactly; it is not a
+    // new resolution decision.
     let origin = crate::handlers::identity::request_origin(&req)?;
     crate::handlers::identity::start_oidc_transaction(
         env,
@@ -78,6 +85,7 @@ pub async fn post_link(mut req: Request, env: &Env, rid: &str) -> Result<Respons
         Some(&auth.user_id),
         "/account",
         true,
+        Locale::Ja,
     )
     .await
 }

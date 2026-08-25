@@ -2,6 +2,7 @@
 // Scenario smoke for RFC-067 monthly attendance matrix. Local wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
 import { createHmac } from 'node:crypto';
@@ -285,7 +286,7 @@ async function setSession(cdp, sessionSecret) {
     sameSite: 'Strict',
   });
   await cdp.send('Network.setExtraHTTPHeaders', {
-    headers: { Cookie: `ciao_sid=${sessionSecret}` },
+    headers: { Cookie: `ciao_sid=${sessionSecret}`, "Accept-Language": SMOKE_ACCEPT_LANGUAGE },
   });
 }
 

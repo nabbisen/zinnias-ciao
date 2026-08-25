@@ -1,6 +1,7 @@
 //! Public active-member help-signin redemption — RFC-024.
 
 use worker::{Env, Request, Response, Result};
+use zinnias_ciao_contracts::Locale;
 use zinnias_ciao_contracts::auth::token_purpose;
 use zinnias_ciao_contracts::i18n;
 
@@ -24,13 +25,19 @@ pub async fn get_relink(req: Request, env: &Env, _rid: &str) -> Result<Response>
         Err(crate::session::AuthError::Unauthenticated) => {}
         Err(error) => return Err(error.into_worker_error()),
     }
+    // RFC-083 §8.1: no membership on this route (rung 1 never applies) —
+    // resolve from Accept-Language (rung 2), falling to Japanese (rung 3).
+    let locale = crate::authz::resolve_anonymous_locale(&req);
     let token = relink_form_token(env).await?;
-    render_relink_form(&token, None)
+    render_relink_form(&token, None, locale)
 }
 
 // ── POST /relink ─────────────────────────────────────────────────────────
 
 pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Response> {
+    // Resolved before body parsing so it is available on every error path.
+    let locale = crate::authz::resolve_anonymous_locale(&req);
+
     // Direct-edge ingress validation runs before body parsing, form-token
     // D1 access, limiter access, and application D1 access (RFC-078). A
     // rejection returns the fixed generic 503 without touching D1 or
@@ -60,7 +67,7 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
     .await?;
     if matches!(consumed, ConsumeResult::Replay(_)) {
         worker::console_log!("[{}] relink rejected: reason=form_replay", rid);
-        return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
+        return refresh_relink_form(env, Some(i18n::t(locale, i18n::RELINK_INVALID)), locale).await;
     }
 
     match abuse_control::reserve(env, pepper.as_str(), Scope::Relink, &client_network).await {
@@ -69,12 +76,16 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
             retry_after_seconds,
         } => {
             abuse_control::log_blocked(rid, "relink", Scope::Relink);
-            let resp = refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await?;
+            let resp =
+                refresh_relink_form(env, Some(i18n::t(locale, i18n::RELINK_INVALID)), locale)
+                    .await?;
             return abuse_control::apply_blocked(resp, retry_after_seconds);
         }
         Outcome::Unavailable { category } => {
             abuse_control::log_unavailable(rid, "relink", Scope::Relink, category);
-            let resp = refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await?;
+            let resp =
+                refresh_relink_form(env, Some(i18n::t(locale, i18n::RELINK_INVALID)), locale)
+                    .await?;
             return Ok(resp.with_status(503));
         }
     }
@@ -83,7 +94,7 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
     let code_hmac = hmac_hex(pepper.as_str(), &normalized);
     let Some(target) = relink_db::find_valid_by_hmac(&db, &code_hmac).await? else {
         worker::console_log!("[{}] relink rejected: reason=no_valid_relink", rid);
-        return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
+        return refresh_relink_form(env, Some(i18n::t(locale, i18n::RELINK_INVALID)), locale).await;
     };
 
     let session_secret = random_token();
@@ -97,7 +108,8 @@ pub async fn post_relink(mut req: Request, env: &Env, rid: &str) -> Result<Respo
             .is_none()
         {
             worker::console_log!("[{}] relink rejected: reason=claim_lost", rid);
-            return refresh_relink_form(env, Some(i18n::JA_RELINK_INVALID)).await;
+            return refresh_relink_form(env, Some(i18n::t(locale, i18n::RELINK_INVALID)), locale)
+                .await;
         }
         return Err(error);
     }
@@ -121,12 +133,16 @@ async fn relink_form_token(env: &Env) -> Result<String> {
     crate::form_token::issue(&db, pepper.as_str(), "", token_purpose::REDEEM_RELINK, None).await
 }
 
-async fn refresh_relink_form(env: &Env, error: Option<&'static str>) -> Result<Response> {
+async fn refresh_relink_form(
+    env: &Env,
+    error: Option<&'static str>,
+    locale: Locale,
+) -> Result<Response> {
     let token = relink_form_token(env).await?;
-    render_relink_form(&token, error)
+    render_relink_form(&token, error, locale)
 }
 
-fn render_relink_form(token: &str, error: Option<&str>) -> Result<Response> {
+fn render_relink_form(token: &str, error: Option<&str>, locale: Locale) -> Result<Response> {
     let error_html = error
         .map(|e| {
             format!(
@@ -135,6 +151,7 @@ fn render_relink_form(token: &str, error: Option<&str>) -> Result<Response> {
             )
         })
         .unwrap_or_default();
+    let title = i18n::t(locale, i18n::RELINK_TITLE);
     let body = format!(
         "<main class=\"cz-anon-main\">\
          <h1 class=\"cz-anon-title\">{title}</h1>\
@@ -150,12 +167,57 @@ fn render_relink_form(token: &str, error: Option<&str>) -> Result<Response> {
              {submit}</button>\
          </form>\
          </main>",
-        title = i18n::JA_RELINK_TITLE,
-        body = i18n::JA_RELINK_BODY,
+        title = title,
+        body = i18n::t(locale, i18n::RELINK_BODY),
         error_html = error_html,
         tok = escape_html(token),
-        code_label = i18n::JA_RELINK_CODE_LABEL,
-        submit = i18n::JA_RELINK_SUBMIT,
+        code_label = i18n::t(locale, i18n::RELINK_CODE_LABEL),
+        submit = i18n::t(locale, i18n::RELINK_SUBMIT),
     );
-    render::page(i18n::JA_RELINK_TITLE, &body)
+    render::page_localized(locale, title, &body)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Duplicated locally per `admin/members.rs`'s own precedent (Handoff
+    /// 072) rather than shared/exported.
+    fn contains_japanese_codepoint(s: &str) -> bool {
+        s.chars().any(|c| {
+            let cp = c as u32;
+            (0x3040..=0x30FF).contains(&cp)
+                || (0x4E00..=0x9FFF).contains(&cp)
+                || (0x3000..=0x303F).contains(&cp)
+                || (0xFF00..=0xFFEF).contains(&cp)
+        })
+    }
+
+    /// Handoff 075 §8: this anonymous page has no header or nav — composes
+    /// the same body pieces `render_relink_form` assembles, at
+    /// `Locale::En`, with a `Locale::Ja` discriminating half.
+    #[test]
+    fn relink_form_renders_with_no_japanese_codepoint_in_english_locale() {
+        let en_body = format!(
+            "{title}{body}{code_label}{submit}",
+            title = i18n::t(Locale::En, i18n::RELINK_TITLE),
+            body = i18n::t(Locale::En, i18n::RELINK_BODY),
+            code_label = i18n::t(Locale::En, i18n::RELINK_CODE_LABEL),
+            submit = i18n::t(Locale::En, i18n::RELINK_SUBMIT),
+        );
+        assert!(
+            !contains_japanese_codepoint(&en_body),
+            "English-locale relink form must contain no Japanese codepoint, found some in: {en_body}"
+        );
+
+        let ja_body = format!(
+            "{title}{body}",
+            title = i18n::t(Locale::Ja, i18n::RELINK_TITLE),
+            body = i18n::t(Locale::Ja, i18n::RELINK_BODY),
+        );
+        assert!(
+            contains_japanese_codepoint(&ja_body),
+            "Japanese-locale relink form render must contain Japanese text"
+        );
+    }
 }

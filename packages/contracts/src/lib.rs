@@ -15,7 +15,7 @@ pub use auth::{
 };
 pub use error::{AppError, ErrorCode};
 pub use html::escape_html;
-pub use locale::Locale;
+pub use locale::{Locale, negotiate_accept_language};
 
 /// Build a comma-separated list of positional D1 placeholders for IN clauses.
 /// `build_in_placeholders(3, 0)` → `"?1, ?2, ?3"`.

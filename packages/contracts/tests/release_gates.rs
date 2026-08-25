@@ -1788,7 +1788,7 @@ fn rfc081_recovery_route_is_abuse_limited_before_any_credential_lookup() {
          starve the other (Handoff 057 §5.2)"
     );
     assert!(
-        RECOVERY_HANDLER_SRC.contains("JA_RECOVERY_INVALID")
+        RECOVERY_HANDLER_SRC.contains("i18n::RECOVERY_INVALID") // RFC-072/Handoff 075 locale-aware accessor
             && !RECOVERY_HANDLER_SRC.contains("already used")
             && !RECOVERY_HANDLER_SRC.contains("revoked")
             && !RECOVERY_HANDLER_SRC.contains("expired"),
@@ -1906,7 +1906,7 @@ fn rfc024_redemption_is_single_use_generic_and_revokes_old_sessions() {
         "RFC-024 redemption must mark codes used with a conditional single-use update"
     );
     assert!(
-        RELINK_HANDLER_SRC.contains("JA_RELINK_INVALID")
+        RELINK_HANDLER_SRC.contains("i18n::RELINK_INVALID") // RFC-072/Handoff 075 locale-aware accessor
             && !RELINK_HANDLER_SRC.contains("already used")
             && !RELINK_HANDLER_SRC.contains("wrong community"),
         "RFC-024 redemption failures must use one generic error"
@@ -2754,30 +2754,6 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
         reason: "account tier has a session but no single community-scoped ui_language to resolve a locale from, RFC-072 Slice D (Handoff 057)",
     },
     LocalizationException {
-        path: "handlers/recovery.rs",
-        ja_count: 10,
-        bare_helper_calls: 1,
-        reason: "anonymous route, no membership/session yet, RFC-072 Slice D — matches handlers/relink.rs's own convention (Handoff 057)",
-    },
-    LocalizationException {
-        path: "handlers/identity/mod.rs",
-        ja_count: 6,
-        bare_helper_calls: 1,
-        reason: "anonymous route, no membership/session yet, RFC-072 Slice D — matches handlers/join.rs's own convention (Handoff 054)",
-    },
-    LocalizationException {
-        path: "handlers/join.rs",
-        ja_count: 18,
-        bare_helper_calls: 2,
-        reason: "anonymous route, no membership/session yet, RFC-072 Slice D",
-    },
-    LocalizationException {
-        path: "handlers/relink.rs",
-        ja_count: 10,
-        bare_helper_calls: 1,
-        reason: "anonymous route, no membership/session yet, RFC-072 Slice D",
-    },
-    LocalizationException {
         path: "render/errors.rs",
         ja_count: 20,
         bare_helper_calls: 0,
@@ -2795,16 +2771,21 @@ const LOCALIZATION_EXCEPTIONS: &[LocalizationException] = &[
 /// the last two admin files, `templates.rs` and `export.rs`: 12→10 entries,
 /// 121→98 `ja_count` sites, and — the third dimension this table has
 /// carried since Handoff 073 but never had its own shrink-only total until
-/// now — 14→8 `bare_helper_calls` sites. This closes RFC-083 Slice D1: the
-/// ten entries remaining are the three structurally-unresolvable files and
-/// D2's seven. A future addition to the table must lower these pinned
-/// values deliberately, not raise them: growth here means a page stopped
-/// being localized, not a documented decision to leave one alone.
+/// then — 14→8 `bare_helper_calls` sites, closing RFC-083 Slice D1. Handoff
+/// 075 (RFC-083 Slice D2a) converted the four anonymous/redemption routes
+/// (`join.rs`, `relink.rs`, `recovery.rs`, `identity/mod.rs`): 10→6
+/// entries, 98→54 `ja_count` sites, 8→3 `bare_helper_calls`. The six
+/// entries remaining are the three structurally-unresolvable files
+/// (RFC-083 §4.4) and D2b's three account surfaces (deferred to their own
+/// RFC — `ui_language` is per-membership, not per-user). A future addition
+/// to the table must lower these pinned values deliberately, not raise
+/// them: growth here means a page stopped being localized, not a
+/// documented decision to leave one alone.
 #[test]
 fn rfc083_localization_exceptions_table_only_shrinks() {
     assert_eq!(
         LOCALIZATION_EXCEPTIONS.len(),
-        10,
+        6,
         "LOCALIZATION_EXCEPTIONS grew to {} entries. This table is shrink-only \
          (RFC-083 §6.1) — re-pin this value only alongside a deliberate, reviewed \
          decision to leave a newly-discovered file unlocalized, never to make a \
@@ -2813,7 +2794,7 @@ fn rfc083_localization_exceptions_table_only_shrinks() {
     );
     let total_sites: usize = LOCALIZATION_EXCEPTIONS.iter().map(|e| e.ja_count).sum();
     assert_eq!(
-        total_sites, 98,
+        total_sites, 54,
         "LOCALIZATION_EXCEPTIONS site total grew to {total_sites}. Re-pin only \
          alongside a reviewed, deliberate change to an individual entry's ja_count."
     );
@@ -2822,11 +2803,38 @@ fn rfc083_localization_exceptions_table_only_shrinks() {
         .map(|e| e.bare_helper_calls)
         .sum();
     assert_eq!(
-        total_bare_helper_calls, 8,
+        total_bare_helper_calls, 3,
         "LOCALIZATION_EXCEPTIONS bare_helper_calls total grew to {total_bare_helper_calls}. \
          Re-pin only alongside a reviewed, deliberate change to an individual entry's \
          bare_helper_calls."
     );
+}
+
+/// RFC-083 §6.3 (Handoff 075): these four anonymous/redemption routes must
+/// rely on `lib.rs`'s default `Cache-Control: no-store` (set only when a
+/// handler hasn't already set one — `lib.rs:281`) rather than opting into
+/// caching themselves. A cacheable response on any of these routes risks
+/// serving one visitor's negotiated locale, or a redemption outcome, to
+/// the next visitor sharing that cache entry. None of the four may write
+/// a `Cache-Control` header anywhere in their own source.
+#[test]
+fn anonymous_routes_rely_on_the_default_no_store_cache_control() {
+    let identity_mod_path = workers_ssr_src_dir().join("handlers/identity/mod.rs");
+    let identity_mod = std::fs::read_to_string(&identity_mod_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", identity_mod_path.display()));
+    for (name, source) in [
+        ("handlers/join.rs", JOIN_HANDLER_SRC),
+        ("handlers/relink.rs", RELINK_HANDLER_SRC),
+        ("handlers/recovery.rs", RECOVERY_HANDLER_SRC),
+        ("handlers/identity/mod.rs", identity_mod.as_str()),
+    ] {
+        assert!(
+            !source.contains("Cache-Control"),
+            "{name} must not set its own Cache-Control header — these anonymous/redemption \
+             routes rely on lib.rs's default `no-store` (lib.rs:281). A route-specific value \
+             here would risk making a redemption or locale-bearing response cacheable."
+        );
+    }
 }
 
 /// The tripwire ROADMAP.md's "The default language flips to English when
@@ -5955,6 +5963,118 @@ fn every_smoke_script_is_reachable_by_name_or_documented_exception() {
     }
 }
 
+/// Handoff 076 (F1 of the Handoff 076 review): a documented exception to the
+/// Accept-Language pin gate below. `reason` must say why the script
+/// genuinely does not need the pin (e.g. it never opens a page at all) —
+/// never used to make a missed import pass quietly.
+struct SmokeLanguagePinException {
+    path: &'static str,
+    reason: &'static str,
+}
+
+/// Empty by design: every `scripts/smoke/*.mjs` that launches a sandboxed
+/// Chromium was given the pin (Handoff 076) rather than excepted. A future
+/// addition here should be rare and should say why the pin genuinely
+/// doesn't apply, not why nobody got around to it.
+const SMOKE_LANGUAGE_PIN_EXCEPTIONS: &[SmokeLanguagePinException] = &[];
+
+/// Handoff 076, origin F1 of its own review
+/// (`.git-exclude/reviewed/zinnias-ciao-main-2026-08-16-pin-smoke-accept-language-and-prove-rung-2-review.md`):
+/// a hand-executed sweep (`grep -l "headless=new"` cross-referenced against
+/// `grep -l "smoke-locale"`) missed `account-recovery-and-unlink.mjs` —
+/// the sixth time in this series a manually-checked population went stale
+/// (`LOCALIZATION_EXCEPTIONS`, the smoke run set, the parity stem list, the
+/// identical-pair array, the locale-blind helper check, and now this).
+/// The fix is the same each time: derive the population instead of sweeping
+/// it by hand. This gate walks every `scripts/smoke/*.mjs` file and fails on
+/// any that launches Chromium (`--headless=new`) without also importing
+/// `scripts/lib/smoke-locale.mjs` (the shared Accept-Language pin,
+/// `SMOKE_ACCEPT_LANGUAGE`) — unless the file is listed in
+/// `SMOKE_LANGUAGE_PIN_EXCEPTIONS` with a written reason. A smoke that opens
+/// a page without the pin lets that page's rendered language, on an
+/// anonymous or re-authenticating route, depend on the developer machine's
+/// `LANG` rather than a fixed value — exactly the defect this whole package
+/// exists to remove.
+#[test]
+fn every_chromium_smoke_pins_accept_language_or_documented_exception() {
+    let dir = scripts_smoke_dir();
+    let entries = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("failed to read directory {}: {e}", dir.display()));
+
+    let mut checked = 0usize;
+    let mut launches_chromium = 0usize;
+    let mut unpinned: Vec<String> = Vec::new();
+    let mut seen_exceptions = std::collections::HashSet::new();
+
+    for entry in entries {
+        let path = entry
+            .unwrap_or_else(|e| panic!("failed to read directory entry: {e}"))
+            .path();
+        if path.is_dir() || !path.extension().is_some_and(|ext| ext == "mjs") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        checked += 1;
+        if !content.contains("headless=new") {
+            continue;
+        }
+        launches_chromium += 1;
+        let pinned = content.contains("smoke-locale.mjs");
+
+        match SMOKE_LANGUAGE_PIN_EXCEPTIONS
+            .iter()
+            .find(|e| e.path == name)
+        {
+            Some(exc) => {
+                seen_exceptions.insert(exc.path);
+                assert!(
+                    !pinned,
+                    "{name} both imports scripts/lib/smoke-locale.mjs AND is listed in \
+                     SMOKE_LANGUAGE_PIN_EXCEPTIONS ({}) — remove the now-stale exception entry.",
+                    exc.reason
+                );
+            }
+            None => {
+                if !pinned {
+                    unpinned.push(name);
+                }
+            }
+        }
+    }
+
+    assert!(
+        checked > 0,
+        "found zero .mjs files under scripts/smoke/ — has the directory moved? This gate \
+         expects the existing scripts to still be there; an empty result likely means the gate \
+         itself is broken, not that there is nothing left to check."
+    );
+    assert!(
+        launches_chromium > 0,
+        "found zero scripts/smoke/*.mjs files launching Chromium (`--headless=new`) — has every \
+         smoke stopped using a real browser, or is this gate's own marker string stale?"
+    );
+    assert!(
+        unpinned.is_empty(),
+        "these scripts/smoke/*.mjs files launch Chromium without importing \
+         scripts/lib/smoke-locale.mjs and are not in SMOKE_LANGUAGE_PIN_EXCEPTIONS: {} — merge \
+         SMOKE_ACCEPT_LANGUAGE into every Network.setExtraHTTPHeaders call the script makes, or \
+         add a pinned exception with a written reason. This is the defect that let \
+         account-recovery-and-unlink.mjs go unpinned without anyone noticing.",
+        unpinned.join(", ")
+    );
+    for exc in SMOKE_LANGUAGE_PIN_EXCEPTIONS {
+        assert!(
+            seen_exceptions.contains(exc.path),
+            "SMOKE_LANGUAGE_PIN_EXCEPTIONS names {} ({}) but no file with that name exists under \
+             scripts/smoke/, or it does not launch Chromium — stale table entry?",
+            exc.path,
+            exc.reason
+        );
+    }
+}
+
 /// Handoff 063 §3.3's cross-language pin: `recurrence-v2.mjs` cannot import
 /// `RECURRENCE_MATERIALIZATION_MONTHS_AHEAD` from Rust, so it carries its own
 /// literal copy, used to derive a "definitely outside the horizon" Calendar
@@ -6252,18 +6372,35 @@ fn prompt_login_is_sent_for_link_and_reauthentication() {
         .map(|offset| offset + 1)
         .unwrap_or(call_site.len());
     let arguments = &call_site[..call_end];
-    let last_argument = arguments
+    // Handoff 075 added an eighth argument (the locale — see below), so
+    // `send_prompt_login` is now the second-from-last segment, not the
+    // last. Collected in reverse (last argument first) rather than
+    // re-anchored to a fixed count, so this keeps working if another
+    // trailing argument is ever added the same way.
+    let trailing_segments: Vec<&str> = arguments
         .trim_end_matches([')', '\n', ' '])
         .rsplit(',')
-        .find(|segment| !segment.trim().is_empty())
         .map(str::trim)
-        .unwrap_or("");
+        .filter(|segment| !segment.is_empty())
+        .collect();
+    let last_argument = trailing_segments.first().copied().unwrap_or("");
+    let send_prompt_login_argument = trailing_segments.get(1).copied().unwrap_or("");
     assert_eq!(
-        last_argument, "true",
+        send_prompt_login_argument, "true",
         "post_link's start_oidc_transaction call must pass true for send_prompt_login (found \
-         {last_argument:?}) — link's own case is unconditional (proven by \
+         {send_prompt_login_argument:?}) — link's own case is unconditional (proven by \
          link_always_sends_prompt_login_regardless_of_session_state), so a literal true here is \
          the correct, equivalent value, not a bypass of a different decision"
+    );
+    // RFC-083 D2b (Handoff 075): account/link.rs stays a literal Japanese
+    // default pending its own RFC — the account tier has no single
+    // resolvable locale yet. A change here would be new D2b resolution
+    // logic, out of scope for this gate's own package.
+    assert_eq!(
+        last_argument, "Locale::Ja",
+        "post_link's start_oidc_transaction call must pass the literal Locale::Ja locale \
+         argument (found {last_argument:?}) — account/link.rs is D2b, deferred to its own RFC; \
+         anything else here would be new, unauthorized resolution logic"
     );
 }
 

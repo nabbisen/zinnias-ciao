@@ -2,16 +2,20 @@
 // Screenshot evidence for RFC-075 Slice 6 (admin tools and onboarding CSS
 // migration): the join form, the relink form, the create-community form,
 // the templates list, and the export page, at mobile width and 200% text.
-// Japanese only, by documented decision (RFC-072 Slice D for the admin
-// tools; anonymous/no-locale for join and relink) — no English rendering
-// exists for any of these pages. Functional behavior — including the
-// invite-redemption and relink security paths — is already covered by
+// Japanese, via the shared smoke harness's pinned `Accept-Language`
+// (`scripts/lib/smoke-locale.mjs`, Handoff 076) — the admin tools render
+// Japanese only by documented decision (RFC-072 Slice D), but join/relink
+// now negotiate a real locale (RFC-083 §8.1 rung 2, Handoff 075) and would
+// render in whatever language the sandboxed browser sends without that
+// pin. Functional behavior — including the invite-redemption and relink
+// security paths, and rung 2 itself — is already covered by
 // scripts/smoke/invite-redemption.mjs and the RFC-076/RFC-078 native test
 // suites, all untouched by this slice; this script exists only to capture
 // the required visual evidence and numeric 200% margins for the CSS
 // extraction itself.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
 import { createHmac } from 'node:crypto';
@@ -229,7 +233,13 @@ async function newPage(sessionSecret) {
   await cdp.send('Runtime.enable');
   await cdp.send('Network.enable');
   await attachCspViolationCapture(cdp);
-  if (sessionSecret) await setSession(cdp, sessionSecret);
+  if (sessionSecret) {
+    await setSession(cdp, sessionSecret);
+  } else {
+    await cdp.send("Network.setExtraHTTPHeaders", {
+      headers: { "Accept-Language": SMOKE_ACCEPT_LANGUAGE },
+    });
+  }
   return cdp;
 }
 
@@ -244,7 +254,7 @@ async function setSession(cdp, sessionSecret) {
     sameSite: 'Strict',
   });
   await cdp.send('Network.setExtraHTTPHeaders', {
-    headers: { Cookie: `ciao_sid=${sessionSecret}` },
+    headers: { Cookie: `ciao_sid=${sessionSecret}`, "Accept-Language": SMOKE_ACCEPT_LANGUAGE },
   });
 }
 
@@ -420,7 +430,7 @@ try {
     baseUrl,
     userDataDir,
     flags,
-    note: 'Evidence capture only (screenshots + numeric 200% margins). Functional and security behavior (RFC-076/RFC-078) is covered by scripts/smoke/invite-redemption.mjs and the native test suites, both re-run/re-checked unmodified for this slice. Japanese only — join.rs/relink.rs are anonymous with no locale to resolve, and the admin tools are RFC-072 Slice D.',
+    note: 'Evidence capture only (screenshots + numeric 200% margins). Functional and security behavior (RFC-076/RFC-078) is covered by scripts/smoke/invite-redemption.mjs and the native test suites, both re-run/re-checked unmodified for this slice. Japanese via the shared harness\'s pinned Accept-Language (scripts/lib/smoke-locale.mjs, Handoff 076) — join.rs/relink.rs now negotiate a real locale (RFC-083 §8.1 rung 2), and the admin tools are RFC-072 Slice D.',
     localOnlyGuard: true,
     results,
     passed: results.every((result) => result.passed),

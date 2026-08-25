@@ -2,12 +2,12 @@
 //! A missing or removed membership returns the same generic not-found response
 //! as a nonexistent resource, so private resource existence is never revealed.
 
-use worker::{Env, Result};
+use worker::{Env, Request, Result};
 
 use crate::db::membership as membership_db;
 use crate::db::session::SessionProvenance;
 use crate::session::AuthContext;
-use zinnias_ciao_contracts::Locale;
+use zinnias_ciao_contracts::{Locale, negotiate_accept_language};
 
 /// RFC-080 §6 / Handoff 055 §5.2: account-level operations are rare and
 /// deliberate — a member performing one has just decided to. Fifteen
@@ -151,6 +151,31 @@ pub async fn require_membership(
         display_name: row.display_name,
         locale: row.locale,
     })
+}
+
+/// RFC-083 §8.1 rung 2 (Handoff 075): resolves a locale for a request that
+/// has **no membership to read one from** — the anonymous/redemption
+/// routes (`/join`, `/relink`, `/recovery`, the identity callback). Rung 1
+/// (a stored membership preference, via `MembershipContext.locale`)
+/// **always outranks this** — a caller on any path where a membership
+/// already exists must resolve from that instead and must never call this
+/// function, so a member who chose Japanese can never see English because
+/// their browser said so.
+///
+/// Negotiates the `Accept-Language` header (`negotiate_accept_language`)
+/// and falls through to `Locale::default()` (rung 3, Japanese) when the
+/// header is absent, empty, or negotiates to no match — this function
+/// never returns an unresolved state, matching every other locale
+/// resolution call site in this codebase. The raw header value itself is
+/// read and immediately discarded here; only the resulting two-valued
+/// `Locale` ever leaves this function.
+pub fn resolve_anonymous_locale(req: &Request) -> Locale {
+    req.headers()
+        .get("Accept-Language")
+        .ok()
+        .flatten()
+        .and_then(|header| negotiate_accept_language(&header))
+        .unwrap_or_default()
 }
 
 /// Like `require_membership`, but also checks that the user is an admin.
