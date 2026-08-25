@@ -3041,3 +3041,79 @@ taken.
       text (only which named constant produces the same Japanese value),
       so this confirms nothing shifted.
 - [x] Evidence baseline unchanged at 996.
+
+## Handoff 078: the smoke fixtures pin `ui_language`, proven by a temporary flip
+
+No fixture sets `ui_language`, and no application insert path backfills it
+either — so every seeded membership was `NULL`, and every signed-in smoke
+page resolved through `Locale::PRODUCT_DEFAULT` (Japanese today, but
+ROADMAP.md's now-due English-default decision moves it). Flipping that one
+line would have flipped every Japanese-asserting smoke with it, for a
+reason with nothing to do with the product — the same ambient-state
+dependence Handoff 076 removed for `Accept-Language`.
+
+- [x] **A shared, idempotent pin**: `scripts/lib/smoke-fixture-locale.mjs`
+      exports `PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL` —
+      `UPDATE community_memberships SET ui_language = 'ja' WHERE
+      ui_language IS NULL`. Safe to call repeatedly; never overwrites a
+      value a smoke set deliberately.
+- [x] **Placement, not just seeding**: called after fixture seeding in
+      every membership-creating smoke (22 of 23 — `abuse-controls.mjs`
+      excluded, since it never navigates a browser or checks rendered
+      text at all), **and** after `invite-redemption.mjs`'s real `/join`
+      HTTP redemption, which creates a membership through application
+      code, not a fixture `INSERT` — that row is `NULL` exactly like an
+      unseeded one.
+- [x] **A derived gate**,
+      `every_japanese_asserting_smoke_pins_fixture_ui_language_or_documented_exception`,
+      requires the pin of every smoke that asserts either a literal
+      Japanese codepoint **or** a hardcoded `htmlLang === 'ja'` comparison
+      — the second signal mattered: four scripts
+      (`rfc075-slice4/5/6/7-*.mjs`) assert `htmlLangJa` with **zero**
+      Japanese codepoints anywhere in the file, so a codepoint-only
+      derivation would have missed a real dependency (confirmed by the
+      temporary flip below, which is exactly how this was caught).
+      Comments stripped first. Demonstrated failing: removed the import
+      from a pinned script, confirmed the gate named it, restored
+      byte-identical.
+- [x] **One documented exception**: `language-preference.mjs` manages
+      `ui_language` directly with its own scoped `UPDATE` (its own
+      membership under test, by id) rather than the shared blanket pin —
+      its `otherMembershipUnaffectedThroughout` check proves the language
+      switch is membership-scoped precisely by asserting a *second*,
+      deliberately-untouched membership's `ui_language` stays `NULL`
+      forever. The blanket `WHERE ui_language IS NULL` pin would have set
+      that row to `'ja'` too, making the check pass by construction and
+      proving nothing — found by running the temporary flip, exactly the
+      failure mode §10 named in advance.
+- [x] **A second, related gap found the same way**: several raw Node
+      `fetch()` calls (not the CDP-driven browser Handoff 076 already
+      pins) carry no `Accept-Language` header at all — harmless while
+      `PRODUCT_DEFAULT` was Japanese (rung 3 coincidentally matched rung
+      2's pinned value), but for a request with no membership to resolve
+      rung 1 from either (a zero-membership account principal, an
+      anonymous identity-callback failure), rung 2 has nothing to
+      negotiate and falls straight to rung 3 — this affected
+      `account-surface.mjs`, `account-link-and-reauthentication.mjs`,
+      `account-recovery-and-unlink.mjs`, and `external-identity-callback.mjs`.
+      Fixed by pinning `Accept-Language: SMOKE_ACCEPT_LANGUAGE` on each
+      affected `fetch()` (or its shared `cookieHeader` helper), reusing
+      Handoff 076's existing constant — not a new mechanism.
+- [x] **The temporary-flip proof (§5), the package's central verification**:
+      temporarily set `Locale::PRODUCT_DEFAULT` to `Locale::En`, rebuilt,
+      ran `bun run smoke:all` — first pass surfaced the four gaps above;
+      after fixing them, a second flipped run was **25/25**. Reverted;
+      `diff` confirmed `locale.rs` byte-identical; rebuilt; a final
+      unflipped run was **25/25** again (after ruling out two transient,
+      unrelated `UND_ERR_SOCKET` failures on `smoke:membership-suspension`
+      — the same class of environment flake this project's history has
+      already named twice — both clean on immediate retry).
+- [x] **Not one assertion changed** — every fix pins an input an existing
+      assertion already depended on. **No product code touched** —
+      `workers/`, `packages/` untouched; `Locale::PRODUCT_DEFAULT` is
+      unchanged in the committed tree. **The ROADMAP tripwire untouched.**
+- [x] `cargo test --workspace --no-fail-fast`: **663 total** (was 662,
+      +1 — the new gate), 662 passing, 1 failing. `--features
+      dev_fake_issuer`: **666 total** (was 665, +1), 665 passing, 1
+      failing. The one failure in both remains the ROADMAP tripwire.
+- [x] Evidence baseline unchanged at 996.

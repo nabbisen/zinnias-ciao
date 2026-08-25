@@ -2,6 +2,7 @@
 // Scenario smoke for recurrence v2 workflows. Local wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from "../lib/smoke-fixture-locale.mjs";
 import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 
 import { createHmac } from 'node:crypto';
@@ -184,6 +185,7 @@ function seed() {
     `INSERT INTO event_days (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at, occurrence_status, series_id, series_occurrence_date) VALUES ('${materializeDayId}', '${materializeEventId}', '${communityId}', 1, '${materializeSeriesStartDayDate}', '${materializeSeriesStartDayDate}T00:00:00.000Z', '${materializeSeriesStartDayDate}T01:00:00.000Z', '${now}', 'scheduled', '${materializeSeriesId}', '${materializeSeriesStartDayDate}')`,
   ];
   for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
 }
 
 function countRows(statement) {

@@ -2,6 +2,7 @@
 // Scenario smoke for RFC-074 community switch route preservation. Local wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from "../lib/smoke-fixture-locale.mjs";
 import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
@@ -119,6 +120,7 @@ function seed() {
     dayInsert('day_rfc074_list', 'evt_rfc074_list', primaryCommunityId, 1, '2026-07-06', '2026-07-06T01:00:00.000Z', '2026-07-06T02:00:00.000Z'),
   ];
   for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
 }
 
 function membershipInsert(id, communityId, role, displayName) {

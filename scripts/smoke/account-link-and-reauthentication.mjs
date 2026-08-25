@@ -31,6 +31,7 @@
 // ordinary sign-in instead of a re-authentication.
 
 import { prepareIsolatedWorkerTest } from '../lib/isolated-worker-test.mjs';
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from '../lib/smoke-fixture-locale.mjs';
 import { attachCspViolationCapture, readCspViolations } from '../lib/csp-violation-capture.mjs';
 import { SMOKE_ACCEPT_LANGUAGE } from '../lib/smoke-locale.mjs';
 
@@ -199,6 +200,7 @@ try {
       `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance, authenticated_at) VALUES ('sess_h056_e', '${userEId}', '${sessionEHmac}', '${now}', '${farFutureExpiry}', '${now}', 'invite_redemption', '${now}')`,
     ];
     for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
   }
 
   async function waitForServer(proc, stderr) {
@@ -231,7 +233,13 @@ try {
   }
 
   function cookieHeader(secret) {
-    return { Cookie: `ciao_sid=${secret}` };
+    // Handoff 078: a raw Node fetch() carries no Accept-Language of its
+    // own (unlike a real browser), so every fetch-driven request needs
+    // this pinned explicitly too — otherwise a route with no membership
+    // to resolve rung 1 from (or none at all, in the anonymous callback
+    // case) falls through to Locale::PRODUCT_DEFAULT with nothing pinning
+    // it, exactly the ambient-state dependence this handoff removes.
+    return { Cookie: `ciao_sid=${secret}`, 'Accept-Language': SMOKE_ACCEPT_LANGUAGE };
   }
 
   async function driveAuthorize(authorizeUrl) {
@@ -303,7 +311,10 @@ try {
   });
   const linkAuthorizeUrl = postLinkA.headers.get('location');
   const linkAuthorize = await driveAuthorize(linkAuthorizeUrl ?? '');
-  const linkCallbackRes = await fetch(linkAuthorize.callbackUrl, { redirect: 'manual' });
+  const linkCallbackRes = await fetch(linkAuthorize.callbackUrl, {
+    redirect: 'manual',
+    headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE },
+  });
   // Handoff 057 §5.1: this is principal A's first-ever link, so the
   // callback now renders the account page directly (200, not a 303
   // redirect) with the newly-issued recovery credential revealed once —
@@ -366,7 +377,10 @@ try {
   });
   const collisionAuthorizeUrl = postLinkB.headers.get('location');
   const collisionAuthorize = await driveAuthorize(collisionAuthorizeUrl ?? '');
-  const collisionCallbackRes = await fetch(collisionAuthorize.callbackUrl, { redirect: 'manual' });
+  const collisionCallbackRes = await fetch(collisionAuthorize.callbackUrl, {
+    redirect: 'manual',
+    headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE },
+  });
   const collisionCallbackBody = await collisionCallbackRes.text();
   const identityRowsAfterCollision = query(
     `SELECT user_id FROM user_identities WHERE identity_namespace_id='${namespaceId}' AND subject_lookup='${fakeSubjectLookup}'`,

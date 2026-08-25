@@ -2,6 +2,7 @@
 // Scenario smoke for RFC-073 Calendar events list and day-detail UX. Local wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from "../lib/smoke-fixture-locale.mjs";
 import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
@@ -118,6 +119,7 @@ function seed() {
     dayInsert('day_rfc073_second', 'evt_rfc073_second', secondCommunityId, 1, '2026-07-20', '2026-07-20T01:00:00.000Z', '2026-07-20T02:00:00.000Z'),
   ];
   for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
 }
 
 function membershipInsert(id, communityId, userId, role, displayName) {

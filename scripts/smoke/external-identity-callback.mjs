@@ -26,6 +26,7 @@
 // shared `workers/ssr/build/` the other eleven smokes depend on.
 
 import { prepareIsolatedWorkerTest } from '../lib/isolated-worker-test.mjs';
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from '../lib/smoke-fixture-locale.mjs';
 import { attachCspViolationCapture, readCspViolations } from '../lib/csp-violation-capture.mjs';
 import { SMOKE_ACCEPT_LANGUAGE } from '../lib/smoke-locale.mjs';
 
@@ -186,6 +187,7 @@ try {
       `INSERT INTO user_identities (id, user_id, identity_namespace_id, subject_lookup, linked_at, status) VALUES ('${identityId}', '${userId}', '${namespaceId}', '${seededSubjectLookup}', '${now}', 'active')`,
     ];
     for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
   }
 
   async function waitForServer(proc, stderr) {
@@ -229,13 +231,13 @@ try {
   // its own session, it does not require one), returning every intermediate
   // response so a scenario can inspect or tamper with any hop.
   async function driveStart(action = 'sign_in') {
-    const startRes = await fetch(`${baseUrl}/identity/start?action=${action}`, { redirect: 'manual' });
+    const startRes = await fetch(`${baseUrl}/identity/start?action=${action}`, { redirect: 'manual', headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE } });
     const authorizeUrl = startRes.headers.get('location');
     return { startRes, authorizeUrl };
   }
 
   async function driveAuthorize(authorizeUrl) {
-    const authorizeRes = await fetch(authorizeUrl, { redirect: 'manual' });
+    const authorizeRes = await fetch(authorizeUrl, { redirect: 'manual', headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE } });
     const callbackUrl = authorizeRes.headers.get('location');
     return { authorizeRes, callbackUrl };
   }
@@ -256,7 +258,7 @@ try {
   logStep('scenario 1: successful sign-in issues a session with provenance external_identity');
   const s1Start = await driveStart('sign_in');
   const s1Authorize = await driveAuthorize(s1Start.authorizeUrl);
-  const s1CallbackRes = await fetch(s1Authorize.callbackUrl, { redirect: 'manual' });
+  const s1CallbackRes = await fetch(s1Authorize.callbackUrl, { redirect: 'manual', headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE } });
   const s1SetCookie = s1CallbackRes.headers.get('set-cookie');
   const { sessionHmac: s1SessionHmac } = sessionHmacFromSetCookie(s1SetCookie);
   const s1SessionRows = s1SessionHmac
@@ -289,7 +291,7 @@ try {
   // ── 2. A replayed callback is rejected ─────────────────────────────────
 
   logStep('scenario 2: replaying the same callback URL is rejected');
-  const s2ReplayRes = await fetch(s1Authorize.callbackUrl, { redirect: 'manual' });
+  const s2ReplayRes = await fetch(s1Authorize.callbackUrl, { redirect: 'manual', headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE } });
   const s2Body = await s2ReplayRes.text();
   results.push({
     name: 'replayed-callback-rejected',
@@ -309,7 +311,7 @@ try {
   const s3Authorize = await driveAuthorize(s3Start.authorizeUrl);
   const s3TamperedUrl = new URL(s3Authorize.callbackUrl);
   s3TamperedUrl.searchParams.set('state', `${s3TamperedUrl.searchParams.get('state')}-tampered`);
-  const s3Res = await fetch(s3TamperedUrl.toString(), { redirect: 'manual' });
+  const s3Res = await fetch(s3TamperedUrl.toString(), { redirect: 'manual', headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE } });
   const s3Body = await s3Res.text();
   results.push({
     name: 'tampered-state-rejected',
@@ -328,7 +330,7 @@ try {
   const s4TamperedAuthorizeUrl = new URL(s4Start.authorizeUrl);
   s4TamperedAuthorizeUrl.searchParams.set('nonce', randomToken());
   const s4Authorize = await driveAuthorize(s4TamperedAuthorizeUrl.toString());
-  const s4Res = await fetch(s4Authorize.callbackUrl, { redirect: 'manual' });
+  const s4Res = await fetch(s4Authorize.callbackUrl, { redirect: 'manual', headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE } });
   const s4Body = await s4Res.text();
   results.push({
     name: 'wrong-nonce-rejected',
@@ -368,7 +370,7 @@ try {
     `&state=${encodeURIComponent(s5State)}&nonce=${encodeURIComponent(s5Nonce)}` +
     `&code_challenge=${encodeURIComponent(s5Challenge)}&code_challenge_method=S256&scope=openid`;
   const s5Authorize = await driveAuthorize(s5AuthorizeUrl);
-  const s5Res = await fetch(s5Authorize.callbackUrl, { redirect: 'manual' });
+  const s5Res = await fetch(s5Authorize.callbackUrl, { redirect: 'manual', headers: { 'Accept-Language': SMOKE_ACCEPT_LANGUAGE } });
   results.push({
     name: 'out-of-allowlist-return-destination-refused',
     observed: {

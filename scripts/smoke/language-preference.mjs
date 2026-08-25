@@ -199,6 +199,17 @@ function seed() {
     `INSERT INTO event_days (id, event_id, community_id, seq, day_date, starts_at_utc, ends_at_utc, created_at, occurrence_status) VALUES ('${eventDayId}', '${eventId}', '${communityId}', 1, '${eventDayDate}', '${eventStartsAtUtc}', '${eventEndsAtUtc}', '${now}', 'scheduled')`,
   ];
   for (const statement of statements) sql(statement);
+  // Handoff 078: deliberately NOT the shared, blanket
+  // PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL — this smoke's own
+  // `otherMembershipUnaffectedThroughout` check (below) proves the
+  // language switch is membership-scoped precisely by asserting
+  // otherMembershipId's ui_language stays NULL forever; the blanket
+  // `WHERE ui_language IS NULL` pin would set it to 'ja' and make that
+  // check pass by construction, proving nothing (RFC-085's own §10
+  // security constraint). Only memberMembershipId — the one this smoke's
+  // *initial*-state assertions (before the first switch) depend on — is
+  // pinned, scoped by id rather than by "any NULL row."
+  sql(`UPDATE community_memberships SET ui_language = 'ja' WHERE id = '${memberMembershipId}' AND ui_language IS NULL`);
 }
 
 function sleep(ms) {

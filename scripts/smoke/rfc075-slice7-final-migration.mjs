@@ -14,6 +14,7 @@
 // evidence, numeric 200% margins, and the sticky-behavior proof.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from "../lib/smoke-fixture-locale.mjs";
 import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
@@ -142,6 +143,7 @@ function seed() {
     `INSERT INTO attendances (id, event_day_id, membership_id, status, status_updated_at, updated_at) VALUES ('att_rfc075s7_attended', 'day_rfc075s7_attended', '${memberIds[2]}', 'attended', '${now}', '${now}')`,
   );
   for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
 }
 
 function sleep(ms) {

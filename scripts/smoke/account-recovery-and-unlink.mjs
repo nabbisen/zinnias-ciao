@@ -35,6 +35,7 @@
 // written into a `results[].observed` field.
 
 import { prepareIsolatedWorkerTest } from '../lib/isolated-worker-test.mjs';
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from '../lib/smoke-fixture-locale.mjs';
 import { attachCspViolationCapture, readCspViolations } from '../lib/csp-violation-capture.mjs';
 import { SMOKE_ACCEPT_LANGUAGE } from '../lib/smoke-locale.mjs';
 
@@ -136,7 +137,11 @@ try {
   const namespaceId = 'idns_local_fake';
 
   function cookieHeader(secret) {
-    return { Cookie: `ciao_sid=${secret}` };
+    // Handoff 078: a raw Node fetch() carries no Accept-Language of its
+    // own (unlike a real browser), so this must be pinned explicitly too
+    // — otherwise a route with no membership to resolve rung 1 from falls
+    // through to Locale::PRODUCT_DEFAULT with nothing pinning it.
+    return { Cookie: `ciao_sid=${secret}`, 'Accept-Language': SMOKE_ACCEPT_LANGUAGE };
   }
 
   function withoutSessionId(rows) {
@@ -305,6 +310,7 @@ try {
       seedSession('sess_h057_nojs', noJsUserId, noJsSessionHmac, 'external_identity', null, now),
     ];
     for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
   }
 
   async function waitForServer(proc, stderr) {
@@ -391,7 +397,9 @@ try {
   }
 
   async function getRecoveryToken(clientIp) {
-    const res = await fetch(`${baseUrl}/recovery`, { headers: { 'CF-Connecting-IP': clientIp } });
+    const res = await fetch(`${baseUrl}/recovery`, {
+      headers: { 'CF-Connecting-IP': clientIp, 'Accept-Language': SMOKE_ACCEPT_LANGUAGE },
+    });
     const body = await res.text();
     return extractToken(body);
   }
@@ -400,7 +408,11 @@ try {
     return fetch(`${baseUrl}/recovery`, {
       method: 'POST',
       redirect: 'manual',
-      headers: { 'CF-Connecting-IP': clientIp, 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'CF-Connecting-IP': clientIp,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept-Language': SMOKE_ACCEPT_LANGUAGE,
+      },
       body: new URLSearchParams({ code, _token: token ?? '' }).toString(),
     });
   }

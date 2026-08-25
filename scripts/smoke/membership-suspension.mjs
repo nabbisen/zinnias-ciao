@@ -26,6 +26,7 @@
 //     suspend -> denied -> unsuspend -> restored, with JavaScript disabled.
 
 import { prepareIsolatedWorkerTest } from '../lib/isolated-worker-test.mjs';
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from '../lib/smoke-fixture-locale.mjs';
 import { attachCspViolationCapture, readCspViolations } from '../lib/csp-violation-capture.mjs';
 import { SMOKE_ACCEPT_LANGUAGE } from '../lib/smoke-locale.mjs';
 
@@ -210,6 +211,7 @@ try {
       seedSession('sess_h058_nojs', noJsUserId, noJsSessionHmac),
     ];
     for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
   }
 
   async function waitForServer(proc, stderr) {

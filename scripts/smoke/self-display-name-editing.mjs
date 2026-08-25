@@ -2,6 +2,7 @@
 // Scenario smoke for self display-name editing. Local wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from "../lib/smoke-fixture-locale.mjs";
 import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
@@ -134,6 +135,7 @@ function seed() {
     `INSERT INTO attendances (id, event_day_id, membership_id, status, updated_at) VALUES ('${attendanceId}', '${eventDayId}', '${memberMembershipId}', 'going', '${now}')`,
   ];
   for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
 }
 
 function sleep(ms) {

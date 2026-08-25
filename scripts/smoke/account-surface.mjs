@@ -14,6 +14,7 @@
 // is seeded straight into D1, no OIDC round trip involved.
 
 import { prepareIsolatedWorkerTest } from '../lib/isolated-worker-test.mjs';
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from '../lib/smoke-fixture-locale.mjs';
 import { attachCspViolationCapture, readCspViolations } from '../lib/csp-violation-capture.mjs';
 import { SMOKE_ACCEPT_LANGUAGE } from '../lib/smoke-locale.mjs';
 
@@ -165,6 +166,7 @@ try {
       `INSERT INTO sessions (id, user_id, session_hmac, created_at, expires_at, last_seen_at, provenance, scope_community_id, authenticated_at) VALUES ('sess_h055_relink', '${relinkUserId}', '${relinkSessionHmac}', '${now}', '${farFutureExpiry}', '${now}', 'relink', '${communityId}', '${now}')`,
     ];
     for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
   }
 
   async function waitForServer(proc, stderr) {
@@ -199,7 +201,12 @@ try {
   async function fetchAccount(sessionSecret) {
     return fetch(`${baseUrl}/account`, {
       redirect: 'manual',
-      headers: { Cookie: `ciao_sid=${sessionSecret}` },
+      // Handoff 078: a raw Node fetch() carries no Accept-Language of its
+      // own (unlike a real browser) — a principal with zero memberships
+      // has no rung 1 to resolve from at all, so without this the account
+      // page falls through to Locale::PRODUCT_DEFAULT with nothing
+      // pinning it.
+      headers: { Cookie: `ciao_sid=${sessionSecret}`, 'Accept-Language': SMOKE_ACCEPT_LANGUAGE },
     });
   }
 

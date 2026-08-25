@@ -2,6 +2,7 @@
 // Scenario smoke for admin-generated invite redemption. Local wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from "../lib/smoke-fixture-locale.mjs";
 import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 
 import { createHmac } from 'node:crypto';
@@ -116,6 +117,7 @@ function seed() {
     `DELETE FROM form_tokens WHERE user_id = '' OR user_id = '${adminUserId}'`,
   ];
   for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
 }
 
 function sleep(ms) {
@@ -780,6 +782,13 @@ try {
 
   logStep('completing join profile');
   await fillAndSubmitProfile(freshPage, newMemberDisplayName);
+  // Handoff 078 §3.2: this redemption just created a membership through
+  // the real application path (join.rs), not a fixture INSERT — its
+  // ui_language is NULL exactly like an unseeded row, so the pin must run
+  // here too, not only in seed(), or this membership's locale resolution
+  // would depend on Locale::PRODUCT_DEFAULT rather than the fixed value
+  // every other membership in this smoke gets.
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
   const joinedHome = await collect(freshPage);
   const redeemedInvite = query(
     `SELECT used_at FROM invite_codes WHERE code_hmac='${hmac(inviteCode)}' LIMIT 1`,

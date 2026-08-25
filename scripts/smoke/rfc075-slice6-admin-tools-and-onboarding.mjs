@@ -15,6 +15,7 @@
 // extraction itself.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from "../lib/smoke-fixture-locale.mjs";
 import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
 
@@ -115,6 +116,7 @@ function seed() {
     `INSERT INTO event_templates (id, community_id, title, location, duration_minutes, created_by_membership_id, created_at, updated_at) VALUES ('${templateId}', '${communityId}', '${esc('RFC075 Slice 6 Practice Session')}', '${esc('RFC075 Slice 6 Room')}', 90, '${adminMembershipId}', '${now}', '${now}')`,
   ];
   for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
 }
 
 function sleep(ms) {

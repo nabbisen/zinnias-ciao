@@ -6123,6 +6123,159 @@ fn every_chromium_smoke_pins_accept_language_or_documented_exception() {
     }
 }
 
+/// Handoff 078: a documented exception to the fixture-locale-pin gate
+/// below. `reason` must say why the script genuinely does not need the pin
+/// (e.g. it asserts nothing locale-dependent despite the pattern match) —
+/// never used to make a missed import pass quietly.
+struct SmokeFixtureLocalePinException {
+    path: &'static str,
+    reason: &'static str,
+}
+
+/// One entry, found while proving the shared pin's placement (RFC-085 §10
+/// / Handoff 078 §10's own named risk): `language-preference.mjs`'s
+/// `otherMembershipUnaffectedThroughout` check proves the language switch
+/// is membership-scoped by asserting a *second*, deliberately-untouched
+/// membership's `ui_language` stays `NULL` forever. The shared blanket
+/// pin (`WHERE ui_language IS NULL`) would set that row to `'ja'` too,
+/// making the check pass by construction and proving nothing — exactly
+/// the failure mode this handoff's §10 warned about. That file pins only
+/// its own membership under test, by id, inline, instead of importing the
+/// shared helper. Confirmed by running the temporary `PRODUCT_DEFAULT`
+/// flip (Handoff 078 §5): without this exception the gate would demand an
+/// import this file must not add.
+const SMOKE_FIXTURE_LOCALE_PIN_EXCEPTIONS: &[SmokeFixtureLocalePinException] = &[
+    SmokeFixtureLocalePinException {
+        path: "language-preference.mjs",
+        reason: "manages ui_language directly with its own scoped UPDATE (memberMembershipId only) — the shared blanket pin would overwrite otherMembershipId's deliberate NULL, which otherMembershipUnaffectedThroughout depends on to prove per-membership scoping",
+    },
+];
+
+/// The same codepoint ranges every Rust render test in this codebase
+/// already uses (e.g. `handlers/account/tests.rs`'s local copy) — Hiragana/
+/// Katakana, CJK Unified Ideographs, CJK punctuation, and fullwidth forms.
+fn contains_japanese_codepoint(s: &str) -> bool {
+    s.chars().any(|c| {
+        let cp = c as u32;
+        (0x3040..=0x30FF).contains(&cp)
+            || (0x4E00..=0x9FFF).contains(&cp)
+            || (0x3000..=0x303F).contains(&cp)
+            || (0xFF00..=0xFFEF).contains(&cp)
+    })
+}
+
+/// Handoff 078: a smoke depends on the fixture-locale pin if it asserts
+/// **either** a literal Japanese codepoint (a rendered string) **or** a
+/// hardcoded `=== 'ja'` / `=== "ja"` comparison (an `html lang` check) —
+/// checked against `rfc075-slice4/5/6/7-*.mjs`, which assert
+/// `htmlLangJa: observed.htmlLang === 'ja'` with **zero** Japanese
+/// codepoints anywhere in the file, so the codepoint check alone misses a
+/// real dependency. Comments stripped first, so an explanatory comment
+/// mentioning either shape (this function's own doc comment, for one)
+/// cannot make a file look like it needs the pin when it does not.
+fn asserts_japanese_locale(content: &str) -> bool {
+    let production = strip_line_comments(content);
+    contains_japanese_codepoint(&production)
+        || production.contains("=== 'ja'")
+        || production.contains("=== \"ja\"")
+}
+
+/// Handoff 078 (Handoff 076's own precedent, derived not swept): no fixture
+/// sets `ui_language`, and no application insert path backfills it either,
+/// so every seeded membership is `NULL` and every signed-in page currently
+/// resolves through `Locale::PRODUCT_DEFAULT` (Japanese today). Flipping
+/// that one line (RFC-085 reduced ROADMAP.md's English-default decision to
+/// exactly that) would flip every Japanese-asserting smoke with it, for a
+/// reason that has nothing to do with the product — the same ambient-state
+/// dependence Handoff 076 removed for `Accept-Language`. This gate walks
+/// every `scripts/smoke/*.mjs` file and fails on any that asserts Japanese
+/// locale (per [`asserts_japanese_locale`]) without importing
+/// `scripts/lib/smoke-fixture-locale.mjs` (`PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL`),
+/// unless the file is listed in `SMOKE_FIXTURE_LOCALE_PIN_EXCEPTIONS` with a
+/// written reason.
+#[test]
+fn every_japanese_asserting_smoke_pins_fixture_ui_language_or_documented_exception() {
+    let dir = scripts_smoke_dir();
+    let entries = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("failed to read directory {}: {e}", dir.display()));
+
+    let mut checked = 0usize;
+    let mut asserts_japanese = 0usize;
+    let mut unpinned: Vec<String> = Vec::new();
+    let mut seen_exceptions = std::collections::HashSet::new();
+
+    for entry in entries {
+        let path = entry
+            .unwrap_or_else(|e| panic!("failed to read directory entry: {e}"))
+            .path();
+        if path.is_dir() || !path.extension().is_some_and(|ext| ext == "mjs") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        checked += 1;
+        if !asserts_japanese_locale(&content) {
+            continue;
+        }
+        asserts_japanese += 1;
+        let pinned = content.contains("smoke-fixture-locale.mjs");
+
+        match SMOKE_FIXTURE_LOCALE_PIN_EXCEPTIONS
+            .iter()
+            .find(|e| e.path == name)
+        {
+            Some(exc) => {
+                seen_exceptions.insert(exc.path);
+                assert!(
+                    !pinned,
+                    "{name} both imports scripts/lib/smoke-fixture-locale.mjs AND is listed in \
+                     SMOKE_FIXTURE_LOCALE_PIN_EXCEPTIONS ({}) — remove the now-stale exception \
+                     entry.",
+                    exc.reason
+                );
+            }
+            None => {
+                if !pinned {
+                    unpinned.push(name);
+                }
+            }
+        }
+    }
+
+    assert!(
+        checked > 0,
+        "found zero .mjs files under scripts/smoke/ — has the directory moved? This gate \
+         expects the existing scripts to still be there; an empty result likely means the gate \
+         itself is broken, not that there is nothing left to check."
+    );
+    assert!(
+        asserts_japanese > 0,
+        "found zero scripts/smoke/*.mjs files asserting Japanese locale — has every Japanese \
+         assertion been removed, or is this gate's own detection stale?"
+    );
+    assert!(
+        unpinned.is_empty(),
+        "these scripts/smoke/*.mjs files assert Japanese locale without importing \
+         scripts/lib/smoke-fixture-locale.mjs and are not in \
+         SMOKE_FIXTURE_LOCALE_PIN_EXCEPTIONS: {} — call \
+         sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL) after every step that can create a \
+         membership (fixture seeding, and any application-created membership mid-scenario), or \
+         add a pinned exception with a written reason. Flipping Locale::PRODUCT_DEFAULT would \
+         flip this smoke's language with it otherwise.",
+        unpinned.join(", ")
+    );
+    for exc in SMOKE_FIXTURE_LOCALE_PIN_EXCEPTIONS {
+        assert!(
+            seen_exceptions.contains(exc.path),
+            "SMOKE_FIXTURE_LOCALE_PIN_EXCEPTIONS names {} ({}) but no file with that name exists \
+             under scripts/smoke/, or it no longer asserts Japanese locale — stale table entry?",
+            exc.path,
+            exc.reason
+        );
+    }
+}
+
 /// Handoff 063 §3.3's cross-language pin: `recurrence-v2.mjs` cannot import
 /// `RECURRENCE_MATERIALIZATION_MONTHS_AHEAD` from Rust, so it carries its own
 /// literal copy, used to derive a "definitely outside the horizon" Calendar

@@ -2,6 +2,7 @@
 // Scenario smoke for RFC-066 event-copy workflows. Local wrangler dev only.
 
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
+import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from "../lib/smoke-fixture-locale.mjs";
 import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 
 import { createHmac } from 'node:crypto';
@@ -146,6 +147,7 @@ function seed() {
     `INSERT INTO event_notes (id, event_id, membership_id, note, note_updated_at) VALUES ('note_rfc066_single_member', '${singleEventId}', '${memberMembershipId}', 'Do not copy this note', '${now}')`,
   ];
   for (const statement of statements) sql(statement);
+  sql(PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL);
 }
 
 function eventInsert(id, title, location, description, status, repeatRule = 'none') {
