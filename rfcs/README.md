@@ -182,6 +182,12 @@ first-real-community deployment remain No-Go while B1, B3, B4, and B5 are open.
 | 033 | Subgroups, Event Visibility, and Boundary Safety | [./proposed/033-subgroups-event-visibility-and-boundary-safety.md](./proposed/033-subgroups-event-visibility-and-boundary-safety.md) |
 | 034 | Notification-Free Quiet Mode and Attention Design | [./proposed/034-notification-free-quiet-mode-and-attention-design.md](./proposed/034-notification-free-quiet-mode-and-attention-design.md) |
 
+## Proposed — localization programme close-out (085)
+
+| ID | Title | File | Note |
+|----|-------|------|------|
+| 085 | Separate the Locale Fallbacks Before Changing the Default | [./proposed/085-separate-the-locale-fallbacks.md](./proposed/085-separate-the-locale-fallbacks.md) | **Blocks** ROADMAP.md's English-default flip, now due — the Slice D tripwire has been failing by design since `cf3baba`. `impl Default for Locale` answers three questions with one value: no preference expressed (product), a **corrupt** stored value (safety, RFC-072's SEC-5 fail-safe), and the RFC-083 §8.1 ladder's floor (product). Flipping the default would move the fail-closed answer too. Deletes the impl so the ambiguity is untypeable, splits `resolve_locale`'s `None` from `Some(unparseable)`, and names rung 3 — two call sites, no migration. Does **not** flip the default; makes the flip a one-line change with provable boundaries |
+
 ## Proposed — F7/F8 follow-ups (044–054)
 
 | ID | Title | File | Note |
