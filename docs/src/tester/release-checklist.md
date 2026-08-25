@@ -3117,3 +3117,72 @@ dependence Handoff 076 removed for `Accept-Language`.
       dev_fake_issuer`: **666 total** (was 665, +1), 665 passing, 1
       failing. The one failure in both remains the ROADMAP tripwire.
 - [x] Evidence baseline unchanged at 996.
+
+## Handoff 079: the default language flips to English — RFC-085's separation made visible
+
+ROADMAP.md's decision was due once RFC-084 closed Slice D: `Locale::PRODUCT_DEFAULT`
+moves from Japanese to English. `Locale::FAIL_CLOSED` — the separate,
+unmoving answer for a corrupt stored `ui_language` value — does not move
+with it. This is the flip RFC-085 and Handoff 078 prepared for.
+
+- [x] **The flip itself, one line**: `Locale::PRODUCT_DEFAULT: Self = Self::Ja`
+      → `Self::En` in `packages/contracts/src/locale.rs`.
+      `Locale::FAIL_CLOSED` is unchanged, still `Self::Ja`.
+- [x] **Confirmed, not assumed**: the RFC-085 re-merge gate
+      (`resolve_locale_corrupt_value_arm_references_fail_closed_not_product_default`)
+      and `locale_never_regains_a_default_impl` were re-run in isolation
+      after the flip — both still pass. They check constant *names* and
+      structural shape, not values, so they survive the flip by
+      construction, but this was verified rather than inferred from the
+      full-suite pass.
+      `resolve_locale(None)` now resolves `Locale::En`;
+      `resolve_locale(Some("fr"))` (an out-of-allow-list stored value)
+      still resolves `Locale::FAIL_CLOSED` (`Locale::Ja`), confirmed by a
+      new test — the two rungs now visibly diverge, where before the flip
+      they coincided and a value-only comparison could not have told a
+      correct separation from a silent re-merge.
+- [x] **Migration `0011` is schema-unchanged**: only its top comment was
+      corrected to stop saying every existing row renders "Japanese" —
+      `ADD COLUMN`/`CHECK` are byte-for-byte unchanged. No installed base
+      to disrupt; the service has never been deployed.
+- [x] **The ROADMAP tripwire retired**: `roadmap_english_default_tripwire_fires_when_slice_d_completes`
+      (added by Handoff 072, the sole intentional failure since `cf3baba`)
+      is deleted, not left failing-by-design or converted to pass — the
+      decision it existed to surface has been taken. Its `STRUCTURALLY_UNRESOLVABLE`
+      exception-tracking logic is deleted with it; confirmed via grep that
+      no other file references the function name.
+- [x] **The RFC-085 test that used to assert coincidence now asserts
+      divergence**: renamed to `product_default_and_fail_closed_now_hold_different_values`,
+      asserting `Locale::PRODUCT_DEFAULT == Locale::En`,
+      `Locale::FAIL_CLOSED == Locale::Ja`, and the two are `!=` each
+      other — impossible to state meaningfully before this handoff, since
+      both held the same value.
+- [x] **Doc comments corrected, named individually, not mass-replaced**:
+      `locale.rs`'s module doc, `PRODUCT_DEFAULT`/`FAIL_CLOSED`'s own doc
+      comments, `negotiate_accept_language`, and
+      `resolve_account_locale_from_memberships` in `locale.rs`;
+      `authz::resolve_anonymous_locale` in `authz.rs`; a stale comment on
+      `db::membership`'s corrupt-value test; and the one release-gate doc
+      comment and panic message in `release_gates.rs` that named "Japanese"
+      as if it were still the product default. Historical sections above
+      this one, and every `rfcs/` document, are deliberately left
+      describing what was true when they were written.
+- [x] **No panic path introduced** (SEC-5): confirmed by diff across every
+      touched file — zero new `.unwrap()`/`.expect()` calls.
+- [x] `cargo test --workspace --no-fail-fast`: **fully green for the
+      first time since `cf3baba`** — 663 total, 663 passing, 0 failing
+      (was 662 passing, 1 failing). `--features dev_fake_issuer`: 666
+      total, 666 passing, 0 failing (was 665 passing, 1 failing). The
+      ROADMAP tripwire's removal accounts for the entire delta; nothing
+      else broke or was added to the count.
+- [x] `bun run smoke:all`: **25/25**. `node scripts/test-evidence-leakage-baseline.mjs`:
+      unchanged at 996.
+- [x] `cargo clippy` (both feature states, `-D warnings`), `cargo fmt --all
+      -- --check`, `cargo check --target wasm32-unknown-unknown -p
+      zinnias-ciao-ssr`, `mdbook build docs`, `git diff --check`, and `bun
+      run build` all pass clean.
+- [x] ROADMAP.md's own entry for this decision is rewritten in place to
+      record it as taken (dated, sequenced against RFC-085 and Handoff
+      078's commits) — the one deliberate exception to this document's
+      own rule of leaving past sections as historical record, since that
+      entry described an open decision this handoff resolves.

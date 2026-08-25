@@ -160,9 +160,10 @@ pub async fn require_membership(
 /// tier, via [`resolve_account_locale`] below). A community-scoped request
 /// with a single active membership must resolve from
 /// `MembershipContext.locale` instead and must never call this function
-/// directly, so a member who chose Japanese can never see English because
-/// their browser said so — rung 1 always outranks this **wherever it
-/// resolves**.
+/// directly, so a member's own stored preference can never be overridden
+/// by whatever their browser's `Accept-Language` header happens to say —
+/// rung 1 always outranks this **wherever it resolves**, regardless of
+/// which language either one names.
 ///
 /// Negotiates the `Accept-Language` header (`negotiate_accept_language`)
 /// and falls through to `Locale::PRODUCT_DEFAULT` (rung 3, named per

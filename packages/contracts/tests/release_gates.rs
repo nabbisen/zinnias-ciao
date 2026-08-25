@@ -2829,52 +2829,6 @@ fn anonymous_routes_rely_on_the_default_no_store_cache_control() {
     }
 }
 
-/// The tripwire ROADMAP.md's "The default language flips to English when
-/// Slice D completes" (owner decision 2026-08-16) says is owed, so that
-/// decision surfaces when its trigger fires rather than depending on
-/// anyone remembering. Handoff 072 (RFC-083 Slice D1b) adds it while
-/// already touching this table.
-///
-/// The trigger, verbatim from ROADMAP.md: `LOCALIZATION_EXCEPTIONS`
-/// containing *only* the three structurally-unresolvable entries
-/// (`render/errors.rs`, `handlers/calendar.rs`, `handlers/communities.rs`
-/// — routes with no membership lookup at all, not merely "not yet
-/// converted"). Deliberately a set-equality check against fixed path
-/// strings, not a count: a numeric assertion here would be satisfiable by
-/// re-pinning a magic number without anyone confronting the actual
-/// decision, exactly the shortcut this test exists to close off. It fires
-/// only when the table narrows to precisely that set — not early (12
-/// entries remain today, nine more than the trigger) and not by shrinking
-/// the wrong subset (the other nine must be D1c/D2/D3 conversions, not a
-/// coincidental drop to three of the wrong three).
-#[test]
-fn roadmap_english_default_tripwire_fires_when_slice_d_completes() {
-    const STRUCTURALLY_UNRESOLVABLE: &[&str] = &[
-        "render/errors.rs",
-        "handlers/calendar.rs",
-        "handlers/communities.rs",
-    ];
-    let remaining: std::collections::BTreeSet<&str> =
-        LOCALIZATION_EXCEPTIONS.iter().map(|e| e.path).collect();
-    let trigger: std::collections::BTreeSet<&str> =
-        STRUCTURALLY_UNRESOLVABLE.iter().copied().collect();
-    // Handoff 073 §3.3 (F1 of the D1b review): subset, not equality. A
-    // future RFC threading render/errors.rs (RFC-083 §4.4 considered and
-    // rejected this, but did not forbid it) would shrink the table to a
-    // proper subset of the trigger set — two of the three, not all three —
-    // and an equality check would stay silent with the decision overdue.
-    assert!(
-        !remaining.is_subset(&trigger),
-        "LOCALIZATION_EXCEPTIONS now holds only entries within the three \
-         structurally-unresolvable paths ({STRUCTURALLY_UNRESOLVABLE:?}) — RFC-083 Slice D \
-         has reached completion. ROADMAP.md's \"The default language flips to English when \
-         Slice D completes\" (owner decision 2026-08-16, RFC-083 §8.2) is now due: flip \
-         Locale::default() to English and update migration 0011_membership_ui_language.sql's \
-         comment. This is not a gate to re-pin — resolve the ROADMAP decision, then delete or \
-         rewrite this test to reflect the new default."
-    );
-}
-
 /// RFC-085 §3.4/§5 (Handoff 085): `impl Default for Locale` must never
 /// return. Its whole purpose was one value silently answering three
 /// different questions (RFC-085 §2) — a member's unexpressed preference, a
@@ -3691,7 +3645,7 @@ fn rfc072_migration_0011_ui_language_check_is_closed() {
     assert!(
         !MIGRATION_0011_SRC.to_ascii_uppercase().contains("UPDATE ")
             && !MIGRATION_0011_SRC.to_ascii_uppercase().contains("DEFAULT"),
-        "RFC-072 migration 0011 must not backfill or default any existing row — NULL means Japanese fallback"
+        "RFC-072 migration 0011 must not backfill or default any existing row — NULL means the caller resolves Locale::PRODUCT_DEFAULT (RFC-085/Handoff 079), not a value baked into the row"
     );
 }
 
@@ -6182,12 +6136,17 @@ fn asserts_japanese_locale(content: &str) -> bool {
 
 /// Handoff 078 (Handoff 076's own precedent, derived not swept): no fixture
 /// sets `ui_language`, and no application insert path backfills it either,
-/// so every seeded membership is `NULL` and every signed-in page currently
-/// resolves through `Locale::PRODUCT_DEFAULT` (Japanese today). Flipping
-/// that one line (RFC-085 reduced ROADMAP.md's English-default decision to
-/// exactly that) would flip every Japanese-asserting smoke with it, for a
-/// reason that has nothing to do with the product — the same ambient-state
-/// dependence Handoff 076 removed for `Accept-Language`. This gate walks
+/// so every seeded membership is `NULL` and every signed-in page resolves
+/// through `Locale::PRODUCT_DEFAULT` — Japanese at the time this gate was
+/// written, English since Handoff 079 took ROADMAP.md's English-default
+/// decision. Flipping that one line (RFC-085 reduced the decision to
+/// exactly that) would have flipped every Japanese-asserting smoke with
+/// it, for a reason that had nothing to do with the product — the same
+/// ambient-state dependence Handoff 076 removed for `Accept-Language`.
+/// This gate's own assertions never depended on which value
+/// `PRODUCT_DEFAULT` held (it checks import presence, not rendered
+/// language), so the flip changed nothing here but this comment's tense.
+/// This gate walks
 /// every `scripts/smoke/*.mjs` file and fails on any that asserts Japanese
 /// locale (per [`asserts_japanese_locale`]) without importing
 /// `scripts/lib/smoke-fixture-locale.mjs` (`PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL`),

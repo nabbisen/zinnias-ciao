@@ -3,8 +3,9 @@
 //! Stored and transmitted as the stable code (`"ja"`/`"en"`), never a
 //! display label. Parsing is a closed allow-list: anything outside the
 //! reviewed set is a rejection, not a silent default — callers decide the
-//! fallback (Japanese, per RFC-072's resolution order), this type never
-//! guesses one on their behalf.
+//! fallback ([`Locale::PRODUCT_DEFAULT`] or [`Locale::FAIL_CLOSED`],
+//! RFC-085 §3.2 separated the two), this type never guesses one on their
+//! behalf.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Locale {
@@ -33,21 +34,23 @@ impl Locale {
         }
     }
 
-    /// RFC-085 §3.2/§3.3: the answer for a request that carries **no
+    /// RFC-085 §3.2/§3.3, ROADMAP.md's *"The default language flips to
+    /// English when Slice D completes"* (owner decision 2026-08-16, taken
+    /// by Handoff 079): the answer for a request that carries **no
     /// expressed preference at all** — a membership whose `ui_language` is
     /// SQL `NULL` (`db::membership::resolve_locale`), and rung 3 of
     /// RFC-083 §8.1's anonymous ladder, when `Accept-Language` matched
     /// nothing (`authz::resolve_anonymous_locale`). This is a **product**
-    /// decision, and the one ROADMAP.md's now-due English-default flip
-    /// changes — when it does, only this line moves.
+    /// decision, separated by RFC-085 precisely so it could move alone —
+    /// [`FAIL_CLOSED`](Self::FAIL_CLOSED) does not move with it.
     ///
     /// Deliberately **not** `impl Default for Locale`: that impl answered
-    /// this question and [`FAIL_CLOSED`](Self::FAIL_CLOSED)'s question with
-    /// one value, indistinguishably, from anywhere a bare
+    /// this question and `FAIL_CLOSED`'s question with one value,
+    /// indistinguishably, from anywhere a bare
     /// `Locale::default()`/`.unwrap_or_default()` cared to reach it
-    /// (RFC-085 §2). Removing the impl makes that conflation untypeable;
+    /// (RFC-085 §2). Removing the impl made that conflation untypeable;
     /// every caller must name which question it is answering instead.
-    pub const PRODUCT_DEFAULT: Self = Self::Ja;
+    pub const PRODUCT_DEFAULT: Self = Self::En;
 
     /// RFC-085 §3.2: the safety answer for a stored `ui_language` value
     /// that is **corrupt** — outside migration `0011`'s
@@ -57,10 +60,11 @@ impl Locale {
     /// arm). This answers "how do we fail safely," never "what do we
     /// prefer" (RFC-072: *"a bad stored value must fail safe, never
     /// panic"*) — it **must not move** when [`PRODUCT_DEFAULT`](Self::PRODUCT_DEFAULT)
-    /// does. Equal to `PRODUCT_DEFAULT` today only because both happen to
-    /// be Japanese right now, not because they are the same answer; a
-    /// dedicated test (`resolve_locale`'s test module) fails if the two
-    /// are ever re-merged into one constant.
+    /// does, and Handoff 079's flip of that constant did not touch this
+    /// one: the two now hold genuinely different values, which is RFC-085's
+    /// separation made visible rather than merely asserted. A dedicated
+    /// test (`resolve_locale`'s test module) fails if the two are ever
+    /// re-merged into one constant.
     pub const FAIL_CLOSED: Self = Self::Ja;
 }
 
@@ -94,8 +98,9 @@ const ACCEPT_LANGUAGE_MAX_ENTRIES: usize = 10;
 ///   `-`), lowercased, is tried against [`Locale::parse`]. The first
 ///   match wins.
 /// - No match anywhere returns `None`, and the caller falls through to
-///   the Japanese floor (RFC-083 §8.1 rung 3) — this function never
-///   guesses a default itself, matching [`Locale::parse`]'s own contract.
+///   [`Locale::PRODUCT_DEFAULT`] (RFC-083 §8.1 rung 3) — this function
+///   never guesses a default itself, matching [`Locale::parse`]'s own
+///   contract.
 pub fn negotiate_accept_language(header: &str) -> Option<Locale> {
     let mut entries: Vec<(f32, &str)> = header
         .split(',')
@@ -147,7 +152,7 @@ pub fn negotiate_accept_language(header: &str) -> Option<Locale> {
 /// one member. Both an empty set (nothing expressed — no memberships, or
 /// every one is `NULL`) and a set with more than one member (a genuine
 /// disagreement) return `None`; the caller falls through to rung 2
-/// (`negotiate_accept_language`), then rung 3 (Japanese).
+/// (`negotiate_accept_language`), then rung 3 ([`Locale::PRODUCT_DEFAULT`]).
 pub fn resolve_account_locale_from_memberships<'a>(
     stored_ui_languages: impl IntoIterator<Item = Option<&'a str>>,
 ) -> Option<Locale> {
@@ -193,12 +198,16 @@ mod tests {
     }
 
     #[test]
-    fn product_default_and_fail_closed_are_both_japanese_today() {
-        // RFC-085 §3.2: unchanged values — this package separates the two
-        // questions, it does not answer either differently. Two distinct
-        // constants, not two spellings of the same answer.
-        assert_eq!(Locale::PRODUCT_DEFAULT, Locale::Ja);
+    fn product_default_and_fail_closed_now_hold_different_values() {
+        // Handoff 079 took ROADMAP.md's English-default decision: this is
+        // the clearest evidence RFC-085's separation achieved what it set
+        // out to. Before the flip both constants were Locale::Ja and this
+        // test could not have told a re-merge from a coincidence; now they
+        // genuinely diverge, which is only possible because they were
+        // already two separate, independently-named constants.
+        assert_eq!(Locale::PRODUCT_DEFAULT, Locale::En);
         assert_eq!(Locale::FAIL_CLOSED, Locale::Ja);
+        assert_ne!(Locale::PRODUCT_DEFAULT, Locale::FAIL_CLOSED);
     }
 
     // ── negotiate_accept_language (RFC-083 §8.1 rung 2, Handoff 075) ─────

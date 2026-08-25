@@ -142,15 +142,17 @@ mod tests {
         // that a defensive read path must still survive (e.g. a
         // hand-repaired row, or a future schema slip). RFC-085 §3.2: this
         // is the *safety* question — asserted against Locale::FAIL_CLOSED
-        // by name, documenting intent, not guarding against a re-merge:
-        // PRODUCT_DEFAULT and FAIL_CLOSED are both Locale::Ja today, so
-        // this value comparison cannot tell the two constants apart and
-        // would still pass if the corrupt-value arm were repointed at
-        // PRODUCT_DEFAULT. The actual re-merge guard is the source-level
-        // gate `resolve_locale_corrupt_value_arm_references_fail_closed_not_product_default`
+        // by name, documenting intent, not guarding against a re-merge.
+        // Handoff 079's flip means PRODUCT_DEFAULT (En) and FAIL_CLOSED
+        // (Ja) now genuinely differ, so this value comparison happens to
+        // catch a re-merge today — but that is a property of today's
+        // values, not a guarantee: if a future change ever pointed both
+        // constants at the same locale again, this comparison would go
+        // blind exactly as it did before the flip. The actual, permanent
+        // re-merge guard is the source-level gate
+        // `resolve_locale_corrupt_value_arm_references_fail_closed_not_product_default`
         // (release_gates.rs), which reads which named constant the arm
-        // references — the only thing that can catch that mistake while
-        // the two values are equal.
+        // references regardless of what either constant currently equals.
         for bad in ["fr", "EN", "", "ja-JP", "en-US", "null", "0"] {
             assert_eq!(
                 resolve_locale(Some(bad)),
@@ -158,6 +160,19 @@ mod tests {
                 "stored={bad:?}"
             );
         }
+    }
+
+    /// Handoff 079 §5: the two ambient answers now visibly diverge, in one
+    /// place — no expressed preference resolves to the *product* default
+    /// (English, the decision this handoff took), while a corrupt stored
+    /// value still resolves to the *safety* answer (Japanese, unmoved).
+    /// This is RFC-085's separation made observable: before this flip
+    /// these two assertions would have looked identical by coincidence.
+    #[test]
+    fn no_preference_and_a_corrupt_value_now_resolve_to_different_locales() {
+        assert_eq!(resolve_locale(None), Locale::En);
+        assert_eq!(resolve_locale(Some("fr")), Locale::Ja);
+        assert_ne!(resolve_locale(None), resolve_locale(Some("fr")));
     }
 }
 

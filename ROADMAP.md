@@ -84,33 +84,52 @@ move is a forward migration — however inconvenient.
 
 Anyone reading this after a deployment has happened: the answer is no.
 
-### The default language flips to English when Slice D completes — owner decision 2026-08-16
+### The default language flips to English when Slice D completes — owner decision 2026-08-16, taken 2026-08-16
 
-`Locale::default()` is Japanese today (`packages/contracts/src/locale.rs:43`), and
-migration `0011_membership_ui_language.sql` was additive with no backfill, so
-**every membership has `ui_language = NULL`** and resolves through that default.
-The default is therefore not an edge case — it is what every member sees.
+`Locale::default()` was Japanese when this decision was recorded
+(`packages/contracts/src/locale.rs:43`), and migration
+`0011_membership_ui_language.sql` was additive with no backfill, so **every
+membership had `ui_language = NULL`** and resolved through that default. The
+default was therefore not an edge case — it was what every member saw.
 
 **Decided: an English-first default is a planned future advancement, deferred on
-readiness, not on principle.** It was not taken now because English is currently
-the less complete surface: after RFC-083 Slice D1a, **203 render sites still emit
-Japanese regardless of locale** — 23 structurally unresolvable, **180 simply not
-yet converted** (RFC-083 D1b, D1c, D2). A default user today would meet a
-substantially Japanese admin surface.
+readiness, not on principle.** It was not taken immediately because English was at
+the time the less complete surface: after RFC-083 Slice D1a, **203 render sites
+still emitted Japanese regardless of locale** — 23 structurally unresolvable, 180
+simply not yet converted (RFC-083 D1b, D1c, D2).
 
-**The trigger is RFC-083 Slice D reaching completion**, measurable as
+**The trigger was RFC-083 Slice D reaching completion**, measurable as
 `LOCALIZATION_EXCEPTIONS` containing only the three structurally-unresolvable
 entries (`render/errors.rs`, `handlers/calendar.rs`, `handlers/communities.rs`).
+RFC-084 (`cf3baba`) closed the last convertible work and reached exactly that
+state — the trigger fired for real, not by re-pinning a number.
 
-The change itself is one line and touches no data: `ui_language` stays NULL
-everywhere and simply resolves differently. Migration `0011`'s comment
-(*"NULL means Japanese fallback"*) updates with it, as prose describing intent
-rather than a constraint. **There is no installed base to disrupt** — the service
-has never been deployed.
+**Taken, in three sequenced packages, exactly as this entry anticipated:**
 
-Recorded in **RFC-083 §8.2**. A tripwire gate is owed so this surfaces when its
-trigger fires rather than depending on anyone remembering; until that gate exists,
-this entry is the only control.
+1. **RFC-085** (accepted `26cc28b`, implemented `f50dd57`) split the ambient
+   `Locale::default()` into two independently-named answers —
+   `Locale::PRODUCT_DEFAULT` (this decision) and `Locale::FAIL_CLOSED` (RFC-072's
+   SEC-5 safety answer for a corrupt stored value) — so the flip below could move
+   one without the other, provably, not by inspection.
+2. **Handoff 078** (`9c1a03b`) pinned every smoke fixture's `ui_language`, proven
+   by running the whole suite with the flip applied temporarily before it was
+   real — 25/25.
+3. **Handoff 079** took the flip itself: `Locale::PRODUCT_DEFAULT` is now
+   `Locale::En`. `Locale::FAIL_CLOSED` is unchanged at `Locale::Ja` — confirmed
+   unmoved by a source-level gate, not assumed. Migration `0011`'s comment was
+   corrected to describe the new resolution (schema and `CHECK` constraint
+   untouched — this was never a migration edit in the immutability sense; there
+   is no installed base to disrupt, since the service has never been deployed).
+
+**The tripwire this entry said was owed
+(`roadmap_english_default_tripwire_fires_when_slice_d_completes`, added by
+Handoff 072) existed, fired when RFC-084 closed Slice D, and is retired by
+Handoff 079** — the decision it existed to surface has been taken, and the
+properties that remain (the exception table's shrink-only pin, the RFC-085
+re-merge gate, the locale-blind-helper check) are all still enforced
+independently of it.
+
+Recorded in **RFC-083 §8.2**.
 
 ### Tagging is not deploying — clarified 2026-07-30
 
