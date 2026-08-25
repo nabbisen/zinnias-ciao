@@ -1,8 +1,11 @@
 # RFC-085 — Separate the Locale Fallbacks Before Changing the Default
 
-**Status:** Proposed
+**Status:** Accepted
 **Author:** high-capability model
 **Date:** 2026-08-16
+**Accepted:** 2026-08-16 by nabbisen. Acceptance authorizes the separation only;
+**the default's value is deliberately not changed here** — that remains ROADMAP.md's
+open decision, and §7 states why the two are sequenced apart.
 **Blocks:** ROADMAP.md § *The default language flips to English when Slice D
 completes* — the decision now made due by
 `roadmap_english_default_tripwire_fires_when_slice_d_completes`, which has been
@@ -172,15 +175,17 @@ separate the fallbacks, then decide the default, then retire the tripwire as par
 | The corrupt-value path is never exercised | **High** | It is only reachable by manual repair — which is why §6.4 requires a test rather than trusting review |
 | Treated as churn with no user behind it | Medium | Nothing is deployed and no member is mis-served today | True, and stated: this buys a design that explains itself before the flip, not a fix for an observed defect |
 
-## 9. The decision required from the owner
+## 9. Decision taken, 2026-08-16
 
-None beyond accepting this RFC. It has no options — the alternative is taking the
-flip with the conflation intact, which is **correct behaviour** but leaves a safety
-fallback and a product default sharing one value for no stated reason.
+> **Accepted by nabbisen, 2026-08-16.** Implement before the flip.
 
-**Recommendation: accept and implement before the flip.** Two call sites, no
-migration, and it converts the pending ROADMAP decision from "change a value" into
-"change a value whose boundaries are provable."
+There were no options to weigh: the alternative was taking the flip with the
+conflation intact, which is correct behaviour but leaves a safety fallback and a
+product default sharing one value for no stated reason.
+
+**The ROADMAP English-default decision remains open and unmade.** This RFC makes it
+a one-line change to a single named product default whose boundaries are provable;
+it does not take it.
 
 ## 10. Not authorized by this RFC
 
