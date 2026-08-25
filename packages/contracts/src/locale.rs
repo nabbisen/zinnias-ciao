@@ -32,16 +32,36 @@ impl Locale {
             Self::En => "en",
         }
     }
-}
 
-impl Default for Locale {
-    /// Japanese is the fallback when no membership preference is set, and
-    /// the safe fallback when a stored value is outside the allow-list
-    /// (RFC-072 §Locale Resolution; a bad stored value must fail safe, never
-    /// panic).
-    fn default() -> Self {
-        Self::Ja
-    }
+    /// RFC-085 §3.2/§3.3: the answer for a request that carries **no
+    /// expressed preference at all** — a membership whose `ui_language` is
+    /// SQL `NULL` (`db::membership::resolve_locale`), and rung 3 of
+    /// RFC-083 §8.1's anonymous ladder, when `Accept-Language` matched
+    /// nothing (`authz::resolve_anonymous_locale`). This is a **product**
+    /// decision, and the one ROADMAP.md's now-due English-default flip
+    /// changes — when it does, only this line moves.
+    ///
+    /// Deliberately **not** `impl Default for Locale`: that impl answered
+    /// this question and [`FAIL_CLOSED`](Self::FAIL_CLOSED)'s question with
+    /// one value, indistinguishably, from anywhere a bare
+    /// `Locale::default()`/`.unwrap_or_default()` cared to reach it
+    /// (RFC-085 §2). Removing the impl makes that conflation untypeable;
+    /// every caller must name which question it is answering instead.
+    pub const PRODUCT_DEFAULT: Self = Self::Ja;
+
+    /// RFC-085 §3.2: the safety answer for a stored `ui_language` value
+    /// that is **corrupt** — outside migration `0011`'s
+    /// `CHECK(ui_language IN ('ja','en') OR ui_language IS NULL)` allow-list,
+    /// reachable only via manual repair since the application itself can
+    /// never write one (`db::membership::resolve_locale`'s `Some(other)`
+    /// arm). This answers "how do we fail safely," never "what do we
+    /// prefer" (RFC-072: *"a bad stored value must fail safe, never
+    /// panic"*) — it **must not move** when [`PRODUCT_DEFAULT`](Self::PRODUCT_DEFAULT)
+    /// does. Equal to `PRODUCT_DEFAULT` today only because both happen to
+    /// be Japanese right now, not because they are the same answer; a
+    /// dedicated test (`resolve_locale`'s test module) fails if the two
+    /// are ever re-merged into one constant.
+    pub const FAIL_CLOSED: Self = Self::Ja;
 }
 
 /// RFC-083 §8.1 rung 2 / Handoff 075 §4.2: the header is attacker-controlled
@@ -173,8 +193,12 @@ mod tests {
     }
 
     #[test]
-    fn default_is_japanese() {
-        assert_eq!(Locale::default(), Locale::Ja);
+    fn product_default_and_fail_closed_are_both_japanese_today() {
+        // RFC-085 §3.2: unchanged values — this package separates the two
+        // questions, it does not answer either differently. Two distinct
+        // constants, not two spellings of the same answer.
+        assert_eq!(Locale::PRODUCT_DEFAULT, Locale::Ja);
+        assert_eq!(Locale::FAIL_CLOSED, Locale::Ja);
     }
 
     // ── negotiate_accept_language (RFC-083 §8.1 rung 2, Handoff 075) ─────

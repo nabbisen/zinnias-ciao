@@ -165,19 +165,20 @@ pub async fn require_membership(
 /// resolves**.
 ///
 /// Negotiates the `Accept-Language` header (`negotiate_accept_language`)
-/// and falls through to `Locale::default()` (rung 3, Japanese) when the
-/// header is absent, empty, or negotiates to no match — this function
-/// never returns an unresolved state, matching every other locale
-/// resolution call site in this codebase. The raw header value itself is
-/// read and immediately discarded here; only the resulting two-valued
-/// `Locale` ever leaves this function.
+/// and falls through to `Locale::PRODUCT_DEFAULT` (rung 3, named per
+/// RFC-085 §3.3 — the product's own answer when nothing matched, never the
+/// fail-closed one) when the header is absent, empty, or negotiates to no
+/// match — this function never returns an unresolved state, matching every
+/// other locale resolution call site in this codebase. The raw header
+/// value itself is read and immediately discarded here; only the resulting
+/// two-valued `Locale` ever leaves this function.
 pub fn resolve_anonymous_locale(req: &Request) -> Locale {
     req.headers()
         .get("Accept-Language")
         .ok()
         .flatten()
         .and_then(|header| negotiate_accept_language(&header))
-        .unwrap_or_default()
+        .unwrap_or(Locale::PRODUCT_DEFAULT)
 }
 
 /// RFC-084 §3 (Handoff 084): the account tier's own ladder — rung 1

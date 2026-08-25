@@ -2970,3 +2970,74 @@ disagreeing ones, has not made a choice for rung 2 to override.
       Per §6/§15: **not re-pinned, not deleted, no exception added.** The
       owner resolves the ROADMAP decision; that resolution — and deleting
       or rewriting this test — is its own package, not this one.
+
+## RFC-085: the locale fallbacks are now three named answers, not one (Handoff 085)
+
+`impl Default for Locale` answered three different questions with one
+value: a member's unexpressed preference, a corrupt stored `ui_language`,
+and an unmatched `Accept-Language`. All three happened to be Japanese, so
+the conflation was invisible — until ROADMAP.md's now-due English-default
+flip, which would have moved the fail-closed answer too, as a side effect
+of a product decision. This package separates them before that flip is
+taken.
+
+- [x] **`impl Default for Locale` deleted.** Two named associated
+      constants replace it, both still `Locale::Ja` — **no value changed**:
+      - `Locale::PRODUCT_DEFAULT` — the answer when nothing was expressed
+        (a `NULL` `ui_language`, or `Accept-Language` matching nothing).
+        This is the one ROADMAP.md's decision moves.
+      - `Locale::FAIL_CLOSED` — the answer for a stored value outside
+        migration `0011`'s `CHECK` allow-list, reachable only by manual
+        repair. Must never move when `PRODUCT_DEFAULT` does — that is the
+        package's whole purpose.
+- [x] `db::membership::resolve_locale` rewritten from
+      `stored.and_then(Locale::parse).unwrap_or_default()` to a `match`
+      naming which answer each of the three inputs gets:
+      `None → PRODUCT_DEFAULT`, `Some(valid) → that locale`,
+      `Some(corrupt) → FAIL_CLOSED`.
+- [x] `authz::resolve_anonymous_locale`'s rung 3
+      (`.unwrap_or_default()`) renamed to `.unwrap_or(Locale::PRODUCT_DEFAULT)`;
+      its doc comment updated from "falls through to `Locale::default()`"
+      to name the constant explicitly.
+- [x] **A new gate, `locale_never_regains_a_default_impl`**, asserts
+      `impl Default for Locale` does not exist in `locale.rs` — comments
+      stripped first, matched on the specific `impl Default for Locale`
+      shape rather than the bare word `Default`, so `Locale`'s own
+      `#[derive(Debug, Clone, Copy, PartialEq, Eq)]` and every unrelated
+      `#[derive(Default)]` elsewhere cannot trip it. Demonstrated failing:
+      temporarily reintroduced the impl, confirmed the gate caught it,
+      restored byte-identical.
+- [x] **The re-merge guard** (§6.4's central assertion,
+      `resolve_locale_corrupt_value_arm_references_fail_closed_not_product_default`):
+      a source-scanning gate, not a behavioral one — both constants are
+      `Locale::Ja` today, so `resolve_locale(None)` and
+      `resolve_locale(Some("corrupt"))` currently produce identical
+      *output* regardless of which named constant the corrupt-value arm
+      actually references. This gate scans which one it references,
+      catching the exact mistake a value-only comparison cannot: someone
+      later pointing the corrupt-value arm at `Locale::PRODUCT_DEFAULT`
+      instead of `Locale::FAIL_CLOSED`. `resolve_locale`'s own unit tests
+      updated to assert against the named constants
+      (`Locale::PRODUCT_DEFAULT`/`Locale::FAIL_CLOSED`) rather than the
+      bare `Locale::Ja` they used before, for the same reason.
+- [x] A pre-existing gate,
+      `rfc072_locale_resolution_never_panics_on_a_bad_stored_value`,
+      checked for the literal string `unwrap_or_default()` that this
+      package removed — updated to check for `Locale::FAIL_CLOSED`
+      instead, preserving its actual purpose (parse-or-fall-back, never
+      assume a valid stored value) rather than the now-stale pattern.
+- [x] **No panic path introduced** (SEC-5): confirmed by diff that this
+      package added zero `.unwrap()`/`.expect()` calls anywhere;
+      `resolve_locale`'s corrupt-value arm uses `.unwrap_or(...)`, a safe
+      combinator, not a panicking one.
+- [x] `cargo test --workspace --no-fail-fast`: **662 total** (was 660,
+      +2 — the two new gates; `default_is_japanese` was renamed to assert
+      both named constants rather than added), **661 passing, 1 failing**.
+      `--features dev_fake_issuer`: **665 total** (was 663, +2), 664
+      passing, 1 failing. **The one failure in both is the ROADMAP
+      tripwire, untouched by this package, exactly as required** — not a
+      regression.
+- [x] `bun run smoke:all`: **25/25** — this package changes no rendered
+      text (only which named constant produces the same Japanese value),
+      so this confirms nothing shifted.
+- [x] Evidence baseline unchanged at 996.

@@ -58,13 +58,24 @@ pub struct AdminMembershipRow {
     pub locale: Locale,
 }
 
-/// Resolves the raw stored `ui_language` column (RFC-072): the membership's
-/// preference if it parses, else Japanese. A stored value outside the
-/// `CHECK` allow-list — never expected, but possible via manual repair —
-/// falls back the same way as no preference at all. Never panics: a bad
-/// stored value reaching a render path would be an SEC-5 violation.
+/// Resolves the raw stored `ui_language` column (RFC-072/RFC-085 §3.2):
+/// three distinguishable inputs, three distinguishable answers, never one
+/// value silently doing both jobs.
+///
+/// - `Some(valid)` — the member's own expressed preference.
+/// - `None` (SQL `NULL`) — **no preference expressed**: the *product*
+///   default, [`Locale::PRODUCT_DEFAULT`] — the answer that moves when
+///   ROADMAP.md's English-default decision is taken.
+/// - `Some(other)` outside `0011`'s `CHECK` allow-list — **corrupt**, only
+///   reachable via manual repair: the *safety* fallback,
+///   [`Locale::FAIL_CLOSED`] — this must never move as a side effect of the
+///   product default changing (RFC-085 §5). Never panics: a bad stored
+///   value reaching a render path would be an SEC-5 violation.
 fn resolve_locale(stored: Option<&str>) -> Locale {
-    stored.and_then(Locale::parse).unwrap_or_default()
+    match stored {
+        None => Locale::PRODUCT_DEFAULT,
+        Some(value) => Locale::parse(value).unwrap_or(Locale::FAIL_CLOSED),
+    }
 }
 
 /// Find an active membership for the given user + community. This is the
@@ -119,17 +130,33 @@ mod tests {
     }
 
     #[test]
-    fn resolve_locale_falls_back_to_japanese_when_absent() {
-        assert_eq!(resolve_locale(None), Locale::Ja);
+    fn resolve_locale_falls_back_to_the_product_default_when_absent() {
+        // RFC-085 §3.2: NULL means no preference expressed — this is the
+        // *product* question, distinct from the fail-closed one below.
+        assert_eq!(resolve_locale(None), Locale::PRODUCT_DEFAULT);
     }
 
     #[test]
-    fn resolve_locale_falls_back_to_japanese_for_an_out_of_allow_list_value_without_panicking() {
+    fn resolve_locale_falls_back_to_fail_closed_for_an_out_of_allow_list_value_without_panicking() {
         // A value the CHECK constraint should have rejected on write, but
         // that a defensive read path must still survive (e.g. a
-        // hand-repaired row, or a future schema slip).
+        // hand-repaired row, or a future schema slip). RFC-085 §3.2: this
+        // is the *safety* question — asserted against Locale::FAIL_CLOSED
+        // by name, documenting intent, not guarding against a re-merge:
+        // PRODUCT_DEFAULT and FAIL_CLOSED are both Locale::Ja today, so
+        // this value comparison cannot tell the two constants apart and
+        // would still pass if the corrupt-value arm were repointed at
+        // PRODUCT_DEFAULT. The actual re-merge guard is the source-level
+        // gate `resolve_locale_corrupt_value_arm_references_fail_closed_not_product_default`
+        // (release_gates.rs), which reads which named constant the arm
+        // references — the only thing that can catch that mistake while
+        // the two values are equal.
         for bad in ["fr", "EN", "", "ja-JP", "en-US", "null", "0"] {
-            assert_eq!(resolve_locale(Some(bad)), Locale::Ja, "stored={bad:?}");
+            assert_eq!(
+                resolve_locale(Some(bad)),
+                Locale::FAIL_CLOSED,
+                "stored={bad:?}"
+            );
         }
     }
 }

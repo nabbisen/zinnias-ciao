@@ -1113,6 +1113,7 @@ const RELINK_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers
 const RECOVERY_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/recovery.rs");
 const OPERATOR_HANDLER_SRC: &str = include_str!("../../../workers/ssr/src/handlers/operator.rs");
 const MEMBERSHIP_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/membership.rs");
+const LOCALE_SRC: &str = include_str!("../src/locale.rs");
 const RELINK_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/relink.rs");
 const RECOVERY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/recovery.rs");
 const IDENTITY_DB_SRC: &str = include_str!("../../../workers/ssr/src/db/identity.rs");
@@ -2576,10 +2577,17 @@ fn rfc072_locale_resolution_never_panics_on_a_bad_stored_value() {
     // now happens next to the SELECT that reads ui_language, inside
     // find_active, and MembershipContext.locale is a pre-resolved Locale
     // — see rfc072_locale_is_only_ever_read_from_find_active below.
+    //
+    // RFC-085 §3.2: `unwrap_or_default()` no longer exists on this path —
+    // `impl Default for Locale` was removed precisely so this fallback
+    // could no longer be spelled anonymously; `Locale::FAIL_CLOSED` is the
+    // named answer for a corrupt stored value (`resolve_locale_corrupt_value_arm_references_fail_closed_not_product_default`
+    // above pins which arm uses which constant — this gate only needs to
+    // confirm parsing is attempted and no bad value is ever assumed valid).
     assert!(
         MEMBERSHIP_DB_SRC.contains("fn resolve_locale")
             && MEMBERSHIP_DB_SRC.contains("Locale::parse")
-            && MEMBERSHIP_DB_SRC.contains("unwrap_or_default()"),
+            && MEMBERSHIP_DB_SRC.contains("Locale::FAIL_CLOSED"),
         "RFC-072 locale resolution must parse-or-fall-back, not assume a valid stored value"
     );
     let resolve_locale_fn = MEMBERSHIP_DB_SRC
@@ -2864,6 +2872,62 @@ fn roadmap_english_default_tripwire_fires_when_slice_d_completes() {
          Locale::default() to English and update migration 0011_membership_ui_language.sql's \
          comment. This is not a gate to re-pin — resolve the ROADMAP decision, then delete or \
          rewrite this test to reflect the new default."
+    );
+}
+
+/// RFC-085 §3.4/§5 (Handoff 085): `impl Default for Locale` must never
+/// return. Its whole purpose was one value silently answering three
+/// different questions (RFC-085 §2) — a member's unexpressed preference, a
+/// corrupt stored value, and an unmatched `Accept-Language`. Reintroducing
+/// it as a convenience re-merges them invisibly, from anywhere a bare
+/// `Locale::default()`/`.unwrap_or_default()` on an `Option<Locale>` cared
+/// to reach it. Comments stripped first — this gate is necessarily
+/// surrounded by prose about the very impl it forbids — and matched on the
+/// specific `impl Default for Locale` shape, never the bare word
+/// `Default`, so `Locale`'s own `#[derive(Debug, Clone, Copy, PartialEq,
+/// Eq)]` and every unrelated `#[derive(Default)]` elsewhere in the
+/// codebase cannot trip it.
+#[test]
+fn locale_never_regains_a_default_impl() {
+    let production = strip_line_comments(LOCALE_SRC);
+    assert!(
+        !production.contains("impl Default for Locale"),
+        "packages/contracts/src/locale.rs must never implement Default for Locale — RFC-085 \
+         removed it because one value was silently answering three different questions (a \
+         member's unexpressed preference, a corrupt stored value, and an unmatched \
+         Accept-Language). Reintroducing it re-merges them. Name which question you're \
+         answering instead: Locale::PRODUCT_DEFAULT or Locale::FAIL_CLOSED."
+    );
+}
+
+/// RFC-085 §6.4 (Handoff 085): the re-merge guard. A purely behavioral test
+/// cannot catch someone pointing `resolve_locale`'s corrupt-value arm at
+/// `Locale::PRODUCT_DEFAULT` instead of `Locale::FAIL_CLOSED` — both
+/// constants are `Locale::Ja` today, so the two arms would produce
+/// identical *output* right up until the product default flips, at which
+/// point the fail-closed answer would silently follow it. This scans which
+/// named constant the source actually references, which a value-only
+/// comparison cannot distinguish.
+#[test]
+fn resolve_locale_corrupt_value_arm_references_fail_closed_not_product_default() {
+    let production = strip_line_comments(MEMBERSHIP_DB_SRC);
+    let body = compact_brace_block(&production, "fn resolve_locale");
+    assert!(
+        body.contains("None=>Locale::PRODUCT_DEFAULT"),
+        "resolve_locale's None (no stored preference) arm must resolve to \
+         Locale::PRODUCT_DEFAULT — the product's own answer, not the fail-closed one. Found: \
+         {body}"
+    );
+    assert!(
+        body.contains("unwrap_or(Locale::FAIL_CLOSED)"),
+        "resolve_locale's corrupt-value arm must resolve to Locale::FAIL_CLOSED, not a literal \
+         or the product default. Found: {body}"
+    );
+    assert!(
+        !body.contains("unwrap_or(Locale::PRODUCT_DEFAULT)"),
+        "resolve_locale's corrupt-value arm must never reference Locale::PRODUCT_DEFAULT — \
+         RFC-085 §5 requires the fail-closed answer to never move as a side effect of a \
+         product decision. This is exactly the re-merge this gate exists to catch."
     );
 }
 
