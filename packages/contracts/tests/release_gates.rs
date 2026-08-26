@@ -931,19 +931,56 @@ fn export_handler_await_count_within_budget() {
     );
 }
 
-// ── Service worker version gate (RFC-044 §11 step 1) ─────────────────────
+// ── Version-artifact derivation gates (RFC-044 §11 step 1; Handoff 081) ──
 //
-// sw.js CACHE_VERSION must equal the package version at every release.
-// A mismatch means the service worker will not invalidate old caches on deploy.
+// Every version-bearing artifact must derive from `[workspace.package]
+// version` in Cargo.toml, so a release bumps ONE authority and every check
+// below follows automatically — never a hand-edited test literal. Handoff
+// 080 (the 0.63.0 release) had to hand-edit a hardcoded cache-buster literal
+// to pass; this section is that finding's own package (§4.1 there).
 //
-// This test reads both files at test time using include_str! so it fires on
-// every `cargo test` run without any external tooling.
+// `workspace_version()` is the single parser every gate here calls. Cache
+// keys (`sw.js` CACHE_VERSION) carry a `v` prefix; the cache-buster and
+// `package.json` do not — that asymmetry is deliberate (§3.4) and each gate
+// below adds or omits the prefix explicitly rather than normalising it away.
+//
+// These tests read source files at test time using include_str! so they
+// fire on every `cargo test` run without any external tooling.
 
 const SW_JS_SOURCE: &str = include_str!("../../../workers/ssr/static/sw.js");
 const APP_JS_SOURCE: &str = include_str!("../../../workers/ssr/static/app.js");
 const APP_CSS_SOURCE: &str = include_str!("../../../workers/ssr/static/app.css");
 const SHELL_RS_SOURCE: &str = include_str!("../../../workers/ssr/src/render/shell.rs");
 const WORKSPACE_CARGO_TOML: &str = include_str!("../../../Cargo.toml");
+
+/// Extract the version from `[workspace.package]` in the workspace
+/// `Cargo.toml`. The single authority every gate in this section derives
+/// from. An unparseable authority fails loudly (`.expect`), which is
+/// correct in a test — silently defaulting would hide a broken release.
+fn workspace_version() -> String {
+    let mut in_workspace_pkg = false;
+    let mut found = None;
+    for line in WORKSPACE_CARGO_TOML.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[workspace.package]" {
+            in_workspace_pkg = true;
+            continue;
+        }
+        if in_workspace_pkg {
+            if trimmed.starts_with('[') {
+                break; // left the [workspace.package] section
+            }
+            if trimmed.starts_with("version") {
+                // version     = "0.25.0"
+                found = trimmed
+                    .split_once('=')
+                    .map(|(_, v)| v.trim().trim_matches('"').to_owned());
+                break;
+            }
+        }
+    }
+    found.expect("workspace version not found in Cargo.toml")
+}
 
 #[test]
 fn sw_cache_version_matches_workspace_version() {
@@ -964,37 +1001,52 @@ fn sw_cache_version_matches_workspace_version() {
         })
         .expect("CACHE_VERSION not found in sw.js");
 
-    // Extract version from [workspace.package] block in Cargo.toml.
-    // Find the version line that follows the [workspace.package] header.
-    let workspace_ver = {
-        let mut in_workspace_pkg = false;
-        let mut found = None;
-        for line in WORKSPACE_CARGO_TOML.lines() {
-            let trimmed = line.trim();
-            if trimmed == "[workspace.package]" {
-                in_workspace_pkg = true;
-                continue;
-            }
-            if in_workspace_pkg {
-                if trimmed.starts_with('[') {
-                    break; // left the [workspace.package] section
-                }
-                if trimmed.starts_with("version") {
-                    // version     = "0.25.0"
-                    found = trimmed
-                        .split_once('=')
-                        .map(|(_, v)| v.trim().trim_matches('"').to_owned());
-                    break;
-                }
-            }
-        }
-        found.expect("workspace version not found in Cargo.toml")
-    };
+    let workspace_ver = workspace_version();
 
     assert_eq!(
         cache_ver, workspace_ver,
         "sw.js CACHE_VERSION 'v{cache_ver}' does not match workspace version '{workspace_ver}'. \
          Update sw.js CACHE_VERSION when bumping the version."
+    );
+}
+
+/// Handoff 081 §3.2: this assertion used to live inside
+/// `rfc056_calendar_page_owns_calendar_and_switcher`, pinned by a hardcoded
+/// version literal that had to be hand-edited every release — misfiled next
+/// to a gate (above) that solves the same derivation problem correctly.
+/// Moved here and derived: a release bumps Cargo.toml and this follows with
+/// no test edit.
+#[test]
+fn cache_buster_matches_workspace_version() {
+    let expected = format!("/static/app.js?v={}", workspace_version());
+    assert!(
+        RENDER_SRC.contains(expected.as_str()) && STATIC_FILES_SRC.contains(expected.as_str()),
+        "HTML shell must cache-bust app.js (in both render/shell.rs and \
+         handlers/static_files.rs, checked independently) so a same-version switcher fix is \
+         not hidden by the service worker. Expected {expected:?} in both files — a release \
+         bumps Cargo.toml's workspace version and this follows automatically."
+    );
+}
+
+/// Handoff 081 §3.3: nothing previously compared `package.json`'s version to
+/// the workspace version, so a release could bump one and not the other and
+/// every test would still pass. Parses the JSON rather than substring-
+/// matching, so a `"version"` key appearing anywhere else in the file could
+/// not satisfy this by accident.
+#[test]
+fn package_json_version_matches_workspace_version() {
+    let parsed: serde_json::Value =
+        serde_json::from_str(PACKAGE_JSON_SRC).expect("package.json must be valid JSON");
+    let package_ver = parsed
+        .get("version")
+        .and_then(|v| v.as_str())
+        .expect("package.json must have a top-level \"version\" string field");
+    let workspace_ver = workspace_version();
+
+    assert_eq!(
+        package_ver, workspace_ver,
+        "package.json \"version\": \"{package_ver}\" does not match workspace version \
+         '{workspace_ver}'. Update package.json's version when bumping the version."
     );
 }
 
@@ -2268,11 +2320,6 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
     assert!(
         !RENDER_SRC.contains("onchange='this.form.submit()'"),
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
-    );
-    assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.63.0")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.63.0"),
-        "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(
         RENDER_SRC.contains("<button type='submit'")

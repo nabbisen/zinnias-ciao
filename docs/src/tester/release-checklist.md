@@ -3186,3 +3186,68 @@ with it. This is the flip RFC-085 and Handoff 078 prepared for.
       078's commits) — the one deliberate exception to this document's
       own rule of leaving past sections as historical record, since that
       entry described an open decision this handoff resolves.
+
+## Handoff 081: every version artifact now derives from one authority
+
+The `0.63.0` release (Handoff 080) had to hand-edit a hardcoded version
+literal inside a release gate to pass — the exact pattern this project has
+spent a week removing elsewhere. Of the five version-bearing artifacts a
+release touches, only `sw.js`'s `CACHE_VERSION` was actually checked against
+`Cargo.toml`; `package.json`'s version was ungated entirely, and the
+`app.js` cache-buster was pinned by a literal sitting inside an unrelated
+test (`rfc056_calendar_page_owns_calendar_and_switcher`, a test about the
+calendar page owning its switcher).
+
+- [x] **A shared `workspace_version()` helper**, extracted from
+      `sw_cache_version_matches_workspace_version`'s inline
+      `[workspace.package]` parser with its behaviour unchanged (including
+      the loud `.expect` on an unparseable authority) — every derivation
+      gate below now calls it instead of re-deriving the value.
+- [x] **The cache-buster assertion moved and derived.** It no longer lives
+      inside `rfc056_...`; it is now its own test,
+      `cache_buster_matches_workspace_version`, beside
+      `sw_cache_version_matches_workspace_version`, and builds its expected
+      string (`/static/app.js?v={workspace_version()}`) instead of
+      hardcoding it. `rfc056_...`'s other assertions — all genuinely about
+      the calendar page — are untouched.
+- [x] **`package.json`'s version is now gated**, in a new
+      `package_json_version_matches_workspace_version` test. Parsed with
+      `serde_json` as a JSON field, not substring-matched, so a `"version"`
+      key appearing anywhere else in the file could not satisfy it by
+      accident.
+- [x] **The `v` prefix stays exactly where it was**: `CACHE_VERSION` reads
+      `v0.63.0` (the gate strips the leading `v` before comparing); the
+      cache-buster and `package.json` read bare `0.63.0` (compared with no
+      prefix added or stripped). Confirmed by construction — neither gate
+      normalises the other's format.
+- [x] **All four mutation points demonstrated failing, individually, then
+      restored byte-identical**: `sw.js`'s `CACHE_VERSION`; `render/shell.rs`'s
+      cache-buster alone (proving `handlers/static_files.rs` is checked
+      independently); `handlers/static_files.rs`'s cache-buster alone
+      (proving the reverse); and `package.json`'s version alone. Each
+      mutation was confirmed landed via grep before running the gate, and
+      each file was confirmed byte-identical via `git diff --stat` after
+      reverting.
+- [x] **The single-authority property demonstrated**: bumped
+      `Cargo.toml`'s workspace version alone, with nothing else touched,
+      and all three derivation gates failed together in one run
+      (`sw_cache_version_matches_workspace_version`,
+      `cache_buster_matches_workspace_version` — which itself covers both
+      source-file mutation points in one assertion — and
+      `package_json_version_matches_workspace_version`). Reverted; `Cargo.lock`
+      was regenerated back to `0.63.0` by the same `cargo check` that
+      confirmed it, and the full suite is green again.
+- [x] `cargo test --workspace --no-fail-fast`: 665 total, 665 passing, 0
+      failing (was 663, +2 — the two new gates; no gate was removed, only
+      moved and derived). `--features dev_fake_issuer`: 668 total, 668
+      passing, 0 failing (was 666, +2).
+- [x] `bun run smoke:all`: 25/25. `node scripts/test-evidence-leakage-baseline.mjs`:
+      unchanged at 996. No product code touched — `workers/ssr/src/` and
+      `packages/contracts/src/` untouched; this is a test-layer change
+      only, and no version value changed anywhere.
+
+**What a release no longer has to do by hand:** bump `Cargo.toml`'s
+workspace version, and `sw.js`'s `CACHE_VERSION`, the `app.js` cache-buster
+in both `render/shell.rs` and `handlers/static_files.rs`, and `package.json`'s
+version all now fail loudly on their own if left behind — no release gate
+needs its own literal hand-edited to reflect the new version.
