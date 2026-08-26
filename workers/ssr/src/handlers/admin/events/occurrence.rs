@@ -44,7 +44,7 @@ pub async fn get_cancel_occurrence(
            <input type=\"hidden\" name=\"_token\" value=\"{token}\">\
            <button type=\"submit\" class=\"cz-admin-occurrence-cancel-button\">{submit}</button>\
          </form>\
-         <a href=\"/c/{cid}/events/{eid}\" class=\"cz-admin-occurrence-back-link\">{back}</a>\
+         <a href=\"/c/{cid}/events/{eid}\" class=\"cz-admin-occurrence-back-link\">{keep}</a>\
          </main>",
         title = i18n::t(locale, i18n::OCCURRENCE_CANCEL_TITLE),
         helper = i18n::t(locale, i18n::OCCURRENCE_CANCEL_HELPER),
@@ -55,7 +55,7 @@ pub async fn get_cancel_occurrence(
         did = render::escape_html(day_id),
         token = render::escape_html(&token),
         submit = i18n::t(locale, i18n::OCCURRENCE_CANCEL_SUBMIT),
-        back = i18n::t(locale, i18n::EVENT_TITLE_HEADER),
+        keep = i18n::t(locale, i18n::OCCURRENCE_CANCEL_KEEP),
     );
     render::page_localized(
         locale,

@@ -3493,6 +3493,17 @@ Four irreversible actions exist in the product; three already said so.
 Cancelling an event did not — it told the admin only that members would
 still see the cancellation, saying nothing about permanence.
 
+**Corrected 2026-08-26 (Handoff, RFC-054 Slice 4):** this count was wrong.
+There are **five** irreversible actions, not four — slice 3's own scope
+grep (matching constant-name suffixes `_KEEP`/`_CONSEQUENCE`/`_DELETE_BODY`/
+`_CANCEL_EVENT_BODY`) missed the occurrence-cancel confirm dialog, whose
+body constant is named `OCCURRENCE_CANCEL_HELPER` and so matched none of
+those suffixes. That dialog also had no decline label at all — its
+decline affordance was a back-link reading 「イベント」/"Event," a noun,
+not a choice. Both are fixed by Slice 4, below. The lesson recorded there:
+derive a copy surface from the handlers that render it, not from
+constant-name patterns.
+
 - [x] **Cancelling an event now states it cannot be undone, and points to
       the remedy.** Both `ADMIN_CANCEL_EVENT_BODY` and
       `ADMIN_CANCEL_EVENT_BODY_ALL_DAYS` follow the shape slice 2 settled
@@ -3561,3 +3572,54 @@ still see the cancellation, saying nothing about permanence.
       constants, so a copy regression in this area would only be caught by
       a gate or a human render check, never by the smoke suite. Neither is
       this slice's job.
+
+## RFC-054 Slice 4: the occurrence-cancel confirm
+
+Slice 3 was scoped by grepping constant-name suffixes, which missed the
+occurrence-cancel confirm dialog (`OCCURRENCE_CANCEL_HELPER`, not
+`_CONSEQUENCE`/`_DELETE_BODY`/`_CANCEL_EVENT_BODY`). There are **five**
+irreversible actions in the product, not four — see the correction on
+slice 3's entry above.
+
+- [x] **Cancelling one occurrence now states it cannot be undone.**
+      `occurrence_status='cancelled'` (`db/event_write.rs:228`) is set once
+      with no restore path — confirmed directly, not assumed: the only
+      other matches of that column are `WHERE occurrence_status='scheduled'`
+      guards on the same statement, never a `SET`. `OCCURRENCE_CANCEL_HELPER`
+      previously stated only scope (the other dates in the series stay
+      scheduled); it now also says the action cannot be undone, in both
+      locales.
+- [x] **Deliberately no remedy sentence.** Unlike slice 3's cancel bodies,
+      which point to the recreate flow because a real button exists on
+      that surface, no such affordance exists here: the recreate action
+      only renders when the whole *event* is cancelled, and a recurring
+      event's schedule is never editable, so there is nothing to point an
+      admin toward. Naming one would have repeated slice 1's F1 mistake —
+      prose describing an affordance that isn't there.
+- [x] **The dialog's decline affordance is now labelled as a choice.**
+      It was previously a back-link reading the bare page-header text
+      「イベント」/"Event" — a noun, invisible to slice 3's `_KEEP`
+      convergence because it was never a `_KEEP` constant at all. A new
+      pair, `OCCURRENCE_CANCEL_KEEP` (「やめる」/"Keep this date"), replaces
+      it; the link's destination, form, `_token`, and CSS class are
+      unchanged — only the label text and the format-string variable
+      naming it (`back` → `keep`) changed. `EVENT_TITLE_HEADER`'s other
+      call site (`event.rs:355`, the real page header) and the gate that
+      pins it are confirmed untouched, since that gate reads `event.rs`'s
+      source, not `occurrence.rs`'s.
+- [x] **Japanese decline buttons reading 「やめる」: 9 → 10**, confirmed by
+      grep across every `i18n/*.rs` file, not by inspecting only the one
+      constant added.
+- [x] **No gate edited, no exception-table entry added, no CSS touched.**
+      The derived EN/JA parity gate (which also covers the identical-pair
+      check) accepted the new stem with no exception needed, confirmed by
+      running it in isolation; the localization-exception table still
+      holds exactly 3 entries, and `occurrence.rs` is not among them —
+      confirmed by running the gate that checks it in isolation.
+- [x] `cargo test --workspace --no-fail-fast`: unchanged at 665/665 passing
+      (0 failing), matching the pre-package baseline. `--features
+      dev_fake_issuer`: unchanged at 668/668.
+- [x] `smoke:recurrence` — the smoke that actually exercises this
+      constant's path (`/days/…/cancel`) — clean, including the
+      confirmation-page render itself. `bun run smoke:all`: 25/25.
+      `node scripts/test-evidence-leakage-baseline.mjs`: unchanged at 996.

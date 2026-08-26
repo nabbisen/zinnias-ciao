@@ -59,9 +59,9 @@ pub const EN_REPEAT_COUNT_LABEL: &str = "Repeat count";
 pub const EN_REPEAT_UNTIL_LABEL: &str = "Repeat until date";
 pub const EN_OCCURRENCE_CANCEL_ACTION: &str = "Cancel this date only";
 pub const EN_OCCURRENCE_CANCEL_TITLE: &str = "Cancel this date";
-pub const EN_OCCURRENCE_CANCEL_HELPER: &str =
-    "Only this date will be cancelled. Other dates in the series stay scheduled.";
+pub const EN_OCCURRENCE_CANCEL_HELPER: &str = "Only this date will be cancelled. Other dates in the series stay scheduled. This cannot be undone.";
 pub const EN_OCCURRENCE_CANCEL_SUBMIT: &str = "Cancel this date";
+pub const EN_OCCURRENCE_CANCEL_KEEP: &str = "Keep this date";
 pub const EN_OCCURRENCE_CANCELLED_BADGE: &str = "This date is cancelled";
 pub const EN_ADMIN_RECREATE_EVENT_ACTION: &str = "Create similar event";
 pub const EN_ADMIN_RECREATE_EVENT_HELPER: &str = "Only the title, place, and description are reused. Choose the date again. Attendance answers and memos are not carried over.";
@@ -126,9 +126,9 @@ pub const JA_REPEAT_COUNT_LABEL: &str = "繰り返し回数";
 pub const JA_REPEAT_UNTIL_LABEL: &str = "繰り返し終了日";
 pub const JA_OCCURRENCE_CANCEL_ACTION: &str = "この日だけ中止する";
 pub const JA_OCCURRENCE_CANCEL_TITLE: &str = "この日だけ中止";
-pub const JA_OCCURRENCE_CANCEL_HELPER: &str =
-    "この日だけを中止します。同じ繰り返し予定の他の日はそのまま残ります。";
+pub const JA_OCCURRENCE_CANCEL_HELPER: &str = "この日だけを中止します。同じ繰り返し予定の他の日はそのまま残ります。この操作は取り消せません。";
 pub const JA_OCCURRENCE_CANCEL_SUBMIT: &str = "この日だけ中止する";
+pub const JA_OCCURRENCE_CANCEL_KEEP: &str = "やめる";
 pub const JA_OCCURRENCE_CANCELLED_BADGE: &str = "この日は中止です";
 pub const JA_ADMIN_RECREATE_EVENT_ACTION: &str = "似た内容で新しいイベントを作成";
 pub const JA_ADMIN_RECREATE_EVENT_HELPER: &str = "タイトル・場所・説明だけを引き継ぎます。日程はもう一度選びます。参加の回答とメモは引き継ぎません。";
@@ -504,4 +504,8 @@ pub const OCCURRENCE_CANCEL_HELPER: super::Localized = super::Localized {
 pub const OCCURRENCE_CANCEL_SUBMIT: super::Localized = super::Localized {
     ja: JA_OCCURRENCE_CANCEL_SUBMIT,
     en: EN_OCCURRENCE_CANCEL_SUBMIT,
+};
+pub const OCCURRENCE_CANCEL_KEEP: super::Localized = super::Localized {
+    ja: JA_OCCURRENCE_CANCEL_KEEP,
+    en: EN_OCCURRENCE_CANCEL_KEEP,
 };
