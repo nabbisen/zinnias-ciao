@@ -4,7 +4,7 @@ use zinnias_ciao_contracts::Locale;
 // Static asset paths.
 const MANIFEST: &str = "/manifest.webmanifest";
 const CSS: &str = "/static/app.css";
-const JS: &str = "/static/app.js?v=0.62.0";
+const JS: &str = "/static/app.js?v=0.63.0";
 const THEME: &str = "#007AFF";
 
 /// Full HTML document shell for the given `lang` attribute value.

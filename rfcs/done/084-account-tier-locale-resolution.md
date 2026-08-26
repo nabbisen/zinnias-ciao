@@ -1,10 +1,11 @@
 # RFC-084 — Account-Tier Locale Resolution
 
-**Status:** Accepted
+**Status:** Done (0.63.0)
 **Author:** high-capability model
 **Date:** 2026-08-16
 **Accepted:** 2026-08-16 by nabbisen. **Option A**, with `link.rs`/`unlink.rs`
 resolving via one new query each — see §10, where both decisions are recorded.
+**Shipped:** `cf3baba`, which also closed RFC-083 Slice D in full.
 **Discharges:** RFC-083 §4.2's **D2b**, deferred there because *"`ui_language` is a
 column on `community_memberships`, not on the user … an account-level page has no
 single correct answer."*

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Current release:** 0.62.0.
+**Current release:** 0.63.0.
 
 The RFC folder is the source of truth for implementation state:
 
@@ -114,12 +114,13 @@ state — the trigger fired for real, not by re-pinning a number.
 2. **Handoff 078** (`9c1a03b`) pinned every smoke fixture's `ui_language`, proven
    by running the whole suite with the flip applied temporarily before it was
    real — 25/25.
-3. **Handoff 079** took the flip itself: `Locale::PRODUCT_DEFAULT` is now
-   `Locale::En`. `Locale::FAIL_CLOSED` is unchanged at `Locale::Ja` — confirmed
-   unmoved by a source-level gate, not assumed. Migration `0011`'s comment was
-   corrected to describe the new resolution (schema and `CHECK` constraint
-   untouched — this was never a migration edit in the immutability sense; there
-   is no installed base to disrupt, since the service has never been deployed).
+3. **Handoff 079** (`cbe6188`) took the flip itself: `Locale::PRODUCT_DEFAULT`
+   is now `Locale::En`. `Locale::FAIL_CLOSED` is unchanged at `Locale::Ja` —
+   confirmed unmoved by a source-level gate, not assumed. Migration `0011`'s
+   comment was corrected to describe the new resolution (schema and `CHECK`
+   constraint untouched — this was never a migration edit in the immutability
+   sense; there is no installed base to disrupt, since the service has never
+   been deployed).
 
 **The tripwire this entry said was owed
 (`roadmap_english_default_tripwire_fires_when_slice_d_completes`, added by
@@ -352,6 +353,17 @@ section remains the tracked summary of record.
 11. **When a pilot is scheduled** — and not before — the RFC-050 hosted evidence
     campaign, unchanged. Stage 3 of the external-identity track (choosing a
     provider) also waits on Stage 0 user research that does not exist.
+12. ~~RFC-083, RFC-084, and RFC-085 — localization Slice D, account-tier locale
+    resolution, and the locale-fallback separation.~~ **Complete 2026-08-16** —
+    implemented across `c13e0fc`…`cf3baba` (RFC-083's D1a/D1b/D1-close/D2a
+    slices and RFC-084) and `f50dd57` (RFC-085), moved to `rfcs/done/`. Item
+    10's "Slice D2 is blocked" note above is superseded by this entry, per this
+    document's own practice of appending rather than rewriting completed
+    narrative. **Cut `0.63.0`** — reconciled the RFC lifecycle, bumped all six
+    version-bearing artifacts, re-pinned the cached-asset content digest, and
+    prepared the release commit (Handoff 080). **Committed, not tagged** —
+    tagging is the owner's decision per instance, and the exact tag command is
+    reported rather than run.
 8. **When a pilot is scheduled** — and not before — provision the persistent
    incident sink (Logpush → R2), then build and freeze one exact immutable
    release candidate and execute the RFC-050 hosted evidence campaign for the

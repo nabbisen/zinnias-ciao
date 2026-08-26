@@ -1,11 +1,16 @@
 # RFC-083 — Localization Slice D: Admin, Anonymous, and Unresolvable Surfaces
 
-**Status:** Accepted
+**Status:** Done (0.63.0)
 **Author:** high-capability model
 **Date:** 2026-08-16
 **Accepted:** 2026-08-16 by nabbisen. Acceptance authorized Slices D1 and D3.
 **§8 was settled 2026-08-16**, unblocking **D2a**; **D2b** is deferred to its own
 RFC (§4.2).
+**Shipped:** Slice D1a `c13e0fc` (prepared at `8cce1de`), Slice D1b `34176d9`,
+Slice D1 close (templates/export) `7806c5c`, Slice D2a `57ffc37`. D3 (`render/
+errors.rs`, `handlers/calendar.rs`, `handlers/communities.rs`) stays pinned by
+design per §4.4 — no further code change ships under this RFC. D2b (account
+tier) was split out and discharged by RFC-084.
 **Amends:** RFC-072 (member language preference and runtime localization), which
 defers Slice D explicitly: *"Admin surfaces, anonymous routes (`/join`,
 `/relink`), static offline HTML, `Accept-Language`, and a community default — is

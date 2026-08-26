@@ -1021,7 +1021,7 @@ fn sw_cache_version_matches_workspace_version() {
 // (Handoff 040 §7.3 re-pinned this digest with no version bump, and that
 // was correct — the prior wording here said otherwise and was wrong).
 const RELEASE_CACHE_ASSET_CONTENT_HASH: &str =
-    "0241132ce2ba3cef87f2c20b36ba032e105e9abd0e2ed1e6f4727814f5a7f606";
+    "0aadd3450f7fd2f6fdee148380d0dd5f5ddbe96df5dccf2adf142ac64bbcf544";
 
 fn cached_asset_content_hash() -> String {
     use sha2::{Digest, Sha256};
@@ -2270,8 +2270,8 @@ fn rfc056_calendar_page_owns_calendar_and_switcher() {
         "Community switcher must not rely on inline onchange handlers because CSP blocks them"
     );
     assert!(
-        RENDER_SRC.contains("/static/app.js?v=0.62.0")
-            && STATIC_FILES_SRC.contains("/static/app.js?v=0.62.0"),
+        RENDER_SRC.contains("/static/app.js?v=0.63.0")
+            && STATIC_FILES_SRC.contains("/static/app.js?v=0.63.0"),
         "HTML shell must cache-bust app.js so same-version switcher fixes are not hidden by the service worker"
     );
     assert!(

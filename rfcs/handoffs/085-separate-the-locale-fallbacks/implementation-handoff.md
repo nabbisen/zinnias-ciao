@@ -5,9 +5,9 @@ Authorization covers §3–§7 only — §12's exclusions still bind, and nothin
 authorizes a tag, deployment, or deletion of evidence.
 **Prepared:** 2026-08-16 by the high-capability model
 **Checkpoint:** `26cc28b` (pushed; `origin/main` in sync)
-**Governing RFC:** `rfcs/accepted/085-separate-the-locale-fallbacks.md`. Per RFC-000
+**Governing RFC:** `rfcs/done/085-separate-the-locale-fallbacks.md`. Per RFC-000
 this handoff has no lifecycle state of its own — its status is inherited from that
-RFC, which is **Accepted**.
+RFC, which is **Done (0.63.0)**.
 
 ---
 

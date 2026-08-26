@@ -23,10 +23,15 @@ not execution priority. The active order is maintained in
 RFC-073, and RFC-074 shipped in `0.60.0` and RFC-075 in `0.61.0` (tagged
 2026-08-02, neither deployed). **RFC-080, RFC-081, and RFC-082 shipped in
 `0.62.0`** (tagged 2026-08-15, not deployed) — the external-identity foundation
-and membership suspension. **RFC-054 (Japanese UX copy review) is the
-active theme** as of 2026-08-15, with **RFC-083** accepted 2026-08-16 and its Slices D1 and D2a **complete**
-(`57ffc37`), and **RFC-084** accepted the same day for the account tier — the last
-convertible localization work.
+and membership suspension. **RFC-083, RFC-084, and RFC-085 shipped in
+`0.63.0`** (committed, not yet tagged — release authority is the owner's, per
+instance) — RFC-083's localization Slice D (admin surfaces and the anonymous
+routes), RFC-084's account-tier locale resolution, and RFC-085's separation of
+the locale fallbacks, which together let ROADMAP.md's English-default decision
+be taken safely. `LOCALIZATION_EXCEPTIONS` went **27 entries / 308 sites → 3 /
+23**. **RFC-054 (Japanese UX copy review) remains the active theme** — slice 1
+shipped in `0.63.0` too; slices 2 and 3 remain, so the RFC itself stays in
+`accepted/`.
 Stage 3 (choosing an identity provider) remains
 deliberately outside RFC-080/081 and blocked on user research that does not
 exist. The RFC-050 hosted
@@ -41,9 +46,6 @@ campaign and its sink remain deferred to the point a pilot is scheduled.
 | 076 | [One-Time Invite Code Response Isolation](./accepted/076-one-time-invite-code-response-isolation.md) | 2026-07-17 | Local implementation reviewed/accepted/committed at `b72f22b`; corrected isolated automation and bounded human no-JS/network evidence were architecture-reviewed and owner-accepted, closing criterion 8 locally. RFC-050 hosted evidence remains required before public/production B1 closure |
 | 078 | [Fail-Closed Strongly Consistent Abuse Controls](./accepted/078-fail-closed-strongly-consistent-abuse-controls.md) | 2026-07-23 | Corrected architecture accepted; implemented and committed at `c991b82` on 2026-07-28, including the required I-B1 concurrency-burst evidence. RFC-050 exact-candidate hosted evidence remains pending, so B3 and all staging/public/production holds remain open |
 | 079 | [Atomic Required Audits and Recursive Metadata Redaction](./accepted/079-atomic-required-audits-and-recursive-redaction.md) | 2026-07-15 | Local Packages 0A–8 and the Class A telemetry correction reviewed/committed. Persistent delivery and exact-candidate hosted B5 evidence remain required |
-| 083 | [Localization Slice D: Admin, Anonymous, and Unresolvable Surfaces](./accepted/083-localization-slice-d-admin-anonymous-and-unresolvable-surfaces.md) | 2026-08-16 | Discharges the Slice D that **RFC-072** deferred as a future RFC. Measured (corrected 2026-08-16 — the first figures counted test-file references as render sites): **308** bare `i18n::JA_*` render sites over **191** constants, of which **183 already have an English half** — plumbing, not translation. **Slice D1 complete** (`8cce1de`, `34176d9`, `7806c5c`) and **D2a complete** (`57ffc37`) — 17 admin files, 210 sites, plus the four anonymous routes; `LOCALIZATION_EXCEPTIONS` has gone **27 entries / 308 sites → 6 / 54**. D1 cost no extra D1 query: `require_admin` already returns a `MembershipContext` carrying a resolved locale that handlers discard. **§8 settled 2026-08-16**: membership preference → `Accept-Language` → **Japanese** floor, for the four genuinely anonymous routes only. **D2b (account surfaces) split out to its own RFC — now RFC-084, accepted 2026-08-16.** What remains under this RFC is only D3, recommended (§4.4) to stay pinned. An **English-first default is a planned future advancement**, triggered by Slice D completing — see ROADMAP.md § *The default language flips to English when Slice D completes* |
-| 084 | [Account-Tier Locale Resolution](./accepted/084-account-tier-locale-resolution.md) | 2026-08-16 | Discharges **RFC-083 §4.2's D2b** — the last convertible localization work: `account/mod.rs` (20 sites), `account/unlink.rs` (6), `account/link.rs` (5). The account tier is authenticated but **not community-scoped**, so a member arrives holding zero, one, or several disagreeing `ui_language` values. **Decided: option A** — rung 1 wins only when every present membership agrees on a non-NULL value, else the RFC-083 §8.1 ladder (`Accept-Language`, then Japanese). No migration; RFC-072's deliberate per-membership model stands (display name lives there too). Corrects RFC-083 §4.2's own reasoning: rung 2 does not override a choice when no stored choice *resolves* — it fills a hole. `link.rs`/`unlink.rs` take **one new D1 query each** (§10 decision 2); `mod.rs` is free, its `list_communities_for_user` call already reads the table. **Completing this fires the Slice D tripwire** — ROADMAP.md's English-default decision becomes due, by design, and must be resolved rather than re-pinned |
-| 085 | [Separate the Locale Fallbacks Before Changing the Default](./accepted/085-separate-the-locale-fallbacks.md) | 2026-08-16 | **Blocks** ROADMAP.md's English-default flip, now due — the Slice D tripwire has been failing by design since `cf3baba`. `impl Default for Locale` answers three questions with one value: no preference expressed (product), a **corrupt** stored value (safety — RFC-072's SEC-5 fail-safe), and the RFC-083 §8.1 ladder's floor (product). Flipping the default would move the fail-closed answer too, and nothing in the code would notice. Deletes the impl so the ambiguity is untypeable, splits `resolve_locale`'s `None` from `Some(unparseable)` into separately named constants, names rung 3, and gates the impl's return. Measured: **two** call sites, no struct derives `Default` with a `Locale` field, no migration. **Does not flip the default** — that stays open |
 
 ## Done — MVP core (001–019)
 
@@ -120,6 +122,27 @@ campaign and its sink remain deferred to the point a pilot is scheduled.
 | 068 | [Calendar Matrix CSV Export](./done/068-calendar-matrix-csv-export.md) | v0.57.0 |
 | 064 | [Rust Module and Crate Boundary Cleanup](./done/064-rust-module-and-crate-boundary-cleanup.md) | v0.52.0 / v0.53.0 / v0.58.0 |
 | 069 | [Total Community Access Recovery](./done/069-total-community-access-recovery.md) | v0.59.0 |
+
+## Done — shipped in 0.63.0
+
+Committed by Handoff 080 (release preparation), triggered by three RFCs
+reaching `done/` — the localization programme completing end to end. **Not
+tagged** — release authority is the owner's, per instance; the exact tag
+command is reported in this package's review request rather than run.
+**Not deployed**; B1, B3, B4, and B5 remain open and nothing in this release
+closes a finding.
+
+| ID | Title | Shipped in |
+|----|-------|------------|
+| 083 | [Localization Slice D: Admin, Anonymous, and Unresolvable Surfaces](./done/083-localization-slice-d-admin-anonymous-and-unresolvable-surfaces.md) | 0.63.0 (`c13e0fc`/`34176d9`/`7806c5c`/`57ffc37`) — Slices D1a, D1b, D1 close (templates/export), and D2a. `LOCALIZATION_EXCEPTIONS` went **27 entries / 308 sites → 3 / 23**; the remaining three are structurally unresolvable by design (§4.4) and stay pinned, not converted |
+| 084 | [Account-Tier Locale Resolution](./done/084-account-tier-locale-resolution.md) | 0.63.0 (`cf3baba`) — discharges RFC-083 §4.2's D2b, the last convertible localization work. Option A: rung 1 wins only when every present membership agrees on a non-NULL value; no migration. Completing this fired the Slice D tripwire for real |
+| 085 | [Separate the Locale Fallbacks Before Changing the Default](./done/085-separate-the-locale-fallbacks.md) | 0.63.0 (`f50dd57`) — deleted `impl Default for Locale`, replacing it with two independently-named constants (`Locale::PRODUCT_DEFAULT`, `Locale::FAIL_CLOSED`) so the English-default flip could move one without the other, provably. The flip itself is Handoff 079 (`cbe6188`), tracked in ROADMAP.md rather than this RFC |
+
+This release also carries RFC-054 slice 1 (findings A1 and B1–B4, plus
+copy-harmony items H1/H2 — `6ea3765`, `2799250`) and two non-RFC handoffs:
+Handoff 078 (pinned every smoke fixture's `ui_language`, `9c1a03b`) and
+Handoff 079 (took the English-default flip itself, `cbe6188`). RFC-054 itself
+remains in `accepted/` — only slice 1 shipped; slices 2 and 3 are open.
 
 ## Done — shipped in 0.62.0
 

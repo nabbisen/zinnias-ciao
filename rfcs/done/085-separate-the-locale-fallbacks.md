@@ -1,11 +1,14 @@
 # RFC-085 — Separate the Locale Fallbacks Before Changing the Default
 
-**Status:** Accepted
+**Status:** Done (0.63.0)
 **Author:** high-capability model
 **Date:** 2026-08-16
 **Accepted:** 2026-08-16 by nabbisen. Acceptance authorizes the separation only;
 **the default's value is deliberately not changed here** — that remains ROADMAP.md's
 open decision, and §7 states why the two are sequenced apart.
+**Shipped:** `f50dd57`. The default's flip itself is not part of this RFC's
+scope — it landed separately at `cbe6188` and is tracked in ROADMAP.md § *The
+default language flips to English when Slice D completes*.
 **Blocks:** ROADMAP.md § *The default language flips to English when Slice D
 completes* — the decision now made due by
 `roadmap_english_default_tripwire_fires_when_slice_d_completes`, which has been

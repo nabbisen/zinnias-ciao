@@ -60,7 +60,7 @@ pub async fn get_offline(_req: Request, _env: &Env) -> Result<Response> {
     <h1 class="cz-anon-title">オフラインです</h1>
     <p class="cz-anon-subtitle">電波がある場所で再度開いてください。</p>
   </main>
-  <script src="/static/app.js?v=0.62.0" defer></script>
+  <script src="/static/app.js?v=0.63.0" defer></script>
 </body>
 </html>"#;
     let mut r = Response::from_html(html)?;

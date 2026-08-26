@@ -2,6 +2,126 @@
 
 All notable changes to ciao.zinnias are documented here.
 
+## [0.63.0] — 2026-08-16
+
+Three RFCs finish the localization programme RFC-072 started: every admin
+surface, anonymous route, and account page now honours a member's language,
+and **a member who expresses no preference now sees English** — a decision
+ROADMAP.md recorded and held open until it was safe to take. Alongside the
+product change, this release's test and evidence layer absorbed the largest
+correction pass of the programme: a parity gate that had been vacuous for
+some time, a smoke run set smaller than the real one, and a leakage scanner
+that stopped at the first violation per document. This is a commit, not a
+tag — release authority is the owner's, per instance; see `ROADMAP.md`
+§ *Tagging is not deploying*.
+Production, public-pilot, and first-real-community deployment remain
+**No-Go**; B1, B3, B4, and B5 remain open, and this release closes no
+finding.
+
+### Changed
+
+- **A member who expresses no preference now sees English (RFC-085 +
+  Handoff 079).** `Locale::PRODUCT_DEFAULT` moved from `Locale::Ja` to
+  `Locale::En`. `Locale::FAIL_CLOSED` — RFC-072's SEC-5 safety answer for a
+  stored `ui_language` value outside the allow-list — did **not** move: the
+  two are now independently-named `Locale` associated constants (RFC-085
+  deleted `impl Default for Locale`, which had answered both questions with
+  one value), with a source-scanning release gate that fails if anyone
+  re-merges them. A corrupt stored value still fails safe to Japanese.
+- **RFC-083 Slice D: admin surfaces, anonymous routes, and (via RFC-084) the
+  account tier resolve and render in the member's language.**
+  `LOCALIZATION_EXCEPTIONS` went **27 entries / 308 sites → 3 / 23** — the
+  remaining three (`render/errors.rs`, `handlers/calendar.rs`,
+  `handlers/communities.rs`) are structurally unresolvable (no membership
+  lookup exists at the point they render) and stay pinned by design, not
+  converted. The four genuinely anonymous routes (`/join`, `/relink`, and
+  two more) negotiate `Accept-Language` and fall through to the product
+  default, never a member's stored preference.
+- **RFC-084: the account tier resolves a locale without a migration.** A
+  member arrives at `/account` authenticated but not community-scoped, so
+  they may hold zero, one, or several `ui_language` values that could
+  disagree. Rung 1 (a stored preference) wins only when every present
+  membership agrees on a non-`NULL` value; otherwise the same
+  `Accept-Language`-then-product-default ladder Slice D2a already
+  established applies. No schema change.
+- **RFC-054 slice 1: two copy corrections.** The account-recovery failure
+  message no longer names an expiry that cannot happen for every failure
+  cause it covers. 「やめる」replaces 「キャンセル」for dismissing a form in
+  three places, because 「キャンセル」already means *an event was called
+  off* elsewhere in this product, and the two must not read as the same
+  word.
+- **Release version bumped to 0.63.0.** `Cargo.toml`, `Cargo.lock`,
+  `package.json`, `workers/ssr/static/sw.js`'s `CACHE_VERSION`, the
+  `app.js` cache-buster in both `render/shell.rs` and the offline page's
+  `<script>` tag in `handlers/static_files.rs`, and the release gate that
+  pins the cache-buster's literal are all aligned. The cached-asset content
+  digest was re-pinned, since the cache-buster's own change is itself
+  content the digest covers.
+
+### Fixed — test and evidence layer
+
+Invisible to members, and the reason the product change above is
+trustworthy:
+
+- **`en_ja_parity` was vacuous.** It compared two hand-maintained stem
+  lists rather than the actual `JA_*`/`EN_*` constants, and 230 string
+  literals in those lists resolved to no constant at all — the gate would
+  have kept passing with every Japanese string in the codebase deleted.
+  Replaced with a gate derived from the constants themselves.
+- **The smoke run set was a remembered "sixteen" against 24 scripts**;
+  three could not be run at all, and the rest had quietly grown past
+  what anyone was actually running as "the smokes." Running the real,
+  derived set surfaced that **`smoke:recurrence` had been red for
+  weeks** — broken twice, independently, three weeks apart, and
+  invisible both times because it wasn't in the run set anyone used for
+  evidence. The run set is now derived from `package.json` rather than
+  remembered, and `bun run smoke:all` is 25/25 today.
+- **The evidence leakage scanner reported only the first violation per
+  document.** A document with five leaks and one fixed leak looked clean
+  after the fix, because the scanner never reported past the first match.
+  It now reports every violation, is gated against a shrink-only pinned
+  baseline (996 today), and additionally scans `.log` evidence, which it
+  did not before.
+- **Seven smokes were writing AD-4 form tokens into evidence** — single-use
+  CSRF/idempotency tokens captured verbatim into committed screenshots or
+  JSON, which a form-token gate should have caught and did not for these
+  seven. Stopped, and a derived gate now covers the pattern by scanning for
+  it rather than by a hand-maintained exception list.
+- **Five hand-maintained lists were replaced with values derived from
+  source**, so each stays correct by construction instead of by someone
+  remembering to update it: the localization exception table, the smoke
+  run set, the EN/JA parity stem lists, an EN==JA identical-pair array, and
+  the locale-blind helper check (previously named one helper function by
+  string; now derives which helpers qualify).
+- **The RFC-083 Slice D completion tripwire is retired.** It existed
+  solely to make ROADMAP.md's English-default decision surface when its
+  trigger condition became true rather than depending on anyone
+  remembering — it fired when RFC-084 closed Slice D, and its job is done.
+
+### Testing
+
+- `cargo test --workspace --no-fail-fast` — **663 passed, 0 failed** — fully
+  green for the first time since `cf3baba`, when the Slice D completion
+  tripwire began failing by design.
+- `cargo test --workspace --no-fail-fast --features dev_fake_issuer` —
+  **666 passed, 0 failed**.
+- `cargo clippy --workspace --all-targets -- -D warnings` — clean, both
+  default and `--features dev_fake_issuer`.
+- `cargo fmt --all -- --check` — clean.
+- `cargo check --target wasm32-unknown-unknown -p zinnias-ciao-ssr` — clean.
+- `bun run build` — `index.js` **28.6kb**, unchanged; the cache-buster
+  change is inside the HTML shell, not the wasm bundle, so no size change
+  was expected here.
+- `bun run smoke:all` — **25/25**.
+- `node scripts/test-evidence-leakage-baseline.mjs` — green at **996**.
+- `mdbook build docs` — clean.
+- `git diff --check` — clean.
+
+Hosted staging/production evidence was not collected in this release — none
+is required for a commit, only for a deployment, which remains **No-Go**
+per the architecture review remediation hold. B1, B3, B4, and B5 remain
+open.
+
 ## [0.62.0] — 2026-08-13
 
 Three RFCs: the external identity foundation, membership suspension, and a
