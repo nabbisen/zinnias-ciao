@@ -3251,3 +3251,62 @@ workspace version, and `sw.js`'s `CACHE_VERSION`, the `app.js` cache-buster
 in both `render/shell.rs` and `handlers/static_files.rs`, and `package.json`'s
 version all now fail loudly on their own if left behind — no release gate
 needs its own literal hand-edited to reflect the new version.
+
+## RFC-054 Slice 2: admin destructive-action copy
+
+Slice 1 was about the member reading at their worst moment; Slice 2 is about
+the volunteer administrator, about to act on someone else, usually once,
+without practice. Three `Localized` pairs in `packages/contracts/src/i18n/admin.rs`
+changed, both halves each — no other constant touched.
+
+- [x] **`ADMIN_REMOVE_CONSEQUENCE` now states removal cannot be undone.**
+      `removed_at` is only ever `SET` (`db/membership.rs:641`); no path
+      clears it. Suspension already said 「この操作は取り消せます。」;
+      removal said nothing, and silence next to an explicit reassurance
+      read as "probably similar." Also merged in the fact that other
+      communities are unaffected, and that re-inviting the same person
+      later creates a **new** membership — their prior role and display
+      name do not carry over. Verified against migration `0001`'s partial
+      unique index, which is what makes the re-invitation claim accurate:
+      the person can be invited again; the membership cannot be restored.
+- [x] **All three last-admin refusals now name the same remedy.** Two of
+      the three already said "transfer the admin role first";
+      `ADMIN_LAST_ADMIN_DEMOTE` stopped at the refusal. Its second sentence
+      is copied verbatim from its siblings — convergence, not new wording.
+- [x] **`ADMIN_DEMOTE_CONSEQUENCE`'s subject converged on "this member."**
+      Five of six sibling constants already said このメンバー/"This
+      member"; this one said この人/"This person" for the same person in
+      the same table. `REMOVE_CONSEQUENCE`'s English subject (`They` →
+      `This member`) converged in the same package, since that string was
+      already changing for the irreversibility fix above.
+- [x] `ADMIN_SUSPEND_CONSEQUENCE` is untouched — its reversibility
+      statement is true and useful; the asymmetry was fixed by making the
+      silent constant speak, not by quieting the informative one.
+- [x] **Cross-check re-run, not taken on trust**: grepped
+      「メンバーから外す」、「メンバーに戻す」、「管理者権限を移譲」、「この人」、
+      and 「この操作は取り消せ」 across `workers/ssr/src` and
+      `packages/contracts/src` before editing — all five counts matched
+      the decision list's own prior measurement exactly. No prose in
+      running text names either changed button's label, so Slice 1's F1
+      class (prose naming a button whose label had since changed) does not
+      recur here.
+- [x] **A pre-existing gate caught a real conflict**:
+      `rfc063_removal_only_policy_is_locked` asserts
+      `JA_ADMIN_REMOVE_CONSEQUENCE.contains("残ります")`. The first draft's
+      continuative phrasing ("…残り、他のコミュニティ…") dropped that exact
+      substring while preserving the same meaning. Fixed with a
+      punctuation-only change (splitting into two sentences,
+      "…残ります。他のコミュニティ…") — no content lost, no gate touched.
+- [x] `cargo test --workspace --no-fail-fast`: unchanged at 665 total, 665
+      passing, 0 failing (the derived EN/JA parity gate and the
+      identical-pair check inside it both re-confirmed passing without any
+      table edit — these three pairs stay paired, and none became
+      identical to another constant). `--features dev_fake_issuer`:
+      unchanged at 668/668.
+- [x] `smoke:admin-member-management` and `smoke:admin-tools-onboarding` —
+      the two smokes that render these pages — both clean, plus
+      `smoke:admin-role-transfer`, which asserts the last-admin-demote
+      copy is absent from an unrelated denial page (a negative substring
+      check that stays valid since the new text still starts with the old
+      substring). `bun run smoke:all`: 25/25.
+      `node scripts/test-evidence-leakage-baseline.mjs`: unchanged at 996.

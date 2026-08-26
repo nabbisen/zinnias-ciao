@@ -40,13 +40,13 @@ pub const EN_ADMIN_PROMOTE_TITLE: &str = "Make admin?";
 pub const EN_ADMIN_PROMOTE_CONSEQUENCE: &str =
     "This member will be able to create events, manage members, and generate invite codes.";
 pub const EN_ADMIN_DEMOTE_TITLE: &str = "Make member?";
-pub const EN_ADMIN_DEMOTE_CONSEQUENCE: &str = "This person will no longer be able to create events, manage members, or generate invite codes. Past attendance and notes remain.";
-pub const EN_ADMIN_LAST_ADMIN_DEMOTE: &str = "Cannot make the last admin a member.";
+pub const EN_ADMIN_DEMOTE_CONSEQUENCE: &str = "This member will no longer be able to create events, manage members, or generate invite codes. Past attendance and notes remain.";
+pub const EN_ADMIN_LAST_ADMIN_DEMOTE: &str =
+    "Cannot make the last admin a member. Transfer the admin role first.";
 pub const EN_ADMIN_REMOVE_TITLE: &str = "Remove member?";
 pub const EN_ADMIN_REMOVE_KEEP: &str = "Keep Member";
 pub const EN_ADMIN_REMOVE_CONFIRM: &str = "Remove";
-pub const EN_ADMIN_REMOVE_CONSEQUENCE: &str =
-    "They will no longer be able to see events or notes. Past attendance and notes remain.";
+pub const EN_ADMIN_REMOVE_CONSEQUENCE: &str = "This member will no longer be able to see events or notes. Past attendance and notes remain, and other communities are unaffected. This cannot be undone. They can be invited again later, but as a new member — their role and display name will not carry over.";
 pub const EN_ADMIN_LAST_ADMIN: &str =
     "Cannot remove the last admin. Transfer the admin role first.";
 pub const EN_ADMIN_HELP_SIGNIN_ACTION: &str = "Help sign in again";
@@ -81,13 +81,13 @@ pub const JA_ADMIN_PROMOTE_TITLE: &str = "管理者にしますか？";
 pub const JA_ADMIN_PROMOTE_CONSEQUENCE: &str =
     "このメンバーはイベントの作成、メンバー管理、招待コードの作成ができるようになります。";
 pub const JA_ADMIN_DEMOTE_TITLE: &str = "メンバーに戻しますか？";
-pub const JA_ADMIN_DEMOTE_CONSEQUENCE: &str = "この人はイベントの作成、メンバー管理、招待コードの作成ができなくなります。過去の参加状況やメモは残ります。";
-pub const JA_ADMIN_LAST_ADMIN_DEMOTE: &str = "最後の管理者はメンバーに戻せません。";
+pub const JA_ADMIN_DEMOTE_CONSEQUENCE: &str = "このメンバーはイベントの作成、メンバー管理、招待コードの作成ができなくなります。過去の参加状況やメモは残ります。";
+pub const JA_ADMIN_LAST_ADMIN_DEMOTE: &str =
+    "最後の管理者はメンバーに戻せません。先に管理者権限を移譲してください。";
 pub const JA_ADMIN_REMOVE_TITLE: &str = "メンバーから外しますか？";
 pub const JA_ADMIN_REMOVE_KEEP: &str = "やめる";
 pub const JA_ADMIN_REMOVE_CONFIRM: &str = "メンバーから外す";
-pub const JA_ADMIN_REMOVE_CONSEQUENCE: &str =
-    "このメンバーはイベントやメモを見ることができなくなります。過去の参加状況やメモは残ります。";
+pub const JA_ADMIN_REMOVE_CONSEQUENCE: &str = "このメンバーはイベントやメモを見ることができなくなります。過去の参加状況やメモは残ります。他のコミュニティへの参加には影響しません。この操作は取り消せません。あとで招待し直すことはできますが、新しいメンバーとしての参加になり、役割や表示名は引き継がれません。";
 
 /// RFC-072 locale-aware pair; see `i18n::Localized`.
 pub const ADMIN_REMOVE_CONSEQUENCE: super::Localized = super::Localized {
