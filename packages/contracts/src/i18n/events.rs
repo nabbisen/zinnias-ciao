@@ -94,10 +94,9 @@ pub const EN_ADMIN_EDIT_RESPONSES_PRESERVED: &str =
 pub const EN_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE: &str =
     "Date and time cannot be changed for this event.";
 pub const EN_ADMIN_CANCEL_EVENT_TITLE: &str = "Cancel this event?";
-pub const EN_ADMIN_CANCEL_EVENT_BODY: &str = "Members will still see that it was cancelled.";
-pub const EN_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS: &str =
-    "All dates for this event will be cancelled. Attendance answers can no longer be changed.";
-pub const EN_ADMIN_CANCEL_EVENT_KEEP: &str = "Back";
+pub const EN_ADMIN_CANCEL_EVENT_BODY: &str = "Members will still see that it was cancelled. Attendance answers can no longer be changed. This cannot be undone. You can create a similar event afterwards.";
+pub const EN_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS: &str = "All dates for this event will be cancelled. Attendance answers can no longer be changed. This cannot be undone. You can create a similar event afterwards.";
+pub const EN_ADMIN_CANCEL_EVENT_KEEP: &str = "Keep event";
 pub const EN_ADMIN_CANCEL_EVENT_CONFIRM: &str = "Cancel Event";
 pub const EN_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS: &str = "Cancel all";
 pub const EN_ADMIN_CANNOT_EDIT_CANCELLED: &str = "Cancelled events cannot be edited.";
@@ -162,11 +161,9 @@ pub const JA_ADMIN_EDIT_RESPONSES_PRESERVED: &str =
     "日時は変わらず、参加の回答もそのまま残ります。";
 pub const JA_ADMIN_EDIT_SCHEDULE_NOT_EDITABLE: &str = "このイベントでは日時を変更できません。";
 pub const JA_ADMIN_CANCEL_EVENT_TITLE: &str = "このイベントをキャンセルしますか？";
-pub const JA_ADMIN_CANCEL_EVENT_BODY: &str =
-    "メンバーにはキャンセルされたことが引き続き表示されます。";
-pub const JA_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS: &str =
-    "このイベントのすべての日程をキャンセルします。参加の回答も、これ以上変更できなくなります。";
-pub const JA_ADMIN_CANCEL_EVENT_KEEP: &str = "戻る";
+pub const JA_ADMIN_CANCEL_EVENT_BODY: &str = "メンバーにはキャンセルされたことが引き続き表示されます。参加の回答も、これ以上変更できなくなります。この操作は取り消せません。あとで似た内容の新しいイベントを作成することはできます。";
+pub const JA_ADMIN_CANCEL_EVENT_BODY_ALL_DAYS: &str = "このイベントのすべての日程をキャンセルします。参加の回答も、これ以上変更できなくなります。この操作は取り消せません。あとで似た内容の新しいイベントを作成することはできます。";
+pub const JA_ADMIN_CANCEL_EVENT_KEEP: &str = "やめる";
 pub const JA_ADMIN_CANCEL_EVENT_CONFIRM: &str = "イベントをキャンセル";
 pub const JA_ADMIN_CANCEL_EVENT_CONFIRM_ALL_DAYS: &str = "すべてキャンセル";
 pub const JA_ADMIN_CANNOT_EDIT_CANCELLED: &str = "キャンセル済みのイベントは編集できません。";

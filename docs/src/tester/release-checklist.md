@@ -3486,3 +3486,78 @@ pattern.
       next occurrence, if any, is now more informative: if it recurs after
       this fix, the shared teardown-timing hypothesis is weakened and a
       different cause should be sought.
+
+## RFC-054 Slice 3: destructive-confirm copy
+
+Four irreversible actions exist in the product; three already said so.
+Cancelling an event did not — it told the admin only that members would
+still see the cancellation, saying nothing about permanence.
+
+- [x] **Cancelling an event now states it cannot be undone, and points to
+      the remedy.** Both `ADMIN_CANCEL_EVENT_BODY` and
+      `ADMIN_CANCEL_EVENT_BODY_ALL_DAYS` follow the shape slice 2 settled
+      on for member removal: consequence → irreversibility → what you can
+      do instead ("you can create a similar event afterwards," naming the
+      real recreate-flow label, not a paraphrase of it). The two bodies
+      now differ only in their first sentence — the scope, which is the
+      only thing that actually differs between cancelling one date's event
+      and cancelling all of them.
+- [x] **The attendance-freeze fact is now stated for single-date
+      cancellation too**, not only all-days — the fact was always equally
+      true of both paths (both write the same `status='cancelled'`, and
+      the attendance form is disabled on that status regardless of scope);
+      only one dialog said so before this package.
+- [x] **Every Japanese decline button in a destructive confirm now reads
+      「やめる」** — `ADMIN_CANCEL_EVENT_KEEP` and `NOTE_KEEP_ACTION`
+      converge on it, taking the product's existing decline word from 7
+      uses to 9, confirmed by grep, not by inspecting the two changed
+      constants alone. `ADMIN_REMOVE_KEEP` was already correct. The English
+      halves deliberately keep their own pattern (naming the preserved
+      outcome — "Keep event," "Keep note," "Keep Member" — rather than the
+      abandoned action); the two locales converge on different concepts on
+      purpose, and the EN/JA parity gate keys on constant-name stems, not
+      meaning, so this is mechanically safe. Making two Japanese constants
+      identical to each other is not a concern for
+      `EN_JA_IDENTICAL_EXCEPTIONS`, which compares the EN and JA halves of
+      one stem, not two JA constants against each other — no exception
+      entry was added or needed.
+- [x] **One Japanese-only convergence**: `NOTE_DELETE_BODY` now says
+      「この操作は取り消せません。」instead of「元に戻すことはできません。」,
+      matching the phrasing Handoff 082 gated
+      (`JA_ADMIN_REMOVE_CONSEQUENCE.contains("取り消せません")`). The
+      English half was already "This cannot be undone." in both places, so
+      nothing changed there. `NOTE_HIDDEN_FLASH` and the comment
+      documenting why the admin-hide and member-delete flashes differ are
+      untouched — that split is correct and unrelated to this wording
+      question.
+- [x] **No gate edited, no exception-table entry added, no `.mjs` edited.**
+      The one gate naming a changed constant
+      (`rfc060_cancelled_event_recreate_is_admin_only_and_details_only`)
+      checks that the handler mentions `ADMIN_CANCEL_EVENT_BODY_ALL_DAYS`
+      by name — wording-agnostic, re-run in isolation and confirmed
+      passing. No smoke asserts the text of any of the eight constants
+      changed; the one Japanese decline-button hit in `scripts/` is
+      `member-management.mjs`'s 「メンバー管理へ戻る」, a navigation link
+      unrelated to any of these buttons.
+- [x] `cargo test --workspace --no-fail-fast`: unchanged at 665/665 passing
+      (0 failing), matching the pre-package baseline exactly.
+      `--features dev_fake_issuer`: unchanged at 668/668. The derived EN/JA
+      parity gate (which also covers the identical-pair check) was
+      re-confirmed passing in isolation, not merely inferred from the
+      full-suite pass.
+- [x] Targeted smokes — `smoke:admin-event-forms` (renders the event-level
+      cancel confirmation; layout only, no copy assertion),
+      `smoke:recurrence` (covers the separate occurrence-level cancel path,
+      which does not use these constants — run as a regression check), and
+      `smoke:language` (the only smoke touching the note route) — all
+      clean. `bun run smoke:all`: 25/25.
+      `node scripts/test-evidence-leakage-baseline.mjs`: unchanged at 996.
+- [x] **Two out-of-scope observations carried, not acted on**: the jargon
+      gate's `reviewed` array is a hand-maintained list of Japanese
+      constants — measured at **22** entries by direct count, not the
+      24 an earlier estimate cited — the same enumerate-don't-derive
+      pattern this project has been removing elsewhere; and no smoke
+      script asserts the *wording* of any of this slice's eight
+      constants, so a copy regression in this area would only be caught by
+      a gate or a human render check, never by the smoke suite. Neither is
+      this slice's job.
