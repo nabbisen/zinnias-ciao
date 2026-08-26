@@ -3310,3 +3310,179 @@ changed, both halves each — no other constant touched.
       check that stays valid since the new text still starts with the old
       substring). `bun run smoke:all`: 25/25.
       `node scripts/test-evidence-leakage-baseline.mjs`: unchanged at 996.
+
+## Handoff 082: copy gates assert what a message must say, not which characters say it
+
+Slice 2's proposed Japanese used a continuative form that kept every word of
+the approved text and still broke a gate, because that gate pinned an exact
+character sequence rather than the fact the sentence stated. **Behaviour
+stays pinned exactly** (`RELINK_CODE_TTL_SECONDS` is still `assert_eq!`'d —
+a duration is not copy); **copy is now pinned by property**: what a message
+must convey, or that two places agree with each other, never the literal
+characters spelling it out. No `assert_eq!` between a copy constant and a
+language literal remains in `rfc063_removal_only_policy_is_locked` or
+`rfc024_help_signin_copy_and_ttl_are_locked` — the two gates named in the
+originating finding — except one label left exact with a stated reason.
+
+- [x] **`JA_ADMIN_REMOVE_CONFIRM` stays exact, deliberately.** Examined for
+      a property beyond its own words and none survives: it is a two-word
+      confirm-button label with no separable claim to verify, unlike the
+      consequence copy beside it. A comment at the assertion records this
+      as an examined decision, not an oversight.
+- [x] **`JA_ADMIN_REMOVE_CONSEQUENCE`/`EN_ADMIN_REMOVE_CONSEQUENCE` now
+      assert three properties, not one sentence**: access ends, past
+      records remain, and — new since slice 2 — the action cannot be
+      undone. The "records remain" check uses the stem 残り rather than
+      the fully-conjugated 残ります, so it accepts both a terminal sentence
+      and a continuative clause joining into the next one — the exact form
+      that broke slice 2 — while an explicit negation guard
+      (`!contains("残りません")`) keeps the stem from accidentally matching
+      the opposite claim. The "cannot be undone" check keeps the full
+      conjugated form (取り消せません), because its own stem (取り消せ) is
+      shared with the reversible claim (取り消せます) one line away in
+      `ADMIN_SUSPEND_CONSEQUENCE` — a shorter stem would have made this
+      property unable to fail on exactly the mistake it exists to catch.
+- [x] **`JA_ADMIN_HELP_SIGNIN_ACTION`/`EN_ADMIN_HELP_SIGNIN_ACTION`** now
+      assert the label describes helping a member sign in and does not
+      read as inviting a new one — the confusion RFC-024 exists to
+      prevent — rather than pinning its exact words.
+- [x] **`JA_ADMIN_HELP_SIGNIN_RELINK_LINK`** now asserts the label
+      describes opening the sign-in-again screen; its cross-consistency
+      with `/join`'s copy of the same link (already wording-agnostic) is
+      unchanged.
+- [x] **`JA_RELINK_INVALID`/`EN_RELINK_INVALID`** now assert two properties
+      instead of pinning the sentence: genericness (RFC-081 §3.2 — a
+      member or an attacker holding a guessed code must not learn which
+      way a code failed) is checked **structurally**, by counting that
+      every relink-failure branch in `relink.rs` (form replay,
+      abuse-blocked, abuse-unavailable, no valid code, redemption-race —
+      5 branches today) shares this one constant rather than by scanning
+      the message's characters; and that the message may mention expiry,
+      tied to `RELINK_CODE_TTL_SECONDS` existing as a real, positive
+      duration — unlike recovery credentials, which never expire.
+- [x] **Every converted assertion demonstrated both directions**: fails on
+      a real violation of the property, and passes on a reworded-but-
+      correct variant, restored byte-identical after each. The "records
+      remain" demonstration used the exact continuative text that broke
+      slice 2 as its passing case. One limitation surfaced and is
+      disclosed rather than hidden: the help-signin action label's English
+      check requires the literal phrase "sign in" and does not recognize
+      "signing in" (gerund form) as equivalent — a real gap in what plain
+      substring matching can express, not silently smoothed over.
+- [x] `cargo test --workspace --no-fail-fast`: unchanged at 665/665 (no
+      test added or removed — every property lives inside an existing
+      `#[test]`, only assertion bodies changed). `--features
+      dev_fake_issuer`: unchanged at 668/668.
+- [x] `bun run smoke:all`: 25/25. `node scripts/test-evidence-leakage-baseline.mjs`:
+      unchanged at 996. No copy changed anywhere — confirmed via `git
+      status --short`, only `packages/contracts/tests/release_gates.rs`
+      and this checklist entry are touched.
+
+**What this means for a future copy slice:** RFC-054 slice 3 can reword
+`ADMIN_REMOVE_CONFIRM`'s siblings, the help-signin labels, or the
+relink-invalid message's phrasing without a gate rewrite, as long as the
+properties above still hold — the gate now asks "does this still say what
+it must," not "are these the same characters as before."
+
+## Handoff 083: three carried debts
+
+Three independent, previously-carried items, each small, each closed or
+investigated in one package.
+
+### Part A — `render::page`/`shell` (was dead *and* wrong)
+
+- [x] `render::page` and its `#[allow(dead_code)]` deleted — zero callers
+      repo-wide, verified by grep before removal, not inferred from the
+      `allow` attribute. Removed from `render.rs`'s re-export list along
+      with the now-unneeded `#[allow(unused_imports)]`.
+- [x] **`shell()` was NOT deleted — the handoff's premise about it was
+      wrong, and this package corrects the record rather than deleting a
+      live function.** `shell()` has real callers: `render/errors.rs`
+      calls it directly seven times. That file is
+      `LOCALIZATION_EXCEPTIONS`' structurally-unresolvable entry — no
+      membership lookup exists at the point those pages render, so
+      Japanese-only there is a deliberate, permanent answer (RFC-083
+      §4.4), not a stale trap left by Handoff 079's flip. Confirmed by
+      removing `shell()`'s `#[allow(dead_code)]` alone and running clippy:
+      zero warnings, proving the attribute was already unnecessary for
+      that function specifically. `shell()`'s doc comment, which
+      previously and incorrectly claimed zero callers, is corrected.
+- [x] The derived locale-blind helper set
+      (`locale_blind_helpers_with_localized_sibling`) now empties, exactly
+      as predicted — **the derivation itself was not touched.** Two
+      *consuming* assertions in the test that reads its result needed
+      updating, since they were written under the now-obsolete assumption
+      that the set could never legitimately be empty: a sanity floor
+      (`!helpers.is_empty() && ...`) and a specific regression-guard
+      checking the set still contained `"page"` by name — both moot once
+      `page` no longer exists as a callable function.
+- [x] `cached_asset_content_matches_pinned_hash` fired, as expected —
+      `shell.rs`'s content changed. Re-pinned per Handoff 040 §7.3's
+      precedent.
+
+### Part B — the migration gate now ignores SQL comments
+
+- [x] `rfc072_migration_0011_ui_language_check_is_closed`'s `DEFAULT`/
+      `UPDATE ` checks now scan comment-stripped source (a new
+      `strip_sql_line_comments`, the SQL counterpart to the existing `//`
+      one). **The structural checks (`ALTER TABLE`/`ADD COLUMN`/`CHECK`)
+      still read the raw statement** — comments are irrelevant to whether
+      the real SQL contains them, and stripping there would be pointless,
+      not just unnecessary.
+- [x] **Both demonstrations captured**: a SQL comment containing the word
+      "DEFAULT" no longer trips the check; an actual `DEFAULT` clause
+      added to the real `ADD COLUMN` statement still does — restored
+      byte-identical after each. The second one matters more, per the
+      handoff's own emphasis, and it still works: the check's breadth
+      (matching `DEFAULT` anywhere, not a narrower pattern like
+      `DEFAULT '`) is unchanged, since a real `DEFAULT` clause on
+      `ui_language` would silently backfill every row, defeating RFC-072's
+      no-backfill design.
+
+### Part C — the smoke harness's transient failures: a shared root cause found and fixed
+
+**Investigated first, not patched blind.** Every one of the 24 smoke
+scripts' teardown blocks sends `SIGTERM` to its spawned `wrangler dev` and
+headless Chromium child processes and returns immediately, without waiting
+to confirm either process actually exited. `smoke-all.mjs` runs each smoke
+via `spawnSync`, which only waits for the smoke script's own top-level
+process to exit — never for grandchildren that were merely asked to
+terminate. A grandchild (`wrangler dev`/`workerd`, or Chromium) still
+tearing down when the next script starts is a plausible, previously
+undiagnosed contributor to the intermittent `UND_ERR_SOCKET`/timeout
+failures carried from Handoffs 064, 069, 076, and 078 — this occurred again
+during this session's own Handoff 082 package (`smoke:display-name`, the
+same script as Handoff 069's instance), giving fresh, live evidence rather
+than only historical reports.
+
+**One script had already, independently, worked around this exact
+problem**: `abuse-controls.mjs`'s own `stop()` helper kills its child, then
+races the child's `exit` event against a timeout, rather than firing the
+signal and moving on. The other 23 scripts predate or never adopted that
+pattern.
+
+- [x] **Fix applied, not merely proposed** — a shared helper,
+      `scripts/lib/kill-and-wait.mjs`, generalizes `abuse-controls.mjs`'s
+      own proven pattern; all 23 other smoke scripts' teardown blocks now
+      call it instead of firing `.kill()` and returning. This is
+      **strictly more conservative than before, never weaker**: a script
+      that passed cleanly still exits at the same point once its children
+      have actually terminated (or after a 5-second bound, so a
+      never-exiting child cannot hang the suite). `abuse-controls.mjs`
+      itself is unchanged — it already had the correct pattern.
+- [x] **Not a retry policy.** Nothing here re-runs a failed smoke or
+      changes what a passing result means; it only makes the *teardown*
+      between smokes deterministic, closing the gap `spawnSync`'s
+      top-level-only wait leaves open.
+- [x] Confirmed via `node --check` on all 23 modified files, and by running
+      a representative script from each of the four distinct teardown-code
+      shapes found (`smoke:display-name`, `smoke:calendar-views`,
+      `smoke:event-copy`, `smoke:recurrence`) individually — all green.
+- [x] **Disclosed honestly**: this is a plausible, well-evidenced
+      contributor, confirmed safe to add and not to have broken anything —
+      it is not proven to be the *sole* cause of every historical
+      instance, since these are intermittent by nature and the fix cannot
+      be proven to have eliminated a failure mode that occurs rarely. The
+      next occurrence, if any, is now more informative: if it recurs after
+      this fix, the shared teardown-timing hypothesis is weakened and a
+      different cause should be sought.

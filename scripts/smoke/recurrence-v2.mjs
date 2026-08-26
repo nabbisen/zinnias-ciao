@@ -4,6 +4,7 @@
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
 import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from "../lib/smoke-fixture-locale.mjs";
 import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
+import { killAndWait } from "../lib/kill-and-wait.mjs";
 
 import { createHmac } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
@@ -721,8 +722,8 @@ try {
   }
   throw error;
 } finally {
-  if (dev && dev.exitCode === null) dev.kill('SIGTERM');
-  if (chrome && chrome.exitCode === null) chrome.kill('SIGTERM');
+  if (dev && dev.exitCode === null) await killAndWait(dev);
+  if (chrome && chrome.exitCode === null) await killAndWait(chrome);
   await rm(userDataDir, { recursive: true, force: true }).catch(() => {});
   await isolated.cleanup();
 }

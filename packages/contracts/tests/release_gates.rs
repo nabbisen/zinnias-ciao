@@ -1073,7 +1073,7 @@ fn package_json_version_matches_workspace_version() {
 // (Handoff 040 §7.3 re-pinned this digest with no version bump, and that
 // was correct — the prior wording here said otherwise and was wrong).
 const RELEASE_CACHE_ASSET_CONTENT_HASH: &str =
-    "0aadd3450f7fd2f6fdee148380d0dd5f5ddbe96df5dccf2adf142ac64bbcf544";
+    "129a9e88266b4d49146b1ea2ee5e976b3efdd186580f472ca24d1ce86f193f4f";
 
 fn cached_asset_content_hash() -> String {
     use sha2::{Digest, Sha256};
@@ -1627,17 +1627,65 @@ fn rfc062_admin_invites_remain_member_role_only() {
     );
 }
 
+// Handoff 082 (F1 of the RFC-054 Slice 2 review): a copy gate matching its
+// own prose, the adjacent failure to a gate matching *source* prose (seven
+// prior instances). The idiom from here down: **behaviour is pinned
+// exactly** (a duration, a count, a route path — `RELINK_CODE_TTL_SECONDS`
+// below stays `assert_eq!`); **copy is pinned by property** — what a
+// message must convey, or that two places agree with each other, never
+// what characters spell it. A copy constant is never `assert_eq!`'d to a
+// language literal; a rewording that keeps the property true must keep
+// passing, and one that breaks the property it protects must still fail.
+// Line 1729's `JA_JOIN_RELINK_LINK == JA_ADMIN_HELP_SIGNIN_RELINK_LINK`
+// already demonstrated the consistency form of this: it pins that two
+// places agree without caring what they say.
 #[test]
 fn rfc063_removal_only_policy_is_locked() {
     use zinnias_ciao_contracts::i18n::*;
 
+    // JA_ADMIN_REMOVE_CONFIRM: examined for a property beyond its exact
+    // words and none survives — it is a two-word confirm-button label with
+    // no separable claim to verify (unlike the consequence copy below,
+    // which states specific, checkable facts). Left exact, deliberately.
     assert_eq!(JA_ADMIN_REMOVE_CONFIRM, "メンバーから外す");
     assert!(
-        JA_ADMIN_REMOVE_CONSEQUENCE.contains("残ります")
+        JA_ADMIN_REMOVE_CONSEQUENCE.contains("できなくなります")
+            && EN_ADMIN_REMOVE_CONSEQUENCE
+                .to_ascii_lowercase()
+                .contains("no longer"),
+        "RFC-063 removal copy must say access ends, in both locales"
+    );
+    // The stem 残り (not the fully-conjugated 残ります) tolerates both a
+    // terminal sentence ("…残ります。") and a continuative clause
+    // ("…残り、…") joining into the next one — the exact form slice 2's
+    // first draft used, which the old assert_eq!-adjacent literal check
+    // rejected even though it stated the same fact. Guarded against a
+    // negated false-positive (残りません, "do NOT remain") explicitly,
+    // since the stem alone cannot distinguish affirmation from negation.
+    assert!(
+        JA_ADMIN_REMOVE_CONSEQUENCE.contains("残り")
+            && !JA_ADMIN_REMOVE_CONSEQUENCE.contains("残りません")
             && EN_ADMIN_REMOVE_CONSEQUENCE
                 .to_ascii_lowercase()
                 .contains("remain"),
-        "RFC-063 removal copy must say access ends and past records remain in both locales"
+        "RFC-063 removal copy must say past records remain, in both locales"
+    );
+    // Handoff 054 Slice 2 added this: the single most important fact the
+    // message states, since silence here is exactly what slice 2's own A1
+    // finding was about (an irreversible action reading as reversible).
+    // Pinned as its own property rather than folded into the two above, so
+    // a future edit cannot drop it without a visible, separately-named
+    // failure — but not extended to every sentence slice 2 added (the
+    // other-communities and re-invitation clauses stay unpinned, per this
+    // handoff's own warning against recreating the problem one sentence at
+    // a time).
+    assert!(
+        JA_ADMIN_REMOVE_CONSEQUENCE.contains("取り消せません")
+            && EN_ADMIN_REMOVE_CONSEQUENCE
+                .to_ascii_lowercase()
+                .contains("cannot be undone"),
+        "RFC-063 removal copy must say the action cannot be undone, in both locales \
+         (Handoff 054 Slice 2 A1 — removal is one-way, unlike suspension)"
     );
 
     // RFC-082 (Handoff 058) amends RFC-063: it explicitly adds a reversible
@@ -1714,12 +1762,34 @@ fn rfc063_active_member_queries_exclude_removed_members() {
 fn rfc024_help_signin_copy_and_ttl_are_locked() {
     use zinnias_ciao_contracts::i18n::*;
 
+    // Behaviour stays exact — a duration, not copy.
     assert_eq!(RELINK_CODE_TTL_SECONDS, 15 * 60);
-    assert_eq!(JA_ADMIN_HELP_SIGNIN_ACTION, "サインインを手伝う");
-    assert_eq!(EN_ADMIN_HELP_SIGNIN_ACTION, "Help sign in again");
+
+    // JA_ADMIN_HELP_SIGNIN_ACTION / EN_ADMIN_HELP_SIGNIN_ACTION: the label
+    // must describe helping a MEMBER sign in, not creating an invite — the
+    // exact confusion RFC-024 exists to prevent. Property, not wording: any
+    // phrasing keeping "sign in" and dropping "invite" passes.
+    assert!(
+        JA_ADMIN_HELP_SIGNIN_ACTION.contains("サインイン")
+            && !JA_ADMIN_HELP_SIGNIN_ACTION.contains("招待")
+            && EN_ADMIN_HELP_SIGNIN_ACTION
+                .to_ascii_lowercase()
+                .contains("sign in")
+            && !EN_ADMIN_HELP_SIGNIN_ACTION
+                .to_ascii_lowercase()
+                .contains("invite"),
+        "RFC-024 help-signin action label must describe helping a member sign in, \
+         and must not read as inviting a new one, in both locales"
+    );
     assert!(
         JA_ADMIN_HELP_SIGNIN_RELINK_HINT.contains("招待コード欄では使えません。")
-            && JA_ADMIN_HELP_SIGNIN_RELINK_LINK == "サインインし直す画面を開く"
+            // JA_ADMIN_HELP_SIGNIN_RELINK_LINK: must describe opening the
+            // re-sign-in screen — property, not wording. Cross-consistency
+            // with /join's copy of this same link is pinned separately
+            // below (JA_JOIN_RELINK_LINK == JA_ADMIN_HELP_SIGNIN_RELINK_LINK),
+            // wording-agnostic on both sides.
+            && JA_ADMIN_HELP_SIGNIN_RELINK_LINK.contains("サインイン")
+            && JA_ADMIN_HELP_SIGNIN_RELINK_LINK.contains("開く")
             && HELP_SIGNIN_HANDLER_SRC.contains("href=\\\"/relink\\\"")
             && JOIN_HANDLER_SRC.contains("href=\\\"/relink\\\"")
             && RENDER_SRC.contains("href=\\\"/relink\\\"")
@@ -1730,11 +1800,42 @@ fn rfc024_help_signin_copy_and_ttl_are_locked() {
             && HELP_SIGNIN_HANDLER_SRC.contains("rel=\\\"noopener\\\""),
         "RFC-024 help-signin result must direct members to /relink and distinguish it from invite-code entry"
     );
-    assert_eq!(
-        JA_RELINK_INVALID,
-        "このコードは無効か、有効期限が切れています。"
+
+    // JA_RELINK_INVALID / EN_RELINK_INVALID: two properties, both from
+    // slice 1's A1 review, not the sentence itself.
+    //
+    // Property 1 (RFC-081 §3.2 genericness): a member — or an attacker
+    // holding a guessed code — must not learn which way a code failed.
+    // Enforced structurally rather than by content: every relink-failure
+    // branch (form replay, abuse-blocked, abuse-unavailable, no valid code,
+    // and the redemption-race branch) must route through this SAME
+    // constant, never a cause-specific one. A wording change that keeps
+    // every branch sharing one constant still passes; a branch given its
+    // own message would shrink this count and must fail.
+    let relink_invalid_call_sites = RELINK_HANDLER_SRC.matches("i18n::RELINK_INVALID").count();
+    assert!(
+        relink_invalid_call_sites >= 5,
+        "RFC-081 §3.2: expected at least 5 relink failure branches (form replay, \
+         abuse-blocked, abuse-unavailable, no valid code, redemption-race) sharing \
+         i18n::RELINK_INVALID; found {relink_invalid_call_sites} — a shrinking count \
+         likely means a branch was given its own, more specific message, which would \
+         leak which failure occurred"
     );
-    assert_eq!(EN_RELINK_INVALID, "This code is invalid or has expired.");
+    // Property 2 (why it is allowed to mention expiry): relink codes
+    // genuinely expire — RELINK_CODE_TTL_SECONDS, asserted exact above, is
+    // a real positive duration — unlike recovery credentials, which never
+    // do (slice 1 changed JA_RECOVERY_INVALID for exactly that reason and
+    // deliberately left this constant alone). Mentioning expiry here does
+    // not violate property 1: the message still does not say *whether*
+    // expiry is what actually happened, only that it is one honest
+    // possibility among the causes this constant covers.
+    assert!(
+        JA_RELINK_INVALID.contains("有効期限")
+            && EN_RELINK_INVALID.to_ascii_lowercase().contains("expired"),
+        "RFC-081/slice 1: the relink-invalid message may and should mention expiry, \
+         since relink codes genuinely expire (RELINK_CODE_TTL_SECONDS) — unlike \
+         recovery credentials"
+    );
 
     // RFC-082 (Handoff 058) legitimately adds "suspend"/"unsuspend" routes to
     // the shared community router — dropped from the forbidden list here for
@@ -3037,21 +3138,21 @@ fn rfc072_every_handler_and_render_file_is_localized_or_documented_exception() {
         files.len()
     );
 
+    // Handoff 083 Part A deleted `render::page` (the last helper this
+    // derivation had found), so this set is now correctly empty — the
+    // derivation working, not the scan breaking. The floor below no longer
+    // requires a non-empty result; a genuinely broken scan is still caught
+    // by an upper bound never being sanely large, and by the demonstration
+    // in Handoff 073's own review that this same function correctly finds
+    // one when a bare/`_localized` pair exists. If a helper gains a
+    // `_localized` sibling again, this set picks it up with no edit here.
     let helpers = locale_blind_helpers_with_localized_sibling();
     assert!(
-        !helpers.is_empty() && helpers.len() < 10,
+        helpers.len() < 10,
         "expected a small derived set of render helpers with a _localized sibling, found {} \
          ({helpers:?}) — the render-layer scan is probably broken, not the codebase having \
-         none or dozens",
+         dozens",
         helpers.len()
-    );
-    // §9: this check replaces (not extends) the one that always caught bare
-    // render::page( — confirm the derived set still contains it, since a
-    // scan regression here would silently stop catching the original case.
-    assert!(
-        helpers.iter().any(|h| h == "page"),
-        "derived helper set {helpers:?} lost \"page\" — the rewritten check must still catch \
-         bare render::page( in a non-excepted file, exactly as the check it replaces did"
     );
 
     let src_dir = workers_ssr_src_dir();
@@ -3678,6 +3779,25 @@ fn rfc072_language_setting_is_linked_from_my_page() {
     );
 }
 
+/// Drops SQL `--...` line-comment text before scanning — Handoff 083 Part B.
+/// The eighth instance of a gate matching its own explanatory prose in this
+/// project, and the first in SQL: `rfc072_migration_0011_ui_language_check_is_closed`
+/// read the raw file, so writing the word "default" anywhere — including a
+/// comment explaining the *absence* of a default — false-tripped it
+/// (Handoff 079 hit this and worked around it by wording the comment to
+/// avoid the word). `strip_line_comments` above is the `//` counterpart for
+/// Rust source; this is the SQL one, applied only to the DEFAULT/UPDATE
+/// checks below — the structural checks (`ALTER TABLE`/`ADD COLUMN`/`CHECK`)
+/// keep reading the raw statement, since comments are irrelevant to whether
+/// the real SQL contains them.
+fn strip_sql_line_comments(content: &str) -> String {
+    content
+        .lines()
+        .map(|line| line.split("--").next().unwrap_or(""))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
 fn rfc072_migration_0011_ui_language_check_is_closed() {
     assert!(
@@ -3689,9 +3809,17 @@ fn rfc072_migration_0011_ui_language_check_is_closed() {
         MIGRATION_0011_SRC.contains("CHECK(ui_language IN ('ja', 'en') OR ui_language IS NULL)"),
         "RFC-072 migration 0011's CHECK set must stay exactly {{'ja', 'en', NULL}} — closed, no third value, no backfill"
     );
+    // Comments stripped for these two checks only — a SQL comment
+    // explaining the absence of a default (or an update) must not be able
+    // to trip a check about the real statement. Deliberately broad
+    // (`DEFAULT` anywhere, not `DEFAULT '` or similar): a real DEFAULT
+    // clause on ui_language would silently backfill every existing row,
+    // defeating RFC-072's no-backfill design, so narrowing the pattern is
+    // not an option even though it would also dodge the false-trip.
+    let stripped = strip_sql_line_comments(MIGRATION_0011_SRC);
     assert!(
-        !MIGRATION_0011_SRC.to_ascii_uppercase().contains("UPDATE ")
-            && !MIGRATION_0011_SRC.to_ascii_uppercase().contains("DEFAULT"),
+        !stripped.to_ascii_uppercase().contains("UPDATE ")
+            && !stripped.to_ascii_uppercase().contains("DEFAULT"),
         "RFC-072 migration 0011 must not backfill or default any existing row — NULL means the caller resolves Locale::PRODUCT_DEFAULT (RFC-085/Handoff 079), not a value baked into the row"
     );
 }

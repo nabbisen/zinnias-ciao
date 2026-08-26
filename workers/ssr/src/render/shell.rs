@@ -31,33 +31,16 @@ pub(super) fn shell_with_lang(lang: &str, title: &str, body: &str) -> String {
     )
 }
 
-/// Full HTML document shell. Non-migrated pages: always Japanese.
-///
-/// RFC-084 (Handoff 084) converted the last caller of [`page`] below,
-/// leaving this and `page` itself with zero callers anywhere in the
-/// codebase — kept, not removed, per that package's explicit "no helper is
-/// removed by this package" scope; whether to delete them is a decision
-/// for whoever picks up next, not assumed here.
-#[allow(dead_code)]
+/// Full HTML document shell, always `lang="ja"`. Not dead code: called
+/// directly by `render/errors.rs`, which is `LOCALIZATION_EXCEPTIONS`'
+/// structurally-unresolvable entry — no membership lookup exists at the
+/// point those pages render, so there is no locale to thread through, and
+/// Japanese-only is the deliberate, permanent answer there (RFC-083 §4.4),
+/// not a stale default. Handoff 083 Part A deleted [`page`] (below), which
+/// *was* dead, along with this function's now-corrected doc comment, which
+/// previously and incorrectly claimed this one had zero callers too.
 pub(super) fn shell(title: &str, body: &str) -> String {
     shell_with_lang("ja", title, body)
-}
-
-/// Render a full page. Was used by every non-migrated handler; always
-/// renders `lang="ja"` regardless of any membership preference — this
-/// function's behavior is unchanged by RFC-072. Migrated pages call
-/// [`page_localized`] instead.
-///
-/// RFC-083 Slice D's last package (RFC-084, Handoff 084) converted this
-/// function's own last remaining caller (`handlers/account/*.rs`) —
-/// confirmed by a repo-wide grep for `render::page(` finding none. Kept
-/// rather than removed: that handoff's own scope said "no helper is
-/// removed by this package," so deleting it here would have exceeded
-/// authorization even though it is now provably dead. Left for an
-/// explicit decision, not silently cleaned up.
-#[allow(dead_code)]
-pub fn page(title: &str, body: &str) -> Result<Response> {
-    Response::from_html(shell(title, body))
 }
 
 /// Render a full page for a page migrated to locale-aware rendering

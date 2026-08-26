@@ -29,6 +29,7 @@ import { prepareIsolatedWorkerTest } from '../lib/isolated-worker-test.mjs';
 import { PIN_FIXTURE_UI_LANGUAGE_TO_JAPANESE_SQL } from '../lib/smoke-fixture-locale.mjs';
 import { attachCspViolationCapture, readCspViolations } from '../lib/csp-violation-capture.mjs';
 import { SMOKE_ACCEPT_LANGUAGE } from '../lib/smoke-locale.mjs';
+import { killAndWait } from "../lib/kill-and-wait.mjs";
 
 import { createHmac } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -652,7 +653,7 @@ try {
   }
   throw error;
 } finally {
-  if (chrome) chrome.kill('SIGTERM');
-  if (dev) dev.kill('SIGTERM');
+  if (chrome) await killAndWait(chrome);
+  if (dev) await killAndWait(dev);
   if (isolated) await isolated.cleanup();
 }

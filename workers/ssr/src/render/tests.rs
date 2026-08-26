@@ -29,7 +29,7 @@ fn format_day_time_tz_localized_date_label_follows_locale() {
 
 // RFC-072: `html lang` must derive from the same locale passed to the
 // shell — tested directly here for the same reason `title_escaped_in_shell`
-// tests `escape_html` directly: `page`/`page_localized` wrap a
+// tests `escape_html` directly: `page_localized` wraps a
 // `worker::Response` and cannot be constructed in a native test
 // environment.
 #[test]
@@ -123,8 +123,8 @@ fn escape_clean_string() {
 #[test]
 fn title_escaped_in_shell() {
     // Verify the title is properly escaped when inserted into the page shell.
-    // We test escape_html directly here because page() wraps a worker::Response
-    // and cannot be constructed in a native test environment.
+    // We test escape_html directly here because page_localized() wraps a
+    // worker::Response and cannot be constructed in a native test environment.
     let escaped = escape_html("<bad>&title");
     assert!(escaped.contains("&lt;bad&gt;"));
     assert!(escaped.contains("&amp;"));

@@ -6,6 +6,7 @@
 import { prepareIsolatedWorkerTest } from "../lib/isolated-worker-test.mjs";
 import { SMOKE_ACCEPT_LANGUAGE } from "../lib/smoke-locale.mjs";
 import { attachCspViolationCapture, readCspViolations } from "../lib/csp-violation-capture.mjs";
+import { killAndWait } from "../lib/kill-and-wait.mjs";
 
 import { createHmac } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -941,7 +942,7 @@ try {
   }
   throw error;
 } finally {
-  if (chrome) chrome.kill('SIGTERM');
-  if (dev) dev.kill('SIGTERM');
+  if (chrome) await killAndWait(chrome);
+  if (dev) await killAndWait(dev);
   await isolated.cleanup();
 }
