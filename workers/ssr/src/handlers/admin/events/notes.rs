@@ -49,13 +49,13 @@ pub async fn get_admin_hide_note_confirm(
         .collect();
     let nav = render::bottom_nav_localized(community_id, "home", locale);
 
-    let nd = i18n::t(locale, i18n::NOTE_DELETE);
+    let title = i18n::t(locale, i18n::ADMIN_HIDE_NOTE_TITLE);
     let body = format!(
         "{header}\
          <main class=\"cz-page-main\">\
-           <h1 class=\"cz-confirm-title\">{nd}</h1>\
-           <p class=\"cz-confirm-body\">\
-             {consequence} {name}</p>\
+           <h1 class=\"cz-confirm-title\">{title}</h1>\
+           <p class=\"cz-confirm-body\"><strong>{name}</strong></p>\
+           <p class=\"cz-confirm-body\">{consequence}</p>\
            <div class=\"cz-confirm-actions\">\
              <a href=\"/c/{cid}/events/{eid}\" \
                 class=\"cz-confirm-keep-link\">{keep}</a>\
@@ -64,22 +64,23 @@ pub async fn get_admin_hide_note_confirm(
                <input type=\"hidden\" name=\"_token\" value=\"{tok}\">\
                <button type=\"submit\" \
                  class=\"cz-confirm-delete-button\">\
-                 {nd}</button>\
+                 {confirm}</button>\
              </form>\
            </div>\
          </main>{nav}",
-        header = render::header_with_switcher_localized(nd, community_id, &pairs, locale),
+        header = render::header_with_switcher_localized(title, community_id, &pairs, locale),
         name = render::escape_html(target_name),
         cid = render::escape_html(community_id),
         eid = render::escape_html(event_id),
         mid = render::escape_html(target_membership_id),
         tok = render::escape_html(&token),
         nav = nav,
-        nd = nd,
+        title = title,
         keep = i18n::t(locale, i18n::NOTE_KEEP_ACTION),
-        consequence = i18n::t(locale, i18n::ADMIN_REMOVE_CONSEQUENCE),
+        confirm = i18n::t(locale, i18n::ADMIN_HIDE_NOTE_CONFIRM),
+        consequence = i18n::t(locale, i18n::ADMIN_HIDE_NOTE_CONSEQUENCE),
     );
-    render::page_localized(locale, nd, &body)
+    render::page_localized(locale, title, &body)
 }
 
 pub async fn post_admin_hide_note(

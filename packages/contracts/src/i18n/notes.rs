@@ -33,6 +33,18 @@ pub const EN_NOTE_HIDDEN_FLASH: &str = "Note hidden.";
 pub const JA_NOTE_SAVED_FLASH: &str = "メモを保存しました。";
 pub const JA_NOTE_HIDDEN_FLASH: &str = "メモを非表示にしました。";
 
+// Handoff (RFC-054 Slice 5): the admin hide-note confirm previously borrowed
+// ADMIN_REMOVE_CONSEQUENCE (member removal) for its body, and NOTE_DELETE
+// ("Delete Note") for its title and button — neither describes what this
+// action does. It sets hidden_by_admin_at, not note_deleted_at; "hidden," not
+// "deleted," matching NOTE_HIDDEN_FLASH above.
+pub const EN_ADMIN_HIDE_NOTE_TITLE: &str = "Hide this note?";
+pub const EN_ADMIN_HIDE_NOTE_CONSEQUENCE: &str = "This note will no longer be shown to anyone, including the member who wrote it. Their membership and other notes are unaffected. This cannot be undone.";
+pub const EN_ADMIN_HIDE_NOTE_CONFIRM: &str = "Hide note";
+pub const JA_ADMIN_HIDE_NOTE_TITLE: &str = "メモを非表示にしますか？";
+pub const JA_ADMIN_HIDE_NOTE_CONSEQUENCE: &str = "このメモは誰にも表示されなくなります。書いた本人にも表示されません。メンバーの参加やほかのメモには影響しません。この操作は取り消せません。";
+pub const JA_ADMIN_HIDE_NOTE_CONFIRM: &str = "メモを非表示にする";
+
 /// RFC-072 locale-aware pairs; see `i18n::Localized`.
 pub const NOTE_DELETE: super::Localized = super::Localized {
     ja: JA_NOTE_DELETE,
@@ -73,4 +85,16 @@ pub const NOTE_SAVED_FLASH: super::Localized = super::Localized {
 pub const NOTE_HIDDEN_FLASH: super::Localized = super::Localized {
     ja: JA_NOTE_HIDDEN_FLASH,
     en: EN_NOTE_HIDDEN_FLASH,
+};
+pub const ADMIN_HIDE_NOTE_TITLE: super::Localized = super::Localized {
+    ja: JA_ADMIN_HIDE_NOTE_TITLE,
+    en: EN_ADMIN_HIDE_NOTE_TITLE,
+};
+pub const ADMIN_HIDE_NOTE_CONSEQUENCE: super::Localized = super::Localized {
+    ja: JA_ADMIN_HIDE_NOTE_CONSEQUENCE,
+    en: EN_ADMIN_HIDE_NOTE_CONSEQUENCE,
+};
+pub const ADMIN_HIDE_NOTE_CONFIRM: super::Localized = super::Localized {
+    ja: JA_ADMIN_HIDE_NOTE_CONFIRM,
+    en: EN_ADMIN_HIDE_NOTE_CONFIRM,
 };

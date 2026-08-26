@@ -3623,3 +3623,54 @@ slice 3's entry above.
       constant's path (`/days/…/cancel`) — clean, including the
       confirmation-page render itself. `bun run smoke:all`: 25/25.
       `node scripts/test-evidence-leakage-baseline.mjs`: unchanged at 996.
+
+## RFC-054 Slice 5: the admin hide-note confirm no longer shows member-removal copy
+
+Found while proposing RFC-086 (still Proposed, not implemented by this
+package): `admin/events/notes.rs`'s hide-note confirmation was rendering
+`ADMIN_REMOVE_CONSEQUENCE` — a different dialog's copy, describing member
+removal (losing access, re-invitation as a new member, role and display
+name not carrying over) — none of which is true of hiding one note. Its
+title and button also said "Delete Note," though the action sets
+`hidden_by_admin_at`, not `note_deleted_at`.
+
+- [x] **Three new constants** — `ADMIN_HIDE_NOTE_TITLE`,
+      `ADMIN_HIDE_NOTE_CONSEQUENCE`, `ADMIN_HIDE_NOTE_CONFIRM` — describe
+      what this action actually does: the note is hidden from everyone,
+      including the member who wrote it (confirmed against the schema: the
+      only two `event_notes` read paths, plus a third in the export
+      handler, all filter `hidden_by_admin_at IS NULL`); membership and
+      other notes are unaffected (the `UPDATE` touches only
+      `event_notes.hidden_by_admin_at`, referencing
+      `community_memberships` only in a read-only `EXISTS` guard); and the
+      action cannot be undone (the column is set once, with no clearing
+      path anywhere in `workers/ssr/src/`).
+- [x] **The dialog now agrees with its own result message.** "Hide," not
+      "delete," matching `NOTE_HIDDEN_FLASH` — the two were describing the
+      same action differently before this package.
+- [x] **`ADMIN_REMOVE_CONSEQUENCE` is back to exactly one call site**
+      (member removal, `admin/member_remove.rs`), confirmed by grep across
+      `workers/ssr/src/`, not by inspecting only the line that changed.
+- [x] **A dangling name, fixed along the way.** The member's name used to
+      trail the consequence sentence with a bare space
+      (`{consequence} {name}`); it now has its own line, reusing the
+      existing `cz-confirm-body` class rather than introducing a new one.
+- [x] **The member's own note-delete dialog is untouched** — confirmed
+      byte-identical by diff. It correctly uses `NOTE_DELETE`/
+      `NOTE_DELETE_BODY`, where "delete" is the accurate word for that
+      separate action.
+- [x] No gate edited, no exception-table entry added, no CSS touched, no
+      RFC-086 work. The derived EN/JA parity gate accepted the three new
+      stems with no exception needed, confirmed in isolation; the
+      localization-exception table and the form-token-purpose
+      completeness gate (`token_purpose::ADMIN_HIDE_NOTE`) both
+      re-confirmed passing in isolation.
+- [x] `cargo test --workspace --no-fail-fast`: unchanged at 665/665 passing
+      (0 failing), matching the pre-package baseline. `--features
+      dev_fake_issuer`: unchanged at 668/668.
+- [x] **No smoke covers this dialog** — the two `scripts/` references to
+      `hide` are the form-token replay and concurrency evidence scripts,
+      which extract the token and check redirect/flash behavior, never
+      the rendered copy. `bun run smoke:all`: 25/25, run as a regression
+      check only. `node scripts/test-evidence-leakage-baseline.mjs`:
+      unchanged at 996.
