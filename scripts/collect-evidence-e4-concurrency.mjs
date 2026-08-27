@@ -27,6 +27,7 @@ import {
   serializeManifestRecords,
 } from './lib/evidence-manifest.mjs';
 import { prepareIsolatedWorkerTest } from './lib/isolated-worker-test.mjs';
+import { flashCodeEmittedBy } from './lib/flash-code.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = process.env.EVIDENCE_DIR ?? '.git-exclude/evidence/rfc050-e4-concurrency';
@@ -201,7 +202,7 @@ try {
     `INSERT INTO communities (id,name,timezone,is_active,created_at) VALUES (${sqlString(communityId)},'E4 Evidence','Asia/Tokyo',1,${sqlString(now)})`,
     `INSERT INTO users (id,created_at) VALUES (${sqlString(adminUserId)},${sqlString(now)})`,
     `INSERT INTO community_memberships (id,community_id,user_id,role,display_name,joined_at) VALUES (${sqlString(adminMembershipId)},${sqlString(communityId)},${sqlString(adminUserId)},'admin','E4 Evidence Admin',${sqlString(now)})`,
-    `INSERT INTO sessions (id,user_id,session_hmac,created_at,expires_at,last_seen_at) VALUES (${sqlString(adminSessionId)},${sqlString(adminUserId)},${sqlString(adminSessionHmac)},${sqlString(now)},'2099-12-31T23:59:59.000Z',${sqlString(now)})`,
+    `INSERT INTO sessions (id,user_id,session_hmac,created_at,expires_at,last_seen_at,provenance,authenticated_at) VALUES (${sqlString(adminSessionId)},${sqlString(adminUserId)},${sqlString(adminSessionHmac)},${sqlString(now)},'2099-12-31T23:59:59.000Z',${sqlString(now)},'external_identity',${sqlString(now)})`,
     `INSERT INTO invite_codes (id,community_id,code_hmac,created_by_membership_id,expires_at,grants_role,created_at) VALUES (${sqlString(inviteId)},${sqlString(communityId)},${sqlString(createHmac('sha256', fixture.pepper).update(inviteCode).digest('hex'))},${sqlString(adminMembershipId)},'2099-12-31T23:59:59.000Z','member',${sqlString(now)})`,
   ].join(';'));
 
@@ -331,6 +332,12 @@ try {
   // Unlike attendance/note, this endpoint's replay branch redirects to a
   // different location than its success branch, so the race is directly
   // observable from the HTTP responses without a write-count probe.
+  const hideNoteFlashCode = flashCodeEmittedBy(
+    'workers/ssr/src/handlers/admin/events/notes.rs',
+    'post_admin_hide_note',
+  );
+  const hideEventDetailPath = `/c/${communityId}/events/${eventId}`;
+  const hideSuccessLocation = `${hideEventDetailPath}?flash=${hideNoteFlashCode}`;
   const hideConfirmPage = await request(baseUrl, `/c/${communityId}/admin/events/${eventId}/notes/${memberMembershipId}/hide`, { cookies: adminCookies });
   const hideToken = hiddenToken(hideConfirmPage.text);
   const hideResults = await Promise.all(
@@ -338,12 +345,12 @@ try {
       method: 'POST', cookies: adminCookies, form: { _token: hideToken },
     })),
   );
-  const hideWinners = hideResults.filter((r) => r.status === 303 && r.location.includes('flash=Note+removed'));
-  const hideReplays = hideResults.filter((r) => r.status === 303 && !r.location.includes('flash=Note+removed'));
+  const hideWinners = hideResults.filter((r) => r.status === 303 && r.location === hideSuccessLocation);
+  const hideReplays = hideResults.filter((r) => r.status === 303 && r.location === hideEventDetailPath);
   const hiddenCount = await scalar(fixture, `SELECT COUNT(*) AS value FROM event_notes WHERE event_id=${sqlString(eventId)} AND membership_id=${sqlString(memberMembershipId)} AND hidden_by_admin_at IS NOT NULL`);
   record(
     'S5.concurrent_form_token_admin_destructive',
-    `${burstSize} concurrent admin hide-note submissions sharing one single-use token: ${hideWinners.length} redirects carried "flash=Note+removed" (post_admin_hide_note's business logic executed) and ${hideReplays.length} did not (the replay branch, which never legitimately fires for this purpose — see S5.form_token_replay_not_detected_by_wrapper); the note shows hidden ${hiddenCount} time(s) (expected exactly 1, since hiding is not idempotent at the audit layer even though the boolean column itself cannot show more than one "hidden" state)`,
+    `${burstSize} concurrent admin hide-note submissions sharing one single-use token: ${hideWinners.length} redirects went to "${hideSuccessLocation}" (post_admin_hide_note's business logic executed) and ${hideReplays.length} went to the bare "${hideEventDetailPath}" with no flash (the replay branch, which never legitimately fires for this purpose — see S5.form_token_replay_not_detected_by_wrapper); the note shows hidden ${hiddenCount} time(s) (expected exactly 1, since hiding is not idempotent at the audit layer even though the boolean column itself cannot show more than one "hidden" state)`,
     hideWinners.length === 1 && hideReplays.length === burstSize - 1 && hiddenCount === 1,
     { winners: hideWinners.length, replays: hideReplays.length, hiddenCount },
   );

@@ -6140,6 +6140,120 @@ fn every_smoke_script_is_reachable_by_name_or_documented_exception() {
     }
 }
 
+fn scripts_top_level_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts")
+}
+
+/// RFC-037 replay-test restoration (Handoff, 2026-08-26), Part D: a
+/// documented exception to the top-level script coverage gate below.
+/// `reason` must say why the script genuinely cannot or should not be
+/// reachable by any `package.json` name — never used to make an oversight
+/// pass quietly.
+struct TopLevelScriptCoverageException {
+    path: &'static str,
+    reason: &'static str,
+}
+
+/// Empty by design, same as `SMOKE_COVERAGE_EXCEPTIONS` above: every
+/// `scripts/*.mjs` file already has a `package.json` name today. This gate
+/// exists so a *future* addition keeps that property, not because one is
+/// missing now.
+const TOP_LEVEL_SCRIPT_COVERAGE_EXCEPTIONS: &[TopLevelScriptCoverageException] = &[];
+
+/// RFC-037 replay-test restoration (Handoff, 2026-08-26), Part D:
+/// `every_smoke_script_is_reachable_by_name_or_documented_exception` above
+/// only ever scanned `scripts/smoke/`. `scripts/test-form-token-replay-rejected.mjs`
+/// and `scripts/collect-evidence-e4-concurrency.mjs` — the two scripts this
+/// package restored — live one directory up, and nothing checked that they
+/// (or any other top-level script) are even nameable, let alone run. A
+/// directory-shaped blind spot, the same shape as the smoke-coverage gate's
+/// own predecessor.
+///
+/// Walks every `scripts/*.mjs` file **directly under `scripts/`** —
+/// `scripts/smoke/` (its own gate, above) and `scripts/lib/` (import-only
+/// helper modules, never meant to be run by name at all — an exception
+/// entry per file would be the wrong shape, so the directory itself is
+/// excluded by construction via `path.is_dir()`) are both out of scope —
+/// and fails on anything neither referenced by some `package.json` script
+/// value nor listed in `TOP_LEVEL_SCRIPT_COVERAGE_EXCEPTIONS` with a
+/// written reason.
+///
+/// This proves every top-level script is **nameable**. It deliberately does
+/// not assert any of them belong in `smoke-all.mjs`'s routine sweep —
+/// several top-level scripts (`bootstrap-cloudflare.mjs`,
+/// `recover-community-access.mjs`) are operator tools against real
+/// infrastructure, not tests, and folding every `test:`/`evidence:` name
+/// into a routine local run would be a different, larger decision than
+/// this gate makes. See this package's review request for that question,
+/// raised rather than decided here.
+#[test]
+fn every_top_level_script_is_reachable_by_name_or_documented_exception() {
+    let dir = scripts_top_level_dir();
+    let entries = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("failed to read directory {}: {e}", dir.display()));
+
+    let mut checked = 0usize;
+    let mut unreferenced: Vec<String> = Vec::new();
+    let mut seen_exceptions = std::collections::HashSet::new();
+
+    for entry in entries {
+        let path = entry
+            .unwrap_or_else(|e| panic!("failed to read directory entry: {e}"))
+            .path();
+        if path.is_dir() || !path.extension().is_some_and(|ext| ext == "mjs") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        checked += 1;
+        let referenced = PACKAGE_JSON_SRC.contains(&format!("scripts/{name}"));
+
+        match TOP_LEVEL_SCRIPT_COVERAGE_EXCEPTIONS
+            .iter()
+            .find(|e| e.path == name)
+        {
+            Some(exc) => {
+                seen_exceptions.insert(exc.path);
+                assert!(
+                    !referenced,
+                    "{name} is both referenced by a package.json script AND listed in \
+                     TOP_LEVEL_SCRIPT_COVERAGE_EXCEPTIONS ({}) — remove the now-stale exception \
+                     entry.",
+                    exc.reason
+                );
+            }
+            None => {
+                if !referenced {
+                    unreferenced.push(name);
+                }
+            }
+        }
+    }
+
+    assert!(
+        checked > 0,
+        "found zero .mjs files directly under scripts/ — has the directory moved? This gate \
+         expects the existing top-level scripts to still be there; an empty result likely means \
+         the gate itself is broken, not that there is nothing left to check."
+    );
+    assert!(
+        unreferenced.is_empty(),
+        "these scripts/*.mjs files are not referenced by any package.json script value and are \
+         not in TOP_LEVEL_SCRIPT_COVERAGE_EXCEPTIONS: {} — add a package.json script entry so \
+         the file can be run by name, or add a pinned exception with a written reason. This is \
+         the sibling defect to Handoff 063's smoke-coverage gate, one directory up.",
+        unreferenced.join(", ")
+    );
+    for exc in TOP_LEVEL_SCRIPT_COVERAGE_EXCEPTIONS {
+        assert!(
+            seen_exceptions.contains(exc.path),
+            "TOP_LEVEL_SCRIPT_COVERAGE_EXCEPTIONS names {} ({}) but no file with that name \
+             exists directly under scripts/ — stale table entry?",
+            exc.path,
+            exc.reason
+        );
+    }
+}
+
 /// Handoff 076 (F1 of the Handoff 076 review): a documented exception to the
 /// Accept-Language pin gate below. `reason` must say why the script
 /// genuinely does not need the pin (e.g. it never opens a page at all) —

@@ -17,6 +17,7 @@
 
 import { createHmac } from 'node:crypto';
 import { prepareIsolatedWorkerTest } from './lib/isolated-worker-test.mjs';
+import { flashCodeEmittedBy } from './lib/flash-code.mjs';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -63,6 +64,15 @@ function queryRows(fixture, statement) {
   return parsed?.[0]?.results ?? parsed?.results ?? [];
 }
 
+const hideNoteFlashCode = flashCodeEmittedBy(
+  'workers/ssr/src/handlers/admin/events/notes.rs',
+  'post_admin_hide_note',
+);
+const regenerateFlashCode = flashCodeEmittedBy(
+  'workers/ssr/src/handlers/calendar.rs',
+  'post_regenerate_calendar',
+);
+
 const fixture = await prepareIsolatedWorkerTest('form-token-replay-rejected');
 let dev;
 
@@ -91,7 +101,7 @@ try {
     `INSERT INTO users (id,created_at) VALUES (${sqlString(memberUserId)},${sqlString(now)})`,
     `INSERT INTO community_memberships (id,community_id,user_id,role,display_name,joined_at) VALUES (${sqlString(adminMembershipId)},${sqlString(communityId)},${sqlString(adminUserId)},'admin','Replay Regress Admin',${sqlString(now)})`,
     `INSERT INTO community_memberships (id,community_id,user_id,role,display_name,joined_at) VALUES (${sqlString(memberMembershipId)},${sqlString(communityId)},${sqlString(memberUserId)},'member','Replay Regress Member',${sqlString(now)})`,
-    `INSERT INTO sessions (id,user_id,session_hmac,created_at,expires_at,last_seen_at) VALUES (${sqlString(adminSessionId)},${sqlString(adminUserId)},${sqlString(adminSessionHmac)},${sqlString(now)},'2099-12-31T23:59:59.000Z',${sqlString(now)})`,
+    `INSERT INTO sessions (id,user_id,session_hmac,created_at,expires_at,last_seen_at,provenance,authenticated_at) VALUES (${sqlString(adminSessionId)},${sqlString(adminUserId)},${sqlString(adminSessionHmac)},${sqlString(now)},'2099-12-31T23:59:59.000Z',${sqlString(now)},'external_identity',${sqlString(now)})`,
     `INSERT INTO events (id,community_id,created_by_membership_id,title,status,created_at,updated_at) VALUES (${sqlString(eventId)},${sqlString(communityId)},${sqlString(adminMembershipId)},'Replay Regression Event','scheduled',${sqlString(now)},${sqlString(now)})`,
     `INSERT INTO event_days (id,event_id,community_id,seq,day_date,starts_at_utc,ends_at_utc,created_at) VALUES (${sqlString(dayId)},${sqlString(eventId)},${sqlString(communityId)},1,'2026-08-03','2026-08-03T00:00:00.000Z','2026-08-03T01:30:00.000Z',${sqlString(now)})`,
     `INSERT INTO event_notes (id,event_id,membership_id,note,note_updated_at) VALUES ('note_replay_regress',${sqlString(eventId)},${sqlString(memberMembershipId)},'note to hide','${now}')`,
@@ -104,6 +114,8 @@ try {
 
   const adminCookie = `ciao_sid=${adminSessionSecret}`;
   const hidePath = `/c/${communityId}/admin/events/${eventId}/notes/${memberMembershipId}/hide`;
+  const hideEventDetailPath = `/c/${communityId}/events/${eventId}`;
+  const hideSuccessLocation = `${hideEventDetailPath}?flash=${hideNoteFlashCode}`;
 
   const confirmResponse = await fetch(`${baseUrl}${hidePath}`, { headers: { Cookie: adminCookie } });
   const confirmHtml = await confirmResponse.text();
@@ -112,15 +124,15 @@ try {
   const first = await request(baseUrl, hidePath, { method: 'POST', cookie: adminCookie, form: { _token: token } });
   assert(first.status === 303, `first submission must succeed (303), got ${first.status}`);
   assert(
-    first.location.includes('flash=Note+removed'),
-    `first submission must carry the success flash, got location "${first.location}"`,
+    first.location === hideSuccessLocation,
+    `first submission must redirect to the success location, got "${first.location}" (expected "${hideSuccessLocation}")`,
   );
 
   const replay = await request(baseUrl, hidePath, { method: 'POST', cookie: adminCookie, form: { _token: token } });
   assert(replay.status === 303, `replayed submission must still redirect (303), got ${replay.status}`);
   assert(
-    !replay.location.includes('flash=Note+removed'),
-    `replayed submission must NOT report success again — this is the defect: got location "${replay.location}"`,
+    replay.location === hideEventDetailPath,
+    `replayed token must redirect to the bare event page with no flash, got "${replay.location}" (expected "${hideEventDetailPath}")`,
   );
 
   // -- R-N1: calendar-token regeneration — no independent fallback guard ----
@@ -131,6 +143,7 @@ try {
   // first one the admin had just been shown.
   const calendarPath = `/c/${communityId}/me/calendar`;
   const regeneratePath = `${calendarPath}/regenerate`;
+  const regenerateSuccessLocation = `${calendarPath}?flash=${regenerateFlashCode}`;
 
   const calendarPage = await fetch(`${baseUrl}${calendarPath}`, { headers: { Cookie: adminCookie } });
   const calendarHtml = await calendarPage.text();
@@ -141,8 +154,8 @@ try {
   });
   assert(regenerateFirst.status === 303, `first regenerate must succeed (303), got ${regenerateFirst.status}`);
   assert(
-    regenerateFirst.location.includes('flash=generated'),
-    `first regenerate must carry the success flash, got location "${regenerateFirst.location}"`,
+    regenerateFirst.location === regenerateSuccessLocation,
+    `first regenerate must redirect to the success location, got "${regenerateFirst.location}" (expected "${regenerateSuccessLocation}")`,
   );
 
   const activeAfterFirst = queryRows(
@@ -157,8 +170,8 @@ try {
   });
   assert(regenerateReplay.status === 303, `replayed regenerate must still redirect (303), got ${regenerateReplay.status}`);
   assert(
-    !regenerateReplay.location.includes('flash=generated'),
-    `replayed regenerate must NOT report success again — this is the defect: got location "${regenerateReplay.location}"`,
+    regenerateReplay.location === calendarPath,
+    `replayed token must redirect to the bare calendar page with no flash, got "${regenerateReplay.location}" (expected "${calendarPath}")`,
   );
 
   const activeAfterReplay = queryRows(

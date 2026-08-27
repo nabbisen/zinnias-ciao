@@ -3674,3 +3674,80 @@ title and button also said "Delete Note," though the action sets
       the rendered copy. `bun run smoke:all`: 25/25, run as a regression
       check only. `node scripts/test-evidence-leakage-baseline.mjs`:
       unchanged at 996.
+
+## RFC-037: the form-token replay test is restored — and had been unable to run at all, not just asserting a stale string
+
+Handoff 037 converted `?flash=Note+removed` to `?flash=note_hidden`
+(`2d2be47`) but never reached the two scripts that verify AD-4's single-use
+form-token replay protection — they kept asserting the old prose value,
+which meant the replay-rejection assertion had gone permanently vacuous
+(no response ever contains that string any more, so `!includes(...)`
+always passed, whether or not replay protection actually worked).
+
+**The deeper finding: the test could not even reach that assertion.**
+Migration `0012_session_provenance.sql` added `sessions.provenance` after
+both scripts were written; `authz.rs`'s `require_membership` has refused
+every NULL-provenance session since — exactly the shape both scripts'
+raw SQL fixture inserts created. The admin confirm page 404'd before either
+script's replay logic ever ran. This is worse than a stale assertion: since
+migration 0012 shipped, this "regression test for AD-4" verified nothing
+at all.
+
+- [x] **`scripts/lib/flash-code.mjs` added** — `flashCodeEmittedBy(handlerRelPath,
+      fnName)` reads the named Rust handler function's source directly and
+      extracts the `?flash=<code>` value it actually emits, throwing
+      loudly if the function or the value can't be found. No flash-code
+      string literal remains in either restored script — this includes
+      `flash=generated` (calendar-token regeneration, sharing
+      `test-form-token-replay-rejected.mjs` with the hide-note scenario),
+      not only the one originally named stale.
+- [x] **Both scripts' fixtures fixed to set `provenance`** on their one
+      manually-inserted admin session, matching the pattern an already-current
+      script (`scripts/smoke/membership-suspension.mjs`) already used. No
+      schema change, no production Rust file touched.
+- [x] **Every replay assertion converted from a negative substring check to
+      a positive, falsifiable one** — asserting exactly what a win or a
+      replay redirects to, not merely what string a response doesn't
+      contain. Independently demonstrated (by the architect, per this
+      package's review) failing against a deliberately broken replay guard,
+      passing once restored, and passing again after the handler's flash
+      code was renamed — proving the derivation, not a hardcoded value,
+      drives the assertion.
+- [x] **A verification-harness hazard found and fixed**: the isolated-Worker
+      test harness (`scripts/lib/isolated-worker-test.mjs`) only *warned*
+      when its copied build artifact was older than the current Rust
+      source, then proceeded to exercise the stale one anyway. This nearly
+      produced exactly the wrong conclusion during the demonstration above
+      — a broken-replay-protection mutation reported success because the
+      unrebuilt artifact silently ran instead. Now a hard failure; a
+      repo-wide sweep found no script depending on the old permissive
+      behavior.
+- [x] **A new gate closes the directory-shaped blind spot the smoke-coverage
+      gate never covered**: `every_top_level_script_is_reachable_by_name_or_documented_exception`
+      requires every `scripts/*.mjs` file to be nameable via a `package.json`
+      script value or a documented exception — the same shape as
+      `every_smoke_script_is_reachable_by_name_or_documented_exception`,
+      one directory up. All 23 top-level scripts already qualify; the gate
+      is purely forward-looking, demonstrated failing when a script's
+      `package.json` entry was temporarily removed, and passing again once
+      restored. It deliberately does not fold any of these scripts into
+      `smoke-all.mjs`'s routine sweep — several (`bootstrap-cloudflare.mjs`,
+      `recover-community-access.mjs`) are operator tools against real
+      infrastructure, not tests, and that is a separate decision, raised
+      not made.
+- [x] **A broader sweep for the same defect class found three more
+      hardcoded flash-code references, all confirmed current** (not
+      stale): `note_saved` (`scripts/smoke/language-preference.mjs`, ×2),
+      `ui_language_updated`, and `display_name_updated`. None needed
+      fixing; they carry the same latent fragility the two restored
+      scripts had before this package, and deriving them proactively is a
+      candidate for a future package, not acted on here.
+- [x] `cargo test --workspace --no-fail-fast`: 666/666 passing (0 failing,
+      +1 for the new top-level coverage gate). `--features dev_fake_issuer`:
+      669/669 (+1). `bun run test:form-token-replay-rejected` now passes.
+      `bun run evidence:e4-concurrency` still fails, for a reason confirmed
+      unrelated and pre-existing (a hardcoded event date has fallen into
+      the past — the same wall-clock-drift class already fixed once for
+      `smoke:recurrence`); verified correct via a discarded, gitignored
+      scratch copy instead of regenerating any tracked evidence artifact.
+      `bun run smoke:all`: 25/25. Evidence baseline unchanged at 996.

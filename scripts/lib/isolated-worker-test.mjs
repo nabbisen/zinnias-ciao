@@ -13,8 +13,19 @@ const repositoryRoot = resolve(scriptsDir, '..');
 // rebuilding from source (see `bun run build`). A Rust source change with no
 // rebuild in between silently produces confidently wrong evidence — every
 // test using this harness would keep exercising the old compiled behavior.
-// Warn (not fail — some workflows may intentionally pin an older artifact)
-// whenever the artifact predates the newest file under `workers/ssr/src/`.
+//
+// RFC-037 replay-test restoration (Handoff, 2026-08-26): this was originally
+// a warning, not a failure, on the stated theory that "some workflows may
+// intentionally pin an older artifact." That theory had no actual instance —
+// a repo-wide grep found no script depending on the permissive behavior, and
+// this exact guard silently let a Part C demonstration nearly reach the wrong
+// conclusion (a broken-replay-protection mutation reported `ok:true` because
+// the stale artifact was silently exercised instead of the rebuilt one). A
+// verification harness that can knowingly run stale code and still print
+// green is a false-negative generator — the same class as the run-set
+// blind spot this same package's Part D closes elsewhere. Fail loudly now;
+// if a real pin-an-older-artifact workflow ever needs this back, that is a
+// design decision to make explicitly, not a default to fall into silently.
 async function newestMtimeUnder(dir) {
   let newest = 0;
   const entries = await readdir(dir, { withFileTypes: true });
@@ -30,7 +41,7 @@ async function newestMtimeUnder(dir) {
   return newest;
 }
 
-async function warnIfWorkerArtifactIsStale() {
+async function failIfWorkerArtifactIsStale() {
   const sourceDir = join(repositoryRoot, 'workers', 'ssr', 'src');
   const artifactPath = join(repositoryRoot, 'workers', 'ssr', 'build', 'index.js');
   let sourceNewest;
@@ -42,16 +53,16 @@ async function warnIfWorkerArtifactIsStale() {
     ]);
   } catch {
     // Either path is missing; the artifact copy step just below will fail
-    // loudly with a clearer message than a staleness warning would give.
+    // loudly with a clearer message than a staleness check would give.
     return;
   }
   if (artifactMtime < sourceNewest) {
-    console.warn(
-      '\n⚠️  workers/ssr/build/index.js is older than the newest file under '
+    throw new Error(
+      'workers/ssr/build/index.js is older than the newest file under '
       + 'workers/ssr/src/ — this isolated Worker test copies that pre-built '
-      + 'artifact rather than rebuilding, so it is about to exercise stale '
-      + 'compiled behavior. Run `bun run build` first if you changed Rust '
-      + 'source and expect this run to reflect it.\n',
+      + 'artifact rather than rebuilding, so it would silently exercise stale '
+      + 'compiled behavior and could report success against code that no '
+      + 'longer exists. Run `bun run build` first.',
     );
   }
 }
@@ -244,7 +255,7 @@ export async function prepareIsolatedWorkerTest(
   });
   await chmod(canaryPath, 0o600);
 
-  await warnIfWorkerArtifactIsStale();
+  await failIfWorkerArtifactIsStale();
   const workerArtifacts = join(root, 'worker-build');
   const isolatedMigrations = join(root, 'migrations');
   await cp(join(repositoryRoot, 'workers', 'ssr', 'build'), workerArtifacts, {
